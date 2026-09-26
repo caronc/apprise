@@ -40,6 +40,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_phone_no,
@@ -172,7 +173,7 @@ class NotifyMSG91(NotifyBase):
                 f"({authkey}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Template ID
         self.template = validate_regex(
@@ -181,7 +182,7 @@ class NotifyMSG91(NotifyBase):
         if not self.template:
             msg = f"An invalid MSG91 Template ID ({template}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if short_url is None:
             self.short_url = self.template_args["short_url"]["default"]

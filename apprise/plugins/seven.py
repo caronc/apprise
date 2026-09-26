@@ -34,6 +34,7 @@ import json
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_phone_no, parse_bool, parse_phone_no
 from .base import NotifyBase
@@ -137,7 +138,7 @@ class NotifySeven(NotifyBase):
         if not self.apikey:
             msg = f"An invalid seven API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.source = None if not isinstance(source, str) else source.strip()
         self.flash = (
@@ -206,6 +207,12 @@ class NotifySeven(NotifyBase):
         while len(targets):
             # Get our target to notify
             target = targets.pop(0)
+
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             # Prepare our user
             payload["to"] = f"+{target}"
             # Some Debug Logging
@@ -285,6 +292,10 @@ class NotifySeven(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
+
         return not has_error
 
     def url(self, privacy=False, *args, **kwargs):

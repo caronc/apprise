@@ -32,6 +32,7 @@ import re
 import requests
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -158,7 +159,7 @@ class NotifyNotifiarr(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Notifiarr APIKey ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Place a thumbnail image inline with the message body
         self.include_image = (
@@ -181,7 +182,7 @@ class NotifyNotifiarr(NotifyBase):
                     f"({event}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
 
         # Prepare our targets
         self.targets = {
@@ -287,6 +288,11 @@ class NotifyNotifiarr(NotifyBase):
                     mentions["content"].append(f"<@{no}>")
 
         for _idx, channel in enumerate(self.targets["channels"]):
+            # Skip a channel that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(channel):
+                continue
+
             # prepare Notifiarr Object
             payload = {
                 "source": self.source if self.source else self.app_id,
@@ -336,6 +342,10 @@ class NotifyNotifiarr(NotifyBase):
 
             if not self._send(payload):
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this channel.
+            self.mark_delivered(channel)
 
         return not has_error
 

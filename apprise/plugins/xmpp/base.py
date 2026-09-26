@@ -33,6 +33,7 @@ import re
 from typing import Any, Optional
 
 from ...common import NotifyType
+from ...exception import AppriseImproperlyConfigured
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
 from ...utils.parse import parse_bool, parse_list, validate_regex
@@ -208,7 +209,7 @@ class NotifyXMPP(NotifyBase):
         except ValueError:
             msg = f"An invalid XMPP JID ({self.user}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         self.targets: list[(str, str)] = []
         # Flag for tracking if we want Multi-User Chat function enabled
@@ -240,7 +241,7 @@ class NotifyXMPP(NotifyBase):
                     f"({secure_mode}) is invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         else:
             self.secure_mode = (
@@ -422,33 +423,50 @@ class NotifyXMPP(NotifyBase):
 
         subject = title if self.subject else ""
 
+        # Leave out anything that was already reached on an earlier attempt
+        # so a retry does not deliver the same message twice.
+        targets = [t for t in self.targets if not self.is_delivered(t)]
+        if self.targets and not targets:
+            # They all arrived the first time around
+            return True
+
         try:
             if self.keepalive and self._adapter:
                 # Reuse existing adapter
-                return self._adapter.send_message(
-                    targets=self.targets,
+                result = self._adapter.send_message(
+                    targets=targets,
                     subject=subject,
                     body=body,
                 )
 
-            adapter_kwargs = {
-                "config": config,
-                "targets": self.targets,
-                "subject": subject,
-                "body": body,
-                "timeout": self.socket_connect_timeout,
-                "roster": self.roster,
-                "keepalive": self.keepalive,
-                "want_muc": self.want_muc,
-                "default_nickname": self.name,
-            }
-            if not self.keepalive:
-                # One-shot mode: Create, process, and discard
-                return SlixmppAdapter(**adapter_kwargs).process()
+            else:
+                adapter_kwargs = {
+                    "config": config,
+                    "targets": targets,
+                    "subject": subject,
+                    "body": body,
+                    "timeout": self.socket_connect_timeout,
+                    "roster": self.roster,
+                    "keepalive": self.keepalive,
+                    "want_muc": self.want_muc,
+                    "default_nickname": self.name,
+                }
+                if not self.keepalive:
+                    # One-shot mode: Create, process, and discard
+                    result = SlixmppAdapter(**adapter_kwargs).process()
 
-            # Keepalive mode, reuse a single adapter instance
-            self._adapter = SlixmppAdapter(**adapter_kwargs)
-            return self._adapter.send_message()
+                else:
+                    # Keepalive mode, reuse a single adapter instance
+                    self._adapter = SlixmppAdapter(**adapter_kwargs)
+                    result = self._adapter.send_message()
+
+            if result:
+                # Our sender works through the list in one pass, so a good
+                # result means every one of them was written out.
+                for target in targets:
+                    self.mark_delivered(target)
+
+            return result
 
         except XMPPChannelBindingError:
             # The server rejected SASL SCRAM-PLUS channel binding.
@@ -497,7 +515,7 @@ class NotifyXMPP(NotifyBase):
         raw = (value or "").strip()
         results = IS_JID.match(raw)
         if not results:
-            raise ValueError("Invalid JID")
+            raise AppriseImproperlyConfigured("Invalid JID")
 
         is_muc = bool(results.group("is_room"))
         host = results.group("domain") or default_host

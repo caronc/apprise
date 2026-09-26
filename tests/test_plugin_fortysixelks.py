@@ -137,7 +137,9 @@ def test_plugin_46elks_edge_cases(mock_post):
 
     obj = Apprise.instantiate(f"46elks://{user}:{password}@{phone}")
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 

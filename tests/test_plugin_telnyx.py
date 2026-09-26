@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.telnyx import NotifyTelnyx
 
 logging.disable(logging.CRITICAL)
@@ -45,21 +46,21 @@ apprise_url_tests = (
         "telnyx://",
         {
             # Instantiated but no auth, so no notification can happen
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "telnyx://:@/",
         {
             # invalid token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "telnyx://{}:{}@{}".format("u" * 10, "p" * 10, "3" * 5),
         {
             # invalid source number provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

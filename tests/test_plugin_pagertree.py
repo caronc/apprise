@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pagertree import NotifyPagerTree
 
 logging.disable(logging.CRITICAL)
@@ -46,14 +47,14 @@ apprise_url_tests = (
         "pagertree://",
         {
             # Missing Integration ID
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid Integration ID
     (
         "pagertree://%s" % ("+" * 24),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Minimum requirements met
@@ -87,7 +88,7 @@ apprise_url_tests = (
     (
         "pagertree://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -172,5 +173,5 @@ def test_plugin_pagertree_general(mock_post):
     mock_post.return_value.status_code = requests.codes.ok
 
     # Invalid thirdparty id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPagerTree(integration=INTEGRATION_ID, thirdparty="   ")

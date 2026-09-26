@@ -31,6 +31,7 @@ import requests
 
 from ..attachment.base import AttachBase
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_list, validate_regex
 from .base import NotifyBase
@@ -98,7 +99,7 @@ class NotifyPushBullet(NotifyBase):
             },
             "target_email": {
                 "name": _("Target Email"),
-                "type": "string",
+                "type": "email",
                 "map_to": "targets",
             },
             "targets": {
@@ -130,7 +131,7 @@ class NotifyPushBullet(NotifyBase):
                 f"({accesstoken}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.targets = parse_list(targets)
         if len(self.targets) == 0:
@@ -240,6 +241,11 @@ class NotifyPushBullet(NotifyBase):
         while len(targets):
             recipient = targets.pop(0)
 
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(recipient):
+                continue
+
             # prepare payload
             payload = {
                 "type": "note",
@@ -272,7 +278,8 @@ class NotifyPushBullet(NotifyBase):
                     f"PushBullet recipient {recipient} parsed as a device"
                 )
 
-            if body:
+            body_key = ("body", recipient)
+            if body and not self.is_delivered(body_key):
                 okay, response = self._send(
                     self.notify_url.format("pushes"), payload
                 )
@@ -283,8 +290,18 @@ class NotifyPushBullet(NotifyBase):
                 self.logger.info(
                     f'Sent PushBullet notification to "{recipient}".'
                 )
+                self.mark_delivered(body_key)
 
-            for attach_payload in attachments:
+            attachments_ok = True
+            for attachment_no, attach_payload in enumerate(attachments):
+                attachment_key = (
+                    "attachment",
+                    recipient,
+                    attachment_no,
+                )
+                if self.is_delivered(attachment_key):
+                    continue
+
                 # Send our attachments to our same user (already prepared as
                 # our payload object)
                 okay, response = self._send(
@@ -292,6 +309,7 @@ class NotifyPushBullet(NotifyBase):
                 )
                 if not okay:
                     has_error = True
+                    attachments_ok = False
                     continue
 
                 self.logger.info(
@@ -299,6 +317,11 @@ class NotifyPushBullet(NotifyBase):
                         attach_payload["file_name"], recipient
                     )
                 )
+                self.mark_delivered(attachment_key)
+
+            if attachments_ok:
+                # Delivered; a retry can safely skip this target.
+                self.mark_delivered(recipient)
 
         return not has_error
 

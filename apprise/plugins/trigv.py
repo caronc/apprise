@@ -47,6 +47,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_list, validate_regex
 from .base import NotifyBase
@@ -221,7 +222,7 @@ class NotifyTrigv(NotifyBase):
         if not self.api_key:
             msg = f"An invalid Trigv API Key ({api_key}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Build our list of channels to notify; validate each one as
         # we go so a single bad entry fails loudly instead of silently
@@ -233,7 +234,7 @@ class NotifyTrigv(NotifyBase):
                     f"An invalid Trigv channel slug ({target}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             self.targets.append(channel)
 
@@ -265,7 +266,7 @@ class NotifyTrigv(NotifyBase):
         if self.urgency not in TRIGV_URGENCIES:
             msg = f"An invalid Trigv urgency ({urgency}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # A custom hostname (e.g. a local/self-hosted ingest gateway)
         # overrides our default api.trigv.com endpoint; a port can be
@@ -300,6 +301,11 @@ class NotifyTrigv(NotifyBase):
         has_error = False
 
         for channel in self.targets:
+            # Skip a channel that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(channel):
+                continue
+
             # Prepare our payload
             payload = {
                 "channel": channel,
@@ -378,6 +384,10 @@ class NotifyTrigv(NotifyBase):
                 )
                 self.logger.debug(f"Socket Exception: {e!s}")
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this channel.
+            self.mark_delivered(channel)
 
         return not has_error
 

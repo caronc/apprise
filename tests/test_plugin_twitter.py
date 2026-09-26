@@ -36,6 +36,8 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
+from apprise.plugins.base import _delivery_tracker
 from apprise.plugins.twitter import NotifyTwitter
 
 # Disable logging for a cleaner testing output
@@ -56,34 +58,34 @@ apprise_url_tests = (
         "twitter://",
         {
             # Missing Consumer API Key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "twitter://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "twitter://consumer_key",
         {
             # Missing Keys
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "twitter://consumer_key/consumer_secret/",
         {
             # Missing Keys
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "twitter://consumer_key/consumer_secret/atoken1/",
         {
             # Missing Access Secret
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -208,7 +210,7 @@ apprise_url_tests = (
         "twitter://user@ckey/csecret/atoken13/access_secret?mode=invalid",
         {
             # An invalid mode
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -618,16 +620,16 @@ def test_plugin_twitter_garbage_responses(mocker):
 def test_plugin_twitter_edge_cases():
     """NotifyTwitter() Edge Cases."""
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwitter(ckey=None, csecret=None, akey=None, asecret=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwitter(ckey="value", csecret=None, akey=None, asecret=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwitter(ckey="value", csecret="value", akey=None, asecret=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwitter(
             ckey="value", csecret="value", akey="value", asecret=None
         )
@@ -660,7 +662,9 @@ def test_plugin_twitter_edge_cases():
     )
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -692,7 +696,9 @@ def test_plugin_twitter_dm_caching(
 
     # Send the first notification.
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -717,7 +723,9 @@ def test_plugin_twitter_dm_caching(
 
     # Send another notification.
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -757,15 +765,21 @@ def test_plugin_twitter_dm_attachments_basic(
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     # Send our notification.
-    assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        assert (
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
+            )
+            is True
         )
-        is True
-    )
+    finally:
+        _delivery_tracker.reset(tracker_token)
 
     # Test call counts.
     assert mock_get.call_count == 1
@@ -801,11 +815,13 @@ def test_plugin_twitter_dm_attachments_message_fails(
 
     # Send our notification; it will fail because of the message response.
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -836,11 +852,13 @@ def test_plugin_twitter_dm_attachments_upload_fails(
 
     # Send our notification; it will fail because of the media response.
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -868,11 +886,13 @@ def test_plugin_twitter_dm_attachments_invalid_attachment(
     )
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -884,6 +904,7 @@ def test_plugin_twitter_dm_attachments_invalid_attachment(
 def test_plugin_twitter_dm_attachments_multiple(
     mocker, twitter_url, good_message_response, good_media_response
 ):
+    """Verify multiple attachments are included with a direct message."""
 
     mock_post = mocker.patch("requests.post")
 
@@ -911,15 +932,21 @@ def test_plugin_twitter_dm_attachments_multiple(
     # Create application objects.
     obj = Apprise.instantiate(twitter_url)
 
-    assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        assert (
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
+            )
+            is True
         )
-        is True
-    )
+    finally:
+        _delivery_tracker.reset(tracker_token)
 
     assert mock_post.call_count == 8
     # First 4 calls are v2 media uploads
@@ -958,6 +985,7 @@ def test_plugin_twitter_dm_attachments_multiple(
 def test_plugin_twitter_dm_attachments_multiple_oserror(
     mocker, twitter_url, good_message_response, good_media_response
 ):
+    """Verify a file error during multi-attachment DM delivery is handled."""
 
     # Inject an `OSError` into the middle of the operation.
     mock_post = mocker.patch("requests.post")
@@ -976,11 +1004,13 @@ def test_plugin_twitter_dm_attachments_multiple_oserror(
 
     # We'll fail to send this time
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -1011,11 +1041,13 @@ def test_plugin_twitter_tweet_attachments_basic(
 
     # Send our notification
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1059,11 +1091,13 @@ def test_plugin_twitter_tweet_attachments_more_logging(
 
     # Send our notification
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1082,6 +1116,7 @@ def test_plugin_twitter_tweet_attachments_more_logging(
 def test_plugin_twitter_tweet_attachments_bad_message_response(
     mock_post, twitter_url, good_media_response, bad_message_response
 ):
+    """Verify a failed tweet response fails attachment delivery."""
 
     mock_post.side_effect = [good_media_response, bad_message_response]
 
@@ -1092,11 +1127,13 @@ def test_plugin_twitter_tweet_attachments_bad_message_response(
 
     # Our notification will fail now since our tweet will error out.
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -1112,9 +1149,10 @@ def test_plugin_twitter_tweet_attachments_bad_message_response(
 
 
 @patch("requests.post")
-def test_plugin_twitter_tweet_attachments_bad_message_response_unparseable(
+def test_plugin_twitter_unparseable_attachment_error(
     mock_post, twitter_url, good_media_response
 ):
+    """Verify an unparseable tweet failure response is handled."""
 
     bad_message_response = bad_response("")
     mock_post.side_effect = [good_media_response, bad_message_response]
@@ -1128,11 +1166,13 @@ def test_plugin_twitter_tweet_attachments_bad_message_response_unparseable(
     # This is the same test as above, except that the error response is not
     # parseable.
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -1151,6 +1191,7 @@ def test_plugin_twitter_tweet_attachments_bad_message_response_unparseable(
 def test_plugin_twitter_tweet_attachments_upload_fails(
     mock_post, twitter_url, good_media_response
 ):
+    """Verify a failed media upload prevents tweet delivery."""
 
     # Prepare a bad tweet response.
     bad_tweet_response = bad_response({})
@@ -1165,11 +1206,13 @@ def test_plugin_twitter_tweet_attachments_upload_fails(
 
     # Send our notification; it will fail because of the message response.
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -1188,6 +1231,7 @@ def test_plugin_twitter_tweet_attachments_upload_fails(
 def test_plugin_twitter_tweet_attachments_invalid_attachment(
     mock_post, twitter_url, good_message_response, good_media_response
 ):
+    """Verify an invalid tweet attachment is rejected cleanly."""
 
     mock_post.side_effect = [good_media_response, good_message_response]
 
@@ -1200,11 +1244,13 @@ def test_plugin_twitter_tweet_attachments_invalid_attachment(
 
     # An invalid attachment will cause a failure.
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -1217,6 +1263,7 @@ def test_plugin_twitter_tweet_attachments_invalid_attachment(
 def test_plugin_twitter_tweet_attachments_multiple_batch(
     mock_post, twitter_url, good_message_response, good_media_response
 ):
+    """Verify multiple tweet attachments are sent in batch mode."""
 
     mock_post.side_effect = [
         good_media_response,
@@ -1243,11 +1290,13 @@ def test_plugin_twitter_tweet_attachments_multiple_batch(
     ]
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1282,6 +1331,7 @@ def test_plugin_twitter_tweet_attachments_multiple_batch(
 def test_plugin_twitter_tweet_attachments_multiple_nobatch(
     mock_post, twitter_url, good_message_response, good_media_response
 ):
+    """Verify multiple tweet attachments are sent without batch mode."""
 
     mock_post.side_effect = [
         good_media_response,
@@ -1308,11 +1358,13 @@ def test_plugin_twitter_tweet_attachments_multiple_nobatch(
     ]
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1349,6 +1401,7 @@ def test_plugin_twitter_tweet_attachments_multiple_nobatch(
 def test_plugin_twitter_tweet_attachments_multiple_oserror(
     mock_post, twitter_url, good_media_response
 ):
+    """Verify file errors during multi-attachment tweets are handled."""
 
     # We have an OSError thrown in the middle of our preparation
     mock_post.side_effect = [good_media_response, OSError()]
@@ -1364,11 +1417,13 @@ def test_plugin_twitter_tweet_attachments_multiple_oserror(
     # We'll fail to send this time
     obj = Apprise.instantiate(twitter_url + "?mode=tweet")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -1419,11 +1474,13 @@ def test_plugin_twitter_tweet_attachments_jpeg_before_gif(
     ]
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )

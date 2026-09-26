@@ -31,6 +31,7 @@ import logging
 from helpers import AppriseURLTester
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.splunk import NotifySplunk
 
 logging.disable(logging.CRITICAL)
@@ -40,32 +41,32 @@ apprise_url_tests = (
     (
         "splunk://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "splunk://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "splunk://routekey@%badapi%",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "splunk://abc123",
         {
             # No route key provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "splunk://%badroute%@apikey",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -220,7 +221,7 @@ apprise_url_tests = (
         "splunk://db@apikey?action=invalid",
         {
             # Invalid Action
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -234,14 +235,14 @@ apprise_url_tests = (
         "splunk://db@apikey?:invalid=critical",
         {
             # A bad Apprise Notification Type was provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "splunk://db@apikey?:warning=invalid",
         {
             # A bad Splunk Notification Type was provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

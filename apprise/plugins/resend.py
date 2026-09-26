@@ -47,6 +47,7 @@ import requests
 
 from .. import exception
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_emails, validate_regex
 from ..utils.sanitize import sanitize_payload
@@ -112,12 +113,12 @@ class NotifyResend(NotifyBase):
             },
             "from_addr": {
                 "name": _("Source Email"),
-                "type": "string",
+                "type": "email",
                 "required": True,
             },
             "target_email": {
                 "name": _("Target Email"),
-                "type": "string",
+                "type": "email",
                 "map_to": "targets",
             },
             "targets": {
@@ -185,7 +186,7 @@ class NotifyResend(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Resend API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Acquire Targets (To Emails)
         self.targets = []
@@ -207,7 +208,7 @@ class NotifyResend(NotifyBase):
             # Invalid from
             msg = "Invalid ~From~ email specified: {}".format(from_addr)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # initialize our from address
         self.from_addr = (
@@ -446,6 +447,11 @@ class NotifyResend(NotifyBase):
         while len(targets) > 0:
             target = targets.pop(0)
 
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             # Create a copy of our template
             payload = payload_.copy()
 
@@ -550,6 +556,9 @@ class NotifyResend(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 

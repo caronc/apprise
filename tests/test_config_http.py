@@ -37,6 +37,7 @@ import requests
 from apprise import NotificationManager
 from apprise.common import ConfigFormat
 from apprise.config.http import ConfigHTTP
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins import NotifyBase
 
 logging.disable(logging.CRITICAL)
@@ -121,6 +122,14 @@ def test_config_http(mock_post):
     # one entry added
     assert len(ch) == 1
 
+    # Password-only administrator credentials preserve the empty username.
+    results = ConfigHTTP.parse_url("http://:pass@localhost/path/")
+    assert isinstance(results, dict)
+    ch = ConfigHTTP(**results)
+    assert ch.url(privacy=False).startswith("http://:pass@localhost/path/")
+    assert isinstance(ch.read(), str) is True
+    assert mock_post.call_args.kwargs["auth"] == ("", "pass")
+
     results = ConfigHTTP.parse_url("http://localhost:8080/path/")
     assert isinstance(results, dict)
     ch = ConfigHTTP(**results)
@@ -171,7 +180,7 @@ def test_config_http(mock_post):
     # make another remote request
     mock_post.reset_mock()
     assert ch
-    assert len(ch.servers()) == 1
+    assert len(ch.services()) == 1
     assert len(ch) == 1
 
     # No remote post has been made
@@ -181,7 +190,7 @@ def test_config_http(mock_post):
         # even with 10 seconds elapsed, no fetch will be made
         assert ch.expired() is False
         assert ch
-        assert len(ch.servers()) == 1
+        assert len(ch.services()) == 1
         assert len(ch) == 1
 
     # No remote post has been made
@@ -191,7 +200,7 @@ def test_config_http(mock_post):
         # but 30+ seconds from now is considered expired
         assert ch.expired() is True
         assert ch
-        assert len(ch.servers()) == 1
+        assert len(ch.services()) == 1
         assert len(ch) == 1
 
     # Our content would have been renewed with a single new fetch
@@ -207,7 +216,7 @@ def test_config_http(mock_post):
 
     results = ConfigHTTP.parse_url("http://localhost:8080/path/?cache=-10")
     assert isinstance(results, dict)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         ch = ConfigHTTP(**results)
 
     results = ConfigHTTP.parse_url("http://user@localhost?format=text")

@@ -22,5 +22,5 @@ hidapi
 # Provides smpp:// support
 smpplib
 
-# For xmpp:// support
-slixmpp >= 1.16.0
+# For xmpp:// support (slixmpp 1.16.0+ needs Python 3.11 or newer)
+slixmpp >= 1.16.0; python_version >= '3.11'

@@ -93,15 +93,29 @@ class AppriseTag:
             return value
         m = _RE_TAG.match(str(value).strip())
         if m:
-            return cls(
-                tag=m.group("tag"),
-                priority=int(m.group("priority") or 0),
-                retry=(
+            # Treat numeric fields beyond Python's conversion limit as absent.
+            # A rejected priority must not trigger exact-priority dispatch.
+            has_priority = m.group("priority") is not None
+            try:
+                priority = int(m.group("priority") or 0)
+            except ValueError:
+                priority = 0
+                has_priority = False
+
+            try:
+                retry = (
                     int(m.group("retry"))
                     if m.group("retry") is not None
                     else None
-                ),
-                has_priority=m.group("priority") is not None,
+                )
+            except ValueError:
+                retry = None
+
+            return cls(
+                tag=m.group("tag"),
+                priority=priority,
+                retry=retry,
+                has_priority=has_priority,
             )
         # Fallback: store raw value as name (no priority/retry)
         return cls(tag=str(value).strip().lower())

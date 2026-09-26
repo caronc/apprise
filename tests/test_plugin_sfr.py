@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.sfr import NotifySFR
 
 logging.disable(logging.CRITICAL)
@@ -62,91 +63,91 @@ apprise_url_tests = (
         "sfr://",
         {
             # No host specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sfr://:@/",
         {
             # Invalid host
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sfr://:service_password",
         {
             # No user specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sfr://testing:serv@ice_password",
         {
             # Invalid Password
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sfr://testing:service_password@/5555555555",
         {
             # No spaceId provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sfr://testing:service_password@12345/",
         {
             # No target provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         f"sfr://:service_password@12345/{3 * 13}",
         {
             # No host but everything else provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sfr://:service_password@space_id/targets?media=TEST",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sfr://service_id:",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sfr://service_id:@",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sfr://service_id:@{}".format("0" * 3),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sfr://service_id:@{}/".format("0" * 3),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sfr://service_id:@{}/targets".format("0" * 3),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sfr://service_id:@{}/targets?media=TEST".format("0" * 3),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -392,7 +393,7 @@ def test_plugin_sfr_notification_multiple_targets_all_ko(mock_post):
     assert results["sender"] == ""
 
     # No valid phone number provided
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySFR(**results)
 
 
@@ -588,7 +589,7 @@ def test_plugin_sfr_failure(mock_post):
     mock_post.return_value = response
 
     # Invalid service_id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySFR(
             user=None,
             password="service_password",
@@ -597,7 +598,7 @@ def test_plugin_sfr_failure(mock_post):
         )
 
     # Invalid service_password
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySFR(
             user="service_id",
             password=None,
@@ -606,7 +607,7 @@ def test_plugin_sfr_failure(mock_post):
         )
 
     # Invalid space_id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySFR(
             user="service_id",
             password="service_password",
@@ -615,7 +616,7 @@ def test_plugin_sfr_failure(mock_post):
         )
 
     # Invalid targets
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySFR(
             user="service_id",
             password="service_password",

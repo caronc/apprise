@@ -34,6 +34,7 @@ import re
 import requests
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, parse_list, validate_regex
@@ -122,7 +123,7 @@ class NotifyLine(NotifyBase):
         if not self.token:
             msg = f"An invalid Access Token ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Display our Apprise Image
         self.include_image = include_image
@@ -180,6 +181,11 @@ class NotifyLine(NotifyBase):
         while len(targets):
             target = targets.pop(0)
 
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             payload["to"] = target
 
             self.logger.debug(
@@ -236,6 +242,9 @@ class NotifyLine(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 

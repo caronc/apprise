@@ -62,7 +62,8 @@ notification services. It supports sending alerts to platforms such as: \
 `APRS`, \
 `AWS SES`, `AWS SNS`, `Bark`, `Blink(1)`, `BlueSky`, `Brevo`, \
 `Burst SMS`, `BulkSMS`, `BulkVS`, \
-`Chanify`, `Clickatell`, `ClickSend`, `DAPNET`, `DingTalk`, `Discord`, \
+`Chanify`, `Clickatell`, `ClickSend`, `DAPNET`, `Delta Chat`, \
+`DingTalk`, `Discord`, \
 `Dot. (Quote/0)`, `E-Mail`, `Emby`, `Evolution API`, `Exotel`, \
 `FCM`, `Feishu`, `Flock`, `Flowtriq`, `Fluxer`, `Free Mobile`, `Google Chat`, \
 `Gotify`, `GroupMe`, `Growl`, `Guilded`, `Home Assistant`, `httpSMS`, \
@@ -72,7 +73,7 @@ notification services. It supports sending alerts to platforms such as: \
 `MailerSend`, \
 `Mastodon`, \
 `Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
-`Microsoft Teams`, `Misskey`, \
+`Microsoft Teams`, `Misskey`, `Mobile Message`, \
 `MQTT`, `MSG91`, `MyAndroid`, `Nexmo`, `Nextcloud`, \
 `NextcloudTalk`, `Notica`, `Notifiarr`, `Notifico`, \
 `Notifyre`, \
@@ -138,6 +139,7 @@ BuildRequires: python3dist(setuptools) >= 69
 
 BuildRequires: python3dist(wheel)
 BuildRequires: python3dist(requests)
+BuildRequires: python3dist(urllib3)
 BuildRequires: python3dist(requests-oauthlib)
 BuildRequires: python3dist(click) >= 5.0
 BuildRequires: python3dist(markdown)
@@ -153,6 +155,7 @@ BuildRequires: python3dist(pytest-mock)
 %endif
 
 Requires: python3dist(requests)
+Requires: python3dist(urllib3)
 Requires: python3dist(requests-oauthlib)
 Requires: python3dist(markdown)
 Requires: python3dist(cryptography)
@@ -236,13 +239,51 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 # Handle egg-info vs. dist-info based on build backend
 %{python3_sitelib}/apprise-*.egg-info
 # Legacy: include all compiled locales that we produced under the package tree
+%lang(ar) %{python3_sitelib}/%{pypi_name}/i18n/ar/LC_MESSAGES/apprise.mo
+%lang(de) %{python3_sitelib}/%{pypi_name}/i18n/de/LC_MESSAGES/apprise.mo
 %lang(en) %{python3_sitelib}/%{pypi_name}/i18n/en/LC_MESSAGES/apprise.mo
+%lang(es) %{python3_sitelib}/%{pypi_name}/i18n/es/LC_MESSAGES/apprise.mo
+%lang(fr) %{python3_sitelib}/%{pypi_name}/i18n/fr/LC_MESSAGES/apprise.mo
+%lang(hi) %{python3_sitelib}/%{pypi_name}/i18n/hi/LC_MESSAGES/apprise.mo
+%lang(id) %{python3_sitelib}/%{pypi_name}/i18n/id/LC_MESSAGES/apprise.mo
+%lang(it) %{python3_sitelib}/%{pypi_name}/i18n/it/LC_MESSAGES/apprise.mo
+%lang(ja) %{python3_sitelib}/%{pypi_name}/i18n/ja/LC_MESSAGES/apprise.mo
+%lang(ko) %{python3_sitelib}/%{pypi_name}/i18n/ko/LC_MESSAGES/apprise.mo
+%lang(ms) %{python3_sitelib}/%{pypi_name}/i18n/ms/LC_MESSAGES/apprise.mo
+%lang(nl) %{python3_sitelib}/%{pypi_name}/i18n/nl/LC_MESSAGES/apprise.mo
+%lang(pl) %{python3_sitelib}/%{pypi_name}/i18n/pl/LC_MESSAGES/apprise.mo
+%lang(pt) %{python3_sitelib}/%{pypi_name}/i18n/pt/LC_MESSAGES/apprise.mo
+%lang(ru) %{python3_sitelib}/%{pypi_name}/i18n/ru/LC_MESSAGES/apprise.mo
+%lang(th) %{python3_sitelib}/%{pypi_name}/i18n/th/LC_MESSAGES/apprise.mo
+%lang(tl) %{python3_sitelib}/%{pypi_name}/i18n/tl/LC_MESSAGES/apprise.mo
+%lang(tr) %{python3_sitelib}/%{pypi_name}/i18n/tr/LC_MESSAGES/apprise.mo
+%lang(vi) %{python3_sitelib}/%{pypi_name}/i18n/vi/LC_MESSAGES/apprise.mo
+%lang(zh) %{python3_sitelib}/%{pypi_name}/i18n/zh/LC_MESSAGES/apprise.mo
 %else
 # Handle egg-info vs. dist-info based on build backend
 %{python3_sitelib}/apprise-*.dist-info/
 # Localised Files
 %exclude %{python3_sitelib}/%{pypi_name}/i18n/
+%lang(ar) %{python3_sitelib}/%{pypi_name}/i18n/ar/LC_MESSAGES/apprise.mo
+%lang(de) %{python3_sitelib}/%{pypi_name}/i18n/de/LC_MESSAGES/apprise.mo
 %lang(en) %{python3_sitelib}/%{pypi_name}/i18n/en/LC_MESSAGES/apprise.mo
+%lang(es) %{python3_sitelib}/%{pypi_name}/i18n/es/LC_MESSAGES/apprise.mo
+%lang(fr) %{python3_sitelib}/%{pypi_name}/i18n/fr/LC_MESSAGES/apprise.mo
+%lang(hi) %{python3_sitelib}/%{pypi_name}/i18n/hi/LC_MESSAGES/apprise.mo
+%lang(id) %{python3_sitelib}/%{pypi_name}/i18n/id/LC_MESSAGES/apprise.mo
+%lang(it) %{python3_sitelib}/%{pypi_name}/i18n/it/LC_MESSAGES/apprise.mo
+%lang(ja) %{python3_sitelib}/%{pypi_name}/i18n/ja/LC_MESSAGES/apprise.mo
+%lang(ko) %{python3_sitelib}/%{pypi_name}/i18n/ko/LC_MESSAGES/apprise.mo
+%lang(ms) %{python3_sitelib}/%{pypi_name}/i18n/ms/LC_MESSAGES/apprise.mo
+%lang(nl) %{python3_sitelib}/%{pypi_name}/i18n/nl/LC_MESSAGES/apprise.mo
+%lang(pl) %{python3_sitelib}/%{pypi_name}/i18n/pl/LC_MESSAGES/apprise.mo
+%lang(pt) %{python3_sitelib}/%{pypi_name}/i18n/pt/LC_MESSAGES/apprise.mo
+%lang(ru) %{python3_sitelib}/%{pypi_name}/i18n/ru/LC_MESSAGES/apprise.mo
+%lang(th) %{python3_sitelib}/%{pypi_name}/i18n/th/LC_MESSAGES/apprise.mo
+%lang(tl) %{python3_sitelib}/%{pypi_name}/i18n/tl/LC_MESSAGES/apprise.mo
+%lang(tr) %{python3_sitelib}/%{pypi_name}/i18n/tr/LC_MESSAGES/apprise.mo
+%lang(vi) %{python3_sitelib}/%{pypi_name}/i18n/vi/LC_MESSAGES/apprise.mo
+%lang(zh) %{python3_sitelib}/%{pypi_name}/i18n/zh/LC_MESSAGES/apprise.mo
 %endif
 
 %files -n %{pypi_name}

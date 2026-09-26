@@ -32,6 +32,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list, validate_regex
@@ -131,7 +132,7 @@ class NotifyPushed(NotifyBase):
                 f"An invalid Pushed Application Key ({app_key}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Access Secret (associated with project)
         self.app_secret = validate_regex(app_secret)
@@ -141,7 +142,7 @@ class NotifyPushed(NotifyBase):
                 f"({app_secret}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Initialize channel list
         self.channels = []
@@ -175,7 +176,7 @@ class NotifyPushed(NotifyBase):
                 # explicitly identifying at least one.
                 msg = "No Pushed targets to notify."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         return
 
@@ -221,11 +222,20 @@ class NotifyPushed(NotifyBase):
             # Get Channel
             payload_["target_alias"] = channels.pop(0)
 
+            # Skip a channel that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(("alias", payload_["target_alias"])):
+                continue
+
             if not self._send(
                 payload=payload_, notify_type=notify_type, **kwargs
             ):
                 # toggle flag
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this channel.
+            self.mark_delivered(("alias", payload_["target_alias"]))
 
         # Copy our payload
         payload_ = dict(payload)
@@ -236,11 +246,20 @@ class NotifyPushed(NotifyBase):
             # Get User's Pushed ID
             payload_["pushed_id"] = users.pop(0)
 
+            # Skip a user that already accepted this message so a retry
+            # does not deliver it twice.
+            if self.is_delivered(("user", payload_["pushed_id"])):
+                continue
+
             if not self._send(
                 payload=payload_, notify_type=notify_type, **kwargs
             ):
                 # toggle flag
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this user.
+            self.mark_delivered(("user", payload_["pushed_id"]))
 
         return not has_error
 

@@ -56,6 +56,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
@@ -188,13 +189,13 @@ class NotifySerwerSMS(NotifyBase):
         if not self.user:
             msg = "A SerwerSMS username must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate password
         if not self.password:
             msg = "A SerwerSMS password must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate sender name
         self.sender = validate_regex(
@@ -204,7 +205,7 @@ class NotifySerwerSMS(NotifyBase):
         if not self.sender:
             msg = "A SerwerSMS sender name ({}) is invalid.".format(sender)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Parse our targets into phones and groups
         self.target_phones = []
@@ -280,6 +281,11 @@ class NotifySerwerSMS(NotifyBase):
         ]
 
         for label, extra in calls:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(label):
+                continue
+
             # Assemble the per-target fields
             fields = dict(base_fields)
             fields.update(extra)
@@ -291,6 +297,10 @@ class NotifySerwerSMS(NotifyBase):
                 # Delegate to the MMS helper
                 if not self._send_mms(label, fields, attach, headers):
                     has_error = True
+                    continue
+
+                # Delivered; a retry can safely skip this target.
+                self.mark_delivered(label)
                 continue
 
             # Debug logging
@@ -383,6 +393,9 @@ class NotifySerwerSMS(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(label)
 
         return not has_error
 

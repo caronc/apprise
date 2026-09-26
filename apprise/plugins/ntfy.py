@@ -44,6 +44,7 @@ import requests
 from ..attachment.base import AttachBase
 from ..attachment.memory import AttachMemory
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
@@ -345,7 +346,7 @@ class NotifyNtfy(NotifyBase):
         if self.mode not in NTFY_MODES:
             msg = f"An invalid ntfy Mode ({mode}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Show image associated with notification
         self.include_image = include_image
@@ -362,7 +363,7 @@ class NotifyNtfy(NotifyBase):
                 f"An invalid ntfy Authentication type ({auth}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Attach a file (URL supported)
         self.attach = attach
@@ -464,6 +465,11 @@ class NotifyNtfy(NotifyBase):
             # Retrieve our topic
             topic = topics.pop()
 
+            # Skip a topic that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(topic):
+                continue
+
             if attach and self.attachment_support:
                 # We need to upload our payload first so that we can source it
                 # in remaining messages
@@ -504,6 +510,10 @@ class NotifyNtfy(NotifyBase):
                 if not okay:
                     # Mark our failure, but contiue to move on
                     has_error = True
+                    continue
+
+            # Delivered; a retry can safely skip this topic.
+            self.mark_delivered(topic)
 
         return not has_error
 

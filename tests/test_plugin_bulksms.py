@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.bulksms import NotifyBulkSMS
 
 logging.disable(logging.CRITICAL)
@@ -121,7 +122,7 @@ apprise_url_tests = (
         "bulksms://{}:{}@admin?route=invalid".format("a" * 10, "b" * 10),
         {
             # invalid route
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -139,7 +140,7 @@ apprise_url_tests = (
         ),
         {
             # use get args to acomplish the same thing
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -209,7 +210,9 @@ def test_plugin_bulksms_edge_cases(mock_post):
     )
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 

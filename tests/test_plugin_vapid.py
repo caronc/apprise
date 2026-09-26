@@ -41,6 +41,7 @@ import requests
 
 from apprise import Apprise, asset, exception, url
 from apprise.common import PersistentStoreMode
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.vapid import VAPID_API_LOOKUP, NotifyVapid
 from apprise.plugins.vapid.subscription import (
     WebPushSubscription,
@@ -73,20 +74,20 @@ apprise_url_tests = (
     (
         "vapid://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "vapid://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "vapid://invalid-subscriber",
         {
             # An invalid Subscriber
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -226,7 +227,8 @@ def test_plugin_vapid_urls_with_required_assets(
 
     # Write our subscriptions file to disk
     subscription_file = os.path.join(
-        patch_persistent_store_namespace, NotifyVapid.vapid_subscription_file
+        patch_persistent_store_namespace,
+        WebPushSubscriptionManager.default_filename,
     )
 
     with open(subscription_file, "w") as f:
@@ -301,7 +303,7 @@ def test_plugin_vapid_urls_with_required_assets(
             "vapid://user@example.com/user1?to=user2&ttl=-4000",
             {
                 # bad ttl
-                "instance": TypeError,
+                "instance": AppriseImproperlyConfigured,
             },
         ),
         (
@@ -315,14 +317,14 @@ def test_plugin_vapid_urls_with_required_assets(
             "vapid://user@example.com/user1?to=user2&mode=",
             {
                 # test mode
-                "instance": TypeError,
+                "instance": AppriseImproperlyConfigured,
             },
         ),
         (
             "vapid://user@example.com/user1?to=user2&mode=invalid",
             {
                 # test mode more
-                "instance": TypeError,
+                "instance": AppriseImproperlyConfigured,
             },
         ),
         (
@@ -1060,8 +1062,9 @@ def test_plugin_vapid_prunes_expired_subscriptions(mock_post, tmpdir):
         name="prune",
     )
 
-    # One accepted target makes the ignored expiration non-fatal.
-    assert obj.send("test") is True
+    # An expired endpoint is reported honestly as a failure, even though
+    # another target was accepted.
+    assert obj.send("test") is False
 
     # Remove only the expired subscriptions from disk.
     with open(subfile) as f:
@@ -1105,8 +1108,8 @@ def test_plugin_vapid_prune_write_failure(mock_post, tmpdir):
     "cryptography" not in sys.modules, reason="Requires cryptography"
 )
 @mock.patch("requests.post")
-def test_plugin_vapid_prune_without_subfile(mock_post, tmpdir):
-    """An expired subscription is dropped even with nothing to write to."""
+def test_plugin_vapid_expired_after_subfile_clear(mock_post, tmpdir):
+    """An expired subscription is dropped after clearing ``subfile``."""
 
     mock_post.return_value = _mk_resp(requests.codes.gone)
 
@@ -1117,9 +1120,8 @@ def test_plugin_vapid_prune_without_subfile(mock_post, tmpdir):
         name="nosubfile",
     )
 
-    # Load subscriptions, then detach the file to prevent persistence.
+    # Load subscriptions, then clear the notifier's file reference
     assert obj.subscriptions.load(subfile) is True
-    obj.subscriptions_loaded = True
     obj.subfile = None
 
     assert obj.send("test") is False
@@ -1566,7 +1568,7 @@ def test_plugin_vapid_readonly_file_respected(tmpdir):
 
     smgr = WebPushSubscriptionManager()
     assert smgr.load(path) is True
-    assert smgr.path == path
+    assert smgr.local_file == path
 
     # We can read it, but it is not ours to change
     assert smgr.writable is False
@@ -1639,7 +1641,7 @@ def test_plugin_vapid_prune_edge_cases(tmpdir):
 
     # Nothing was loaded, so there is no file to update
     smgr = WebPushSubscriptionManager()
-    assert smgr.path is None
+    assert smgr.local_file is None
     assert smgr.writable is False
     assert smgr.prune(["anything"]) is False
 
@@ -1721,7 +1723,7 @@ def test_plugin_vapid_remote_subfile(tmpdir):
     assert set(smgr.dict) == {"abc123"}
 
     # With no local source file, it cannot be rewritten.
-    assert smgr.path is None
+    assert smgr.local_file is None
     assert smgr.writable is False
     assert smgr.prune(["abc123"]) is False
 
@@ -1790,12 +1792,12 @@ def test_plugin_vapid_load_forgets_previous_path(tmpdir):
 
     smgr = WebPushSubscriptionManager()
     assert smgr.load(first) is True
-    assert smgr.path == first
+    assert smgr.local_file == first
 
     # A load that fails must not leave the previous file remembered,
     # otherwise a prune would rewrite a file we are no longer using
     assert smgr.load(os.path.join(str(tmpdir0), "missing.json")) is False
-    assert smgr.path is None
+    assert smgr.local_file is None
     assert smgr.writable is False
     assert smgr.prune(["abc123"]) is False
 
@@ -1963,8 +1965,8 @@ def test_plugin_vapid_write_unreadable_mode(tmpdir):
     "cryptography" not in sys.modules, reason="Requires cryptography"
 )
 @mock.patch("requests.post")
-def test_plugin_vapid_ignore_expired(mock_post, tmpdir):
-    """An expired subscription does not fail the send by default."""
+def test_plugin_vapid_expired_is_reported(mock_post, tmpdir):
+    """An expired subscription is reported as a failure."""
 
     def respond(url, *args, **kwargs):
         # One device is gone, the other is fine
@@ -1983,56 +1985,13 @@ def test_plugin_vapid_ignore_expired(mock_post, tmpdir):
             "dead": "https://web.push.apple.com/DEAD",
         },
         ["live", "dead"],
-        name="ignoreexp",
+        name="expreport",
     )
 
-    # The accepted target makes the ignored expiration non-fatal.
-    assert obj.ignore_expired is True
-    assert obj.send("test") is True
-
-
-@pytest.mark.skipif(
-    "cryptography" not in sys.modules, reason="Requires cryptography"
-)
-@mock.patch("requests.post")
-def test_plugin_vapid_ignore_expired_disabled(mock_post, tmpdir):
-    """Turning the flag off reports an expired subscription as a failure."""
-
-    def respond(url, *args, **kwargs):
-        return _mk_resp(
-            requests.codes.gone
-            if url.endswith("DEAD")
-            else requests.codes.created
-        )
-
-    mock_post.side_effect = respond
-
-    tmpdir0 = tmpdir.mkdir("noignore")
-    subfile = os.path.join(str(tmpdir0), "subscriptions.json")
-    _write_subscriptions(
-        subfile,
-        {
-            "live": "https://web.push.apple.com/LIVE",
-            "dead": "https://web.push.apple.com/DEAD",
-        },
-    )
-
-    obj = NotifyVapid(
-        "user@example.ca",
-        targets=["live", "dead"],
-        subfile=subfile,
-        ignore_expired=False,
-        asset=asset.AppriseAsset(
-            storage_mode=PersistentStoreMode.FLUSH,
-            storage_path=str(tmpdir0),
-            pem_autogen=True,
-        ),
-    )
-
-    assert obj.ignore_expired is False
-
-    # The caller requested a failure even when another target was accepted.
+    # The expired endpoint is a real failure; it is pruned below so no
+    # retry will reach for it again.
     assert obj.send("test") is False
+    assert "dead" not in obj.subscriptions
 
 
 @pytest.mark.skipif(
@@ -2051,38 +2010,8 @@ def test_plugin_vapid_all_expired_still_fails(mock_post, tmpdir):
         name="allexp",
     )
 
-    # Every target expired, so the message went nowhere. Ignoring expired
-    # subscriptions must not turn that into a success.
-    assert obj.ignore_expired is True
+    # Every target expired, so the message went nowhere.
     assert obj.send("test") is False
-
-
-@pytest.mark.skipif(
-    "cryptography" not in sys.modules, reason="Requires cryptography"
-)
-def test_plugin_vapid_ignore_expired_url(tmpdir):
-    """The flag survives a round trip through the URL."""
-
-    tmpdir0 = tmpdir.mkdir("expurl")
-    asset_ = asset.AppriseAsset(
-        storage_mode=PersistentStoreMode.FLUSH,
-        storage_path=str(tmpdir0),
-        pem_autogen=True,
-    )
-
-    obj = Apprise.instantiate("vapid://user@example.ca/abc123", asset=asset_)
-    assert obj.ignore_expired is True
-    assert "ignore_expired=yes" in obj.url()
-
-    off = Apprise.instantiate(
-        "vapid://user@example.ca/abc123?ignore_expired=no", asset=asset_
-    )
-    assert off.ignore_expired is False
-    assert "ignore_expired=no" in off.url()
-
-    # ...and re-loading the generated url keeps the setting
-    assert Apprise.instantiate(off.url()).ignore_expired is False
-    assert Apprise.instantiate(obj.url()).ignore_expired is True
 
 
 @pytest.mark.skipif(
@@ -2113,3 +2042,117 @@ def test_plugin_vapid_image_url(tmpdir):
 
     assert Apprise.instantiate(off.url()).include_image is False
     assert Apprise.instantiate(obj.url()).include_image is True
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
+def test_plugin_vapid_autogen(tmpdir):
+    """Create and manage the default subscription file."""
+
+    tmpdir0 = tmpdir.mkdir("autogen")
+
+    # With nothing to work with there is no file and nothing to load
+    smgr = WebPushSubscriptionManager()
+    assert smgr.subscription_file is None
+    assert smgr.loaded is False
+    assert smgr.autogen() is False
+    assert smgr.load() is False
+    assert smgr.loaded is True
+
+    # A directory gives us a file of our own to create
+    smgr = WebPushSubscriptionManager(str(tmpdir0))
+    assert smgr.subscription_file == os.path.join(
+        str(tmpdir0), WebPushSubscriptionManager.default_filename
+    )
+    assert smgr.autogen() is True
+
+    # The file shows what a subscription is supposed to look like
+    with open(smgr.subscription_file) as f:
+        assert json.load(f) == smgr.template
+
+    # We do not overwrite what is already there
+    assert smgr.autogen() is False
+
+    # The placeholder is not a working subscription, so loading it leaves us
+    # with nothing to notify
+    assert smgr.load() is True
+    assert len(smgr) == 0
+
+    # A file we were pointed at belongs to our user, not to us
+    subfile = os.path.join(str(tmpdir0), "mine.json")
+    smgr = WebPushSubscriptionManager(str(tmpdir0), subfile=subfile)
+    assert smgr.subscription_file == subfile
+    assert smgr.autogen() is False
+    assert not os.path.exists(subfile)
+
+    # A file we cannot write does not cause an exception
+    tmpdir1 = tmpdir.mkdir("autogen-fail")
+    smgr = WebPushSubscriptionManager(str(tmpdir1))
+    with mock.patch("json.dump", side_effect=OSError):
+        assert smgr.autogen() is False
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
+def test_plugin_vapid_autogen_disabled(tmpdir):
+    """No starter file is left behind when auto-generation is turned off."""
+
+    tmpdir0 = tmpdir.mkdir("noautogen")
+    asset_ = asset.AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir0),
+        pem_autogen=False,
+    )
+
+    obj = Apprise.instantiate("vapid://user@example.ca/abc123", asset=asset_)
+    assert obj.subfile is not None
+    assert not os.path.exists(obj.subfile)
+
+    # There is nothing for us to notify with
+    assert obj.send("test") is False
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
+def test_plugin_vapid_rejects_malformed_subscription(tmpdir):
+    """Reject malformed subscription data without raising exceptions."""
+
+    smgr = WebPushSubscriptionManager()
+
+    # The keys entry is not an object we can read
+    for keys in (None, "nope", [1, 2], 42):
+        assert (
+            smgr.add(
+                {"endpoint": "https://web.push.apple.com/X", "keys": keys},
+                name="junk",
+            )
+            is False
+        )
+
+    # The keys are there, but they are not base64
+    assert (
+        smgr.add(
+            {
+                "endpoint": "https://web.push.apple.com/X",
+                "keys": {"p256dh": "!!", "auth": "!!"},
+            },
+            name="junk",
+        )
+        is False
+    )
+
+    assert len(smgr) == 0
+
+    # Reject nesting deep enough to exhaust the JSON parser
+    tmpdir0 = tmpdir.mkdir("junk")
+    path = os.path.join(str(tmpdir0), "subscriptions.json")
+    with open(path, "w") as f:
+        f.write("[" * 200000 + "]" * 200000)
+
+    assert smgr.load(path) is False
+
+    # Reject the same nesting when supplied as a string
+    assert WebPushSubscription().load("[" * 200000 + "]" * 200000) is False

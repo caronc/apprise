@@ -33,6 +33,7 @@
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
@@ -191,7 +192,7 @@ class NotifyBurstSMS(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Burst SMS API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # API Secret (associated with project)
         self.secret = validate_regex(
@@ -200,7 +201,7 @@ class NotifyBurstSMS(NotifyBase):
         if not self.secret:
             msg = f"An invalid Burst SMS API Secret ({secret}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if not country:
             self.country = self.template_args["country"]["default"]
@@ -212,7 +213,7 @@ class NotifyBurstSMS(NotifyBase):
                     f"An invalid Burst SMS country ({country}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Set our Validity
         self.validity = self.template_args["validity"]["default"]
@@ -226,7 +227,7 @@ class NotifyBurstSMS(NotifyBase):
                     " invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
 
         # Prepare Batch Mode Flag
         self.batch = (
@@ -238,7 +239,7 @@ class NotifyBurstSMS(NotifyBase):
         if not self.source:
             msg = f"The Account Sender ID specified ({source}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Parse our targets
         self.targets = []
@@ -295,6 +296,11 @@ class NotifyBurstSMS(NotifyBase):
         targets = list(self.targets)
 
         for index in range(0, len(targets), batch_size):
+            # Skip a batch that already went out so a retry does
+            # not deliver it to those recipients twice.
+            if self.is_delivered(index):
+                continue
+
             # Prepare our user
             payload["to"] = ",".join(self.targets[index : index + batch_size])
 
@@ -362,6 +368,9 @@ class NotifyBurstSMS(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this batch.
+            self.mark_delivered(index)
 
         return not has_error
 

@@ -48,6 +48,7 @@ import re
 from typing import Any, Optional
 
 from ...common import NotifyType
+from ...exception import AppriseImproperlyConfigured
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
 from ...utils.parse import parse_bool, parse_list
@@ -209,7 +210,7 @@ class NotifyIRC(NotifyBase):
             if self.auth_mode not in IRC_AUTH_MODES:
                 msg = f"The IRC auth mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         self.fullname = (name or "").strip()
 
@@ -340,6 +341,10 @@ class NotifyIRC(NotifyBase):
             message = body if not title else f"{title} {body}".strip()
 
             for c, key in self.channels.items():
+                delivery_key = ("channel", c)
+                if self.is_delivered(delivery_key):
+                    continue
+
                 chan = normalise_channel(c)
                 if self.join or key:
                     client.join(
@@ -359,8 +364,15 @@ class NotifyIRC(NotifyBase):
                     c,
                     client.nickname,
                 )
+                self.mark_delivered(delivery_key)
 
             for u in self.users:
+                # Skip a target that already accepted this message so
+                # a retry does not deliver it twice.
+                delivery_key = ("user", u)
+                if self.is_delivered(delivery_key):
+                    continue
+
                 target = u.lstrip("@")
                 client.privmsg(
                     target=target,
@@ -372,6 +384,9 @@ class NotifyIRC(NotifyBase):
                     u,
                     client.nickname,
                 )
+
+                # Delivered; a retry can safely skip this target.
+                self.mark_delivered(delivery_key)
 
             client.quit(message=self.app_desc, timeout=self.send_timeout)
             return True

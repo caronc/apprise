@@ -35,6 +35,7 @@ from unittest import mock
 from helpers import AppriseURLTester
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.reddit import NotifyReddit
 
 logging.disable(logging.CRITICAL)
@@ -45,48 +46,48 @@ apprise_url_tests = (
         "reddit://",
         {
             # Missing all credentials
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "reddit://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "reddit://user@app_id/app_secret/",
         {
             # No password
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "reddit://user:password@app_id/",
         {
             # No app secret
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "reddit://user:password@app%id/appsecret/apprise",
         {
             # No invalid app_id (has percent)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "reddit://user:password@app%id/app_secret/apprise",
         {
             # No invalid app_secret (has percent)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "reddit://user:password@app-id/app-secret/apprise?kind=invalid",
         {
             # An Invalid Kind
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

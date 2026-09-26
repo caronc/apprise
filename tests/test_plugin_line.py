@@ -30,6 +30,7 @@ import logging
 
 from helpers import AppriseURLTester
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.line import NotifyLine
 
 logging.disable(logging.CRITICAL)
@@ -40,14 +41,14 @@ apprise_url_tests = (
         "line://",
         {
             # No Access Token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "line://%20/",
         {
             # invalid Access Token; no Integration/Routing Key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

@@ -30,6 +30,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import validate_regex
@@ -116,7 +117,7 @@ class NotifyPushjet(NotifyBase):
                 f"An invalid Pushjet Secret Key ({secret_key}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         return
 

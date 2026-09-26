@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.resend import NotifyResend
 
 logging.disable(logging.CRITICAL)
@@ -50,34 +51,34 @@ apprise_url_tests = (
     (
         "resend://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "resend://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "resend://abcd",
         {
             # Just an broken email (no api key or email)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "resend://abcd@host",
         {
             # Just an Email specified, no API Key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "resend://invalid-api-key+*-d:user@example.com",
         {
             # An invalid API Key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -225,15 +226,15 @@ def test_plugin_resend_edge_cases(mock_post, mock_get):
     """NotifyResend() Edge Cases."""
 
     # no apikey
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyResend(apikey=None, from_addr="user@example.com")
 
     # invalid from email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyResend(apikey="abcd", from_addr="!invalid")
 
     # no email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyResend(apikey="abcd", from_addr=None)
 
     # Invalid To email address
@@ -270,11 +271,13 @@ def test_plugin_resend_attachments(mock_post, mock_get):
     obj = Apprise.instantiate("resend://abcd:user@example.com")
     assert isinstance(obj, NotifyResend)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -285,11 +288,13 @@ def test_plugin_resend_attachments(mock_post, mock_get):
     # Try again in a use case where we can't access the file
     with mock.patch("os.path.isfile", return_value=False):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -297,11 +302,13 @@ def test_plugin_resend_attachments(mock_post, mock_get):
     # Try again in a use case where we can't access the file
     with mock.patch("builtins.open", side_effect=OSError):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )

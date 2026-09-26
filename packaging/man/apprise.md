@@ -55,6 +55,14 @@ The Apprise options are as follows:
   `-T`, `--theme=`<VALUE>:
   Specify the default theme.
 
+  `-tv`, `--template-var=`<NAME=VALUE>:
+  Supply a value used by a YAML configuration written with `${NAME}`.
+  Specify this option more than once to supply more than one value, but
+  name each one only once.
+  A value not provided here uses the default in the configuration's
+  `template:` section, then `APPRISE_TEMPLATE_<NAME>`. A URL that still has no value
+  available is not loaded.
+
   `-g`, `--tag=`<VALUE>:
   Specify one or more tags to filter which services to notify:
 
@@ -72,6 +80,18 @@ The Apprise options are as follows:
   `-Da`, `--disable-async`:
   Send notifications synchronously (one after the other) instead of
   all at once.
+
+  `-L`, `--limit=`<SECONDS>:
+  Give up on the whole run if it's taking too long, e.g. `-L 10` or
+  `-L 2.5`. By default (`0`) there's no limit; see `--service-limit`
+  below to cap each service on its own instead. If a service is truly
+  stuck, Apprise gives it a few extra seconds to wrap up, then exits
+  anyway with status **5**.
+
+  `-SL`, `--service-limit=`<SECONDS>:
+  Give up on any single service if it's taking too long, e.g. `-SL 10`
+  or `-SL 2.5`, or `0` to turn this off entirely. Leave it unset to use
+  Apprise's own default of 60 seconds.
 
   `-R`, `--recursion-depth`<INTEGER>:
   The number of recursive import entries that can be loaded from within
@@ -158,11 +178,15 @@ The **storage** action has the following sub actions:
 **apprise** exits with a status of:
 
 * **0** if all of the notifications were sent successfully.
-* **1** if one or more notifications could not be sent.
+* **1** if every notification failed, or the notification could not start.
 * **2** if there was an error specified on the command line such as not
-  providing an valid argument.
-* **3** if there was one or more Apprise Service URLs successfully
-  loaded but none could be notified due to user filtering (via tags).
+  providing a valid argument.
+* **3** if one or more Apprise Service URLs were successfully loaded but
+  none could be notified due to user filtering (via tags).
+* **4** if at least one notification was sent successfully and at least
+  one other was not (whether it failed outright or ran out of time).
+* **5** if no notification was sent, and the only problem was that one or
+  more services ran out of time.
 
 ## SERVICE URLS
 
@@ -179,8 +203,7 @@ provide the default set of URLs you wish to notify if none are otherwise specifi
 
 ## EXAMPLES
 
-Send a notification to as many servers as you want to specify as you can
-easily chain them together:
+Send a notification to multiple services by chaining their URLs:
 
     $ apprise -vv -t "my title" -b "my notification body" \
        "mailto://myemail:mypass@gmail.com" \
@@ -334,6 +357,52 @@ configuration that you want and only specifically notify a subset of them:
         --body "Please go ahead and make dinner without me." \
         --tag=family
 
+### TEMPLATE VARIABLES
+
+A **YAML** configuration can leave a value out of a URL and have it filled in
+later.  Write `${NAME}` where the value belongs and declare every name you use
+in a `template:` section:
+
+    template:
+      # A value written here is used when nothing else supplies one
+      smtp_host: smtp.example.com
+      # No value, so this one must always be supplied
+      api_key:
+
+    urls:
+      - sendgrid://${API_KEY}:noreply@example.com/you@example.com:
+          - tag: alerts
+
+Values are looked for in this order, stopping at the first that answers:
+
+* a value given with `--template-var` (`-tv`)
+* the default written in the `template:` section
+* the environment variable `APPRISE_TEMPLATE_<NAME>`
+
+A URL with no value available is not loaded, and **apprise** exits with a
+status of **4** if others were notified, or **1** if none were.  Use
+`--dry-run` to see which values a configuration is still waiting for.
+
+`${NAME}` only means something when `NAME` appears in the `template:` section.
+Anywhere else it is ordinary text and is sent exactly as written, so a password
+containing `${...}` is never altered.  Names ignore case, and a name may be
+used as often as you like. Values may be up to 1,024 characters. Extra supplied
+names are accepted and ignored; their names appear only in the local debug log,
+never with their values.
+
+The configuration author may place a variable directly in a URL or in a named
+YAML setting below it. URL markers can change any field, including the
+destination; whole-host markers also accept `user@host` and `user:pass@host`.
+A named setting changes only its option, so prefer it for values supplied by
+less-trusted callers.
+
+A variable may not appear before `://`, may not be used for `tag:`/`tags:`, and
+may not be used as a setting's name. The service and tags are selected before
+values are filled in, so neither can be dynamic.
+
+This applies to **YAML** configuration only; **TEXT** configuration is passed
+through unchanged.
+
 [config]: https://appriseit.com/getting-started/configuration/
 [tagging]: https://appriseit.com/cli/usage/#tagging-and-filtering
 [pstorage]: https://appriseit.com/cli/persistent-storage/
@@ -354,6 +423,12 @@ configuration that you want and only specifically notify a subset of them:
 
   `APPRISE_STORAGE_PATH`:
   Explicitly specify the persistent storage path to use (overriding the default).
+
+  `APPRISE_TEMPLATE_<NAME>`:
+  Supply a value for a `${NAME}` used by a YAML configuration.  For example
+  `APPRISE_TEMPLATE_API_KEY` fills in `${API_KEY}`.  A value supplied with
+  `--template-var` (`-tv`) and a configuration default both take priority.
+  Blank values are ignored.
 
   `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`:
   Standard proxy variables honored by the underlying `requests` library (not

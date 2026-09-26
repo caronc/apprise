@@ -36,6 +36,7 @@ import re
 import requests
 
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_email, parse_list
@@ -105,7 +106,7 @@ class NotifyTwist(NotifyBase):
             },
             "email": {
                 "name": _("Email"),
-                "type": "string",
+                "type": "email",
                 "required": True,
             },
             "target_channel": {
@@ -181,7 +182,7 @@ class NotifyTwist(NotifyBase):
             # let outer exception handle this
             msg = f"The Twist Auth email specified ({self.email}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Re-assign email based on what was parsed
         self.email = result["full_email"]
@@ -196,7 +197,7 @@ class NotifyTwist(NotifyBase):
         if not self.password:
             msg = f"No Twist password was specified with account: {self.email}"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate recipients and drop bad ones:
         for recipient in parse_list(targets):
@@ -595,6 +596,11 @@ class NotifyTwist(NotifyBase):
             # We need both the workspace/team id and channel id
             channel_id = int(result.group("channel"))
 
+            # Skip a channel that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(channel_id):
+                continue
+
             # Prepare our payload
             payload = {
                 "channel_id": channel_id,
@@ -617,6 +623,9 @@ class NotifyTwist(NotifyBase):
             self.logger.info(
                 "Sent Twist notification to {}.".format(result.group("name"))
             )
+
+            # Delivered; a retry can safely skip this channel.
+            self.mark_delivered(channel_id)
 
         return not has_error
 

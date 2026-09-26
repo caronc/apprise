@@ -61,6 +61,7 @@ from uuid import uuid4
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list, validate_regex
@@ -233,7 +234,7 @@ class NotifyWPush(NotifyBase):
         if not self.apikey:
             msg = "The WPUSH API Key ({}) is invalid.".format(apikey)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Resolve one or more delivery channels (comma-separated)
         if channel:
@@ -246,7 +247,7 @@ class NotifyWPush(NotifyBase):
                 if not resolved:
                     msg = "The WPUSH channel ({}) is not valid.".format(entry)
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
                 # Remove duplicate channels before sorting them
                 if resolved not in self.channels:
                     self.channels.append(resolved)
@@ -271,7 +272,7 @@ class NotifyWPush(NotifyBase):
                 "The WPUSH option/group cannot be combined with topic targets."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Optional click-through link delivered alongside the notification
         self.click_url = (
@@ -311,6 +312,11 @@ class NotifyWPush(NotifyBase):
         )
 
         for topic in topics_to_notify:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(topic):
+                continue
+
             # Build this topic's payload
             payload = {
                 "apikey": self.apikey,
@@ -420,6 +426,9 @@ class NotifyWPush(NotifyBase):
                 "Sent WPUSH notification%s.",
                 " to topic {}".format(topic) if topic else "",
             )
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(topic)
 
         return not has_error
 

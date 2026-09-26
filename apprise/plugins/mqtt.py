@@ -39,6 +39,7 @@ import ssl
 from time import sleep
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, parse_list
@@ -269,12 +270,12 @@ class NotifyMQTT(NotifyBase):
                 or self.qos > self.template_args["qos"]["max"]
             ):
                 # Let error get handle on exceptio higher up
-                raise ValueError("")
+                raise AppriseImproperlyConfigured("")
 
         except (ValueError, TypeError):
             msg = f"An invalid MQTT QOS ({qos}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         if not self.port:
             # Assign port (if not otherwise set)
@@ -311,7 +312,7 @@ class NotifyMQTT(NotifyBase):
                 f"An invalid MQTT Protocol version ({version}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # Our MQTT Client Object
         self.client = mqtt.Client(
@@ -418,6 +419,11 @@ class NotifyMQTT(NotifyBase):
                 # Retrieve our subreddit
                 topic = topics.pop()
 
+                # Skip a topic that already accepted this message so a
+                # retry does not deliver it twice.
+                if self.is_delivered(topic):
+                    continue
+
                 # For logging:
                 url = f"{self.host}:{self.port}/{topic}"
 
@@ -471,6 +477,10 @@ class NotifyMQTT(NotifyBase):
                                 "The MQTT message could not be delivered"
                             )
                             has_error = True
+
+                if not has_error:
+                    # Delivered; a retry can safely skip this topic.
+                    self.mark_delivered(topic)
 
                 # if we reach here; we're at the bottom of our loop
                 # we loop around and do the next topic now

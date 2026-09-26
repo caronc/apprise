@@ -30,6 +30,7 @@ import logging
 
 from helpers import AppriseURLTester
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.streamlabs import NotifyStreamlabs
 
 logging.disable(logging.CRITICAL)
@@ -40,14 +41,14 @@ apprise_url_tests = (
         "strmlabs://",
         {
             # No Access Token specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "strmlabs://a_bd_/",
         {
             # invalid Access Token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -63,7 +64,7 @@ apprise_url_tests = (
     (
         "strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?currency=ABCD",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Test complete params - donations
@@ -105,7 +106,7 @@ apprise_url_tests = (
             "?name=tt&identifier=pyt&amount=20&currency=USD&call=rms"
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Test incorrect alert_type
@@ -115,14 +116,14 @@ apprise_url_tests = (
             "?name=tt&identifier=pyt&amount=20&currency=USD&alert_type=rms"
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Test incorrect name
     (
         "strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?name=t",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

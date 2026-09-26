@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyFormat
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.twist import NotifyTwist
 
 logging.disable(logging.CRITICAL)
@@ -130,10 +131,10 @@ def test_plugin_twist_urls():
 
 def test_plugin_twist_init():
     """NotifyTwist() init()"""
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwist(email="invalid", targets=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwist(email="user@domain", targets=None)
 
     # Simple object initialization
@@ -596,9 +597,11 @@ def test_plugin_twist_html_to_markdown_format(mock_post, mock_get):
     # Notify with an HTML body; the framework converts it to Markdown
     # before dispatching to the Twist plugin
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )

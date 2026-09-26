@@ -41,6 +41,7 @@ from json import dumps, loads
 import requests
 
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_list, validate_regex
 from .base import NotifyBase
@@ -146,7 +147,7 @@ class NotifyRevolt(NotifyBase):
         if not self.bot_token:
             msg = f"An invalid Revolt Bot Token ({bot_token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Parse our Channel IDs
         self.targets = []
@@ -217,10 +218,19 @@ class NotifyRevolt(NotifyBase):
         has_error = False
         channel_ids = list(self.targets)
         for channel_id in channel_ids:
+            # Skip a channel that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(channel_id):
+                continue
+
             postokay, _response = self._send(payload, channel_id)
             if not postokay:
                 # Failed to send message
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this channel.
+            self.mark_delivered(channel_id)
 
         return not has_error
 

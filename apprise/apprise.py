@@ -28,42 +28,170 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 import concurrent.futures as cf
+import contextvars
+from functools import partial
 from itertools import chain
 import json
+import logging
 import os
+import threading
 import time
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from . import __version__, common, plugins
 from .apprise_attachment import AppriseAttachment
 from .apprise_config import AppriseConfig
 from .asset import AppriseAsset
-from .common import ContentLocation
+from .common import (
+    JSON_COMPACT_SEPARATORS,
+    ContentLocation,
+)
 from .config.base import ConfigBase
 from .conversion import convert_between
+from .dispatch import (
+    CallState,
+    RetryRunner,
+    ServiceCall,
+    call_with_retry,
+    compute_deadline,
+    configured_max_attempts,
+    prepared_failure,
+    service_crashed,
+    service_metadata,
+    timeout_result,
+)
 from .emojis import apply_emojis
+from .exception import AppriseImproperlyConfigured, AppriseTemplateError
 from .locale import AppriseLocale
-from .logger import logger
+from .logger import NotifyLogEntry, logger
 from .manager_plugins import NotificationManager
-from .plugins.base import NotifyBase
+from .plugins.base import (
+    _PAYLOAD_PRECAPPED,
+    NotifyBase,
+)
+from .result import (
+    AppriseResult,
+    AppriseResultStatus,
+    NotifyResult,
+)
 from .tag import AppriseTag
+from .template import NotifyTemplate
 from .utils.cwe312 import cwe312_loggable
 from .utils.json import AppriseJSONEncoder
 from .utils.logic import is_exclusive_match
 from .utils.parse import parse_list, parse_urls
+from .utils.template import (
+    normalize_name,
+    resolve_values,
+    validate_overrides,
+)
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
 
+# Extra seconds of patience for notify() calls.
+_ABANDON_GRACE_SECONDS = 0.1
+
+# Shared pool for service calls. Coordinators use a separate pool so they
+# cannot occupy the workers needed by the service calls they await.
+_shared_executor: Optional[cf.ThreadPoolExecutor] = None
+_shared_executor_lock = threading.Lock()
+
+
+def get_shared_executor() -> cf.ThreadPoolExecutor:
+    """Return the shared service worker pool, creating it when first used."""
+    global _shared_executor
+    # Avoid taking the lock after the pool has already been created.
+    if _shared_executor is None:
+        with _shared_executor_lock:
+            # Another thread may have created the pool while we waited.
+            if _shared_executor is None:
+                _shared_executor = cf.ThreadPoolExecutor()
+    # Every notification call reuses this same bounded pool.
+    return _shared_executor
+
+
+# Coordinators dispatch tag chains and synchronous batches from this pool.
+# Their child service calls run in ``_shared_executor`` above.
+_coordinator_executor: Optional[cf.ThreadPoolExecutor] = None
+_coordinator_executor_lock = threading.Lock()
+
+
+def get_coordinator_executor() -> cf.ThreadPoolExecutor:
+    """Return the shared coordinator thread pool, creating it on first use."""
+    global _coordinator_executor
+    # Avoid taking the lock after the pool has already been created.
+    if _coordinator_executor is None:
+        with _coordinator_executor_lock:
+            # Another thread may have created the pool while we waited.
+            if _coordinator_executor is None:
+                _coordinator_executor = cf.ThreadPoolExecutor()
+    # Keep batch coordination separate from service calls it waits for.
+    return _coordinator_executor
+
+
+def submit_with_context(
+    executor: cf.Executor, function: Callable, *args: Any
+) -> cf.Future:
+    """Submit work with a copy of the caller's logging context."""
+    # The copied context lets worker logs find the current call capture.
+    context = contextvars.copy_context()
+    # Run the function inside that copied context on a worker thread.
+    return executor.submit(context.run, function, *args)
+
+
+# Services abandoned on timeout that are still genuinely running. Lets
+# cli.py poll instead of just sleeping out its whole grace window.
+_abandoned_futures: list[tuple[cf.Future, str, str]] = []
+_abandoned_futures_lock = threading.Lock()
+
+
+def track_abandoned_future(future: cf.Future, name: str, url: str) -> None:
+    """Record one abandoned-but-still-running service call."""
+    with _abandoned_futures_lock:
+        # Remove completed work before adding the newly abandoned call.
+        _abandoned_futures[:] = [
+            entry for entry in _abandoned_futures if not entry[0].done()
+        ]
+        # Keep safe display details beside the future for CLI reporting.
+        _abandoned_futures.append((future, name, url))
+
+
+def any_abandoned_calls_still_running() -> bool:
+    """True if any abandoned service call is still actually running."""
+    with _abandoned_futures_lock:
+        # Completed calls no longer need to delay CLI shutdown.
+        _abandoned_futures[:] = [
+            entry for entry in _abandoned_futures if not entry[0].done()
+        ]
+        # A non-empty list means at least one worker remains busy.
+        return bool(_abandoned_futures)
+
+
+def abandoned_call_descriptions() -> list[str]:
+    """Return "name (url)" for each still-running abandoned call."""
+    with _abandoned_futures_lock:
+        # Do not show calls that finished since the last check.
+        _abandoned_futures[:] = [
+            entry for entry in _abandoned_futures if not entry[0].done()
+        ]
+        # URLs were privacy-masked before being stored here.
+        return [f"{name} ({url})" for _, name, url in _abandoned_futures]
+
 
 class Apprise:
-    """Our Notification Manager."""
+    """Manage and dispatch messages to Apprise services.
+
+    A service is any loaded notification plugin. It is not necessarily a push
+    notification server: email, IRC, XMPP, desktop integrations, webhooks, and
+    other custom protocols all use the same service interface.
+    """
 
     def __init__(
         self,
-        servers: Optional[
+        services: Optional[
             Union[
                 str,
                 dict,
@@ -76,18 +204,35 @@ class Apprise:
         asset: Optional[AppriseAsset] = None,
         location: Optional[ContentLocation] = None,
         debug: bool = False,
+        log_callback: Optional[
+            Callable[[NotifyLogEntry, Optional[NotifyBase]], None]
+        ] = None,
+        log_level: Optional[int] = None,
     ) -> None:
-        """Loads a set of server urls while applying the Asset() module to each
-        if specified.
+        """Initialize the manager and optionally load one or more services.
 
-        If no asset is provided, then the default asset is used.
+        ``services`` may be a URL, a URL dictionary, an instantiated
+        notification or configuration plugin, an :class:`AppriseConfig`
+        object, or a list containing any mixture of these. URL-based services
+        are instantiated with ``asset``; when no asset is supplied, a default
+        :class:`AppriseAsset` is created and shared with them.
 
-        Optionally specify a global ContentLocation for a more strict means of
-        handling Attachments.
+        ``location`` applies an optional :class:`ContentLocation` restriction
+        when attachments are prepared. For example, callers can prevent a
+        remotely sourced request from attaching local content. A value of
+        ``None`` leaves attachment locations unrestricted.
+
+        ``log_callback`` receives captured entries synchronously as
+        ``callback(entry, service)``. ``service`` is the plugin associated with
+        the entry, or ``None`` for orchestration messages exposed through
+        :meth:`AppriseResult.call_logs`. ``log_level`` controls the minimum
+        captured level and defaults to ``WARNING``, or ``INFO`` when a callback
+        is configured. Both settings may be overridden by an individual call
+        to :meth:`notify` or :meth:`async_notify`.
         """
 
-        # Initialize a server list of URLs
-        self.servers = []
+        # Store notification services and configuration sources.
+        self.services = []
 
         # Assigns an central asset object that will be later passed into each
         # notification plugin.  Assets contain information such as the local
@@ -98,11 +243,11 @@ class Apprise:
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
         )
 
-        if servers:
-            self.add(servers)
+        if services:
+            self.add(services)
 
-        # Initialize our locale object
-        self.locale = AppriseLocale()
+        # Use the asset language, or let Apprise detect the system language.
+        self.locale = AppriseLocale(language=self.asset.language)
 
         # Set our debug flag
         self.debug = debug
@@ -112,6 +257,15 @@ class Apprise:
         # restrictions.
         self.location = location
 
+        # Default log_callback for every notify()/async_notify() call made
+        # with this instance, unless overridden per-call.
+        self._log_callback = log_callback
+
+        # Default log_level for every notify()/async_notify() call made
+        # with this instance, unless overridden per-call. None defers to
+        # _ServiceLogCapture's own WARNING default.
+        self._log_level = log_level
+
     @staticmethod
     def instantiate(
         url: Union[str, dict],
@@ -119,13 +273,17 @@ class Apprise:
         tag: Optional[Union[str, list[str]]] = None,
         suppress_exceptions: bool = True,
     ) -> Optional[NotifyBase]:
-        """Returns the instance of a instantiated plugin based on the provided
-        Server URL.  If the url fails to be parsed, then None is returned.
+        """Create a notification service from a URL or URL dictionary.
 
-        The specified url can be either a string (the URL itself) or a
-        dictionary containing all of the components needed to istantiate
-        the notification service.  If identifying a dictionary, at the bare
-        minimum, one must specify the schema.
+        A string is parsed as an Apprise URL. A dictionary supplies the parsed
+        constructor components directly and must contain at least ``schema``
+        so the matching plugin can be selected. ``tag`` replaces the tags in
+        the parsed data, and ``asset`` is passed to the plugin instance.
+
+        Invalid, unsupported, or disabled services return ``None``. Plugin
+        constructor errors are also converted to ``None`` when
+        ``suppress_exceptions`` is true; setting it to false lets those errors
+        reach the caller.
 
         An example of a url dictionary object might look like:
           {
@@ -138,8 +296,9 @@ class Apprise:
         Alternatively the string is much easier to specify:
           mailto://user:mypassword@google.com
 
-        The dictionary works well for people who are calling details() to
-        extract the components they need to build the URL manually.
+        The dictionary form is particularly useful to callers that use
+        :meth:`details` to discover the fields supported by a plugin and then
+        build those fields programmatically.
         """
 
         # Initialize our result set
@@ -155,7 +314,7 @@ class Apprise:
             )
 
             if results is None:
-                # Failed to parse the server URL; detailed logging handled
+                # Failed to parse the service URL; detailed logging handled
                 # inside url_to_dict - nothing to report here.
                 return None
 
@@ -265,7 +424,7 @@ class Apprise:
 
     def add(
         self,
-        servers: Union[
+        services: Union[
             str,
             dict,
             NotifyBase,
@@ -276,14 +435,21 @@ class Apprise:
         asset: Optional[AppriseAsset] = None,
         tag: Optional[Union[str, list[str]]] = None,
     ) -> bool:
-        """Adds one or more server URLs into our list.
+        """Add one or more notification services or configuration sources.
 
-        You can override the global asset if you wish by including it with the
-        server(s) that you add.
+        A string may contain one or more URLs and is split with
+        :func:`parse_urls`. Dictionaries are treated as parsed URL components.
+        Existing :class:`NotifyBase`, :class:`ConfigBase`, and
+        :class:`AppriseConfig` objects are stored directly.
 
-        The tag allows you to associate 1 or more tag values to the server(s)
-        being added. tagging a service allows you to exclusively access them
-        when calling the notify() function.
+        ``asset`` overrides the manager's shared asset for services created
+        from URLs or dictionaries. ``tag`` associates one or more tags with
+        those newly created services so they can be selected by
+        :meth:`notify`, :meth:`async_notify`, or :meth:`find`.
+
+        The return value is true only when every supplied item was accepted.
+        Valid items are retained even if another item in the same collection
+        is invalid.
         """
 
         # Initialize our return status
@@ -293,37 +459,37 @@ class Apprise:
             # prepare default asset
             asset = self.asset
 
-        if isinstance(servers, str):
-            # build our server list
-            servers = parse_urls(servers)
-            if len(servers) == 0:
+        if isinstance(services, str):
+            # build our service list
+            services = parse_urls(services)
+            if len(services) == 0:
                 return False
 
-        elif isinstance(servers, dict):
+        elif isinstance(services, dict):
             # no problem, we support kwargs, convert it to a list
-            servers = [servers]
+            services = [services]
 
-        elif isinstance(servers, (ConfigBase, NotifyBase, AppriseConfig)):
+        elif isinstance(services, (ConfigBase, NotifyBase, AppriseConfig)):
             # Go ahead and just add our plugin into our list
-            self.servers.append(servers)
+            self.services.append(services)
             return True
 
-        elif not isinstance(servers, (tuple, set, list)):
+        elif not isinstance(services, (tuple, set, list)):
             logger.error(
-                f"An invalid notification (type={type(servers)}) was"
+                f"An invalid notification (type={type(services)}) was"
                 " specified."
             )
             return False
 
-        for server in servers:
-            if isinstance(server, (ConfigBase, NotifyBase, AppriseConfig)):
+        for service in services:
+            if isinstance(service, (ConfigBase, NotifyBase, AppriseConfig)):
                 # Go ahead and just add our plugin into our list
-                self.servers.append(server)
+                self.services.append(service)
                 continue
 
-            elif not isinstance(server, (str, dict)):
+            elif not isinstance(service, (str, dict)):
                 logger.error(
-                    f"An invalid notification (type={type(server)}) was"
+                    f"An invalid notification (type={type(service)}) was"
                     " specified."
                 )
                 return_status = False
@@ -331,29 +497,48 @@ class Apprise:
 
             # Instantiate ourselves an object, this function throws or
             # returns None if it fails
-            instance = Apprise.instantiate(server, asset=asset, tag=tag)
+            instance = Apprise.instantiate(service, asset=asset, tag=tag)
             if not isinstance(instance, NotifyBase):
                 # No logging is required as instantiate() handles failure
                 # and/or success reasons for us
                 return_status = False
                 continue
 
-            # Add our initialized plugin to our server listings
-            self.servers.append(instance)
+            # Add our initialized plugin to our service listings
+            self.services.append(instance)
 
         # Return our status
         return return_status
 
     def clear(self) -> None:
-        """Empties our server list."""
-        self.servers[:] = []
+        """Remove all directly loaded services and configuration sources."""
+        self.services[:] = []
 
     def find(
         self,
         tag: Any = common.MATCH_ALL_TAG,
         match_always: bool = True,
+        template: Optional[dict] = None,
+        resolve: bool = True,
+        report: Optional[list] = None,
     ) -> Iterator[NotifyBase]:
-        """Returns a list of all servers matching against the tag specified."""
+        """Yield loaded services that match ``tag``.
+
+        Services from configuration sources are flattened into the same
+        sequence used for delivery. Top-level tags are alternatives (OR),
+        while nested collections are intersections (AND). For example,
+        ``[('a', 'b'), 'c']`` means ``(a AND b) OR c``.
+
+        When ``match_always`` is true, services tagged ``always`` are yielded
+        even when the requested filter would not otherwise select them.
+
+        ``template`` supplies values for pending ``${NAME}`` entries. A
+        value not given here falls back to the configuration's own default
+        and then to ``APPRISE_TEMPLATE_<NAME>``. Names are case-insensitive,
+        unused names are ignored, and a blank value reads as no value.
+        Unresolved entries are skipped and may be added to ``report``. Set
+        ``resolve=False`` to return pending entries unchanged.
+        """
 
         # Build our tag setup
         #   - top level entries are treated as an 'or'
@@ -369,247 +554,465 @@ class Apprise:
         # and notify these services under all circumstances
         match_always = common.MATCH_ALWAYS_TAG if match_always else None
 
+        # Turn down unusable input before anything is logged or built.
+        template = validate_overrides(template)
+
+        # One value table can cover several configurations. Extra names are
+        # harmless, but acknowledge them in the local debug log.
+        loaded = None
+        if resolve and template:
+            # Reading a configuration can mean a network request, so keep
+            # what each source returns and use it for both the check below
+            # and the matching further down.
+            loaded = [self._entry_services(entry) for entry in self.services]
+            self._log_unused_template_names(template, loaded)
+
         # Iterate over our loaded plugins
-        for entry in self.servers:
-            if isinstance(entry, (ConfigBase, AppriseConfig)):
-                # load our servers
-                servers = entry.servers()
+        for index, entry in enumerate(self.services):
+            # Without a value table nothing was read ahead of time, so each
+            # source is still visited only as it is needed.
+            services = (
+                loaded[index]
+                if loaded is not None
+                else self._entry_services(entry)
+            )
 
-            else:
-                servers = [
-                    entry,
-                ]
-
-            for server in servers:
+            for service in services:
                 # Apply our tag matching based on our defined logic
-                if is_exclusive_match(
+                if not is_exclusive_match(
                     logic=tag,
-                    data=server.tags,
+                    data=service.tags,
                     match_all=common.MATCH_ALL_TAG,
                     match_always=match_always,
                 ):
-                    yield server
+                    continue
+
+                if resolve and isinstance(service, NotifyTemplate):
+                    built = self._resolve_template(service, template)
+                    if built is None:
+                        if report is not None:
+                            # Track the entry itself, never the value
+                            # it was waiting on
+                            report.append(service)
+                        continue
+
+                    service = built
+
+                yield service
         return
 
     @staticmethod
-    def _extract_filter_retry(tag):
-        """Return the retry override embedded in a filter tag, or None.
+    def _entry_services(entry: Any) -> list:
+        """Return the services one loaded entry stands for."""
+        if isinstance(entry, (ConfigBase, AppriseConfig)):
+            # A configuration source may hold any number of services.
+            return entry.services()
 
-        A filter like "3:endpoint:2" or "endpoint:2" carries ":2" as the
-        call-level retry count.  When present it overrides each matched
-        server's configured retry for this single notify() call.
+        return [
+            entry,
+        ]
+
+    def _log_unused_template_names(
+        self,
+        template: Mapping,
+        loaded: list,
+    ) -> None:
+        """Acknowledge supplied names that no loaded template uses.
+
+        ``loaded`` holds the services each entry already returned, so no
+        configuration source is read a second time here.
+        """
+
+        known: set[str] = set()
+        for services in loaded:
+            known.update(
+                name
+                for service in services
+                if isinstance(service, NotifyTemplate)
+                for name in service.template_names
+            )
+
+        unused = []
+        seen = set()
+        unused_count = 0
+        for key in template:
+            # Names arriving here already passed validate_overrides(), so
+            # nothing unprintable can reach the log line below.
+            name = normalize_name(key)
+            if name in known or name in seen:
+                continue
+
+            seen.add(name)
+            unused_count += 1
+            if len(unused) < 20:
+                # Keep debug output bounded for large caller mappings.
+                unused.append(name)
+
+        if not unused_count:
+            return
+
+        # Names may help the operator find a typo, but values may be secrets.
+        # Keep this out of result logs that an API can stream to its caller.
+        logger.debug(
+            "Template variable(s) %s%s were supplied but not used",
+            ", ".join(unused),
+            (
+                " (+{} more)".format(unused_count - len(unused))
+                if unused_count > len(unused)
+                else ""
+            ),
+            extra={"apprise_capture": False},
+        )
+
+    @staticmethod
+    def _resolve_template(
+        service: NotifyTemplate,
+        template: Optional[dict],
+    ) -> Optional[NotifyBase]:
+        """Build a pending service, or return ``None`` when values are missing.
+
+        Missing variable names are written only to the local log.
+        """
+
+        try:
+            values = resolve_values(
+                service.template_schema,
+                template,
+                names=service.names,
+            )
+
+        except AppriseTemplateError as e:
+            logger.error(
+                "Template variable '%s' is not available; %s:// was skipped",
+                e.variable,
+                service.schema,
+                extra={"apprise_capture": False},
+            )
+            logger.warning(
+                "A %s:// entry was skipped; it is waiting on a"
+                " configuration value",
+                service.schema,
+            )
+            return None
+
+        return service.resolve(values)
+
+    @staticmethod
+    def _filter_entries(tag):
+        """Return top-level filter entries in a stable order.
+
+        Sets are sorted because they have no order. Lists and tuples keep the
+        order supplied by the caller.
+        """
+        if isinstance(tag, (str, AppriseTag)):
+            # A lone filter is the only entry there is.
+            return [tag]
+
+        if isinstance(tag, (set, frozenset)):
+            # Sets have no fixed order and may appear differently each run.
+            return sorted(tag, key=str)
+
+        # Lists and tuples keep the order the caller wrote them in.
+        return list(tag)
+
+    @staticmethod
+    def _parse_filter_tokens(tag):
+        """Return a flat list of parsed tokens from any supported tag filter.
+
+        Filters may be strings, :class:`AppriseTag` objects, lists, or nested
+        AND groups. Match-all filters return an empty list.
         """
         if tag is None or tag == common.MATCH_ALL_TAG:
-            return None
-        for entry in (
-            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
-        ):
-            if isinstance(entry, (list, tuple, set)):
-                for tok in parse_list(entry):
-                    ft = AppriseTag.parse(tok)
-                    if ft.retry is not None:
-                        return ft.retry
-            else:
-                ft = AppriseTag.parse(str(entry))
-                if ft.retry is not None:
-                    return ft.retry
-        return None
+            # Match-all does not name any individual tag.
+            return []
+
+        # parse_list() sorts comma-separated tokens. Use separate list entries
+        # when their order decides which retry value wins.
+        tokens = []
+        for entry in Apprise._filter_entries(tag):
+            # Split comma-separated text and flatten any inner group.
+            raw = (
+                parse_list(entry)
+                if isinstance(entry, (list, tuple, set))
+                else parse_list(str(entry))
+            )
+            # Parsing once here lets later helpers reuse the same metadata.
+            tokens.extend(AppriseTag.parse(tok) for tok in raw)
+
+        # Callers can now inspect names, priorities, and retry counts.
+        return tokens
 
     @staticmethod
     def _filter_has_explicit_priority(tag):
-        """Return True if any token in *tag* carries an explicit priority
-        prefix.
+        """Return whether a filter selects an exact priority.
 
-        When True, notify() dispatches matched servers as a flat batch
-        (no escalation) because the caller selected an exact priority level.
-        When False, matched servers are grouped by their own tag priorities
-        and dispatched in ascending order with early-True exit.
+        Exact priorities use flat dispatch; other filters use escalation.
         """
-        if tag is None or tag == common.MATCH_ALL_TAG:
-            return False
-        for entry in (
-            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
-        ):
-            if isinstance(entry, (list, tuple, set)):
-                for tok in parse_list(entry):
-                    if AppriseTag.parse(tok).has_priority:
-                        return True
-            else:
-                for tok in parse_list(str(entry)):
-                    if AppriseTag.parse(tok).has_priority:
-                        return True
-        return False
+        return any(
+            token.has_priority for token in Apprise._parse_filter_tokens(tag)
+        )
 
     @staticmethod
-    def _server_priority_for_tag_name(server, tag_name):
-        """Return the dispatch priority stored on *server* for *tag_name*.
+    def _service_priority_for_tag_name(service, tag_name):
+        """Return the dispatch priority stored on *service* for *tag_name*.
 
-        Looks up the AppriseTag in server.tags whose bare name equals
-        *tag_name* and returns its priority.  Returns 0 when the tag is
-        absent or stored as a plain string (no explicit priority).
+        Missing tags and plain strings use priority zero.
         """
-        for stag in server.tags:
+        for stag in service.tags:
             if str(stag) == tag_name:
                 return stag.priority if isinstance(stag, AppriseTag) else 0
         return 0
 
     @staticmethod
-    def _match_service_retry(server, tag):
-        """Return the call-time retry override for *server* given *tag*.
+    def _parse_retry_filter_tokens(tag):
+        """Parse retry-bearing filter tokens once for all matched services."""
+        # Keep only the tokens that actually carry a ":retry" suffix.
+        return [
+            token
+            for token in Apprise._parse_filter_tokens(tag)
+            if token.retry is not None
+        ]
 
-        Iterates the OR tokens in *tag* in order.  The first token that
-        both carries a retry suffix AND matches *server* determines the
-        override.  Returns None when no such token exists.
+    @staticmethod
+    def _match_service_retry(service, retry_tokens):
+        """Return the first retry override matching ``service``.
 
-        Matching follows the same rules as _token_matches_data:
-          - no priority prefix  -> name-only match
-          - explicit priority   -> name + priority-exact match
+        Plain tokens match names; priority tokens also require that priority.
         """
-        if tag is None or tag == common.MATCH_ALL_TAG:
-            return None
-        for entry in (
-            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
-        ):
-            tokens = (
-                parse_list(entry)
-                if isinstance(entry, (list, tuple, set))
-                else parse_list(str(entry))
-            )
-            for tok in tokens:
-                ft = AppriseTag.parse(tok)
-                if ft.retry is None:
-                    continue
-                tag_name = str(ft)
-                if not ft.has_priority:
-                    if tag_name in server.tags:
-                        return ft.retry
-                else:
-                    for stag in server.tags:
-                        if isinstance(stag, AppriseTag):
-                            if (
-                                str(stag) == tag_name
-                                and stag.priority == ft.priority
-                            ):
-                                return ft.retry
-                        else:
-                            if str(stag).lower() == tag_name:
-                                return ft.retry
+        for ft in retry_tokens:
+            tag_name = str(ft)
+            if not ft.has_priority:
+                if tag_name in service.tags:
+                    return ft.retry
+
+            else:
+                for stag in service.tags:
+                    if isinstance(stag, AppriseTag):
+                        if (
+                            str(stag) == tag_name
+                            and stag.priority == ft.priority
+                        ):
+                            return ft.retry
+                    else:
+                        if str(stag).lower() == tag_name:
+                            return ft.retry
         return None
 
     @staticmethod
     def _inject_per_service_retries(all_calls, tag):
-        """Return *all_calls* with per-service _retry_override injected.
+        """Add the first matching retry override to each service call."""
+        # Parse the filter once instead of repeating the work per service.
+        retry_tokens = Apprise._parse_retry_filter_tokens(tag)
+        if not retry_tokens:
+            # No service can match when the filter has no retry override.
+            return all_calls
 
-        For each (server, kwargs) pair, finds the first filter token in
-        *tag* that matches the service and carries a retry suffix.  When
-        found, injects that value as _retry_override so that all dispatch
-        paths (sequential, threadpool, asyncio) pick it up automatically.
-        Services with no matching retry token are left unchanged.
-        """
+        # Build new call pairs without changing the caller's list.
         result = []
-        for server, kwargs in all_calls:
-            retry = Apprise._match_service_retry(server, tag)
+        for service, kwargs in all_calls:
+            # The first matching filter token decides this service's override.
+            retry = Apprise._match_service_retry(service, retry_tokens)
             if retry is not None:
+                # Copy kwargs so other services keep their original options.
                 kwargs = dict(kwargs, _retry_override=retry)
-            result.append((server, kwargs))
+            result.append((service, kwargs))
+
+        # Keep service ordering exactly as it was received.
         return result
+
+    @staticmethod
+    def _resolve_call_level(
+        effective_log_level: Optional[int],
+        effective_log_callback: Optional[
+            Callable[[NotifyLogEntry, Optional[NotifyBase]], None]
+        ],
+    ) -> int:
+        """Resolve the explicit level or the callback-aware default."""
+        # A level supplied by the caller always takes priority.
+        if effective_log_level is not None:
+            return effective_log_level
+        # Live callbacks usually need progress messages as well as warnings.
+        if effective_log_callback is not None:
+            return logging.INFO
+        # Preserve the quieter result-only default when no callback is active.
+        return logging.WARNING
 
     @staticmethod
     def _build_tag_chains(all_calls, tag):
         """Group *all_calls* into per-OR-token escalation chains.
 
-        Returns {chain_key: {priority: [(server, kwargs)]}}.
-
-        Each service is assigned to the chain of the first OR token whose
-        bare tag name appears in the service's own tags.  The chain key is
-        that bare tag name.  Services that don't match any token by name
-        fall into a catch-all chain keyed as "".
-
-        When *tag* is MATCH_ALL_TAG or None, a single chain "" is built
-        using the existing _server_priority_for_filter logic.
+        Returns {chain_key: {priority: [(service, kwargs)]}}.
+        Each service joins its first matching OR chain; unmatched services
+        use ``""``. Match-all filters create one ``""`` chain.
         """
         if tag is None or tag == common.MATCH_ALL_TAG:
+            # Match-all has no tag priority, so every service uses one chain.
             chain: dict[int, list] = {}
-            for server, kwargs in all_calls:
-                p = Apprise._server_priority_for_filter(server, tag)
-                chain.setdefault(p, []).append((server, kwargs))
+            for service, kwargs in all_calls:
+                chain.setdefault(0, []).append((service, kwargs))
             return {"": chain}
 
-        # Flatten OR tokens; AND groups are kept as a single opaque entry
-        # that falls through to the catch-all chain.
-        #
-        # The CLI wraps each --tag value in a list via parse_list(), so a
-        # single --tag flag produces a single-element inner list such as
-        # [["alerts:3"]].  A single-element list is always a plain OR token
-        # (there is nothing to AND against), so we treat it the same as a
-        # bare string.  A multi-element inner list is a genuine AND condition
-        # (the server must carry every tag in the group) and falls through to
-        # the catch-all chain instead of getting its own independent chain.
+        # Flatten OR tokens while keeping true AND groups in the catch-all
+        # chain. The CLI wraps a single --tag value in a one-item list, so
+        # treat that form as an OR token rather than an AND group.
+        # Use the same order as retry matching so sets behave consistently.
         or_tag_names: list[str] = []
-        for entry in (
-            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
-        ):
+        for entry in Apprise._filter_entries(tag):
             if isinstance(entry, (list, tuple, set)):
                 flat = parse_list(*entry) if entry else []
                 if len(flat) == 1:
                     # single OR token wrapped in a list (CLI convention)
                     or_tag_names.append(str(AppriseTag.parse(flat[0])))
+
                 else:
                     or_tag_names.append("")  # AND group placeholder
+
             else:
                 for tok in parse_list(str(entry)):
                     or_tag_names.append(str(AppriseTag.parse(tok)))
 
+        # Reuse these names when assigning services without an OR chain.
+        filter_names = {
+            str(token) for token in Apprise._parse_filter_tokens(tag)
+        }
+
         chains: dict[str, dict[int, list]] = {}
-        for server, kwargs in all_calls:
+        for service, kwargs in all_calls:
             for chain_key in or_tag_names:
-                if chain_key and chain_key in server.tags:
-                    p = Apprise._server_priority_for_tag_name(
-                        server, chain_key
+                if chain_key and chain_key in service.tags:
+                    p = Apprise._service_priority_for_tag_name(
+                        service, chain_key
                     )
                     chains.setdefault(chain_key, {}).setdefault(p, []).append(
-                        (server, kwargs)
+                        (service, kwargs)
                     )
                     break
             else:
-                # fallback: use global priority
-                p = Apprise._server_priority_for_filter(server, tag)
+                # No named OR chain matched, so use the catch-all chain.
+                # Choose the most urgent matching priority, or zero if none
+                # of the service's tags appear in the filter.
+                priorities = [
+                    stag.priority if isinstance(stag, AppriseTag) else 0
+                    for stag in service.tags
+                    if str(stag) in filter_names
+                ]
+                p = min(priorities) if priorities else 0
                 chains.setdefault("", {}).setdefault(p, []).append(
-                    (server, kwargs)
+                    (service, kwargs)
                 )
 
         return chains
 
     @staticmethod
-    def _server_priority_for_filter(server, tag):
-        """Return the effective dispatch priority for *server* given *tag*.
+    def _split_and_dispatch(
+        batch: list[ServiceCall], call_deadline: Optional[float] = None
+    ) -> tuple[bool, list[NotifyResult]]:
+        """Dispatch sequential and parallel subsets of ``batch``.
 
-        The priority comes from the AppriseTag stored on the server whose
-        name matches one of the tag-filter names.  When multiple server tags
-        match, the minimum (highest-precedence) priority is returned.
-        Returns 0 when no matching priority tag is found.
+        Results keep the caller's original order. ``call_deadline`` is passed
+        through to the dispatch helpers.
         """
-        if tag is None or tag == common.MATCH_ALL_TAG:
-            return 0
+        # Remember positions while splitting so results retain input order.
+        sequential: list = []
+        parallel: list = []
+        for index, (service, kwargs) in enumerate(batch):
+            # Each service's own asset decides how it gets dispatched.
+            group = parallel if service.asset.async_mode else sequential
+            group.append((index, service, kwargs))
 
-        # Flatten the filter to a set of bare lowercase tag names.
-        filter_names = set()
-        for entry in (
-            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
-        ):
-            if isinstance(entry, (list, tuple, set)):
-                for t in parse_list(entry):
-                    filter_names.add(str(AppriseTag.parse(t)))
-            else:
-                for t in parse_list(str(entry)):
-                    filter_names.add(str(AppriseTag.parse(t)))
+        # Run services that require ordered, one-at-a-time delivery.
+        seq_ok, seq_results = (
+            Apprise._notify_sequential(
+                *[(s, k) for _, s, k in sequential],
+                call_deadline=call_deadline,
+            )
+            if sequential
+            else (True, [])
+        )
+        # Run services that allow worker-thread delivery.
+        par_ok, par_results = (
+            Apprise._notify_parallel_threadpool(
+                *[(s, k) for _, s, k in parallel], call_deadline=call_deadline
+            )
+            if parallel
+            else (True, [])
+        )
 
-        priorities = [
-            stag.priority if isinstance(stag, AppriseTag) else 0
-            for stag in server.tags
-            if str(stag) in filter_names
-        ]
-        return min(priorities) if priorities else 0
+        # Restore each subset's results to their original positions.
+        merged: list[NotifyResult] = [None] * len(batch)
+        for (index, _, _), result in zip(sequential, seq_results):
+            # Put each ordered result back where its service began.
+            merged[index] = result
+
+        for (index, _, _), result in zip(parallel, par_results):
+            # Do the same for results from the worker pool.
+            merged[index] = result
+
+        # Both subsets must succeed for the complete batch to succeed.
+        return seq_ok and par_ok, merged
+
+    @staticmethod
+    async def _split_and_dispatch_async(
+        batch: list[ServiceCall], call_deadline: Optional[float] = None
+    ) -> tuple[bool, list[NotifyResult]]:
+        """Dispatch sequential and asynchronous subsets of ``batch``.
+
+        Both subsets run together without blocking the event loop. Results
+        retain their original order.
+        """
+        # Remember positions while splitting so results retain input order.
+        sequential: list = []
+        parallel: list = []
+        for index, (service, kwargs) in enumerate(batch):
+            # Each service's own asset decides how it gets dispatched.
+            group = parallel if service.asset.async_mode else sequential
+            group.append((index, service, kwargs))
+
+        # Use the caller's active event loop for the blocking subset.
+        loop = asyncio.get_running_loop()
+        # Run the blocking coordinator outside the leaf-call pool it awaits.
+        executor = get_coordinator_executor()
+
+        # Start the blocking batch in the executor so both subsets overlap
+        # without blocking this event loop.
+        seq_future = (
+            loop.run_in_executor(
+                executor,
+                contextvars.copy_context().run,
+                partial(
+                    Apprise._notify_sequential,
+                    *[(s, k) for _, s, k in sequential],
+                    call_deadline=call_deadline,
+                ),
+            )
+            if sequential
+            else None
+        )
+
+        # Start and await services that support asynchronous delivery.
+        par_ok, par_results = (
+            await Apprise._notify_parallel_asyncio(
+                *[(s, k) for _, s, k in parallel], call_deadline=call_deadline
+            )
+            if parallel
+            else (True, [])
+        )
+
+        # Collect the blocking batch, which may already be complete.
+        seq_ok, seq_results = await seq_future if seq_future else (True, [])
+
+        # Restore each subset's results to their original positions.
+        merged: list[NotifyResult] = [None] * len(batch)
+        for (index, _, _), result in zip(sequential, seq_results):
+            # Put each ordered result back where its service began.
+            merged[index] = result
+
+        for (index, _, _), result in zip(parallel, par_results):
+            # Do the same for asynchronously delivered results.
+            merged[index] = result
+
+        # Both subsets must succeed for the complete batch to succeed.
+        return seq_ok and par_ok, merged
 
     def notify(
         self,
@@ -621,7 +1024,13 @@ class Apprise:
         match_always: bool = True,
         attach: Any = None,
         interpret_escapes: Optional[bool] = None,
-    ) -> Optional[bool]:
+        template: Optional[dict] = None,
+        timeout: Union[int, float] = 0,
+        log_callback: Optional[
+            Callable[[NotifyLogEntry, Optional[NotifyBase]], None]
+        ] = None,
+        log_level: Optional[int] = None,
+    ) -> AppriseResult:
         """Send a notification to all the plugins previously loaded.
 
         If the body_format specified is NotifyFormat.MARKDOWN, it will be
@@ -632,10 +1041,17 @@ class Apprise:
         are notified.  By default, all added services are notified
         (tag=MATCH_ALL_TAG)
 
-        This function returns True if all notifications were successfully sent,
-        False if even just one of them fails, and None if no notifications were
-        sent at all as a result of tag filtering and/or simply having empty
-        configuration files that were read.
+        Delivery and message-validation outcomes return ``AppriseResult``.
+        ``bool(result)`` preserves the previous True/False behavior, while its
+        status distinguishes success, failure, no match, and timeout. Iterate
+        the result to inspect each service actually dispatched:
+
+            result = apobj.notify(body="hello")
+            for service_result in result:
+                print(service_result.name, bool(service_result))
+
+        ``result.logs()`` combines service and orchestration entries in time
+        order. Orchestration-only entries are also available in ``call_logs``.
 
         A filter tag may carry an optional priority prefix and/or retry suffix:
 
@@ -647,7 +1063,7 @@ class Apprise:
         When no priority prefix is given, matched services are grouped by
         their configured tag priority and dispatched in ascending order
         (lowest number = highest urgency).  If every service in the lowest
-        priority group succeeds, Apprise returns True immediately without
+        priority group succeeds, Apprise returns success immediately without
         running higher-numbered priority groups (escalation chain).
 
         When an explicit priority prefix IS given (e.g. "3:endpoint"), only
@@ -660,253 +1076,199 @@ class Apprise:
 
         Set interpret_escapes to True if you want to pre-escape a string such
         as turning a \n into an actual new line, etc.
+
+        ``template`` supplies values for any YAML configuration entry
+        written with ``${NAME}``.  A value not given here is looked for
+        in the configuration's own defaults and then in
+        ``APPRISE_TEMPLATE_<NAME>``. Blank call values are ignored, while
+        an empty configuration default remains valid. An entry still missing
+        a value is skipped, and the overall status reports PARTIAL rather
+        than SUCCESS.
+
+        ``timeout`` limits the entire call in seconds; unfinished services
+        report TIMEOUT. The earlier call or service limit applies. A value of
+        0 leaves only the service limit active. Values must be finite,
+        non-negative numbers; invalid values raise
+        ``AppriseImproperlyConfigured``.
+
+        log_callback overrides the instance default for this call. It must be
+        synchronous; schedule any async work from inside the callback.
+        ``service`` is ``None`` for a call-level entry (see
+        ``result.call_logs()`` above).
+
+        log_level overrides the capture level for this call. It defaults to
+        WARNING, or INFO when a log_callback is active. Use DEBUG or TRACE for
+        more detail.
         """
-
-        try:
-            all_calls = list(
-                self._create_notify_gen(
-                    body,
-                    title,
-                    notify_type=notify_type,
-                    body_format=body_format,
-                    tag=tag,
-                    match_always=match_always,
-                    attach=attach,
-                    interpret_escapes=interpret_escapes,
+        with CallState(self, tag, timeout, log_callback, log_level) as call:
+            try:
+                all_calls = list(
+                    self._create_notify_gen(
+                        body,
+                        title,
+                        notify_type=notify_type,
+                        body_format=body_format,
+                        tag=tag,
+                        match_always=match_always,
+                        attach=attach,
+                        interpret_escapes=interpret_escapes,
+                        template=template,
+                        report=call.skipped,
+                    )
                 )
-            )
 
-        except TypeError:
-            return False
+            except Exception as e:
+                # A single service that fails is handled per service, so
+                # anything reaching here is a problem with the call: a
+                # message Apprise cannot use, or nothing to send at all.
+                return call.unprepared(e)
 
-        if not all_calls:
-            return None
+            if not all_calls:
+                # Tag filter matched nothing, or no services are loaded at all.
+                return call.result(AppriseResultStatus.NOMATCH)
 
-        # Inject the per-service call-time retry override.  Each matched
-        # service gets the retry from the first filter token that both matches
-        # it and carries a retry suffix (e.g. "devops:3" applies retry=3 only
-        # to devops-tagged services, not to management-tagged services).
-        all_calls = Apprise._inject_per_service_retries(all_calls, tag)
+            # Apply the first matching retry suffix to each service.
+            all_calls = call.prepare(all_calls)
 
-        if Apprise._filter_has_explicit_priority(tag):
-            # Tag filter carries an explicit priority prefix (e.g. "2:alerts").
-            # Skip the escalation chain: dispatch all matched services as a
-            # single flat batch regardless of their individual tag priorities.
-            sequential = [
-                (s, k) for s, k in all_calls if not s.asset.async_mode
-            ]
-            parallel = [(s, k) for s, k in all_calls if s.asset.async_mode]
-            seq_ok = (
-                Apprise._notify_sequential(*sequential) if sequential else True
-            )
-            par_ok = (
-                Apprise._notify_parallel_threadpool(*parallel)
-                if parallel
-                else True
-            )
-            return seq_ok and par_ok
+            if Apprise._filter_has_explicit_priority(tag):
+                # An explicit priority sends one flat batch without escalation.
+                try:
+                    outcome = Apprise._split_and_dispatch(
+                        all_calls, call_deadline=call.deadline
+                    )
 
-        # No explicit priority in the filter -- use per-tag escalation chains.
-        #
-        # Each distinct OR token forms an independent chain.  Within a chain,
-        # services are grouped by their configured tag priority.  The lowest-
-        # numbered group (highest urgency) runs first.  If every service in
-        # that group succeeds the chain is done; any failure escalates to the
-        # next priority group.  notify() returns True only when every chain
-        # finds a fully-successful group.
-        #
-        # When multiple chains are active in the same round their current
-        # priority-group batches run concurrently via a thread pool so that
-        # one chain's services cannot delay another chain.
-        chains = Apprise._build_tag_chains(all_calls, tag)
+                except Exception as e:
+                    # Hand the crash over as the batch outcome.
+                    outcome = e
 
-        def _run_batch(batch):
-            """Dispatch one priority-group batch; True = all services ok."""
-            seq = [(s, k) for s, k in batch if not s.asset.async_mode]
-            par = [(s, k) for s, k in batch if s.asset.async_mode]
-            seq_ok = Apprise._notify_sequential(*seq) if seq else True
-            par_ok = Apprise._notify_parallel_threadpool(*par) if par else True
-            return seq_ok and par_ok
+                return call.flat(outcome)
 
-        # Per-chain state: priorities (sorted), groups dict, current index,
-        # and a flag marking whether a successful group has been found.
-        chain_states = {
-            key: {
-                "priorities": sorted(groups),
-                "groups": groups,
-                "idx": 0,
-                "succeeded": False,
-            }
-            for key, groups in chains.items()
-        }
+            # Without an explicit priority:
+            # - Each OR tag becomes an independent chain.
+            # - Each chain starts at its highest priority.
+            # - A failed group advances only its own chain.
+            # - Active chains run concurrently.
+            call.escalate(all_calls)
 
-        while True:
-            # When abort_on_chain_failure is enabled, stop as soon as any
-            # chain has exhausted all its priority groups without success.
-            # With the default (False) all chains run to completion even if
-            # one has already failed, so every defined URL gets an attempt.
-            if self.asset.abort_on_chain_failure and any(
-                not st["succeeded"] and st["idx"] >= len(st["priorities"])
-                for st in chain_states.values()
-            ):
-                return False
+            for active in call.rounds():
+                if len(active) == 1:
+                    # Single active chain: dispatch directly, no thread
+                    # overhead.
+                    chain = active[0]
+                    try:
+                        outcome = Apprise._split_and_dispatch(
+                            chain.batch, call_deadline=call.deadline
+                        )
 
-            # Collect chains that still need to try their next priority group.
-            active = [
-                (key, st)
-                for key, st in chain_states.items()
-                if not st["succeeded"] and st["idx"] < len(st["priorities"])
-            ]
-            if not active:
-                break  # every chain has either succeeded or been exhausted
+                    except Exception as e:
+                        # Hand the crash over as the batch outcome.
+                        outcome = e
 
-            if len(active) == 1:
-                # Single active chain: dispatch directly, no thread overhead.
-                _, st = active[0]
-                batch = st["groups"][st["priorities"][st["idx"]]]
-                if _run_batch(batch):
-                    st["succeeded"] = True
-                else:
-                    st["idx"] += 1  # escalate to next priority
-            else:
-                # Multiple active chains: run their current-priority batches
-                # concurrently so independent chains don't block each other.
-                with cf.ThreadPoolExecutor() as executor:
-                    future_map = {
-                        executor.submit(
-                            _run_batch,
-                            st["groups"][st["priorities"][st["idx"]]],
-                        ): (key, st)
-                        for key, st in active
-                    }
-                    for future in cf.as_completed(future_map):
-                        _, st = future_map[future]
-                        try:
-                            ok = future.result()
-                        except Exception:
-                            logger.exception(
-                                "Unhandled Notification Exception"
-                            )
-                            ok = False
-                        if ok:
-                            st["succeeded"] = True
-                        else:
-                            st["idx"] += 1  # escalate to next priority
+                    call.settle(chain, outcome)
+                    continue
 
-        return all(st["succeeded"] for st in chain_states.values())
+                # Run active chains in the coordinator pool so their
+                # service calls can use the shared worker pool.
+                executor = get_coordinator_executor()
+                future_map = {
+                    submit_with_context(
+                        executor,
+                        Apprise._split_and_dispatch,
+                        chain.batch,
+                        call.deadline,
+                    ): chain
+                    for chain in active
+                }
+                # Collect in submission order so results are stable
+                # even when chains finish in a different order.
+                for future, chain in future_map.items():
+                    try:
+                        outcome = future.result()
 
-    async def async_notify(self, *args: Any, **kwargs: Any) -> Optional[bool]:
-        """Send a notification to all the plugins previously loaded, for
-        asynchronous callers.
+                    except Exception as e:
+                        # Hand the crash over as the batch outcome.
+                        outcome = e
 
-        The arguments are identical to those of Apprise.notify().
+                    call.settle(chain, outcome)
+
+            return call.finish()
+
+    async def async_notify(self, *args: Any, **kwargs: Any) -> AppriseResult:
+        """Asynchronously notify all loaded plugins.
+
+        Arguments and results match :meth:`notify`, including ``timeout``,
+        ``log_callback``, and ``log_level``.
         """
         tag = kwargs.get("tag", common.MATCH_ALL_TAG)
 
-        try:
-            all_calls = list(self._create_notify_gen(*args, **kwargs))
+        # Pop these -- none is a _create_notify_gen() parameter.
+        with CallState(
+            self,
+            tag,
+            kwargs.pop("timeout", 0),
+            kwargs.pop("log_callback", None),
+            kwargs.pop("log_level", None),
+        ) as call:
+            # Entries held back because a template value was never supplied.
+            kwargs["report"] = call.skipped
 
-        except TypeError:
-            return False
+            try:
+                all_calls = list(self._create_notify_gen(*args, **kwargs))
 
-        if not all_calls:
-            return None
+            except Exception as e:
+                # As in notify(), but this signature takes *args/**kwargs,
+                # so an unknown argument lands here too instead of being
+                # rejected before the block above runs.
+                return call.unprepared(e)
 
-        # Inject per-service call-time retry overrides (same logic as notify).
-        all_calls = Apprise._inject_per_service_retries(all_calls, tag)
+            if not all_calls:
+                # Tag filter matched nothing, or no services are loaded at all.
+                return call.result(AppriseResultStatus.NOMATCH)
 
-        if Apprise._filter_has_explicit_priority(tag):
-            # Explicit priority prefix: flat dispatch, no escalation.
-            sequential = [
-                (s, k) for s, k in all_calls if not s.asset.async_mode
-            ]
-            parallel = [(s, k) for s, k in all_calls if s.asset.async_mode]
-            seq_ok = (
-                Apprise._notify_sequential(*sequential) if sequential else True
-            )
-            par_ok = (
-                await Apprise._notify_parallel_asyncio(*parallel)
-                if parallel
-                else True
-            )
-            return seq_ok and par_ok
+            # Inject per-service call-time retry overrides (same logic as
+            # notify).
+            all_calls = call.prepare(all_calls)
 
-        # Per-tag independent escalation chains -- same semantics as notify().
-        #
-        # Each chain's current-priority batch is dispatched as a coroutine.
-        # All active chains' batches run concurrently via asyncio.gather() so
-        # async services across independent chains can make I/O progress
-        # simultaneously.  Only chains whose current batch failed advance to
-        # the next priority group (escalation).
-        chains = Apprise._build_tag_chains(all_calls, tag)
+            if Apprise._filter_has_explicit_priority(tag):
+                # Explicit priority prefix: flat dispatch, no escalation.
+                try:
+                    outcome = await Apprise._split_and_dispatch_async(
+                        all_calls, call_deadline=call.deadline
+                    )
 
-        async def _run_batch_async(batch):
-            """Dispatch one priority-group batch; True = all services ok."""
-            seq = [(s, k) for s, k in batch if not s.asset.async_mode]
-            par = [(s, k) for s, k in batch if s.asset.async_mode]
-            # Sequential items (async_mode=False) run blocking in the caller;
-            # async items are gathered concurrently.
-            seq_ok = Apprise._notify_sequential(*seq) if seq else True
-            par_ok = (
-                await Apprise._notify_parallel_asyncio(*par) if par else True
-            )
-            return seq_ok and par_ok
+                except Exception as e:
+                    # Hand the crash over as the batch outcome.
+                    outcome = e
 
-        chain_states = {
-            key: {
-                "priorities": sorted(groups),
-                "groups": groups,
-                "idx": 0,
-                "succeeded": False,
-            }
-            for key, groups in chains.items()
-        }
+                return call.flat(outcome)
 
-        while True:
-            # Same abort_on_chain_failure guard as notify().
-            if self.asset.abort_on_chain_failure and any(
-                not st["succeeded"] and st["idx"] >= len(st["priorities"])
-                for st in chain_states.values()
-            ):
-                return False
+            # Use the same independent escalation chains as notify(). Active
+            # groups run together; only a failed chain advances.
+            call.escalate(all_calls)
 
-            active = [
-                (key, st)
-                for key, st in chain_states.items()
-                if not st["succeeded"] and st["idx"] < len(st["priorities"])
-            ]
-            if not active:
-                break  # every chain has either succeeded or been exhausted
+            for active in call.rounds():
+                # Run active chains together. Keep one failure from cancelling
+                # the others; gather() hands a cancellation back as a value,
+                # so settle() receives it like any other outcome.
+                gathered = await asyncio.gather(
+                    *(
+                        Apprise._split_and_dispatch_async(
+                            chain.batch, call_deadline=call.deadline
+                        )
+                        for chain in active
+                    ),
+                    return_exceptions=True,
+                )
 
-            # Run all active chains' current-priority batches concurrently.
-            # asyncio.gather() interleaves coroutines so async services across
-            # different chains can pipeline their I/O simultaneously.
-            # return_exceptions=True prevents one failing batch from cancelling
-            # the others; exceptions are treated as delivery failures below.
-            results = await asyncio.gather(
-                *(
-                    _run_batch_async(st["groups"][st["priorities"][st["idx"]]])
-                    for _, st in active
-                ),
-                return_exceptions=True,
-            )
+                for chain, outcome in zip(active, gathered):
+                    call.settle(chain, outcome)
 
-            for (_, st), ok in zip(active, results):
-                if isinstance(ok, Exception):
-                    # Escaped exception -- safety net; treat as failure.
-                    logger.exception("Unhandled Notification Exception")
-                    st["idx"] += 1
-                elif ok:
-                    st["succeeded"] = True
-                else:
-                    st["idx"] += 1  # escalate to next priority group
-
-        return all(st["succeeded"] for st in chain_states.values())
+            return call.finish()
 
     def _create_notify_calls(self, *args, **kwargs):
         """Creates notifications for all the plugins loaded.
 
-        Returns a list of (server, notify() kwargs) tuples for plugins with
+        Returns a list of (service, notify() kwargs) tuples for plugins with
         parallelism disabled and another list for plugins with parallelism
         enabled.
         """
@@ -915,11 +1277,11 @@ class Apprise:
 
         # Split into sequential and parallel notify() calls.
         sequential, parallel = [], []
-        for server, notify_kwargs in all_calls:
-            if server.asset.async_mode:
-                parallel.append((server, notify_kwargs))
+        for service, notify_kwargs in all_calls:
+            if service.asset.async_mode:
+                parallel.append((service, notify_kwargs))
             else:
-                sequential.append((server, notify_kwargs))
+                sequential.append((service, notify_kwargs))
 
         return sequential, parallel
 
@@ -933,19 +1295,26 @@ class Apprise:
         match_always=True,
         attach=None,
         interpret_escapes=None,
+        template=None,
+        report=None,
     ):
-        """Internal generator function for _create_notify_calls()."""
+        """Internal generator function for _create_notify_calls().
+
+        A service that raises while its content is prepared is still
+        yielded, carrying its exception, so dispatch reports it only if a
+        chain actually reaches it.
+        """
 
         if len(self) == 0:
-            # Nothing to notify
-            msg = "There are no service(s) to notify"
-            logger.error(msg)
-            raise TypeError(msg)
+            # Nothing loaded -- same as an empty tag match: NOMATCH, not
+            # FAILURE.
+            logger.warning("There are no service(s) to notify")
+            return
 
         if not (title or body or attach):
             msg = "No message content specified to deliver"
             logger.error(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         try:
             notify_type = (
@@ -958,7 +1327,7 @@ class Apprise:
             err = (
                 f"An invalid notification type ({notify_type}) was specified."
             )
-            raise TypeError(err) from None
+            raise AppriseImproperlyConfigured(err) from None
 
         try:
             if title and isinstance(title, bytes):
@@ -973,7 +1342,12 @@ class Apprise:
                 f"type: {self.asset.encoding}"
             )
             logger.error(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
+
+        # Normalize falsy values. Each service applies the cap from its own
+        # asset below, which may differ from ``self.asset``.
+        title = title or ""
+        body = body or ""
 
         # Tracks conversions
         conversion_body_map = {}
@@ -998,406 +1372,540 @@ class Apprise:
         )
 
         # Iterate over our loaded plugins
-        for server in self.find(tag, match_always=match_always):
+        for service in self.find(
+            tag,
+            match_always=match_always,
+            template=template,
+            report=report,
+        ):
             # If our code reaches here, we either did not define a tag (it
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
 
-            # First we need to generate a key we will use to determine if we
-            # need to build our data out.  Entries without are merged with
-            # the body at this stage.
-            key = (
-                server.notify_format
-                if server.title_maxlen > 0
-                else f"_{server.notify_format}"
-            )
+            # One misbehaving plugin must not stop the rest, so
+            # anything raised while preparing this service's content
+            # fails only this service.
+            try:
+                # Resolve this service's actual output format for this call.
+                # A single-format service always uses its declared format. A
+                # multi-format service may resolve differently for each call,
+                # based on its URL's ``format`` option or the ``body_format``
+                # supplied to notify().
+                target_format = service.resolve_format(body_format)
 
-            if server.interpret_emojis:
-                # alter our key slightly to handle emojis since their value is
-                # pulled out of the notification
-                key += "-emojis"
-
-            if key not in conversion_title_map:
-                # Prepare our title
-                conversion_title_map[key] = title if title else ""
-
-                # Conversion of title only occurs for services where the title
-                # is blended with the body (title_maxlen <= 0)
-                if conversion_title_map[key] and server.title_maxlen <= 0:
-                    conversion_title_map[key] = convert_between(
-                        body_format,
-                        server.notify_format,
-                        content=conversion_title_map[key],
-                    )
-
-                # Our body is always converted no matter what
-                conversion_body_map[key] = convert_between(
-                    body_format, server.notify_format, content=body
+                # Apply the service's own cap before conversion. Its asset may
+                # differ from the top-level asset and have a smaller limit.
+                capped_title, capped_body = (
+                    service.asset.enforce_payload_max_size(title, body)
                 )
+                capped_len = len(capped_title) + len(capped_body)
+                if capped_len < len(title) + len(body):
+                    logger.warning(
+                        "%s payload trimmed to stay within the configured "
+                        "payload_max_size of %d characters.",
+                        service.service_name,
+                        service.asset._payload_max_size,
+                    )
 
-                if interpret_escapes:
-                    #
-                    # Escape our content
-                    #
+                # Cache by the resolved format, title handling, and
+                # payload cap.  Services with the same output needs can
+                # share converted content.
+                key = (
+                    target_format
+                    if service.title_maxlen > 0
+                    else f"_{target_format}"
+                )
+                if service.asset._payload_max_size:
+                    # Allocation settings can produce different capped content,
+                    # so each combination needs its own conversion.
+                    key += (
+                        f"-cap{service.asset._payload_max_size}"
+                        f"-buf{service.asset._payload_buffer_threshold}"
+                        f"-min{service.asset._payload_min_buffer}"
+                    )
 
-                    try:
-                        # Added overhead required due to Python 3 Encoding Bug
-                        # identified here: https://bugs.python.org/issue21331
-                        conversion_body_map[key] = (
+                if service.interpret_emojis:
+                    # alter our key slightly to handle emojis since
+                    # their value is pulled out of the notification
+                    key += "-emojis"
+
+                if key not in conversion_title_map:
+                    # Prepare our title
+                    conversion_title_map[key] = (
+                        capped_title if capped_title else ""
+                    )
+
+                    # Conversion of title only occurs for services
+                    # where the title is blended with the body
+                    # (title_maxlen <= 0)
+                    if conversion_title_map[key] and service.title_maxlen <= 0:
+                        conversion_title_map[key] = convert_between(
+                            body_format,
+                            target_format,
+                            content=conversion_title_map[key],
+                        )
+
+                    # Our body is always converted no matter what
+                    conversion_body_map[key] = convert_between(
+                        body_format, target_format, content=capped_body
+                    )
+
+                    if interpret_escapes:
+                        #
+                        # Escape our content
+                        #
+
+                        try:
+                            # Added overhead required due to Python 3
+                            # Encoding Bug identified here:
+                            # https://bugs.python.org/issue21331
+                            conversion_body_map[key] = (
+                                conversion_body_map[key]
+                                .encode("ascii", "backslashreplace")
+                                .decode("unicode-escape")
+                            )
+
+                            conversion_title_map[key] = (
+                                conversion_title_map[key]
+                                .encode("ascii", "backslashreplace")
+                                .decode("unicode-escape")
+                            )
+
+                        except AttributeError:
+                            # Must be of string type
+                            msg = "Failed to escape message body"
+                            logger.error(msg)
+                            raise AppriseImproperlyConfigured(msg) from None
+
+                    if service.interpret_emojis:
+                        #
+                        # Convert our :emoji: definitions
+                        #
+
+                        conversion_body_map[key] = apply_emojis(
                             conversion_body_map[key]
-                            .encode("ascii", "backslashreplace")
-                            .decode("unicode-escape")
                         )
-
-                        conversion_title_map[key] = (
+                        conversion_title_map[key] = apply_emojis(
                             conversion_title_map[key]
-                            .encode("ascii", "backslashreplace")
-                            .decode("unicode-escape")
                         )
 
-                    except AttributeError:
-                        # Must be of string type
-                        msg = "Failed to escape message body"
-                        logger.error(msg)
-                        raise TypeError(msg) from None
+            except AppriseImproperlyConfigured:
+                # Bad input from the caller is not this service's
+                # fault; it stops the whole call as it always has.
+                raise
 
-                if server.interpret_emojis:
-                    #
-                    # Convert our :emoji: definitions
-                    #
-
-                    conversion_body_map[key] = apply_emojis(
-                        conversion_body_map[key]
-                    )
-                    conversion_title_map[key] = apply_emojis(
-                        conversion_title_map[key]
-                    )
+            except Exception as e:
+                # Hand the failure to dispatch rather than reporting it
+                # now.  A fallback that escalation never reaches is then
+                # never blamed, and an optional service stays optional.
+                yield (service, {"_prepare_error": e})
+                continue
 
             kwargs = {
                 "body": conversion_body_map[key],
                 "title": conversion_title_map[key],
                 "notify_type": notify_type,
                 "attach": attach,
-                "body_format": body_format,
+                # Pass the resolved target format; downstream notify()
+                # calls use it directly without resolving again.
+                # Preserve whether the caller omitted a source format so
+                # downstream code skips automatic format conversion.
+                "body_format": target_format,
+                "body_passthrough": body_format is None,
+                # Confirm the source was capped before conversion. The private
+                # token prevents direct callers from skipping their own cap.
+                "_payload_precapped": _PAYLOAD_PRECAPPED,
             }
-            yield (server, kwargs)
+            yield (service, kwargs)
 
     @staticmethod
-    def _notify_sequential(*servers_kwargs):
-        """Process a list of notify() calls sequentially and synchronously.
+    def _notify_sequential(
+        *services_kwargs: ServiceCall, call_deadline: Optional[float] = None
+    ) -> tuple[bool, list[NotifyResult]]:
+        """Process a list of notify() calls one at a time, in order.
 
-        Each server is attempted once and then retried up to server.retry
-        additional times on failure before moving on.  When server.wait is
-        greater than zero, the process sleeps that many seconds between
-        each retry attempt.
-
-        A per-call retry override may be injected into kwargs under the key
-        ``_retry_override``; when present it takes precedence over the
-        server's own retry attribute for this invocation only.
-
-        Exceptions raised by a plugin's notify() -- including those from
-        third-party @notify-decorated functions that are outside our control
-        -- are caught here and treated as a delivery failure.  The retry
-        logic still applies, so a plugin that raises on the first attempt
-        will be retried the configured number of times before giving up.
+        Calls with deadlines use the shared executor so Apprise can stop
+        waiting on a blocked service while preserving result order.
         """
 
         success = True
+        results: list[NotifyResult] = []
 
-        for server, kwargs in servers_kwargs:
-            # Pop the per-call override before forwarding kwargs to the
-            # plugin so it never sees the internal _retry_override key.
-            retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
-            wait = getattr(server, "wait", 0.0)
+        for service, kwargs in services_kwargs:
+            # The outer wait needs a deadline before submission.
+            deadline = compute_deadline(service, call_deadline)
 
-            result = False
-            for attempt in range(retry + 1):
-                # Attempt delivery.  TypeError comes from Apprise's own
-                # validation; bare Exception guards against buggy or
-                # third-party plugins (including @notify decorators) that
-                # may raise unexpectedly.  Both are treated as failure so
-                # the retry loop can continue.
-                try:
-                    result = server.notify(**kwargs)
-                except TypeError:
-                    result = False
-                except Exception:
-                    logger.exception("Unhandled Notification Exception")
-                    result = False
+            # Preserve retry metadata before the worker consumes its override.
+            max_attempts = configured_max_attempts(service, kwargs)
 
-                if result:
-                    # Delivered successfully; no need to retry this server.
-                    break
+            if deadline is None:
+                ok, notify_result = call_with_retry(service, kwargs, None)
+                success = success and ok
+                results.append(notify_result)
+                continue
 
-                if attempt < retry:
-                    # Delivery failed and retries remain.  Log the attempt
-                    # number and pause before the next try.
-                    logger.warning(
-                        "Retry %d/%d for %s",
-                        attempt + 1,
-                        retry,
-                        server.service_name,
-                    )
-                    if wait > 0:
-                        time.sleep(wait)
+            # Allow a small grace window before abandoning the wait.
+            abandon_at = deadline + _ABANDON_GRACE_SECONDS
+            wait_start = time.monotonic()
+            wait_for = max(0.0, abandon_at - wait_start)
 
-            # Optional-service check.
-            #
-            # At this point all retry attempts for 'server' have been
-            # exhausted (the for-loop above has finished).  If the final
-            # result is still False *and* the service is marked optional,
-            # we overwrite result to True before folding it into the
-            # running 'success' accumulator.  This silently absorbs the
-            # failure: the caller will not see it as a delivery error.
-            #
-            # Interaction with retries:
-            #   The retry loop above has already run.  optional= does not
-            #   short-circuit or bypass retries -- it only changes the
-            #   interpretation of the *final* result once all attempts
-            #   are done.  A service with retry=3 and optional=True will
-            #   still be attempted four times before the failure is
-            #   absorbed here.
-            if not result and getattr(server, "optional", False):
-                logger.info(
-                    "Optional service '%s' failed; ignoring failure.",
-                    server.service_name,
+            logger.trace(
+                "Waiting up to %.3fs for '%s'.",
+                wait_for,
+                service.service_name,
+            )
+
+            executor = get_shared_executor()
+            future = submit_with_context(
+                executor, call_with_retry, service, kwargs, deadline
+            )
+            try:
+                # Keep a final guard for unexpected executor failures.
+                ok, notify_result = future.result(timeout=wait_for)
+                logger.trace(
+                    "'%s' finished after %.3fs: %s.",
+                    service.service_name,
+                    time.monotonic() - wait_start,
+                    "success" if ok else "failure",
                 )
-                result = True
 
-            # Fold this service's result into the running batch outcome.
-            # Boolean AND is used so that a single False from any required
-            # (non-optional) service permanently taints 'success' for the
-            # whole batch -- even if later services succeed.  Optional
-            # failures are already re-mapped to True above, so they never
-            # contribute a False here.
-            success = success and result
+            except cf.TimeoutError:
+                # The service took too long; report TIMEOUT and move on.
+                wait_elapsed = time.monotonic() - wait_start
 
-        return success
+                # Track only work that already started and cannot be cancelled.
+                cancelled = future.cancel()
+                if not cancelled:
+                    name, url, _, _, _ = service_metadata(service)
+                    track_abandoned_future(future, name, url)
+                logger.trace(
+                    "Stopped waiting for '%s' after %.3fs (%s).",
+                    service.service_name,
+                    wait_elapsed,
+                    "it was still queued and has been cancelled"
+                    if cancelled
+                    else "its worker thread may still be running in the "
+                    "background",
+                )
+                notify_result = timeout_result(
+                    service,
+                    wait_elapsed,
+                    max_attempts,
+                )
+                ok = bool(notify_result)
+
+            except Exception as e:
+                # Safety net; one crash must not sink the whole batch.
+                notify_result = service_crashed(service, e)
+                ok = bool(notify_result)
+
+            # One required failure means the whole batch cannot succeed.
+            # Optional failures already count as SUCCESS in NotifyResult.
+            success = success and ok
+            results.append(notify_result)
+
+        return success, results
 
     @staticmethod
-    def _notify_parallel_threadpool(*servers_kwargs):
+    def _notify_parallel_threadpool(
+        *services_kwargs: ServiceCall, call_deadline: Optional[float] = None
+    ) -> tuple[bool, list[NotifyResult]]:
         """Process a list of notify() calls in parallel via a thread pool.
 
-        Each server runs in its own thread.  Within each thread, the server
-        is retried up to server.retry additional times on failure with an
-        optional server.wait second sleep between each attempt.
-
-        Falls back to _notify_sequential() when only a single server is
-        given to avoid the overhead of spawning a thread pool for one call.
-
-        Exceptions from a plugin's notify() -- including those from
-        third-party @notify-decorated functions -- are caught inside each
-        thread and treated as delivery failures so the retry logic can
-        still run.
+        Each worker handles retries and deadlines for one service. Timed-out
+        workers may keep running, but Apprise stops waiting.
         """
 
-        n_calls = len(servers_kwargs)
+        n_calls = len(services_kwargs)
 
         if n_calls == 0:
-            return True
+            return True, []
 
-        # Avoid thread-pool overhead for a single notification.
         if n_calls == 1:
-            return Apprise._notify_sequential(servers_kwargs[0])
-
-        logger.info(
-            "Notifying %d service(s) with threads.", len(servers_kwargs)
-        )
-
-        def _call_with_retry(server, kwargs):
-            """Execute one server's notify() with retry/wait logic.
-
-            Runs inside a worker thread.  Pops ``_retry_override`` from
-            kwargs so it is never forwarded to the plugin's notify() call.
-            Exceptions are caught and treated as failures so the retry
-            loop continues even when a plugin raises unexpectedly.
-            """
-            # Pop the per-call override so it stays internal.
-            retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
-            wait = getattr(server, "wait", 0.0)
-
-            result = False
-            for attempt in range(retry + 1):
-                # Same exception handling as _notify_sequential: TypeError
-                # from Apprise validation and bare Exception for buggy or
-                # third-party plugins both map to a retriable failure.
-                try:
-                    result = server.notify(**kwargs)
-                except TypeError:
-                    result = False
-                except Exception:
-                    logger.exception("Unhandled Notification Exception")
-                    result = False
-
-                if result:
-                    return True
-
-                if attempt < retry:
-                    logger.warning(
-                        "Retry %d/%d for %s",
-                        attempt + 1,
-                        retry,
-                        server.service_name,
-                    )
-                    if wait > 0:
-                        time.sleep(wait)
-
-            # Optional-service check (thread-pool path).
-            #
-            # All retry attempts for this server have been exhausted by the
-            # loop above.  If the final result is still False and the service
-            # is tagged as optional, return True from this worker function
-            # instead of False.  The caller (_notify_parallel_threadpool)
-            # collects each worker's return value via future.result() and
-            # ANDs them together; returning True here prevents this worker's
-            # failure from tainting the aggregate result.
-            #
-            # This is the thread-pool equivalent of the same check in
-            # _notify_sequential.  See the comment there for a full
-            # explanation of the getattr() guard and the retry interaction.
-            if not result and getattr(server, "optional", False):
-                logger.info(
-                    "Optional service '%s' failed; ignoring failure.",
-                    server.service_name,
+            service, _ = services_kwargs[0]
+            # Only take the no-thread-pool shortcut when this service has
+            # no deadline whatsoever -- there is nothing to abandon, so a
+            # plain blocking call is strictly cheaper and behaves
+            # identically. Otherwise fall through to the thread-pool path
+            # below so the deadline can actually be enforced.
+            if compute_deadline(service, call_deadline) is None:
+                return Apprise._notify_sequential(
+                    services_kwargs[0], call_deadline=call_deadline
                 )
-                # Return True so future.result() in the caller reports
-                # success for this optional worker thread.
-                return True
 
-            # Every attempt for this service failed and it is not optional;
-            # propagate the failure to the caller.
-            return result
+        logger.debug("Threaded notification mode")
+        logger.info("Notifying %d service(s).", len(services_kwargs))
 
-        # Submit all server calls to the thread pool and collect results.
-        with cf.ThreadPoolExecutor() as executor:
-            success = True
-            futures = [
-                executor.submit(_call_with_retry, server, kwargs)
-                for (server, kwargs) in servers_kwargs
-            ]
+        # Keep output ordered by input, though threads finish out of order.
+        # This is the shared, process-wide pool (see get_shared_executor()),
+        # not a fresh one per call -- never shut down here, it persists for
+        # the life of the process so a chronically hanging endpoint cannot
+        # leak one more permanently-running thread with every call.
+        executor = get_shared_executor()
+        success = True
+        results: list[Optional[NotifyResult]] = [None] * n_calls
 
-            for future in cf.as_completed(futures):
+        # Snapshot every service's deadline once, right at submission
+        # time (they all start at essentially the same instant here).
+        deadlines: list[Optional[float]] = [
+            compute_deadline(service, call_deadline)
+            for service, kwargs in services_kwargs
+        ]
+
+        # Preserve retry metadata before workers consume private overrides.
+        max_attempts = [
+            configured_max_attempts(service, kwargs)
+            for service, kwargs in services_kwargs
+        ]
+        future_to_idx: dict[cf.Future, int] = {
+            submit_with_context(
+                executor, call_with_retry, service, kwargs, deadlines[i]
+            ): i
+            for i, (service, kwargs) in enumerate(services_kwargs)
+        }
+
+        for future, idx in future_to_idx.items():
+            service = services_kwargs[idx][0]
+            # Give each expired service one grace window, not one per loop.
+            abandon_at = (
+                deadlines[idx] + _ABANDON_GRACE_SECONDS
+                if deadlines[idx] is not None
+                else None
+            )
+            wait_start = time.monotonic()
+            wait_for = (
+                max(0.0, abandon_at - wait_start)
+                if abandon_at is not None
+                else None
+            )
+            logger.trace(
+                "Waiting up to %s for '%s'.",
+                "no limit" if wait_for is None else f"{wait_for:.3f}s",
+                service.service_name,
+            )
+            try:
                 # future.result() re-raises any exception that escaped
-                # _call_with_retry (should not happen given the inner
+                # call_with_retry (should not happen given the inner
                 # try/except, but guard here as a safety net).
-                try:
-                    success = success and future.result()
-                except Exception:
-                    logger.exception("Unhandled Notification Exception")
-                    success = False
+                ok, notify_result = future.result(timeout=wait_for)
+                logger.trace(
+                    "'%s' finished after %.3fs: %s.",
+                    service.service_name,
+                    time.monotonic() - wait_start,
+                    "success" if ok else "failure",
+                )
 
-            return success
+            except cf.TimeoutError:
+                # Stop waiting once this service's grace window is spent.
+                # NotifyResult keeps optional services successful.
+                wait_elapsed = time.monotonic() - wait_start
+
+                # Still queued -> cancel() succeeds, nothing to track.
+                # Already running -> cancel() fails, so track it instead.
+                cancelled = future.cancel()
+                if not cancelled:
+                    name, url, _, _, _ = service_metadata(service)
+                    track_abandoned_future(future, name, url)
+                logger.trace(
+                    "Stopped waiting for '%s' after %.3fs (%s).",
+                    service.service_name,
+                    wait_elapsed,
+                    "it was still queued and has been cancelled"
+                    if cancelled
+                    else "its worker thread may still be running in the "
+                    "background",
+                )
+                notify_result = timeout_result(
+                    service,
+                    wait_elapsed,
+                    max_attempts[idx],
+                )
+                ok = bool(notify_result)
+
+            except Exception as e:
+                # Safety net; one crash must not sink the whole batch.
+                notify_result = service_crashed(service, e)
+                ok = bool(notify_result)
+
+            success = success and ok
+            results[idx] = notify_result
+
+        return success, results
 
     @staticmethod
-    async def _notify_parallel_asyncio(*servers_kwargs):
+    async def _notify_parallel_asyncio(
+        *services_kwargs: ServiceCall, call_deadline: Optional[float] = None
+    ) -> tuple[bool, list[NotifyResult]]:
         """Process a list of async_notify() calls concurrently via asyncio.
 
-        All coroutines are gathered with asyncio.gather().  Each server is
-        retried up to server.retry additional times on failure with an
-        optional asyncio.sleep(server.wait) between attempts.
+        Each coroutine handles one service, including retry and wait logic.
+        The outer wait_for() keeps one stuck service from blocking its peers.
 
-        Unlike the thread-pool path, there is no single-server optimisation
-        here because asyncio can pipeline work across coroutines while one
-        is awaiting I/O.
-
-        Exceptions from a plugin's async_notify() -- including those from
-        third-party @notify-decorated coroutines -- are caught inside each
-        coroutine and treated as delivery failures so the retry loop can
-        still run for that service.
+        A timeout means Apprise stops waiting and reports TIMEOUT. If the
+        plugin is running sync work in a worker thread, that work may still
+        finish later.
         """
 
-        n_calls = len(servers_kwargs)
+        n_calls = len(services_kwargs)
 
         if n_calls == 0:
-            return True
+            return True, []
 
-        logger.info(
-            "Notifying %d service(s) asynchronously.", len(servers_kwargs)
-        )
+        logger.debug("Asynchronous notification mode")
+        logger.info("Notifying %d service(s).", len(services_kwargs))
 
-        async def do_call(server, kwargs):
-            """Coroutine driving one server's async_notify() with retry/wait.
+        async def do_call(
+            service: NotifyBase,
+            kwargs: dict[str, Any],
+            deadline: Optional[float],
+        ) -> tuple[bool, NotifyResult]:
+            """Run one asynchronous service with retries and waits.
 
-            Pops ``_retry_override`` from kwargs so it is never forwarded
-            to the plugin.  Exceptions are caught and treated as failures
-            so the retry loop continues even when a plugin raises
-            unexpectedly (e.g. a third-party @notify-decorated coroutine).
+            Plugin errors become failed attempts so retries can continue.
+            Reuse the caller's deadline so the outer wait and worker agree.
             """
-            # Pop the per-call override so it stays internal.
-            retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
-            wait = getattr(server, "wait", 0.0)
+            # A service that could not be prepared is never called at all.
+            failed = prepared_failure(service, kwargs)
+            if failed is not None:
+                return failed
 
-            result = False
-            for attempt in range(retry + 1):
-                # Mirror the exception handling from the synchronous paths:
-                # TypeError from Apprise's own validation layer and bare
-                # Exception for any plugin that raises unexpectedly are both
-                # treated as retriable failures rather than hard crashes.
-                try:
-                    result = await server.async_notify(**kwargs)
-                except TypeError:
-                    result = False
-                except Exception:
-                    logger.exception("Unhandled Notification Exception")
-                    result = False
+            runner = RetryRunner(service, kwargs, deadline)
+            try:
+                for attempt in range(runner.total):
+                    started = runner.begin(attempt)
+                    if started is None:
+                        break
 
-                if result:
-                    return True
+                    # Treat validation errors and plugin crashes alike,
+                    # matching synchronous delivery.
+                    with runner.capture() as capture:
+                        try:
+                            result = await service.async_notify(**kwargs)
 
-                if attempt < retry:
-                    logger.warning(
-                        "Retry %d/%d for %s",
-                        attempt + 1,
-                        retry,
-                        server.service_name,
-                    )
-                    if wait > 0:
-                        await asyncio.sleep(wait)
+                        except Exception as e:
+                            runner.crashed(e)
+                            result = False
 
-            # Optional-service check (asyncio coroutine path).
-            #
-            # All retry attempts have been exhausted by the async loop
-            # above.  If the final result is still False and the service
-            # is tagged optional, return True from this coroutine so that
-            # asyncio.gather() receives a truthy value for this task.
-            # The caller inspects all gathered results with all(); a True
-            # here ensures this coroutine does not lower the aggregate
-            # result for the batch.
-            #
-            # This is the asyncio equivalent of the same check in
-            # _notify_sequential and _call_with_retry.  See the comment
-            # in _notify_sequential for a full explanation of the getattr()
-            # guard and the interaction with the retry count.
-            if not result and getattr(server, "optional", False):
-                logger.info(
-                    "Optional service '%s' failed; ignoring failure.",
-                    server.service_name,
+                    if runner.record(attempt, result, started, capture):
+                        break
+
+                    delay = runner.delay(attempt)
+                    if delay > 0:
+                        await asyncio.sleep(delay)
+
+            finally:
+                runner.close()
+
+            return runner.result()
+
+        async def do_call_bounded(
+            service: NotifyBase,
+            kwargs: dict[str, Any],
+            deadline: Optional[float],
+            max_attempts: int,
+        ) -> tuple[bool, NotifyResult]:
+            """Apply an outer asyncio timeout to one service call.
+
+            The service still owns its normal retry deadline inside do_call().
+            This wrapper limits how long this batch waits for the result.
+            """
+            remaining = (
+                max(0.0, deadline - time.monotonic())
+                if deadline is not None
+                else None
+            )
+            # Add one small grace window so a nearly-finished service can
+            # settle before it is reported as abandoned.
+            wait_for = (
+                remaining + _ABANDON_GRACE_SECONDS
+                if remaining is not None
+                else None
+            )
+            logger.trace(
+                "Waiting up to %s for '%s'.",
+                "no limit" if wait_for is None else f"{wait_for:.3f}s",
+                service.service_name,
+            )
+            wait_start = time.monotonic()
+            try:
+                # timeout=None makes wait_for() behave like a plain await.
+                # This keeps the bounded and unbounded paths together.
+                ok, notify_result = await asyncio.wait_for(
+                    do_call(service, kwargs, deadline), timeout=wait_for
                 )
-                # Return True so asyncio.gather() sees a success value
-                # for this optional coroutine.
-                return True
+                logger.trace(
+                    "'%s' finished after %.3fs: %s.",
+                    service.service_name,
+                    time.monotonic() - wait_start,
+                    "success" if ok else "failure",
+                )
+                return ok, notify_result
 
-            # Every attempt for this service failed and it is not optional;
-            # propagate the failure to the caller.
-            return result
+            except asyncio.TimeoutError:
+                # Derive the outcome from NotifyResult so an optional timeout
+                # remains successful.
+                # Apprise stops waiting here; it does not promise delivery
+                # work has stopped. A send already running in the shared
+                # executor cannot be cancelled, so NotifyBase tracks that
+                # worker until it finishes.
+                wait_elapsed = time.monotonic() - wait_start
+                logger.trace(
+                    "Stopped waiting for '%s' after %.3fs; it may still "
+                    "be finishing in the background.",
+                    service.service_name,
+                    wait_elapsed,
+                )
+                notify_result = timeout_result(
+                    service,
+                    wait_elapsed,
+                    max_attempts,
+                )
+                return bool(notify_result), notify_result
+
+        # Snapshot outer wait deadlines before launching the async workers;
+        # do_call() reuses the same value instead of recomputing its own.
+        deadlines: list[Optional[float]] = [
+            compute_deadline(service, call_deadline)
+            for service, kwargs in services_kwargs
+        ]
+
+        # Preserve retry metadata before coroutines consume private overrides.
+        max_attempts = [
+            configured_max_attempts(service, kwargs)
+            for service, kwargs in services_kwargs
+        ]
 
         # Run all coroutines concurrently.  return_exceptions=True ensures
-        # that one coroutine raising does not cancel the others; any escaped
-        # exception (beyond what do_call already handles) is caught below.
-        cors = (do_call(server, kwargs) for (server, kwargs) in servers_kwargs)
-        results = await asyncio.gather(*cors, return_exceptions=True)
+        # one escaped exception is reported without cancelling other services.
+        cors = (
+            do_call_bounded(
+                service,
+                kwargs,
+                deadlines[i],
+                max_attempts[i],
+            )
+            for i, (service, kwargs) in enumerate(services_kwargs)
+        )
+        gathered = await asyncio.gather(*cors, return_exceptions=True)
 
-        if any(isinstance(status, Exception) for status in results):
-            # Safety net: an exception escaped do_call's own try/except.
-            # Log each one and treat the whole batch as failed.
-            for status in results:
-                if isinstance(status, Exception):
-                    logger.error(
-                        "Unhandled Notification Exception: %s", status
-                    )
-            return False
+        success = True
+        results: list[NotifyResult] = []
+        for idx, item in enumerate(gathered):
+            service = services_kwargs[idx][0]
+            # gather() hands back BaseException, so a cancellation lands
+            # here too instead of being unpacked as a result pair.
+            if isinstance(item, BaseException):
+                # Safety net: an exception escaped do_call's own try/except.
+                notify_result = service_crashed(service, item)
+                success = success and bool(notify_result)
+                results.append(notify_result)
 
-        return all(results)
+            else:
+                ok, notify_result = item
+                success = success and ok
+                results.append(notify_result)
+
+        return success, results
 
     def json(
         self,
@@ -1417,17 +1925,21 @@ class Apprise:
         if not path:
             return json.dumps(
                 details,
-                separators=(",", ":"),
+                separators=JSON_COMPACT_SEPARATORS,
                 indent=indent,
                 cls=AppriseJSONEncoder,
             )
 
-        with open(path, "w") as fp:
+        # Accented characters are written out as they are (see
+        # ensure_ascii below), so the stream has to be able to hold them.
+        # UTF-8 is named here rather than leaving it to the locale of
+        # whoever is running Apprise.
+        with open(path, "w", encoding="utf-8") as fp:
             try:
                 json.dump(
                     details,
                     fp,
-                    separators=(",", ":"),
+                    separators=JSON_COMPACT_SEPARATORS,
                     indent=indent,
                     cls=AppriseJSONEncoder,
                     ensure_ascii=False,
@@ -1453,6 +1965,9 @@ class Apprise:
         show_disabled: bool = False,
     ) -> dict[str, Any]:
         """Returns the details associated with the Apprise object."""
+
+        # Use the asset language when the caller does not provide one.
+        lang = lang if lang else self.asset.language
 
         # general object returned
         response = {
@@ -1530,43 +2045,95 @@ class Apprise:
 
         return response
 
+    def template_vars(
+        self,
+        tag: Any = common.MATCH_ALL_TAG,
+        match_always: bool = True,
+    ) -> dict[str, dict]:
+        """Summarize the template variables used by loaded entries.
+
+        Returns a mapping of variable name to a small summary::
+
+            {"api_key":   {"default": None, "services": 2},
+             "smtp_host": {"default": "smtp.example.com", "services": 1}}
+
+        ``default`` is ``None`` when no configuration default applies, either
+        because none was written or because two configurations disagreed on
+        one. A value may still arrive from ``APPRISE_TEMPLATE_<NAME>``, so
+        ``None`` does not always mean the caller has to supply it. Defaults
+        are configuration content and should only be shared with authorized
+        users.
+        """
+
+        response: dict[str, dict] = {}
+        for service in self.find(
+            tag, match_always=match_always, resolve=False
+        ):
+            if not isinstance(service, NotifyTemplate):
+                continue
+
+            for name in service.template_names:
+                variable = service.template_schema.variables[name]
+                if name not in response:
+                    response[name] = {
+                        "default": variable.default,
+                        "services": 0,
+                    }
+
+                elif response[name]["default"] != variable.default:
+                    # Two configurations disagree on the default.  Keep
+                    # the stricter reading so nothing is quietly sent
+                    # with a value its author did not choose.
+                    logger.warning(
+                        "Template variable '%s' is declared differently"
+                        " in more than one configuration",
+                        name,
+                    )
+                    response[name]["default"] = None
+
+                response[name]["services"] += 1
+
+        return response
+
     def urls(self, privacy: bool = False) -> list[str]:
         """Returns all of the loaded URLs defined in this apprise object."""
         urls = []
-        for s in self.servers:
+        for s in self.services:
             if isinstance(s, (ConfigBase, AppriseConfig)):
-                for s_ in s.servers():
+                for s_ in s.services():
                     urls.append(s_.url(privacy=privacy))
             else:
                 urls.append(s.url(privacy=privacy))
         return urls
 
     def pop(self, index: int) -> NotifyBase:
-        """Removes an indexed Notification Service from the stack and returns
-        it.
+        """Remove and return the notification service at ``index``.
 
-        The thing is we can never pop AppriseConfig() entries, only what was
-        loaded within them. So pop needs to carefully iterate over our list and
-        only track actual entries.
+        Indexing uses the flattened service view: directly added plugins and
+        plugins discovered inside configuration sources share one continuous
+        sequence. Configuration containers are never popped by this method.
+        When ``index`` identifies one of their services, that service is
+        removed from the container while the configuration source remains
+        loaded. An out-of-range index raises :class:`IndexError`.
         """
 
         # Tracking variables
         prev_offset = -1
         offset = prev_offset
 
-        for idx, s in enumerate(self.servers):
+        for idx, s in enumerate(self.services):
             if isinstance(s, (ConfigBase, AppriseConfig)):
-                servers = s.servers()
-                if len(servers) > 0:
+                services = s.services()
+                if len(services) > 0:
                     # Acquire a new maximum offset to work with
-                    offset = prev_offset + len(servers)
+                    offset = prev_offset + len(services)
 
                     if offset >= index:
                         # we can pop an element from our config stack
                         fn = (
                             s.pop
                             if isinstance(s, ConfigBase)
-                            else s.server_pop
+                            else s.service_pop
                         )
 
                         return fn(
@@ -1578,7 +2145,7 @@ class Apprise:
             else:
                 offset = prev_offset + 1
                 if offset == index:
-                    return self.servers.pop(idx)
+                    return self.services.pop(idx)
 
             # Update our old offset
             prev_offset = offset
@@ -1587,21 +2154,26 @@ class Apprise:
         raise IndexError("list index out of range")
 
     def __getitem__(self, index: int) -> NotifyBase:
-        """Returns the indexed server entry of a loaded notification server."""
+        """Return a service by its index in the flattened service view.
+
+        Configuration sources themselves are not addressable here. Their
+        discovered services occupy positions in the same sequence as services
+        added directly. An out-of-range index raises :class:`IndexError`.
+        """
         # Tracking variables
         prev_offset = -1
         offset = prev_offset
 
-        for idx, s in enumerate(self.servers):
+        for idx, s in enumerate(self.services):
             if isinstance(s, (ConfigBase, AppriseConfig)):
-                # Get our list of servers associate with our config object
-                servers = s.servers()
-                if len(servers) > 0:
+                # Get our list of services associate with our config object
+                services = s.services()
+                if len(services) > 0:
                     # Acquire a new maximum offset to work with
-                    offset = prev_offset + len(servers)
+                    offset = prev_offset + len(services)
 
                     if offset >= index:
-                        return servers[
+                        return services[
                             (
                                 index
                                 if prev_offset == -1
@@ -1612,7 +2184,7 @@ class Apprise:
             else:
                 offset = prev_offset + 1
                 if offset == index:
-                    return self.servers[idx]
+                    return self.services[idx]
 
             # Update our old offset
             prev_offset = offset
@@ -1628,11 +2200,11 @@ class Apprise:
             # and asset details associated with it
             "urls": [
                 {
-                    "url": server.url(privacy=False),
-                    "tag": server.tags if server.tags else None,
-                    "asset": server.asset,
+                    "url": service.url(privacy=False),
+                    "tag": service.tags if service.tags else None,
+                    "asset": service.asset,
                 }
-                for server in self.servers
+                for service in self.services
             ],
             "locale": self.locale,
             "debug": self.debug,
@@ -1643,7 +2215,7 @@ class Apprise:
 
     def __setstate__(self, state: dict[str, object]) -> None:
         """Pickle Support loads()"""
-        self.servers = []
+        self.services = []
         self.asset = state["asset"]
         self.locale = state["locale"]
 
@@ -1667,33 +2239,36 @@ class Apprise:
         return len(self) > 0
 
     def __iter__(self) -> Iterator[NotifyBase]:
-        """Returns an iterator to each of our servers loaded.
+        """Iterate over the flattened collection of loaded services.
 
-        This includes those found inside configuration.
+        Configuration containers are not yielded. Instead, each service
+        discovered inside them is yielded alongside directly added services.
         """
         return chain(
             *[
                 (
                     [s]
                     if not isinstance(s, (ConfigBase, AppriseConfig))
-                    else iter(s.servers())
+                    else iter(s.services())
                 )
-                for s in self.servers
+                for s in self.services
             ]
         )
 
     def __len__(self) -> int:
-        """Returns the number of servers loaded; this includes those found
-        within loaded configuration.
+        """Return the size of the flattened collection of loaded services.
 
-        This funtion nnever actually counts the Config entry themselves (if
-        they exist), only what they contain.
+        Directly added notification plugins each count as one. Configuration
+        containers do not count as entries themselves; every service currently
+        discovered inside them does. Calling ``len()`` may therefore cause a
+        configuration source to be read or refreshed according to its cache
+        policy.
         """
         return sum(
             (
                 1
                 if not isinstance(s, (ConfigBase, AppriseConfig))
-                else len(s.servers())
+                else len(s.services())
             )
-            for s in self.servers
+            for s in self.services
         )

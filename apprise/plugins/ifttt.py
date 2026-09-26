@@ -45,6 +45,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_list, validate_regex
 from .base import NotifyBase
@@ -155,14 +156,14 @@ class NotifyIFTTT(NotifyBase):
         if not self.webhook_id:
             msg = f"An invalid IFTTT Webhook ID ({webhook_id}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our Events we wish to trigger
         self.events = parse_list(events)
         if not self.events:
             msg = "You must specify at least one event you wish to trigger on."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Tokens to include in post
         self.add_tokens = {}
@@ -185,7 +186,7 @@ class NotifyIFTTT(NotifyBase):
                     " provided"
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform IFTTT Notification."""
@@ -223,6 +224,11 @@ class NotifyIFTTT(NotifyBase):
         while len(events):
             # Retrive an entry off of our event list
             event = events.pop(0)
+
+            # Skip an event that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(event):
+                continue
 
             # URL to transmit content via
             url = self.notify_url.format(
@@ -290,6 +296,9 @@ class NotifyIFTTT(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this event.
+            self.mark_delivered(event)
 
         return not has_error
 
