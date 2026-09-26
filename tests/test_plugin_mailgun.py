@@ -616,6 +616,7 @@ def test_plugin_mailgun_cc_bcc_invalid_branch():
     assert "bcc@example.com" in obj.bcc
     assert len(obj.bcc) == 1
 
+
 def test_plugin_mailgun_cc_names():
     """NotifyMailgun() url() keeps the display names of CC addresses."""
     obj = Apprise.instantiate(
@@ -635,6 +636,7 @@ def test_plugin_mailgun_cc_names():
     assert obj2.cc == obj.cc
     assert obj2.names["l2g@nuxref.com"] == "Chris"
     assert obj2.names["plain@example.com"] is False
+
 
 def test_plugin_mailgun_non_string_region():
     """Verify a region that isn't a string is rejected cleanly."""
