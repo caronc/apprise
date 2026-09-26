@@ -36,6 +36,7 @@ import yaml
 from .. import common, plugins
 from ..asset import AppriseAsset
 from ..exception import AppriseImproperlyConfigured, AppriseTemplateError
+from ..locale import AppriseLocale
 from ..logger import logging
 from ..manager_config import ConfigurationManager
 from ..manager_plugins import NotificationManager
@@ -992,8 +993,32 @@ class ConfigBase(URLBase):
                     'Ignored invalid timezone "%r"', raw_tz
                 )
 
+            # A missing value leaves the language of the asset we were
+            # given alone; it is not reset here.
+            raw_lang = tokens.get("language", tokens.get("lang"))
+            if isinstance(raw_lang, str) and raw_lang.strip():
+                language = AppriseLocale.normalize_language(raw_lang)
+                if not language:
+                    ConfigBase.logger.warning(
+                        'Ignored invalid language "%s"', raw_lang
+                    )
+
+                else:
+                    asset._language = language
+
+            elif raw_lang is not None:
+                # %r quotes a string on its own, so no quotes are added
+                # around it here.
+                ConfigBase.logger.warning(
+                    "Ignored invalid language %r", raw_lang
+                )
+
             # Iterate over remaining tokens
             for k, v in tokens.items():
+                if k in ("lang", "language", "timezone", "tz"):
+                    # These validated settings were already applied above.
+                    continue
+
                 if k.startswith("_") or k.endswith("_"):
                     # Entries are considered reserved if they start or end
                     # with an underscore

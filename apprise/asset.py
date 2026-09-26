@@ -39,6 +39,7 @@ from .common import (
     PersistentStoreMode,
 )
 from .exception import AppriseImproperlyConfigured
+from .locale import AppriseLocale
 from .manager_plugins import NotificationManager
 from .utils.time import zoneinfo
 
@@ -233,6 +234,11 @@ class AppriseAsset:
     # settings must use their validated public constructor arguments.
     _KWARGS_INTERNAL_ALLOWLIST = frozenset({"_recursion", "_uid"})
 
+    # Language for user-facing text. Codes may include a region, such as
+    # en-CA or en_CA. Apprise tries the base language, then English, when a
+    # matching catalog is unavailable. None uses the system language.
+    _language = None
+
     # Default timezone to use (pass in timezone value)
     # A list of timezones can be found here:
     # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
@@ -279,6 +285,7 @@ class AppriseAsset:
         storage_salt: Optional[Union[str, bytes]] = None,
         storage_idlen: Optional[int] = None,
         timezone: Optional[Union[str, tzinfo]] = None,
+        language: Optional[str] = None,
         service_timeout: Optional[Union[int, float]] = None,
         payload_max_size: Optional[int] = None,
         allow_templates: Optional[bool] = None,
@@ -290,6 +297,8 @@ class AppriseAsset:
     ) -> None:
         """Initialize shared settings and delivery limits.
 
+        ``language`` accepts codes such as ``en``, ``en-CA``, or ``en_CA``.
+        ``None`` uses the detected system language.
         Zero disables ``service_timeout`` and ``payload_max_size``.
         ``payload_buffer_threshold`` and ``payload_min_buffer`` control how a
         capped payload is shared between title and body; see
@@ -363,6 +372,20 @@ class AppriseAsset:
         else:
             # Default our timezone to what is detected on the system
             self._tzinfo = datetime.now().astimezone().tzinfo
+
+        if language is not None:
+            if not isinstance(language, str):
+                raise AppriseImproperlyConfigured(
+                    "AppriseAsset language must be a string."
+                ) from None
+
+            if language.strip():
+                # Store the normalized form, such as en_CA
+                self._language = AppriseLocale.normalize_language(language)
+                if not self._language:
+                    raise AppriseImproperlyConfigured(
+                        "AppriseAsset language provided is invalid"
+                    ) from None
 
         if allow_templates is not None:
             if not isinstance(allow_templates, bool):
@@ -777,3 +800,9 @@ class AppriseAsset:
     def tzinfo(self) -> tzinfo:
         """Return the timezone object"""
         return self._tzinfo
+
+    @property
+    def language(self) -> Optional[str]:
+        """Return the language, or None when the system one is used."""
+        # None tells Apprise to detect the system language.
+        return self._language

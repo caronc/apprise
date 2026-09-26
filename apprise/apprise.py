@@ -246,8 +246,8 @@ class Apprise:
         if services:
             self.add(services)
 
-        # Initialize our locale object
-        self.locale = AppriseLocale()
+        # Use the asset language, or let Apprise detect the system language.
+        self.locale = AppriseLocale(language=self.asset.language)
 
         # Set our debug flag
         self.debug = debug
@@ -1930,7 +1930,11 @@ class Apprise:
                 cls=AppriseJSONEncoder,
             )
 
-        with open(path, "w") as fp:
+        # Accented characters are written out as they are (see
+        # ensure_ascii below), so the stream has to be able to hold them.
+        # UTF-8 is named here rather than leaving it to the locale of
+        # whoever is running Apprise.
+        with open(path, "w", encoding="utf-8") as fp:
             try:
                 json.dump(
                     details,
@@ -1961,6 +1965,9 @@ class Apprise:
         show_disabled: bool = False,
     ) -> dict[str, Any]:
         """Returns the details associated with the Apprise object."""
+
+        # Use the asset language when the caller does not provide one.
+        lang = lang if lang else self.asset.language
 
         # general object returned
         response = {

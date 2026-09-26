@@ -1754,6 +1754,76 @@ urls:
     assert asset.app_id == ""
 
 
+def test_yaml_asset_language(tmpdir):
+    """A YAML asset may set the language Apprise presents strings in."""
+
+    def language_for(content):
+        """Load ``content`` and return the language of its asset."""
+        cfg = tmpdir.join("asset-lang.yml")
+        cfg.write(content)
+        services = AppriseConfig(paths=str(cfg)).services()
+        assert len(services) == 1
+        return services[0].asset.language
+
+    # Accepted, and stored in its normalized form
+    assert (
+        language_for(
+            """
+version: 1
+asset:
+  language: "  ES-mx  "
+urls:
+  - json://localhost
+"""
+        )
+        == "es_MX"
+    )
+
+    # lang is accepted as well
+    assert (
+        language_for(
+            """
+version: 1
+asset:
+  lang: fr
+urls:
+  - json://localhost
+"""
+        )
+        == "fr"
+    )
+
+    # language wins when both are present
+    assert (
+        language_for(
+            """
+version: 1
+asset:
+  lang: fr
+  language: de
+urls:
+  - json://localhost
+"""
+        )
+        == "de"
+    )
+
+    # Anything we can not work with is ignored, leaving the system language
+    for value in ('"garbage"', "null", "[ a, b ]", "42"):
+        assert (
+            language_for(
+                f"""
+version: 1
+asset:
+  lang: {value}
+urls:
+  - json://localhost
+"""
+            )
+            is None
+        )
+
+
 def test_yaml_asset_timezone_invalid_and_precedence(tmpdir):
     """
     If 'timezone' is present but invalid, it takes precedence over 'tz'

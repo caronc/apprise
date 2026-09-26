@@ -25,7 +25,35 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""Opt-in HTTP destination checks for callers that fetch untrusted URLs."""
+"""Opt-in HTTP destination checks for callers that fetch untrusted URLs.
+
+Apprise API imports HTTPPolicy, HTTPPolicySession and is_public_ip_address
+from here, so this module is shared between the two projects rather than
+being internal to Apprise. Anything in it that looks unused from inside
+Apprise alone is most likely there for that caller; check apprise-api
+before removing it.
+
+Requests and urllib3 are the only HTTP libraries involved, and nothing here
+needs, or should grow, another one. urllib3 is not held at arm's length
+though: pinning a connection to an address we already approved is not
+something its public interface can express, so this module subclasses its
+connection and pool classes and hooks two protected details.
+
+- ``_new_conn()`` is overridden to open our own pinned socket.
+- ``_dns_host`` is read rather than ``host``, because it is the name urllib3
+  itself resolves; ``host`` may have been normalized by then.
+
+Both have been present unchanged through urllib3 1.26 and 2.x. What is
+deliberately avoided is *importing* underscore-prefixed names out of
+urllib3, since those do move between releases and several are missing from
+1.26 altogether; ``_DEFAULT_TIMEOUT`` below is defined locally for exactly
+that reason.
+
+Because of that coupling, the tests for this module are a compatibility
+gate rather than plain unit tests. Run them against the oldest urllib3 that
+Apprise supports (the 1.26 series, which RHEL and Rocky Linux ship) as well
+as the current one before accepting a change here.
+"""
 
 from concurrent.futures import (
     ThreadPoolExecutor,
@@ -211,11 +239,39 @@ def _release_dns_slot(_future):
 
 
 def _set_socket_options(sock, options):
-    """Apply the same socket options urllib3 would normally configure."""
+    """Apply the same socket options urllib3 would normally configure.
+
+    Three shapes of option arrive here, and all three are supported on
+    purpose:
+
+    - ``(level, option, value)``, which is what urllib3 itself supplies.
+    - ``(level, option, value, "tcp"|"udp")``, which urllib3-future adds so
+      one option list can describe both transports. Apprise never requires
+      urllib3-future, but a host may well have it installed, and an option
+      it supplies must not raise here.
+    - ``(level, option, None, length)``, Python's own form for an option
+      given by length rather than by value.
+
+    The tests build each shape by hand instead of installing anything, so
+    they also pass on systems that ship the older urllib3 1.26 series.
+    """
     if options is None:
         return
 
     for opt in options:
+        # A fourth item that is text names the transport the option belongs
+        # to, so an option meant for UDP is not pushed onto a TCP socket.
+        if len(opt) == 4 and isinstance(opt[3], str):
+            socket_type = {
+                "tcp": socket.SOCK_STREAM,
+                "udp": socket.SOCK_DGRAM,
+            }.get(opt[3].lower())
+            if socket_type == sock.type:
+                sock.setsockopt(*opt[:3])
+
+            continue
+
+        # This also preserves Python's (level, option, None, length) form.
         sock.setsockopt(*opt)
 
 
@@ -463,6 +519,9 @@ class _PolicyHTTPAdapter(HTTPAdapter):
         **pool_kwargs,
     ):
         """Create the normal manager, then replace its pool classes."""
+        # These three belong to Requests' own adapter rather than to urllib3.
+        # They are part of what it pickles, so an adapter that overrides this
+        # method still has to set them.
         self._pool_connections = connections
         self._pool_maxsize = maxsize
         self._pool_block = block

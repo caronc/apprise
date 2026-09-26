@@ -9,6 +9,7 @@ certifi
 
 # Application dependencies
 requests
+urllib3
 requests-oauthlib
 click >= 5.0
 markdown
