@@ -32,6 +32,7 @@ from json import dumps, loads
 import logging
 import os
 import re
+import struct
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -45,7 +46,13 @@ from apprise import (
     NotifyFormat,
     NotifyType,
 )
-from apprise.plugins.telegram import NotifyTelegram
+from apprise.plugins.telegram import (
+    TELEGRAM_FILE_MAX_BYTES,
+    TELEGRAM_PHOTO_MAX_BYTES,
+    NotifyTelegram,
+    TelegramMediaKind,
+    telegram_image_dimensions,
+)
 
 logging.disable(logging.CRITICAL)
 
@@ -2643,3 +2650,453 @@ def test_plugin_telegram_template_request_exception(mock_post, tmpdir):
     assert (
         obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
     )
+
+
+def telegram_album_png(width, height, animated=False):
+    """Return a minimal PNG header fixture."""
+    data = b"\x89PNG\r\n\x1a\n"
+    data += struct.pack(">I", 13) + b"IHDR"
+    data += struct.pack(">II", width, height) + b"\x08\x02\x00\x00\x00"
+    data += b"\x00\x00\x00\x00"
+    if animated:
+        data += struct.pack(">I", 8) + b"acTL" + b"\x00" * 12
+    data += struct.pack(">I", 0) + b"IDAT" + b"\x00\x00\x00\x00"
+    return data
+
+
+def telegram_album_jpeg(width, height):
+    """Return a minimal JPEG header fixture."""
+    return (
+        b"\xff\xd8\xff\xc0"
+        + struct.pack(">H", 11)
+        + b"\x08"
+        + struct.pack(">HH", height, width)
+        + b"\x01\x01\x11\x00"
+        + b"\xff\xd9"
+    )
+
+
+def telegram_album_webp(width, height, animated=False):
+    """Return a minimal WebP header fixture."""
+    flags = 0x02 if animated else 0
+    payload = bytes([flags, 0, 0, 0])
+    payload += (width - 1).to_bytes(3, "little")
+    payload += (height - 1).to_bytes(3, "little")
+    chunk = b"VP8X" + struct.pack("<I", len(payload)) + payload
+    return b"RIFF" + struct.pack("<I", len(chunk) + 4) + b"WEBP" + chunk
+
+
+def telegram_album_mp4():
+    """Return a minimal ISO-BMFF ftyp fixture."""
+    return (
+        struct.pack(">I", 24)
+        + b"ftyp"
+        + b"isom"
+        + b"\x00\x00\x00\x00"
+        + b"isommp42"
+    )
+
+
+def telegram_album_attachment(tmp_path, name, content, mimetype, size=None):
+    """Create a local attachment, optionally padded to a boundary size."""
+    from apprise.attachment.base import AttachBase
+
+    class LocalAttachment(AttachBase):
+        """Local attachment bound to the currently loaded base class."""
+
+        def __init__(self, path, mimetype):
+            super().__init__(name=os.path.basename(path))
+            self._mimetype = mimetype
+            self.download_path = path
+            self.detected_name = os.path.basename(path)
+            self.detected_mimetype = mimetype
+
+        def exists(self):
+            return bool(
+                self.download_path and os.path.isfile(self.download_path)
+            )
+
+        def download(self):
+            return self.exists()
+
+        def url(self, privacy=False, *args, **kwargs):
+            return f"file://{self.download_path}"
+
+    path = tmp_path / name
+    path.write_bytes(content)
+    if size is not None:
+        with path.open("r+b") as file_obj:
+            file_obj.truncate(size)
+    return LocalAttachment(str(path), mimetype)
+
+
+def telegram_album_notify():
+    """Return an album-enabled Telegram instance."""
+    obj = NotifyTelegram(
+        bot_token="123456789:abcdefg_hijklmnop",
+        targets=["12345"],
+        album=True,
+        silent=True,
+    )
+    obj.throttle = mock.Mock()
+    return obj
+
+
+def test_plugin_telegram_album_url_round_trip():
+    """The album query option parses and serializes with a false default."""
+    parsed = NotifyTelegram.parse_url(
+        "tgram://123456789:abcdefg_hijklmnop/12345/?album=yes"
+    )
+    assert parsed["album"] is True
+    obj = NotifyTelegram(**parsed)
+    assert obj.album is True
+    assert "album=yes" in obj.url()
+
+    parsed = NotifyTelegram.parse_url(
+        "tgram://123456789:abcdefg_hijklmnop/12345/"
+    )
+    assert parsed["album"] is False
+    assert "album=no" in NotifyTelegram(**parsed).url()
+
+
+def test_plugin_telegram_album_disabled_uses_existing_attachment_path():
+    """Album-disabled notifications retain the existing send loop."""
+    obj = NotifyTelegram(
+        bot_token="123456789:abcdefg_hijklmnop", targets=["12345"]
+    )
+    attachment = mock.Mock(name="attachment")
+    with (
+        mock.patch.object(obj, "send_media", return_value=True) as send_media,
+        mock.patch.object(obj, "_send_album_attachments") as send_album,
+    ):
+        assert obj._send_attachments(
+            (12345, None), NotifyType.INFO, [attachment]
+        )
+    send_media.assert_called_once()
+    send_album.assert_not_called()
+
+
+def test_plugin_telegram_album_image_headers_and_boundaries(tmp_path):
+    """Static image headers and Telegram photo limits are enforced."""
+    obj = telegram_album_notify()
+    fixtures = (
+        ("photo.jpg", telegram_album_jpeg(640, 480), (640, 480)),
+        ("photo.png", telegram_album_png(800, 600), (800, 600)),
+        ("photo.webp", telegram_album_webp(1024, 768), (1024, 768)),
+    )
+    for name, content, expected in fixtures:
+        attachment = telegram_album_attachment(
+            tmp_path, name, content, "image/jpeg"
+        )
+        assert telegram_image_dimensions(attachment.path) == expected
+
+    animated_png = telegram_album_attachment(
+        tmp_path,
+        "animated.png",
+        telegram_album_png(100, 100, animated=True),
+        "image/png",
+    )
+    animated_webp = telegram_album_attachment(
+        tmp_path,
+        "animated.webp",
+        telegram_album_webp(100, 100, animated=True),
+        "image/webp",
+    )
+    assert telegram_image_dimensions(animated_png.path) is None
+    assert telegram_image_dimensions(animated_webp.path) is None
+
+    valid = telegram_album_attachment(
+        tmp_path,
+        "valid.png",
+        telegram_album_png(5000, 5000),
+        "image/png",
+        size=TELEGRAM_PHOTO_MAX_BYTES,
+    )
+    exact_ratio = telegram_album_attachment(
+        tmp_path,
+        "ratio-20.png",
+        telegram_album_png(2000, 100),
+        "image/png",
+    )
+    too_large = telegram_album_attachment(
+        tmp_path,
+        "large.png",
+        telegram_album_png(100, 100),
+        "image/png",
+        size=TELEGRAM_PHOTO_MAX_BYTES + 1,
+    )
+    dimensions = telegram_album_attachment(
+        tmp_path,
+        "dimensions.png",
+        telegram_album_png(5001, 5000),
+        "image/png",
+    )
+    ratio = telegram_album_attachment(
+        tmp_path,
+        "ratio.png",
+        telegram_album_png(2100, 100),
+        "image/png",
+    )
+    gif = telegram_album_attachment(
+        tmp_path, "animation.gif", b"GIF89a" + b"\x00" * 20, "image/gif"
+    )
+
+    assert obj._inspect_album_attachment(valid)[0] == TelegramMediaKind.PHOTO
+    assert (
+        obj._inspect_album_attachment(exact_ratio)[0]
+        == TelegramMediaKind.PHOTO
+    )
+    assert (
+        obj._inspect_album_attachment(too_large)[0]
+        == TelegramMediaKind.DOCUMENT
+    )
+    assert (
+        obj._inspect_album_attachment(dimensions)[0]
+        == TelegramMediaKind.DOCUMENT
+    )
+    assert (
+        obj._inspect_album_attachment(ratio)[0] == TelegramMediaKind.DOCUMENT
+    )
+    assert obj._inspect_album_attachment(gif)[0] == TelegramMediaKind.NATIVE
+
+
+def test_plugin_telegram_album_mp4_validation(tmp_path):
+    """Only valid, in-limit MP4 videos are eligible for media groups."""
+    obj = telegram_album_notify()
+    valid = telegram_album_attachment(
+        tmp_path, "video.mp4", telegram_album_mp4(), "video/mp4"
+    )
+    broken = telegram_album_attachment(
+        tmp_path, "broken.mp4", b"not-mp4", "video/mp4"
+    )
+    other = telegram_album_attachment(
+        tmp_path, "video.mov", b"mov", "video/quicktime"
+    )
+    huge = telegram_album_attachment(
+        tmp_path,
+        "huge.mp4",
+        telegram_album_mp4(),
+        "video/mp4",
+        size=TELEGRAM_FILE_MAX_BYTES + 1,
+    )
+    assert obj._inspect_album_attachment(valid)[0] == TelegramMediaKind.VIDEO
+    for attachment in (broken, other, huge):
+        assert (
+            obj._inspect_album_attachment(attachment)[0]
+            == TelegramMediaKind.DOCUMENT
+        )
+
+
+@pytest.mark.parametrize(
+    ("count", "expected_groups", "expected_singles"),
+    ((2, [2], 0), (10, [10], 0), (11, [10], 1), (20, [10, 10], 0)),
+)
+def test_plugin_telegram_album_group_sizes(
+    count, expected_groups, expected_singles
+):
+    """Eligible runs are partitioned into Telegram's 2-10 item groups."""
+    obj = telegram_album_notify()
+    attachments = [mock.Mock(name=f"media{index}") for index in range(count)]
+    obj._inspect_album_attachment = mock.Mock(
+        side_effect=[(TelegramMediaKind.PHOTO, None)] * count
+    )
+    groups = []
+    obj._send_media_group = mock.Mock(
+        side_effect=lambda target, batch, kinds, payload=None: (
+            groups.append(len(batch)) or "success"
+        )
+    )
+    obj._send_album_item = mock.Mock(return_value=True)
+
+    assert obj._send_attachments((12345, None), NotifyType.INFO, attachments)
+    assert groups == expected_groups
+    assert obj._send_album_item.call_count == expected_singles
+
+
+def test_plugin_telegram_album_preserves_incompatible_order():
+    """Album groups do not cross an incompatible attachment."""
+    obj = telegram_album_notify()
+    attachments = []
+    for name in ("a.jpg", "b.pdf", "c.jpg"):
+        attachment = mock.Mock()
+        attachment.name = name
+        attachments.append(attachment)
+    obj._inspect_album_attachment = mock.Mock(
+        side_effect=[
+            (TelegramMediaKind.PHOTO, None),
+            (TelegramMediaKind.NATIVE, None),
+            (TelegramMediaKind.PHOTO, None),
+        ]
+    )
+    sent = []
+
+    def send_item(target, notify_type, attachment, kind, payload=None):
+        sent.append(attachment.name)
+        return True
+
+    obj._send_album_item = mock.Mock(side_effect=send_item)
+    obj._send_media_group = mock.Mock(return_value="success")
+
+    assert obj._send_attachments((12345, None), NotifyType.INFO, attachments)
+    assert sent == ["a.jpg", "b.pdf", "c.jpg"]
+    obj._send_media_group.assert_not_called()
+
+
+def test_plugin_telegram_album_media_group_payload_and_handles(tmp_path):
+    """Media-group requests carry Telegram options and close file handles."""
+    obj = telegram_album_notify()
+    photo = telegram_album_attachment(
+        tmp_path, "photo.png", telegram_album_png(100, 100), "image/png"
+    )
+    video = telegram_album_attachment(
+        tmp_path, "video.mp4", telegram_album_mp4(), "video/mp4"
+    )
+    captured_files = []
+
+    def post(_url, **kwargs):
+        media = loads(kwargs["data"]["media"])
+        assert [entry["type"] for entry in media] == ["photo", "video"]
+        assert [entry["media"] for entry in media] == [
+            "attach://file0",
+            "attach://file1",
+        ]
+        assert media[0]["caption"] == "<b>Alert</b>"
+        assert media[0]["parse_mode"] == "HTML"
+        assert "caption" not in media[1]
+        assert all(entry["show_caption_above_media"] for entry in media)
+        assert kwargs["data"]["message_thread_id"] == 42
+        assert kwargs["data"]["disable_notification"] is True
+        assert kwargs["allow_redirects"] == obj.redirects
+        captured_files.extend(value[1] for value in kwargs["files"].values())
+        assert all(not file_obj.closed for file_obj in captured_files)
+        response = mock.Mock(status_code=requests.codes.ok)
+        response.content = dumps({"description": "ok"}).encode()
+        return response
+
+    with mock.patch("requests.post", side_effect=post):
+        outcome = obj._send_media_group(
+            (12345, 42),
+            [photo, video],
+            [TelegramMediaKind.PHOTO, TelegramMediaKind.VIDEO],
+            payload={
+                "caption": "<b>Alert</b>",
+                "parse_mode": "HTML",
+                "show_caption_above_media": True,
+            },
+        )
+    assert outcome == "success"
+    assert all(file_obj.closed for file_obj in captured_files)
+
+
+def test_plugin_telegram_album_caption_only_on_first_batch():
+    """Only the first media-group batch receives the notification caption."""
+    obj = telegram_album_notify()
+    attachments = [mock.Mock(name=f"photo{index}") for index in range(20)]
+    obj._inspect_album_attachment = mock.Mock(
+        side_effect=[(TelegramMediaKind.PHOTO, None)] * 20
+    )
+    captions = []
+    obj._send_media_group = mock.Mock(
+        side_effect=lambda target, batch, kinds, payload=None: (
+            captions.append(dict(payload or {})) or "success"
+        )
+    )
+
+    assert obj._send_attachments(
+        (12345, None),
+        NotifyType.INFO,
+        attachments,
+        payload={"caption": "Alert", "parse_mode": "MarkdownV2"},
+    )
+    assert captions == [
+        {"caption": "Alert", "parse_mode": "MarkdownV2"},
+        {},
+    ]
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    ((400, "fallback"), (422, "fallback"), (401, "failure"), (500, "failure")),
+)
+def test_plugin_telegram_album_group_error_policy(tmp_path, status, expected):
+    """Only deterministic media validation errors request single fallback."""
+    obj = telegram_album_notify()
+    attachments = [
+        telegram_album_attachment(
+            tmp_path,
+            f"{name}.png",
+            telegram_album_png(100, 100),
+            "image/png",
+        )
+        for name in ("a", "b")
+    ]
+    response = mock.Mock(status_code=status)
+    response.content = dumps({"description": "failed"}).encode()
+    with mock.patch("requests.post", return_value=response):
+        assert (
+            obj._send_media_group(
+                (12345, None),
+                attachments,
+                [TelegramMediaKind.PHOTO, TelegramMediaKind.PHOTO],
+            )
+            == expected
+        )
+
+
+def test_plugin_telegram_album_fallback_and_network_failure(tmp_path):
+    """Fallback preserves caption once; network failures are not retried."""
+    obj = telegram_album_notify()
+    attachments = [mock.Mock(name="a"), mock.Mock(name="b")]
+    obj._inspect_album_attachment = mock.Mock(
+        side_effect=[(TelegramMediaKind.PHOTO, None)] * 2
+    )
+    obj._send_media_group = mock.Mock(return_value="fallback")
+    payloads = []
+
+    def send_item(target, notify_type, attachment, kind, payload=None):
+        payloads.append(dict(payload or {}))
+        return True
+
+    obj._send_album_item = mock.Mock(side_effect=send_item)
+    assert obj._send_attachments(
+        (12345, None),
+        NotifyType.INFO,
+        attachments,
+        payload={"caption": "Alert"},
+    )
+    assert payloads == [{"caption": "Alert"}, {}]
+
+    obj = telegram_album_notify()
+    photos = [
+        telegram_album_attachment(
+            tmp_path,
+            f"network-{name}.png",
+            telegram_album_png(100, 100),
+            "image/png",
+        )
+        for name in ("a", "b")
+    ]
+    with mock.patch("requests.post", side_effect=requests.Timeout("timeout")):
+        assert (
+            obj._send_media_group(
+                (12345, None),
+                photos,
+                [TelegramMediaKind.PHOTO, TelegramMediaKind.PHOTO],
+            )
+            == "failure"
+        )
+
+
+def test_plugin_telegram_album_oversized_document_skips_http(tmp_path):
+    """Documents beyond Telegram's Bot API limit fail before upload."""
+    obj = telegram_album_notify()
+    attachment = telegram_album_attachment(
+        tmp_path,
+        "large.png",
+        telegram_album_png(100, 100),
+        "image/png",
+        size=TELEGRAM_FILE_MAX_BYTES + 1,
+    )
+    with mock.patch("requests.post") as post:
+        assert obj._send_document((12345, None), attachment) is False
+    post.assert_not_called()
