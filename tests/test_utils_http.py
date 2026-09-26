@@ -25,7 +25,15 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""Tests for opt-in HTTP destination policy."""
+"""Tests for opt-in HTTP destination policy.
+
+The socket option tests below describe each option shape by hand rather
+than installing urllib3-future to produce one. That keeps the whole file
+passing on RHEL and Rocky Linux, which ship the urllib3 1.26 series, and it
+means the compatibility branch is covered everywhere instead of only where
+an extra package happens to be present. Please do not swap them for a
+skipif that needs urllib3-future installed.
+"""
 
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -241,6 +249,85 @@ def test_policy_normalizes_lookup_failure():
     ):
         pool.submit.return_value = future
         HTTPPolicy().resolve("example.com", 443)
+
+
+def test_socket_options_are_left_alone():
+    """Nothing is configured when urllib3 asks for no options."""
+    sock = mock.Mock()
+    http._set_socket_options(sock, None)
+
+    # An absent option list is not the same as an empty one.
+    sock.setsockopt.assert_not_called()
+
+
+def test_socket_options_urllib3_standard_form():
+    """A standard urllib3 option reaches setsockopt untouched."""
+    sock = mock.Mock()
+    option = (socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    http._set_socket_options(sock, [option])
+
+    sock.setsockopt.assert_called_once_with(*option)
+
+
+def test_socket_options_urllib3_future_tcp_form():
+    """An urllib3-future TCP option is applied to a stream socket.
+
+    Apprise never requires urllib3-future, but a host can have it installed
+    alongside Requests, and the option it hands us must still work.
+    """
+    sock = mock.Mock()
+    sock.type = socket.SOCK_STREAM
+    http._set_socket_options(
+        sock, [(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1, "tcp")]
+    )
+
+    sock.setsockopt.assert_called_once_with(
+        socket.IPPROTO_TCP, socket.TCP_NODELAY, 1
+    )
+
+
+def test_socket_options_skip_wrong_protocol():
+    """An urllib3-future UDP option is skipped for a stream socket."""
+    sock = mock.Mock()
+    sock.type = socket.SOCK_STREAM
+    http._set_socket_options(
+        sock, [(socket.SOL_SOCKET, socket.SO_BROADCAST, 1, "udp")]
+    )
+
+    sock.setsockopt.assert_not_called()
+
+
+def test_socket_options_native_length_form():
+    """Python's native four-argument length form remains supported."""
+    sock = mock.Mock()
+    http._set_socket_options(
+        sock, [(socket.SOL_SOCKET, socket.SO_RCVBUF, None, 8)]
+    )
+
+    sock.setsockopt.assert_called_once_with(
+        socket.SOL_SOCKET, socket.SO_RCVBUF, None, 8
+    )
+
+
+def test_socket_options_applied_in_order():
+    """Every option is configured, whatever mix of forms is supplied."""
+    sock = mock.Mock()
+    sock.type = socket.SOCK_STREAM
+    http._set_socket_options(
+        sock,
+        [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+            (socket.IPPROTO_TCP, socket.TCP_NODELAY, 1, "tcp"),
+            (socket.SOL_SOCKET, socket.SO_BROADCAST, 1, "udp"),
+            (socket.SOL_SOCKET, socket.SO_RCVBUF, None, 8),
+        ],
+    )
+
+    assert sock.setsockopt.call_args_list == [
+        mock.call(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+        mock.call(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1),
+        mock.call(socket.SOL_SOCKET, socket.SO_RCVBUF, None, 8),
+    ]
 
 
 def test_policy_skips_malformed_answer():
@@ -521,6 +608,51 @@ def test_session_connects_through_policy_adapter():
             )
             assert response.status_code == requests.codes.ok
             assert response.content == b"ok"
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()
+
+
+def test_policy_connects_with_urllib3_future_option():
+    """A real socket accepts the protocol form urllib3-future supplies.
+
+    The unit tests above use a mock, which tolerates any call signature.
+    Only a real socket proves setsockopt itself is happy.
+    """
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def log_message(self, _format, *args):
+            # Keep the test server quiet.
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+
+    # Describe the option the way urllib3-future does alongside Requests.
+    options = [(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1, "tcp")]
+    try:
+        # This test permits loopback only to exercise the transport locally.
+        policy = HTTPPolicy(address_filter=lambda _address: True)
+        sock = policy.create_connection(
+            "127.0.0.1",
+            server.server_port,
+            timeout=2,
+            socket_options=options,
+        )
+        try:
+            sock.sendall(b"GET / HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+            assert b"200 OK" in sock.recv(1024)
+
+        finally:
+            sock.close()
+
     finally:
         server.shutdown()
         thread.join()

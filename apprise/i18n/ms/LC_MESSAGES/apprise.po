@@ -1,0 +1,2192 @@
+# Malay translations for apprise.
+# Copyright (C) 2026 Chris Caron
+# This file is distributed under the same license as the apprise project.
+# Chris Caron <lead2gold@gmail.com>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: apprise 1.13.1\n"
+"Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
+"POT-Creation-Date: 2026-08-30 22:08-0400\n"
+"PO-Revision-Date: 2026-09-25 12:00-0400\n"
+"Last-Translator: Chris Caron <lead2gold@gmail.com>\n"
+"Language: ms\n"
+"Language-Team: ms <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: apprise/attachment/base.py:97 apprise/url.py:158
+msgid "Verify SSL"
+msgstr "Sahkan SSL"
+
+#: apprise/url.py:168
+msgid "Follow Redirects"
+msgstr "Ikut pengalihan"
+
+#: apprise/url.py:178
+msgid "Socket Read Timeout"
+msgstr "Had masa bacaan soket"
+
+#: apprise/url.py:192
+msgid "Socket Connect Timeout"
+msgstr "Had masa sambungan soket"
+
+#: apprise/attachment/base.py:83
+msgid "Cache Age"
+msgstr "Usia cache"
+
+#: apprise/attachment/base.py:89
+msgid "Forced Mime Type"
+msgstr "Jenis MIME yang dipaksa"
+
+#: apprise/attachment/base.py:93
+msgid "Forced File Name"
+msgstr "Nama fail yang dipaksa"
+
+#: apprise/attachment/file.py:41 apprise/config/file.py:41
+msgid "Local File"
+msgstr "Fail tempatan"
+
+#: apprise/attachment/http.py:50 apprise/config/http.py:55
+msgid "Web Based"
+msgstr "Berasaskan web"
+
+#: apprise/attachment/memory.py:46 apprise/config/memory.py:37
+msgid "Memory"
+msgstr "Memori"
+
+#: apprise/plugins/__init__.py:282
+msgid "Schema"
+msgstr "Skema"
+
+#: apprise/plugins/__init__.py:421
+msgid "No dependencies."
+msgstr "Tiada kebergantungan."
+
+#: apprise/plugins/__init__.py:424
+msgid "Packages are required to function."
+msgstr "Pakej diperlukan untuk berfungsi."
+
+#: apprise/plugins/__init__.py:428
+msgid "Packages are recommended to improve functionality."
+msgstr "Pakej disyorkan untuk menambah baik kefungsian."
+
+#: apprise/plugins/africas_talking.py:133
+msgid "App User Name"
+msgstr "Nama pengguna aplikasi"
+
+#: apprise/plugins/africas_talking.py:139 apprise/plugins/brevo.py:159
+#: apprise/plugins/burstsms.py:105 apprise/plugins/clicksend.py:99
+#: apprise/plugins/dot.py:136 apprise/plugins/evolution.py:120
+#: apprise/plugins/exotel.py:214 apprise/plugins/fcm/__init__.py:144
+#: apprise/plugins/flowtriq.py:113 apprise/plugins/httpsms.py:78
+#: apprise/plugins/jira.py:231 apprise/plugins/join.py:141
+#: apprise/plugins/kavenegar.py:116 apprise/plugins/kumulos.py:88
+#: apprise/plugins/mailersend.py:128 apprise/plugins/mailgun.py:140
+#: apprise/plugins/messagebird.py:79 apprise/plugins/notifyre.py:131
+#: apprise/plugins/octopush.py:137 apprise/plugins/one_signal.py:114
+#: apprise/plugins/opsgenie.py:229 apprise/plugins/pagerduty.py:132
+#: apprise/plugins/pinglet.py:138 apprise/plugins/pingram.py:182
+#: apprise/plugins/postmark.py:118 apprise/plugins/prowl.py:122
+#: apprise/plugins/resend.py:108 apprise/plugins/resend.py:146
+#: apprise/plugins/sendgrid.py:117 apprise/plugins/seven.py:76
+#: apprise/plugins/simplepush.py:102 apprise/plugins/smsmanager.py:107
+#: apprise/plugins/smtp2go.py:119 apprise/plugins/sparkpost.py:170
+#: apprise/plugins/splunk.py:166 apprise/plugins/techuluspush.py:98
+#: apprise/plugins/telnyx.py:88 apprise/plugins/trigv.py:143
+#: apprise/plugins/twilio.py:195 apprise/plugins/vapid/__init__.py:162
+#: apprise/plugins/vonage.py:81 apprise/plugins/wpush.py:158
+msgid "API Key"
+msgstr "Kunci API"
+
+#: apprise/plugins/africas_talking.py:146 apprise/plugins/fortysixelks.py:107
+msgid "Target Phone"
+msgstr "Telefon sasaran"
+
+#: apprise/plugins/africas_talking.py:151 apprise/plugins/aprs.py:188
+#: apprise/plugins/bark.py:179 apprise/plugins/brevo.py:176
+#: apprise/plugins/bulksms.py:138 apprise/plugins/bulkvs.py:111
+#: apprise/plugins/burstsms.py:132 apprise/plugins/clickatell.py:91
+#: apprise/plugins/clicksend.py:113 apprise/plugins/d7networks.py:111
+#: apprise/plugins/dapnet.py:139 apprise/plugins/dingtalk.py:116
+#: apprise/plugins/eight00com.py:129 apprise/plugins/email/base.py:168
+#: apprise/plugins/evolution.py:149 apprise/plugins/exotel.py:191
+#: apprise/plugins/fcm/__init__.py:169 apprise/plugins/flock.py:126
+#: apprise/plugins/fortysixelks.py:112 apprise/plugins/home_assistant.py:155
+#: apprise/plugins/httpsms.py:98 apprise/plugins/humhub.py:150
+#: apprise/plugins/irc/base.py:150 apprise/plugins/join.py:173
+#: apprise/plugins/kavenegar.py:136 apprise/plugins/kook.py:177
+#: apprise/plugins/line.py:94 apprise/plugins/mailersend.py:145
+#: apprise/plugins/mailgun.py:151 apprise/plugins/mastodon.py:203
+#: apprise/plugins/matrix/base.py:350 apprise/plugins/mattermost.py:195
+#: apprise/plugins/messagebird.py:100 apprise/plugins/mobilemessage.py:145
+#: apprise/plugins/mqtt.py:178 apprise/plugins/msg91.py:124
+#: apprise/plugins/nextcloud.py:148 apprise/plugins/nextcloudtalk.py:102
+#: apprise/plugins/notifiarr.py:104 apprise/plugins/notifyre.py:144
+#: apprise/plugins/ntfy.py:242 apprise/plugins/octopush.py:154
+#: apprise/plugins/office365.py:288 apprise/plugins/one_signal.py:142
+#: apprise/plugins/pingram.py:205 apprise/plugins/plivo.py:115
+#: apprise/plugins/postmark.py:134 apprise/plugins/pushbullet.py:106
+#: apprise/plugins/pushed.py:108 apprise/plugins/pushover.py:261
+#: apprise/plugins/pushsafer.py:377 apprise/plugins/pushy.py:98
+#: apprise/plugins/reddit.py:171 apprise/plugins/resend.py:125
+#: apprise/plugins/revolt.py:113 apprise/plugins/ringcentral.py:220
+#: apprise/plugins/rocketchat.py:168 apprise/plugins/sendgrid.py:134
+#: apprise/plugins/sendpulse.py:141 apprise/plugins/serwersms.py:162
+#: apprise/plugins/seven.py:89 apprise/plugins/sfr.py:114
+#: apprise/plugins/signal_api.py:139 apprise/plugins/sinch.py:141
+#: apprise/plugins/slack.py:287 apprise/plugins/smpp.py:129
+#: apprise/plugins/smsc.py:157 apprise/plugins/smseagle.py:173
+#: apprise/plugins/smsmanager.py:120 apprise/plugins/sns.py:171
+#: apprise/plugins/telegram.py:379 apprise/plugins/telnyx.py:108
+#: apprise/plugins/threema.py:116 apprise/plugins/trigv.py:156
+#: apprise/plugins/twilio.py:175 apprise/plugins/twist.py:124
+#: apprise/plugins/twitter.py:194 apprise/plugins/vapid/__init__.py:168
+#: apprise/plugins/voipms.py:109 apprise/plugins/vonage.py:109
+#: apprise/plugins/wechat.py:219 apprise/plugins/whatsapp.py:167
+#: apprise/plugins/wxpusher.py:140 apprise/plugins/xmpp/base.py:135
+#: apprise/plugins/zulip.py:154
+msgid "Targets"
+msgstr "Sasaran"
+
+#: apprise/plugins/africas_talking.py:167
+msgid "From"
+msgstr "Penghantar"
+
+#: apprise/plugins/africas_talking.py:173
+msgid "SMS Mode"
+msgstr "Mod SMS"
+
+#: apprise/plugins/africas_talking.py:182 apprise/plugins/bulksms.py:171
+#: apprise/plugins/bulkvs.py:132 apprise/plugins/burstsms.py:167
+#: apprise/plugins/clicksend.py:131 apprise/plugins/d7networks.py:145
+#: apprise/plugins/dapnet.py:168 apprise/plugins/exotel.py:223
+#: apprise/plugins/home_assistant.py:172 apprise/plugins/jira.py:283
+#: apprise/plugins/mailgun.py:188 apprise/plugins/mastodon.py:248
+#: apprise/plugins/mobilemessage.py:182 apprise/plugins/octopush.py:174
+#: apprise/plugins/one_signal.py:189 apprise/plugins/opsgenie.py:308
+#: apprise/plugins/plivo.py:138 apprise/plugins/signal_api.py:161
+#: apprise/plugins/smseagle.py:212 apprise/plugins/smsmanager.py:153
+#: apprise/plugins/smtp2go.py:152 apprise/plugins/sparkpost.py:210
+#: apprise/plugins/twitter.py:219
+msgid "Batch Mode"
+msgstr "Mod berkelompok"
+
+#: apprise/plugins/apprise_api.py:126 apprise/plugins/bark.py:153
+#: apprise/plugins/custom_form.py:140 apprise/plugins/custom_json.py:122
+#: apprise/plugins/custom_xml.py:122 apprise/plugins/emby.py:86
+#: apprise/plugins/enigma2.py:111 apprise/plugins/evolution.py:126
+#: apprise/plugins/flowtriq.py:119 apprise/plugins/fluxer.py:181
+#: apprise/plugins/gotify.py:130 apprise/plugins/growl.py:140
+#: apprise/plugins/home_assistant.py:124 apprise/plugins/humhub.py:139
+#: apprise/plugins/irc/base.py:118 apprise/plugins/kodi.py:96
+#: apprise/plugins/lametric.py:461 apprise/plugins/mastodon.py:181
+#: apprise/plugins/matrix/base.py:305 apprise/plugins/mattermost.py:161
+#: apprise/plugins/misskey.py:118 apprise/plugins/mqtt.py:150
+#: apprise/plugins/nextcloud.py:116 apprise/plugins/nextcloudtalk.py:75
+#: apprise/plugins/notica.py:127 apprise/plugins/notifico.py:167
+#: apprise/plugins/ntfy.py:212 apprise/plugins/parseplatform.py:91
+#: apprise/plugins/pinglet.py:144 apprise/plugins/pushdeer.py:76
+#: apprise/plugins/pushjet.py:72 apprise/plugins/rocketchat.py:121
+#: apprise/plugins/rsyslog.py:181 apprise/plugins/signal_api.py:98
+#: apprise/plugins/smseagle.py:136 apprise/plugins/sogs.py:209
+#: apprise/plugins/synology.py:85 apprise/plugins/workflows.py:139
+#: apprise/plugins/xmpp/base.py:102
+msgid "Hostname"
+msgstr "Nama hos"
+
+#: apprise/plugins/apprise_api.py:131 apprise/plugins/bark.py:158
+#: apprise/plugins/custom_form.py:145 apprise/plugins/custom_json.py:127
+#: apprise/plugins/custom_xml.py:127 apprise/plugins/email/base.py:157
+#: apprise/plugins/emby.py:91 apprise/plugins/enigma2.py:116
+#: apprise/plugins/evolution.py:131 apprise/plugins/flowtriq.py:124
+#: apprise/plugins/fluxer.py:185 apprise/plugins/gotify.py:141
+#: apprise/plugins/growl.py:145 apprise/plugins/home_assistant.py:129
+#: apprise/plugins/humhub.py:144 apprise/plugins/irc/base.py:123
+#: apprise/plugins/kodi.py:101 apprise/plugins/lametric.py:465
+#: apprise/plugins/mastodon.py:191 apprise/plugins/matrix/base.py:310
+#: apprise/plugins/mattermost.py:177 apprise/plugins/misskey.py:128
+#: apprise/plugins/mqtt.py:155 apprise/plugins/nextcloud.py:121
+#: apprise/plugins/nextcloudtalk.py:80 apprise/plugins/notica.py:131
+#: apprise/plugins/notifico.py:171 apprise/plugins/ntfy.py:216
+#: apprise/plugins/parseplatform.py:96 apprise/plugins/pinglet.py:149
+#: apprise/plugins/pushdeer.py:80 apprise/plugins/pushjet.py:77
+#: apprise/plugins/rocketchat.py:126 apprise/plugins/rsyslog.py:186
+#: apprise/plugins/signal_api.py:103 apprise/plugins/smpp.py:109
+#: apprise/plugins/smseagle.py:141 apprise/plugins/sogs.py:214
+#: apprise/plugins/synology.py:90 apprise/plugins/trigv.py:164
+#: apprise/plugins/workflows.py:144 apprise/plugins/xmpp/base.py:107
+msgid "Port"
+msgstr "Port"
+
+#: apprise/plugins/apprise_api.py:137 apprise/plugins/bark.py:164
+#: apprise/plugins/bluesky.py:125 apprise/plugins/custom_form.py:151
+#: apprise/plugins/custom_json.py:133 apprise/plugins/custom_xml.py:133
+#: apprise/plugins/emby.py:98 apprise/plugins/enigma2.py:122
+#: apprise/plugins/freemobile.py:79 apprise/plugins/home_assistant.py:135
+#: apprise/plugins/jira.py:237 apprise/plugins/kodi.py:107
+#: apprise/plugins/lametric.py:472 apprise/plugins/matrix/base.py:316
+#: apprise/plugins/nextcloud.py:127 apprise/plugins/nextcloudtalk.py:86
+#: apprise/plugins/notica.py:137 apprise/plugins/notifico.py:177
+#: apprise/plugins/ntfy.py:222 apprise/plugins/opsgenie.py:235
+#: apprise/plugins/pushjet.py:89 apprise/plugins/rocketchat.py:132
+#: apprise/plugins/serwersms.py:132 apprise/plugins/signal_api.py:109
+#: apprise/plugins/smpp.py:93 apprise/plugins/synology.py:96
+msgid "Username"
+msgstr "Nama pengguna"
+
+#: apprise/plugins/apprise_api.py:141 apprise/plugins/aprs.py:173
+#: apprise/plugins/bark.py:168 apprise/plugins/bluesky.py:130
+#: apprise/plugins/bulksms.py:118 apprise/plugins/bulkvs.py:91
+#: apprise/plugins/custom_form.py:155 apprise/plugins/custom_json.py:137
+#: apprise/plugins/custom_xml.py:137 apprise/plugins/dapnet.py:124
+#: apprise/plugins/email/base.py:147 apprise/plugins/emby.py:102
+#: apprise/plugins/enigma2.py:126 apprise/plugins/freemobile.py:84
+#: apprise/plugins/growl.py:151 apprise/plugins/home_assistant.py:139
+#: apprise/plugins/humhub.py:134 apprise/plugins/irc/base.py:133
+#: apprise/plugins/kodi.py:111 apprise/plugins/matrix/base.py:320
+#: apprise/plugins/mqtt.py:166 apprise/plugins/nextcloud.py:131
+#: apprise/plugins/nextcloudtalk.py:91 apprise/plugins/notica.py:141
+#: apprise/plugins/notifico.py:181 apprise/plugins/ntfy.py:226
+#: apprise/plugins/pushjet.py:93 apprise/plugins/reddit.py:146
+#: apprise/plugins/rocketchat.py:136 apprise/plugins/serwersms.py:137
+#: apprise/plugins/signal_api.py:113 apprise/plugins/simplepush.py:109
+#: apprise/plugins/smpp.py:98 apprise/plugins/smsc.py:144
+#: apprise/plugins/synology.py:100 apprise/plugins/twist.py:102
+#: apprise/plugins/voipms.py:89 apprise/plugins/xmpp/base.py:118
+msgid "Password"
+msgstr "Kata laluan"
+
+#: apprise/plugins/apprise_api.py:146 apprise/plugins/chanify.py:75
+#: apprise/plugins/dingtalk.py:98 apprise/plugins/exotel.py:167
+#: apprise/plugins/feishu.py:81 apprise/plugins/gotify.py:124
+#: apprise/plugins/kook.py:171 apprise/plugins/lauther.py:116
+#: apprise/plugins/mattermost.py:167 apprise/plugins/notica.py:120
+#: apprise/plugins/notifiarr.py:92 apprise/plugins/ntfy.py:231
+#: apprise/plugins/pushme.py:63 apprise/plugins/ryver.py:100
+#: apprise/plugins/serverchan.py:71 apprise/plugins/slack.py:337
+#: apprise/plugins/synology.py:105 apprise/plugins/zulip.py:137
+msgid "Token"
+msgstr "Token"
+
+#: apprise/plugins/apprise_api.py:160 apprise/plugins/jira.py:302
+#: apprise/plugins/ntfy.py:290 apprise/plugins/opsgenie.py:295
+#: apprise/plugins/pagertree.py:134
+msgid "Tags"
+msgstr "Tanda"
+
+#: apprise/plugins/apprise_api.py:164
+msgid "Query Method"
+msgstr "Kaedah pertanyaan"
+
+#: apprise/plugins/apprise_api.py:170
+msgid "Apprise API Version"
+msgstr "Versi API Apprise"
+
+#: apprise/plugins/apprise_api.py:184 apprise/plugins/custom_form.py:184
+#: apprise/plugins/custom_json.py:160 apprise/plugins/custom_xml.py:160
+#: apprise/plugins/enigma2.py:154 apprise/plugins/nextcloud.py:181
+#: apprise/plugins/nextcloudtalk.py:123 apprise/plugins/notica.py:157
+#: apprise/plugins/pagertree.py:143 apprise/plugins/synology.py:130
+msgid "HTTP Header"
+msgstr "Pengepala HTTP"
+
+#: apprise/plugins/aprs.py:168 apprise/plugins/bulksms.py:113
+#: apprise/plugins/bulkvs.py:86 apprise/plugins/clicksend.py:94
+#: apprise/plugins/dapnet.py:119 apprise/plugins/email/base.py:143
+#: apprise/plugins/mailgun.py:130 apprise/plugins/mqtt.py:161
+#: apprise/plugins/reddit.py:141 apprise/plugins/sendpulse.py:112
+#: apprise/plugins/smtp2go.py:109 apprise/plugins/sparkpost.py:160
+msgid "User Name"
+msgstr "Nama pengguna"
+
+#: apprise/plugins/aprs.py:179 apprise/plugins/aprs.py:200
+#: apprise/plugins/dapnet.py:130 apprise/plugins/dapnet.py:163
+msgid "Target Callsign"
+msgstr "Tanda panggilan sasaran"
+
+#: apprise/plugins/aprs.py:205
+msgid "Resend Delay"
+msgstr "Lengah hantar semula"
+
+#: apprise/plugins/aprs.py:212
+msgid "Locale"
+msgstr "Tetapan setempat"
+
+#: apprise/plugins/bark.py:173 apprise/plugins/fcm/__init__.py:158
+#: apprise/plugins/home_assistant.py:150 apprise/plugins/pushbullet.py:90
+#: apprise/plugins/pushover.py:249 apprise/plugins/pushsafer.py:367
+#: apprise/plugins/pushy.py:86
+msgid "Target Device"
+msgstr "Peranti sasaran"
+
+#: apprise/plugins/bark.py:192 apprise/plugins/lametric.py:517
+#: apprise/plugins/lauther.py:139 apprise/plugins/macosx.py:166
+#: apprise/plugins/pushover.py:278 apprise/plugins/pushsafer.py:393
+#: apprise/plugins/pushy.py:111
+msgid "Sound"
+msgstr "Bunyi"
+
+#: apprise/plugins/bark.py:197 apprise/plugins/pushward.py:153
+msgid "Level"
+msgstr "Tahap"
+
+#: apprise/plugins/bark.py:202 apprise/plugins/pushward.py:183
+msgid "Volume"
+msgstr "Kelantangan"
+
+#: apprise/plugins/bark.py:208 apprise/plugins/ntfy.py:272
+#: apprise/plugins/pagerduty.py:173
+msgid "Click"
+msgstr "Klik"
+
+#: apprise/plugins/bark.py:212 apprise/plugins/pushy.py:115
+msgid "Badge"
+msgstr "Lencana"
+
+#: apprise/plugins/bark.py:217
+msgid "Category"
+msgstr "Kategori"
+
+#: apprise/plugins/bark.py:221 apprise/plugins/join.py:159
+#: apprise/plugins/lauther.py:158 apprise/plugins/pagerduty.py:164
+#: apprise/plugins/youlmk.py:222
+msgid "Group"
+msgstr "Kumpulan"
+
+#: apprise/plugins/bark.py:225 apprise/plugins/dbus.py:229
+#: apprise/plugins/discord.py:215 apprise/plugins/fcm/__init__.py:198
+#: apprise/plugins/flock.py:137 apprise/plugins/fluxer.py:281
+#: apprise/plugins/glib.py:189 apprise/plugins/gnome.py:154
+#: apprise/plugins/growl.py:175 apprise/plugins/join.py:184
+#: apprise/plugins/kodi.py:129 apprise/plugins/line.py:109
+#: apprise/plugins/macosx.py:157 apprise/plugins/matrix/base.py:361
+#: apprise/plugins/mattermost.py:218 apprise/plugins/notifiarr.py:126
+#: apprise/plugins/ntfy.py:258 apprise/plugins/one_signal.py:168
+#: apprise/plugins/pagerduty.py:192 apprise/plugins/ryver.py:125
+#: apprise/plugins/slack.py:305 apprise/plugins/telegram.py:390
+#: apprise/plugins/vapid/__init__.py:214 apprise/plugins/windows.py:106
+#: apprise/plugins/workflows.py:176 apprise/plugins/youlmk.py:229
+msgid "Include Image"
+msgstr "Sertakan imej"
+
+#: apprise/plugins/bark.py:231 apprise/plugins/lauther.py:147
+#: apprise/plugins/mattermost.py:214 apprise/plugins/revolt.py:130
+msgid "Icon URL"
+msgstr "URL ikon"
+
+#: apprise/plugins/bark.py:235 apprise/plugins/streamlabs.py:120
+msgid "Call"
+msgstr "Panggilan"
+
+#: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:310
+msgid "Encryption Key"
+msgstr "Kunci penyulitan"
+
+#: apprise/plugins/base.py:344
+msgid "Overflow Mode"
+msgstr "Mod limpahan"
+
+#: apprise/plugins/base.py:359
+msgid "Notify Format"
+msgstr "Format pemberitahuan"
+
+#: apprise/plugins/base.py:375
+msgid "Interpret Emojis"
+msgstr "Tafsir emoji"
+
+#: apprise/plugins/base.py:385
+msgid "Persistent Storage"
+msgstr "Storan kekal"
+
+#: apprise/plugins/base.py:395
+msgid "Timezone"
+msgstr "Zon waktu"
+
+#: apprise/plugins/base.py:404
+msgid "Service Retry"
+msgstr "Cubaan semula perkhidmatan"
+
+#: apprise/plugins/base.py:412
+msgid "Inter-Retry Wait"
+msgstr "Tunggu antara cubaan"
+
+#: apprise/plugins/base.py:420
+msgid "Optional Service"
+msgstr "Perkhidmatan pilihan"
+
+#: apprise/plugins/blink1.py:152
+msgid "blink(1)"
+msgstr "blink(1)"
+
+#: apprise/plugins/blink1.py:179
+msgid "Serial Number"
+msgstr "Nombor siri"
+
+#: apprise/plugins/blink1.py:189
+msgid "Duration (ms)"
+msgstr "Tempoh (ms)"
+
+#: apprise/plugins/blink1.py:196
+msgid "Fade Time (ms)"
+msgstr "Masa pudar (ms)"
+
+#: apprise/plugins/blink1.py:203
+msgid "LED Number"
+msgstr "Nombor LED"
+
+#: apprise/plugins/brevo.py:166 apprise/plugins/mailersend.py:135
+#: apprise/plugins/postmark.py:124 apprise/plugins/resend.py:115
+#: apprise/plugins/sendgrid.py:124
+msgid "Source Email"
+msgstr "E-mel sumber"
+
+#: apprise/plugins/brevo.py:171 apprise/plugins/email/base.py:163
+#: apprise/plugins/mailersend.py:140 apprise/plugins/mailgun.py:146
+#: apprise/plugins/office365.py:283 apprise/plugins/one_signal.py:125
+#: apprise/plugins/pingram.py:189 apprise/plugins/postmark.py:129
+#: apprise/plugins/pushbullet.py:101 apprise/plugins/pushsafer.py:372
+#: apprise/plugins/resend.py:120 apprise/plugins/sendgrid.py:129
+#: apprise/plugins/sendpulse.py:136 apprise/plugins/slack.py:270
+#: apprise/plugins/threema.py:106
+msgid "Target Email"
+msgstr "E-mel sasaran"
+
+#: apprise/plugins/brevo.py:187 apprise/plugins/postmark.py:150
+#: apprise/plugins/ses.py:206
+msgid "Reply To Email"
+msgstr "E-mel untuk balasan"
+
+#: apprise/plugins/brevo.py:195 apprise/plugins/email/base.py:244
+#: apprise/plugins/mailersend.py:159 apprise/plugins/mailgun.py:180
+#: apprise/plugins/office365.py:308 apprise/plugins/pingram.py:252
+#: apprise/plugins/postmark.py:158 apprise/plugins/resend.py:159
+#: apprise/plugins/sendgrid.py:154 apprise/plugins/sendpulse.py:171
+#: apprise/plugins/ses.py:233 apprise/plugins/smtp2go.py:144
+#: apprise/plugins/sparkpost.py:202
+msgid "Carbon Copy"
+msgstr "Salinan"
+
+#: apprise/plugins/brevo.py:199 apprise/plugins/email/base.py:248
+#: apprise/plugins/mailersend.py:163 apprise/plugins/mailgun.py:184
+#: apprise/plugins/office365.py:312 apprise/plugins/pingram.py:256
+#: apprise/plugins/postmark.py:162 apprise/plugins/resend.py:163
+#: apprise/plugins/sendgrid.py:158 apprise/plugins/sendpulse.py:175
+#: apprise/plugins/ses.py:237 apprise/plugins/smtp2go.py:148
+#: apprise/plugins/sparkpost.py:206
+msgid "Blind Carbon Copy"
+msgstr "Salinan tersembunyi"
+
+#: apprise/plugins/bulksms.py:124 apprise/plugins/bulkvs.py:104
+#: apprise/plugins/burstsms.py:125 apprise/plugins/clickatell.py:84
+#: apprise/plugins/clicksend.py:106 apprise/plugins/d7networks.py:104
+#: apprise/plugins/dingtalk.py:111 apprise/plugins/eight00com.py:122
+#: apprise/plugins/evolution.py:142 apprise/plugins/exotel.py:184
+#: apprise/plugins/httpsms.py:91 apprise/plugins/kavenegar.py:129
+#: apprise/plugins/messagebird.py:93 apprise/plugins/mobilemessage.py:138
+#: apprise/plugins/msg91.py:117 apprise/plugins/notifyre.py:137
+#: apprise/plugins/octopush.py:147 apprise/plugins/plivo.py:108
+#: apprise/plugins/ringcentral.py:214 apprise/plugins/serwersms.py:149
+#: apprise/plugins/seven.py:82 apprise/plugins/signal_api.py:125
+#: apprise/plugins/sinch.py:128 apprise/plugins/smpp.py:122
+#: apprise/plugins/smsc.py:150 apprise/plugins/smseagle.py:152
+#: apprise/plugins/smsmanager.py:113 apprise/plugins/sns.py:158
+#: apprise/plugins/telnyx.py:101 apprise/plugins/threema.py:99
+#: apprise/plugins/twilio.py:162 apprise/plugins/voipms.py:102
+#: apprise/plugins/vonage.py:102 apprise/plugins/whatsapp.py:148
+msgid "Target Phone No"
+msgstr "Nombor telefon sasaran"
+
+#: apprise/plugins/bulksms.py:131 apprise/plugins/nextcloud.py:142
+#: apprise/plugins/pushover.py:255
+msgid "Target Group"
+msgstr "Kumpulan sasaran"
+
+#: apprise/plugins/bulksms.py:150 apprise/plugins/bulkvs.py:97
+#: apprise/plugins/bulkvs.py:123 apprise/plugins/clickatell.py:79
+#: apprise/plugins/eight00com.py:115 apprise/plugins/eight00com.py:143
+#: apprise/plugins/fortysixelks.py:101 apprise/plugins/httpsms.py:84
+#: apprise/plugins/httpsms.py:116 apprise/plugins/ringcentral.py:208
+#: apprise/plugins/signal_api.py:118 apprise/plugins/sinch.py:121
+#: apprise/plugins/smpp.py:115 apprise/plugins/smsmanager.py:135
+#: apprise/plugins/telnyx.py:94 apprise/plugins/telnyx.py:126
+#: apprise/plugins/twilio.py:155 apprise/plugins/voipms.py:95
+#: apprise/plugins/vonage.py:95
+msgid "From Phone No"
+msgstr "Nombor telefon penghantar"
+
+#: apprise/plugins/bulksms.py:156
+msgid "Route Group"
+msgstr "Kumpulan penghalaan"
+
+#: apprise/plugins/bulksms.py:163 apprise/plugins/d7networks.py:137
+#: apprise/plugins/exotel.py:229 apprise/plugins/mobilemessage.py:164
+msgid "Unicode Characters"
+msgstr "Aksara Unicode"
+
+#: apprise/plugins/burstsms.py:112 apprise/plugins/threema.py:93
+#: apprise/plugins/vonage.py:88
+msgid "API Secret"
+msgstr "Rahsia API"
+
+#: apprise/plugins/burstsms.py:119 apprise/plugins/mobilemessage.py:131
+#: apprise/plugins/smsc.py:172
+msgid "Sender ID"
+msgstr "ID penghantar"
+
+#: apprise/plugins/burstsms.py:153
+msgid "Country"
+msgstr "Negara"
+
+#: apprise/plugins/burstsms.py:162
+msgid "validity"
+msgstr "kesahan"
+
+#: apprise/plugins/chanify.py:48
+msgid "Chanify"
+msgstr "Chanify"
+
+#: apprise/plugins/chime.py:131 apprise/plugins/discord.py:149
+#: apprise/plugins/fluxer.py:202 apprise/plugins/ifttt.py:104
+#: apprise/plugins/zoom.py:140
+msgid "Webhook ID"
+msgstr "ID webhook"
+
+#: apprise/plugins/chime.py:137 apprise/plugins/discord.py:155
+#: apprise/plugins/fluxer.py:209 apprise/plugins/google_chat.py:132
+#: apprise/plugins/stackfield.py:93 apprise/plugins/webexteams.py:172
+msgid "Webhook Token"
+msgstr "Token webhook"
+
+#: apprise/plugins/clickatell.py:46
+msgid "Clickatell"
+msgstr "Clickatell"
+
+#: apprise/plugins/clickatell.py:73 apprise/plugins/eight00com.py:109
+#: apprise/plugins/rocketchat.py:141
+msgid "API Token"
+msgstr "Token API"
+
+#: apprise/plugins/custom_form.py:167 apprise/plugins/custom_json.py:149
+#: apprise/plugins/custom_xml.py:149
+msgid "Fetch Method"
+msgstr "Kaedah pengambilan"
+
+#: apprise/plugins/custom_form.py:173
+msgid "Attach File As"
+msgstr "Lampirkan fail sebagai"
+
+#: apprise/plugins/custom_form.py:188 apprise/plugins/custom_json.py:164
+#: apprise/plugins/custom_xml.py:164 apprise/plugins/pagertree.py:147
+msgid "Payload Extras"
+msgstr "Tambahan muatan"
+
+#: apprise/plugins/custom_form.py:192 apprise/plugins/custom_json.py:168
+#: apprise/plugins/custom_xml.py:168
+msgid "GET Params"
+msgstr "Parameter GET"
+
+#: apprise/plugins/d7networks.py:98
+msgid "API Access Token"
+msgstr "Token akses API"
+
+#: apprise/plugins/d7networks.py:128 apprise/plugins/seven.py:106
+msgid "Originating Address"
+msgstr "Alamat asal"
+
+#: apprise/plugins/dapnet.py:151 apprise/plugins/exotel.py:241
+#: apprise/plugins/gotify.py:154 apprise/plugins/growl.py:163
+#: apprise/plugins/jira.py:288 apprise/plugins/join.py:190
+#: apprise/plugins/lametric.py:495 apprise/plugins/lauther.py:133
+#: apprise/plugins/ntfy.py:284 apprise/plugins/opsgenie.py:281
+#: apprise/plugins/pinglet.py:178 apprise/plugins/prowl.py:142
+#: apprise/plugins/pushover.py:272 apprise/plugins/pushsafer.py:388
+#: apprise/plugins/smseagle.py:188 apprise/plugins/youlmk.py:177
+msgid "Priority"
+msgstr "Keutamaan"
+
+#: apprise/plugins/dapnet.py:157
+msgid "Transmitter Groups"
+msgstr "Kumpulan pemancar"
+
+#: apprise/plugins/dbus.py:157
+msgid "libdbus-1.so.x must be installed."
+msgstr "libdbus-1.so.x mesti dipasang."
+
+#: apprise/plugins/dbus.py:161
+msgid "DBus Notification"
+msgstr "Pemberitahuan DBus"
+
+#: apprise/plugins/dbus.py:205 apprise/plugins/glib.py:166
+#: apprise/plugins/gnome.py:142 apprise/plugins/pagertree.py:129
+#: apprise/plugins/trigv.py:190
+msgid "Urgency"
+msgstr "Tahap desakan"
+
+#: apprise/plugins/dbus.py:217 apprise/plugins/glib.py:177
+msgid "X-Axis"
+msgstr "Paksi X"
+
+#: apprise/plugins/dbus.py:223 apprise/plugins/glib.py:183
+msgid "Y-Axis"
+msgstr "Paksi Y"
+
+#: apprise/plugins/dingtalk.py:105 apprise/plugins/signl4.py:77
+msgid "Secret"
+msgstr "Rahsia"
+
+#: apprise/plugins/discord.py:144 apprise/plugins/flock.py:107
+#: apprise/plugins/fluxer.py:197 apprise/plugins/ryver.py:107
+#: apprise/plugins/slack.py:222 apprise/plugins/viber.py:100
+#: apprise/plugins/zulip.py:125
+msgid "Bot Name"
+msgstr "Nama bot"
+
+#: apprise/plugins/discord.py:168 apprise/plugins/fluxer.py:232
+msgid "Text To Speech"
+msgstr "Teks ke pertuturan"
+
+#: apprise/plugins/discord.py:173 apprise/plugins/fluxer.py:237
+msgid "Avatar Image"
+msgstr "Imej avatar"
+
+#: apprise/plugins/discord.py:178 apprise/plugins/fluxer.py:242
+#: apprise/plugins/ntfy.py:264
+msgid "Avatar URL"
+msgstr "URL avatar"
+
+#: apprise/plugins/discord.py:182 apprise/plugins/fluxer.py:246
+#: apprise/plugins/pushover.py:284 apprise/plugins/trigv.py:181
+msgid "URL"
+msgstr "URL"
+
+#: apprise/plugins/discord.py:191 apprise/plugins/fluxer.py:253
+msgid "Thread ID"
+msgstr "ID bebenang"
+
+#: apprise/plugins/discord.py:195 apprise/plugins/fluxer.py:261
+msgid "Display Footer"
+msgstr "Tunjukkan pengaki"
+
+#: apprise/plugins/discord.py:200 apprise/plugins/fluxer.py:266
+msgid "Footer Logo"
+msgstr "Logo pengaki"
+
+#: apprise/plugins/discord.py:205 apprise/plugins/fluxer.py:271
+msgid "Use Fields"
+msgstr "Guna medan"
+
+#: apprise/plugins/discord.py:210 apprise/plugins/fluxer.py:276
+msgid "Discord Flags"
+msgstr "Bendera Discord"
+
+#: apprise/plugins/discord.py:224 apprise/plugins/fluxer.py:287
+msgid "Ping Users/Roles"
+msgstr "Sebut pengguna atau peranan"
+
+#: apprise/plugins/discord.py:228 apprise/plugins/slack.py:344
+#: apprise/plugins/workflows.py:201
+msgid "Template Path"
+msgstr "Laluan templat"
+
+#: apprise/plugins/discord.py:236
+msgid "Batch Attachments"
+msgstr "Gabungkan lampiran"
+
+#: apprise/plugins/discord.py:246 apprise/plugins/mailgun.py:202
+#: apprise/plugins/pingram.py:265 apprise/plugins/slack.py:354
+#: apprise/plugins/sparkpost.py:224 apprise/plugins/telegram.py:444
+#: apprise/plugins/workflows.py:222
+msgid "Template Tokens"
+msgstr "Token templat"
+
+#: apprise/plugins/dot.py:142
+msgid "Device Serial Number"
+msgstr "Nombor siri peranti"
+
+#: apprise/plugins/dot.py:155
+msgid "API Mode"
+msgstr "Mod API"
+
+#: apprise/plugins/dot.py:161
+msgid "Refresh Now"
+msgstr "Muat semula sekarang"
+
+#: apprise/plugins/dot.py:167
+msgid "Text Signature"
+msgstr "Tandatangan teks"
+
+#: apprise/plugins/dot.py:171
+msgid "Icon Base64 (Text API)"
+msgstr "Ikon dalam Base64 (API teks)"
+
+#: apprise/plugins/dot.py:175
+msgid "Image Base64 (Image API)"
+msgstr "Imej dalam Base64 (API imej)"
+
+#: apprise/plugins/dot.py:180 apprise/plugins/youlmk.py:210
+msgid "Link"
+msgstr "Pautan"
+
+#: apprise/plugins/dot.py:184
+msgid "Border"
+msgstr "Sempadan"
+
+#: apprise/plugins/dot.py:191
+msgid "Dither Type"
+msgstr "Jenis dithering"
+
+#: apprise/plugins/dot.py:197
+msgid "Dither Kernel"
+msgstr "Kernel dithering"
+
+#: apprise/plugins/dot.py:203
+msgid "Task Key"
+msgstr "Kunci tugas"
+
+#: apprise/plugins/emby.py:113
+msgid "Modal"
+msgstr "Modal"
+
+#: apprise/plugins/enigma2.py:131 apprise/plugins/fluxer.py:191
+#: apprise/plugins/gotify.py:135 apprise/plugins/mattermost.py:173
+#: apprise/plugins/notica.py:146 apprise/plugins/pinglet.py:155
+msgid "Path"
+msgstr "Laluan"
+
+#: apprise/plugins/enigma2.py:141
+msgid "Server Timeout"
+msgstr "Had masa pelayan"
+
+#: apprise/plugins/evolution.py:137
+msgid "Instance Name"
+msgstr "Nama tika"
+
+#: apprise/plugins/exotel.py:161 apprise/plugins/sinch.py:107
+#: apprise/plugins/twilio.py:141
+msgid "Account SID"
+msgstr "SID akaun"
+
+#: apprise/plugins/exotel.py:173
+msgid "From Phone No / Sender ID"
+msgstr "Nombor telefon penghantar atau ID penghantar"
+
+#: apprise/plugins/exotel.py:234 apprise/plugins/jira.py:276
+#: apprise/plugins/mailgun.py:170 apprise/plugins/opsgenie.py:274
+#: apprise/plugins/pagerduty.py:177 apprise/plugins/pingram.py:227
+#: apprise/plugins/sparkpost.py:192
+msgid "Region Name"
+msgstr "Nama wilayah"
+
+#: apprise/plugins/feishu.py:50
+msgid "Feishu"
+msgstr "Feishu"
+
+#: apprise/plugins/flock.py:100 apprise/plugins/twitter.py:176
+msgid "Access Key"
+msgstr "Kunci akses"
+
+#: apprise/plugins/flock.py:112
+msgid "To User ID"
+msgstr "Ke ID pengguna"
+
+#: apprise/plugins/flock.py:119
+msgid "To Channel ID"
+msgstr "Ke ID saluran"
+
+#: apprise/plugins/flowtriq.py:130 apprise/plugins/matrix/base.py:383
+msgid "Webhook Path"
+msgstr "Laluan webhook"
+
+#: apprise/plugins/fcm/__init__.py:183 apprise/plugins/fcm/__init__.py:189
+#: apprise/plugins/fluxer.py:223 apprise/plugins/kook.py:197
+#: apprise/plugins/lametric.py:511 apprise/plugins/mattermost.py:230
+#: apprise/plugins/notifyre.py:158 apprise/plugins/ntfy.py:298
+#: apprise/plugins/office365.py:320 apprise/plugins/pingram.py:233
+#: apprise/plugins/sns.py:203 apprise/plugins/vapid/__init__.py:179
+#: apprise/plugins/webexteams.py:198 apprise/plugins/zoom.py:159
+msgid "Mode"
+msgstr "Mod"
+
+#: apprise/plugins/fluxer.py:257
+msgid "Thread Name"
+msgstr "Nama bebenang"
+
+#: apprise/plugins/fortysixelks.py:59
+msgid "46elks"
+msgstr "46elks"
+
+#: apprise/plugins/fortysixelks.py:90 apprise/plugins/mobilemessage.py:120
+msgid "API Username"
+msgstr "Nama pengguna API"
+
+#: apprise/plugins/fortysixelks.py:95 apprise/plugins/mobilemessage.py:125
+msgid "API Password"
+msgstr "Kata laluan API"
+
+#: apprise/plugins/freemobile.py:49
+msgid "Free-Mobile"
+msgstr "Free-Mobile"
+
+#: apprise/plugins/glib.py:124
+msgid "libdbus-1.so.x or libdbus-2.so.x must be installed."
+msgstr "libdbus-1.so.x atau libdbus-2.so.x mesti dipasang."
+
+#: apprise/plugins/glib.py:128
+msgid "GLib Notification"
+msgstr "Pemberitahuan GLib"
+
+#: apprise/plugins/gnome.py:100
+msgid "A local Gnome environment is required."
+msgstr "Persekitaran Gnome tempatan diperlukan."
+
+#: apprise/plugins/gnome.py:104
+msgid "Gnome Notification"
+msgstr "Pemberitahuan Gnome"
+
+#: apprise/plugins/google_chat.py:120
+msgid "Workspace"
+msgstr "Ruang kerja"
+
+#: apprise/plugins/google_chat.py:126
+msgid "Webhook Key"
+msgstr "Kunci webhook"
+
+#: apprise/plugins/google_chat.py:138
+msgid "Thread Key"
+msgstr "Kunci bebenang"
+
+#: apprise/plugins/groupme.py:124
+msgid "Bot ID"
+msgstr "ID bot"
+
+#: apprise/plugins/groupme.py:131 apprise/plugins/line.py:83
+#: apprise/plugins/mastodon.py:186 apprise/plugins/matrix/base.py:325
+#: apprise/plugins/misskey.py:123 apprise/plugins/pushbullet.py:84
+#: apprise/plugins/pushover.py:243 apprise/plugins/smseagle.py:147
+#: apprise/plugins/spugpush.py:69 apprise/plugins/streamlabs.py:106
+#: apprise/plugins/whatsapp.py:122
+msgid "Access Token"
+msgstr "Token akses"
+
+#: apprise/plugins/growl.py:169 apprise/plugins/mqtt.py:196
+#: apprise/plugins/nextcloud.py:163
+msgid "Version"
+msgstr "Versi"
+
+#: apprise/plugins/growl.py:181
+msgid "Sticky"
+msgstr "Disematkan"
+
+#: apprise/plugins/home_assistant.py:144
+msgid "Long-Lived Access Token"
+msgstr "Token akses jangka panjang"
+
+#: apprise/plugins/home_assistant.py:167
+msgid "Notification ID"
+msgstr "ID pemberitahuan"
+
+#: apprise/plugins/home_assistant.py:184
+msgid "Path Prefix"
+msgstr "Awalan laluan"
+
+#: apprise/plugins/humhub.py:128
+msgid "Token or Username"
+msgstr "Token atau nama pengguna"
+
+#: apprise/plugins/ifttt.py:110
+msgid "Events"
+msgstr "Peristiwa"
+
+#: apprise/plugins/ifttt.py:130
+msgid "Add Tokens"
+msgstr "Tambah token"
+
+#: apprise/plugins/ifttt.py:134
+msgid "Remove Tokens"
+msgstr "Buang token"
+
+#: apprise/plugins/jira.py:241 apprise/plugins/opsgenie.py:239
+msgid "Target Escalation"
+msgstr "Peningkatan sasaran"
+
+#: apprise/plugins/jira.py:247 apprise/plugins/opsgenie.py:245
+msgid "Target Schedule"
+msgstr "Jadual sasaran"
+
+#: apprise/plugins/irc/base.py:138 apprise/plugins/jira.py:253
+#: apprise/plugins/line.py:89 apprise/plugins/mastodon.py:197
+#: apprise/plugins/matrix/base.py:332 apprise/plugins/nextcloud.py:136
+#: apprise/plugins/one_signal.py:130 apprise/plugins/opsgenie.py:251
+#: apprise/plugins/pushed.py:96 apprise/plugins/rocketchat.py:157
+#: apprise/plugins/slack.py:275 apprise/plugins/twitter.py:188
+#: apprise/plugins/wechat.py:199 apprise/plugins/xmpp/base.py:124
+#: apprise/plugins/zulip.py:144
+msgid "Target User"
+msgstr "Pengguna sasaran"
+
+#: apprise/plugins/jira.py:259 apprise/plugins/opsgenie.py:257
+msgid "Target Team"
+msgstr "Pasukan sasaran"
+
+#: apprise/plugins/jira.py:265 apprise/plugins/opsgenie.py:263
+msgid "Targets "
+msgstr "Sasaran "
+
+#: apprise/plugins/jira.py:294 apprise/plugins/opsgenie.py:287
+msgid "Entity"
+msgstr "Entiti"
+
+#: apprise/plugins/jira.py:298 apprise/plugins/opsgenie.py:291
+msgid "Alias"
+msgstr "Alias"
+
+#: apprise/plugins/jira.py:309 apprise/plugins/opsgenie.py:299
+#: apprise/plugins/pagertree.py:119 apprise/plugins/splunk.py:203
+msgid "Action"
+msgstr "Tindakan"
+
+#: apprise/plugins/jira.py:320 apprise/plugins/opsgenie.py:318
+msgid "Details"
+msgstr "Perincian"
+
+#: apprise/plugins/jira.py:324 apprise/plugins/opsgenie.py:322
+#: apprise/plugins/splunk.py:214
+msgid "Action Mapping"
+msgstr "Pemetaan tindakan"
+
+#: apprise/plugins/join.py:148
+msgid "Device ID"
+msgstr "ID peranti"
+
+#: apprise/plugins/join.py:154
+msgid "Device Name"
+msgstr "Nama peranti"
+
+#: apprise/plugins/kavenegar.py:123 apprise/plugins/messagebird.py:86
+#: apprise/plugins/notifyre.py:164 apprise/plugins/plivo.py:101
+msgid "Source Phone No"
+msgstr "Nombor telefon sumber"
+
+#: apprise/plugins/kodi.py:123 apprise/plugins/streamlabs.py:142
+#: apprise/plugins/windows.py:100
+msgid "Duration"
+msgstr "Tempoh"
+
+#: apprise/plugins/kumulos.py:100
+msgid "Server Key"
+msgstr "Kunci pelayan"
+
+#: apprise/plugins/lametric.py:437
+msgid "Device API Key"
+msgstr "Kunci API peranti"
+
+#: apprise/plugins/lametric.py:443 apprise/plugins/one_signal.py:103
+#: apprise/plugins/parseplatform.py:102
+msgid "App ID"
+msgstr "ID aplikasi"
+
+#: apprise/plugins/lametric.py:449
+msgid "App Version"
+msgstr "Versi aplikasi"
+
+#: apprise/plugins/lametric.py:456
+msgid "App Access Token"
+msgstr "Token akses aplikasi"
+
+#: apprise/plugins/lametric.py:501
+msgid "Custom Icon"
+msgstr "Ikon tersuai"
+
+#: apprise/plugins/lametric.py:505
+msgid "Icon Type"
+msgstr "Jenis ikon"
+
+#: apprise/plugins/lametric.py:522
+msgid "Cycles"
+msgstr "Kitaran"
+
+#: apprise/plugins/lark.py:48
+msgid "Lark (Feishu)"
+msgstr "Lark (Feishu)"
+
+#: apprise/plugins/lark.py:68 apprise/plugins/revolt.py:99
+#: apprise/plugins/telegram.py:364
+msgid "Bot Token"
+msgstr "Token bot"
+
+#: apprise/plugins/lauther.py:143 apprise/plugins/wpush.py:211
+msgid "Click URL"
+msgstr "URL klik"
+
+#: apprise/plugins/lauther.py:151
+msgid "Color"
+msgstr "Warna"
+
+#: apprise/plugins/lauther.py:166
+msgid "Route"
+msgstr "Laluan penghantaran"
+
+#: apprise/plugins/macosx.py:109
+msgid ""
+"Only works with Mac OS X 10.8 and higher. Additionally  requires that /usr/"
+"local/bin/terminal-notifier is locally accessible."
+msgstr ""
+"Hanya berfungsi dengan Mac OS X 10.8 dan lebih baru. Selain itu, /usr/local/"
+"bin/terminal-notifier mesti boleh dicapai secara tempatan."
+
+#: apprise/plugins/macosx.py:116
+msgid "MacOSX Notification"
+msgstr "Pemberitahuan MacOSX"
+
+#: apprise/plugins/macosx.py:170
+msgid "Open/Click URL"
+msgstr "URL untuk dibuka atau diklik"
+
+#: apprise/plugins/macosx.py:175
+msgid "Terminal-Notifier Version"
+msgstr "Versi Terminal-Notifier"
+
+#: apprise/plugins/macosx.py:181 apprise/plugins/octopush.py:143
+msgid "Sender"
+msgstr "Penghantar"
+
+#: apprise/plugins/email/base.py:200 apprise/plugins/mailersend.py:167
+#: apprise/plugins/office365.py:316 apprise/plugins/pingram.py:238
+#: apprise/plugins/resend.py:151
+msgid "Reply To"
+msgstr "Balas kepada"
+
+#: apprise/plugins/email/base.py:152 apprise/plugins/mailgun.py:135
+#: apprise/plugins/sendpulse.py:117 apprise/plugins/smtp2go.py:114
+#: apprise/plugins/sparkpost.py:165
+msgid "Domain"
+msgstr "Domain"
+
+#: apprise/plugins/email/base.py:183 apprise/plugins/mailgun.py:162
+#: apprise/plugins/postmark.py:145 apprise/plugins/resend.py:141
+#: apprise/plugins/ses.py:211 apprise/plugins/smtp2go.py:136
+#: apprise/plugins/sparkpost.py:187
+msgid "From Name"
+msgstr "Nama penghantar"
+
+#: apprise/plugins/email/base.py:257 apprise/plugins/mailgun.py:198
+#: apprise/plugins/smtp2go.py:162 apprise/plugins/sparkpost.py:220
+msgid "Email Header"
+msgstr "Pengepala e-mel"
+
+#: apprise/plugins/mastodon.py:217 apprise/plugins/misskey.py:144
+msgid "Visibility"
+msgstr "Keterlihatan"
+
+#: apprise/plugins/mastodon.py:223
+msgid "Spoiler Text"
+msgstr "Teks tersembunyi"
+
+#: apprise/plugins/mastodon.py:227
+msgid "Idempotency-Key"
+msgstr "Idempotency-Key"
+
+#: apprise/plugins/mastodon.py:231
+msgid "Language Code"
+msgstr "Kod bahasa"
+
+#: apprise/plugins/mastodon.py:235 apprise/plugins/twitter.py:211
+msgid "Cache Results"
+msgstr "Simpan hasil dalam cache"
+
+#: apprise/plugins/mastodon.py:240
+msgid "Sensitive Attachments"
+msgstr "Lampiran sensitif"
+
+#: apprise/plugins/mastodon.py:256
+msgid "Ping Users/Tags"
+msgstr "Sebut pengguna atau tanda"
+
+#: apprise/plugins/irc/base.py:129 apprise/plugins/mattermost.py:157
+#: apprise/plugins/xmpp/base.py:113
+msgid "User"
+msgstr "Pengguna"
+
+#: apprise/plugins/irc/base.py:144 apprise/plugins/mattermost.py:183
+#: apprise/plugins/notifiarr.py:98 apprise/plugins/pushbullet.py:95
+#: apprise/plugins/pushed.py:102 apprise/plugins/rocketchat.py:151
+#: apprise/plugins/slack.py:281 apprise/plugins/trigv.py:151
+#: apprise/plugins/twist.py:113 apprise/plugins/xmpp/base.py:129
+msgid "Target Channel"
+msgstr "Saluran sasaran"
+
+#: apprise/plugins/mattermost.py:189 apprise/plugins/twist.py:119
+msgid "Target Channel ID"
+msgstr "ID saluran sasaran"
+
+#: apprise/plugins/mobilemessage.py:170
+msgid "Max Message Parts"
+msgstr "Bilangan maksimum bahagian mesej"
+
+#: apprise/plugins/mobilemessage.py:177
+msgid "Custom Reference"
+msgstr "Rujukan tersuai"
+
+#: apprise/plugins/mqtt.py:172
+msgid "Target Queue"
+msgstr "Baris gilir sasaran"
+
+#: apprise/plugins/mqtt.py:189
+msgid "QOS"
+msgstr "QOS"
+
+#: apprise/plugins/mqtt.py:202 apprise/plugins/office365.py:270
+#: apprise/plugins/ringcentral.py:193 apprise/plugins/sendpulse.py:122
+msgid "Client ID"
+msgstr "ID klien"
+
+#: apprise/plugins/mqtt.py:206
+msgid "Use Session"
+msgstr "Guna sesi"
+
+#: apprise/plugins/mqtt.py:211
+msgid "Retain Messages"
+msgstr "Simpan mesej"
+
+#: apprise/plugins/msg91.py:103 apprise/plugins/sendpulse.py:158
+msgid "Template ID"
+msgstr "ID templat"
+
+#: apprise/plugins/msg91.py:110
+msgid "Authentication Key"
+msgstr "Kunci pengesahan"
+
+#: apprise/plugins/msg91.py:139
+msgid "Short URL"
+msgstr "URL pendek"
+
+#: apprise/plugins/msg91.py:149 apprise/plugins/whatsapp.py:204
+msgid "Template Mapping"
+msgstr "Pemetaan templat"
+
+#: apprise/plugins/nextcloud.py:169 apprise/plugins/nextcloudtalk.py:114
+msgid "URL Prefix"
+msgstr "Awalan URL"
+
+#: apprise/plugins/nextcloudtalk.py:44
+msgid "Nextcloud Talk"
+msgstr "Nextcloud Talk"
+
+#: apprise/plugins/nextcloudtalk.py:97
+msgid "Room ID"
+msgstr "ID bilik"
+
+#: apprise/plugins/notifiarr.py:122
+msgid "Discord Event ID"
+msgstr "ID peristiwa Discord"
+
+#: apprise/plugins/notifiarr.py:132 apprise/plugins/pagerduty.py:146
+msgid "Source"
+msgstr "Sumber"
+
+#: apprise/plugins/fcm/__init__.py:154 apprise/plugins/notifico.py:188
+msgid "Project ID"
+msgstr "ID projek"
+
+#: apprise/plugins/notifico.py:197
+msgid "Message Hook"
+msgstr "Cangkuk mesej"
+
+#: apprise/plugins/notifico.py:212
+msgid "IRC Colors"
+msgstr "Warna IRC"
+
+#: apprise/plugins/notifico.py:218
+msgid "Prefix"
+msgstr "Awalan"
+
+#: apprise/plugins/notifyre.py:169
+msgid "Campaign Name"
+msgstr "Nama kempen"
+
+#: apprise/plugins/notifyre.py:173 apprise/plugins/whatsapp.py:129
+msgid "Template Name"
+msgstr "Nama templat"
+
+#: apprise/plugins/notifyre.py:177
+msgid "Client Reference"
+msgstr "Rujukan klien"
+
+#: apprise/plugins/notifyre.py:181
+msgid "High Quality"
+msgstr "Kualiti tinggi"
+
+#: apprise/plugins/notifyre.py:186
+msgid "Fax Header"
+msgstr "Pengepala faks"
+
+#: apprise/plugins/ntfy.py:236 apprise/plugins/pinglet.py:166
+msgid "Topic"
+msgstr "Topik"
+
+#: apprise/plugins/ntfy.py:254
+msgid "Attach"
+msgstr "Lampiran"
+
+#: apprise/plugins/ntfy.py:268
+msgid "Attach Filename"
+msgstr "Nama fail lampiran"
+
+#: apprise/plugins/ntfy.py:276
+msgid "Delay"
+msgstr "Lengah"
+
+#: apprise/plugins/ntfy.py:280 apprise/plugins/twist.py:108
+msgid "Email"
+msgstr "E-mel"
+
+#: apprise/plugins/ntfy.py:294
+msgid "Actions"
+msgstr "Tindakan"
+
+#: apprise/plugins/ntfy.py:307
+msgid "Authentication Type"
+msgstr "Jenis pengesahan"
+
+#: apprise/plugins/octopush.py:131
+msgid "API Login"
+msgstr "Nama masuk API"
+
+#: apprise/plugins/octopush.py:179
+msgid "Accept Replies"
+msgstr "Terima balasan"
+
+#: apprise/plugins/octopush.py:184
+msgid "Purpose"
+msgstr "Tujuan"
+
+#: apprise/plugins/octopush.py:190
+msgid "Type"
+msgstr "Jenis"
+
+#: apprise/plugins/office365.py:258
+msgid "Tenant Domain"
+msgstr "Domain penyewa"
+
+#: apprise/plugins/office365.py:265
+msgid "Account Email or Object ID"
+msgstr "E-mel akaun atau ID objek"
+
+#: apprise/plugins/office365.py:277 apprise/plugins/ringcentral.py:200
+#: apprise/plugins/sendpulse.py:129
+msgid "Client Secret"
+msgstr "Rahsia klien"
+
+#: apprise/plugins/office365.py:326
+msgid "Save to Sent Items"
+msgstr "Simpan dalam item dihantar"
+
+#: apprise/plugins/one_signal.py:109 apprise/plugins/sendgrid.py:147
+msgid "Template"
+msgstr "Templat"
+
+#: apprise/plugins/one_signal.py:120
+msgid "Target Player ID"
+msgstr "ID pemain sasaran"
+
+#: apprise/plugins/one_signal.py:136
+msgid "Include Segment"
+msgstr "Sertakan segmen"
+
+#: apprise/plugins/one_signal.py:156
+msgid "Subtitle"
+msgstr "Sari kata"
+
+#: apprise/plugins/one_signal.py:160 apprise/plugins/sfr.py:126
+#: apprise/plugins/whatsapp.py:142
+msgid "Language"
+msgstr "Bahasa"
+
+#: apprise/plugins/one_signal.py:174
+msgid "Enable Contents"
+msgstr "Bolehkan kandungan"
+
+#: apprise/plugins/one_signal.py:180
+msgid "Decode Template Args"
+msgstr "Nyahkod argumen templat"
+
+#: apprise/plugins/one_signal.py:199
+msgid "Custom Data"
+msgstr "Data tersuai"
+
+#: apprise/plugins/one_signal.py:203
+msgid "Postback Data"
+msgstr "Data maklum balas"
+
+#: apprise/plugins/pagerduty.py:139 apprise/plugins/pushward.py:135
+#: apprise/plugins/spike.py:69
+msgid "Integration Key"
+msgstr "Kunci penyatuan"
+
+#: apprise/plugins/pagerduty.py:152
+msgid "Component"
+msgstr "Komponen"
+
+#: apprise/plugins/pagerduty.py:168
+msgid "Class"
+msgstr "Kelas"
+
+#: apprise/plugins/pagerduty.py:186
+msgid "Severity"
+msgstr "Tahap keterukan"
+
+#: apprise/plugins/pagerduty.py:203
+msgid "Custom Details"
+msgstr "Perincian tersuai"
+
+#: apprise/plugins/pagertree.py:106
+msgid "Integration ID"
+msgstr "ID penyatuan"
+
+#: apprise/plugins/pagertree.py:125
+msgid "Third Party ID"
+msgstr "ID pihak ketiga"
+
+#: apprise/plugins/pagertree.py:151
+msgid "Meta Extras"
+msgstr "Tambahan Meta"
+
+#: apprise/plugins/parseplatform.py:108
+msgid "Master Key"
+msgstr "Kunci induk"
+
+#: apprise/plugins/parseplatform.py:121
+msgid "Device"
+msgstr "Peranti"
+
+#: apprise/plugins/pinglet.py:161
+msgid "Namespace"
+msgstr "Ruang nama"
+
+#: apprise/plugins/pinglet.py:192
+msgid "Badges"
+msgstr "Lencana"
+
+#: apprise/plugins/pinglet.py:196
+msgid "Metadata"
+msgstr "Metadata"
+
+#: apprise/plugins/matrix/base.py:395 apprise/plugins/pingram.py:176
+msgid "Message Type"
+msgstr "Jenis mesej"
+
+#: apprise/plugins/pingram.py:194
+msgid "Target ID"
+msgstr "ID sasaran"
+
+#: apprise/plugins/pingram.py:200
+msgid "Target SMS"
+msgstr "SMS sasaran"
+
+#: apprise/plugins/pingram.py:222 apprise/plugins/signalgrid.py:102
+msgid "Channels"
+msgstr "Saluran"
+
+#: apprise/plugins/email/base.py:178 apprise/plugins/pingram.py:243
+#: apprise/plugins/sendpulse.py:152 apprise/plugins/ses.py:164
+msgid "From Email"
+msgstr "E-mel penghantar"
+
+#: apprise/plugins/plivo.py:89
+msgid "Auth ID"
+msgstr "ID pengesahan"
+
+#: apprise/plugins/plivo.py:95 apprise/plugins/sinch.py:114
+#: apprise/plugins/twilio.py:148
+msgid "Auth Token"
+msgstr "Token pengesahan"
+
+#: apprise/plugins/prowl.py:129
+msgid "Provider Key"
+msgstr "Kunci penyedia"
+
+#: apprise/plugins/pushdeer.py:86
+msgid "Pushkey"
+msgstr "Kunci pemberitahuan"
+
+#: apprise/plugins/pushed.py:84
+msgid "Application Key"
+msgstr "Kunci aplikasi"
+
+#: apprise/plugins/pushed.py:90 apprise/plugins/reddit.py:159
+msgid "Application Secret"
+msgstr "Rahsia aplikasi"
+
+#: apprise/plugins/pushjet.py:83
+msgid "Secret Key"
+msgstr "Kunci rahsia"
+
+#: apprise/plugins/pushme.py:82 apprise/plugins/signal_api.py:153
+#: apprise/plugins/smseagle.py:194
+msgid "Show Status"
+msgstr "Tunjukkan status"
+
+#: apprise/plugins/pushover.py:237
+msgid "User Key"
+msgstr "Kunci pengguna"
+
+#: apprise/plugins/pushover.py:289
+msgid "URL Title"
+msgstr "Tajuk URL"
+
+#: apprise/plugins/pushover.py:294
+msgid "Emergency Retry Interval"
+msgstr "Selang cubaan semula kecemasan"
+
+#: apprise/plugins/pushover.py:300
+msgid "Expire"
+msgstr "Luput"
+
+#: apprise/plugins/pushover.py:317
+msgid "E2EE"
+msgstr "E2EE"
+
+#: apprise/plugins/pushplus.py:173
+msgid "Pushplus"
+msgstr "Pushplus"
+
+#: apprise/plugins/pushplus.py:211 apprise/plugins/qq.py:67
+msgid "User Token"
+msgstr "Token pengguna"
+
+#: apprise/plugins/pushplus.py:220
+msgid "Group Topics"
+msgstr "Topik kumpulan"
+
+#: apprise/plugins/pushplus.py:241 apprise/plugins/wpush.py:183
+msgid "Channel"
+msgstr "Saluran"
+
+#: apprise/plugins/pushplus.py:258
+msgid "Webhook Name"
+msgstr "Nama webhook"
+
+#: apprise/plugins/pushsafer.py:361
+msgid "Private Key"
+msgstr "Kunci peribadi"
+
+#: apprise/plugins/pushsafer.py:398
+msgid "Vibration"
+msgstr "Getaran"
+
+#: apprise/plugins/pushward.py:159
+msgid "Info Level"
+msgstr "Tahap maklumat"
+
+#: apprise/plugins/pushward.py:165
+msgid "Success Level"
+msgstr "Tahap kejayaan"
+
+#: apprise/plugins/pushward.py:171
+msgid "Warning Level"
+msgstr "Tahap amaran"
+
+#: apprise/plugins/pushward.py:177
+msgid "Failure Level"
+msgstr "Tahap kegagalan"
+
+#: apprise/plugins/pushy.py:80
+msgid "Secret API Key"
+msgstr "Kunci API rahsia"
+
+#: apprise/plugins/fcm/__init__.py:163 apprise/plugins/pushy.py:92
+#: apprise/plugins/sns.py:164 apprise/plugins/wxpusher.py:129
+msgid "Target Topic"
+msgstr "Topik sasaran"
+
+#: apprise/plugins/qq.py:47
+msgid "QQ Push"
+msgstr "QQ Push"
+
+#: apprise/plugins/reddit.py:152
+msgid "Application ID"
+msgstr "ID aplikasi"
+
+#: apprise/plugins/reddit.py:166
+msgid "Target Subreddit"
+msgstr "Subreddit sasaran"
+
+#: apprise/plugins/reddit.py:183
+msgid "Kind"
+msgstr "Jenis kandungan"
+
+#: apprise/plugins/reddit.py:189
+msgid "Flair ID"
+msgstr "ID flair"
+
+#: apprise/plugins/reddit.py:194
+msgid "Flair Text"
+msgstr "Teks flair"
+
+#: apprise/plugins/reddit.py:199
+msgid "NSFW"
+msgstr "NSFW"
+
+#: apprise/plugins/reddit.py:205
+msgid "Is Ad?"
+msgstr "Adakah iklan?"
+
+#: apprise/plugins/reddit.py:211
+msgid "Send Replies"
+msgstr "Hantar balasan"
+
+#: apprise/plugins/reddit.py:217
+msgid "Is Spoiler"
+msgstr "Mengandungi spoiler"
+
+#: apprise/plugins/reddit.py:223
+msgid "Resubmit Flag"
+msgstr "Bendera hantar semula"
+
+#: apprise/plugins/resend.py:136
+msgid "From Address"
+msgstr "Alamat penghantar"
+
+#: apprise/plugins/revolt.py:105
+msgid "Channel ID"
+msgstr "ID saluran"
+
+#: apprise/plugins/revolt.py:132
+msgid "Embed URL"
+msgstr "URL terbenam"
+
+#: apprise/plugins/ringcentral.py:187
+msgid "Token / Password"
+msgstr "Token atau kata laluan"
+
+#: apprise/plugins/ringcentral.py:240
+msgid "Environment"
+msgstr "Persekitaran"
+
+#: apprise/plugins/ringcentral.py:253
+msgid "Authentication Mode"
+msgstr "Mod pengesahan"
+
+#: apprise/plugins/rocketchat.py:147
+msgid "Webhook"
+msgstr "Webhook"
+
+#: apprise/plugins/matrix/base.py:338 apprise/plugins/rocketchat.py:163
+msgid "Target Room ID"
+msgstr "ID bilik sasaran"
+
+#: apprise/plugins/matrix/base.py:377 apprise/plugins/rocketchat.py:179
+#: apprise/plugins/ryver.py:119
+msgid "Webhook Mode"
+msgstr "Mod webhook"
+
+#: apprise/plugins/rocketchat.py:184
+msgid "Use Avatar"
+msgstr "Guna avatar"
+
+#: apprise/plugins/rsyslog.py:174 apprise/plugins/syslog.py:145
+msgid "Facility"
+msgstr "Kemudahan"
+
+#: apprise/plugins/rsyslog.py:204 apprise/plugins/syslog.py:162
+msgid "Log PID"
+msgstr "Rekod PID"
+
+#: apprise/plugins/ryver.py:94 apprise/plugins/zulip.py:131
+msgid "Organization"
+msgstr "Organisasi"
+
+#: apprise/plugins/sendgrid.py:167 apprise/plugins/sendpulse.py:184
+msgid "Template Data"
+msgstr "Data templat"
+
+#: apprise/plugins/serwersms.py:143 apprise/plugins/sfr.py:132
+msgid "Sender Name"
+msgstr "Nama penghantar"
+
+#: apprise/plugins/serwersms.py:156 apprise/plugins/signal_api.py:132
+#: apprise/plugins/smseagle.py:159 apprise/plugins/whatsapp.py:160
+msgid "Target Group ID"
+msgstr "ID kumpulan sasaran"
+
+#: apprise/plugins/ses.py:158 apprise/plugins/sns.py:133
+msgid "Session Token"
+msgstr "Token sesi"
+
+#: apprise/plugins/ses.py:170 apprise/plugins/sns.py:139
+msgid "Access Key ID"
+msgstr "ID kunci akses"
+
+#: apprise/plugins/ses.py:176 apprise/plugins/sns.py:145
+msgid "Secret Access Key"
+msgstr "Kunci akses rahsia"
+
+#: apprise/plugins/ses.py:182 apprise/plugins/sinch.py:158
+#: apprise/plugins/sns.py:151
+msgid "Region"
+msgstr "Wilayah"
+
+#: apprise/plugins/ses.py:189 apprise/plugins/smtp2go.py:125
+#: apprise/plugins/sparkpost.py:176
+msgid "Target Emails"
+msgstr "E-mel sasaran"
+
+#: apprise/plugins/seven.py:114 apprise/plugins/smseagle.py:204
+msgid "Flash"
+msgstr "Denyar"
+
+#: apprise/plugins/seven.py:118
+msgid "Label"
+msgstr "Label"
+
+#: apprise/plugins/sfr.py:59
+msgid "Société Française du Radiotéléphone"
+msgstr "Société Française du Radiotéléphone"
+
+#: apprise/plugins/sfr.py:91
+msgid "Service ID"
+msgstr "ID perkhidmatan"
+
+#: apprise/plugins/sfr.py:96
+msgid "Service Password"
+msgstr "Kata laluan perkhidmatan"
+
+#: apprise/plugins/sfr.py:102
+msgid "Space ID"
+msgstr "ID ruang"
+
+#: apprise/plugins/sfr.py:108
+msgid "Recipient Phone Number"
+msgstr "Nombor telefon penerima"
+
+#: apprise/plugins/sfr.py:139
+msgid "Media Type"
+msgstr "Jenis media"
+
+#: apprise/plugins/sfr.py:146
+msgid "Timeout"
+msgstr "Had masa"
+
+#: apprise/plugins/sfr.py:152
+msgid "TTS Voice"
+msgstr "Suara teks ke pertuturan"
+
+#: apprise/plugins/signalgrid.py:96
+msgid "Client Key"
+msgstr "Kunci klien"
+
+#: apprise/plugins/signalgrid.py:119
+msgid "Critical Notification"
+msgstr "Pemberitahuan kritikal"
+
+#: apprise/plugins/signl4.py:90
+msgid "Service"
+msgstr "Perkhidmatan"
+
+#: apprise/plugins/signl4.py:94
+msgid "Location"
+msgstr "Lokasi"
+
+#: apprise/plugins/signl4.py:98
+msgid "Alerting Scenario"
+msgstr "Senario amaran"
+
+#: apprise/plugins/signl4.py:102
+msgid "Filtering"
+msgstr "Penapisan"
+
+#: apprise/plugins/signl4.py:107
+msgid "External ID"
+msgstr "ID luaran"
+
+#: apprise/plugins/signl4.py:111
+msgid "Status"
+msgstr "Status"
+
+#: apprise/plugins/simplepush.py:114
+msgid "Salt"
+msgstr "Salt"
+
+#: apprise/plugins/simplepush.py:127
+msgid "Event"
+msgstr "Peristiwa"
+
+#: apprise/plugins/sinch.py:135 apprise/plugins/twilio.py:169
+msgid "Target Short Code"
+msgstr "Kod pendek sasaran"
+
+#: apprise/plugins/slack.py:230
+msgid "OAuth Access Token"
+msgstr "Token akses OAuth"
+
+#: apprise/plugins/slack.py:239
+msgid "Token A"
+msgstr "Token A"
+
+#: apprise/plugins/slack.py:248
+msgid "Token B"
+msgstr "Token B"
+
+#: apprise/plugins/slack.py:257
+msgid "Token C"
+msgstr "Token C"
+
+#: apprise/plugins/slack.py:264
+msgid "Target Encoded ID"
+msgstr "ID terkod sasaran"
+
+#: apprise/plugins/slack.py:293
+msgid "Workflow Path"
+msgstr "Laluan aliran kerja"
+
+#: apprise/plugins/slack.py:311
+msgid "Include Footer"
+msgstr "Sertakan pengaki"
+
+#: apprise/plugins/slack.py:319
+msgid "Use Blocks"
+msgstr "Guna blok"
+
+#: apprise/plugins/slack.py:325
+msgid "Include Timestamp"
+msgstr "Sertakan cap masa"
+
+#: apprise/plugins/slack.py:331 apprise/plugins/twitter.py:205
+msgid "Message Mode"
+msgstr "Mod mesej"
+
+#: apprise/plugins/smpp.py:62
+msgid "SMPP"
+msgstr "SMPP"
+
+#: apprise/plugins/smpp.py:104
+msgid "Host"
+msgstr "Hos"
+
+#: apprise/plugins/smsc.py:139
+msgid "Login"
+msgstr "Nama masuk"
+
+#: apprise/plugins/smsc.py:176
+msgid "Transliterate"
+msgstr "Alih huruf"
+
+#: apprise/plugins/smseagle.py:166
+msgid "Target Contact"
+msgstr "Kenalan sasaran"
+
+#: apprise/plugins/smseagle.py:199
+msgid "Test Only"
+msgstr "Ujian sahaja"
+
+#: apprise/plugins/smsmanager.py:144
+msgid "Gateway"
+msgstr "Get laluan"
+
+#: apprise/plugins/sogs.py:221
+msgid "Public Key"
+msgstr "Kunci awam"
+
+#: apprise/plugins/sogs.py:228
+msgid "Seed"
+msgstr "Benih"
+
+#: apprise/plugins/sogs.py:235
+msgid "Rooms"
+msgstr "Bilik"
+
+#: apprise/plugins/spike.py:49
+msgid "Spike.sh"
+msgstr "Spike.sh"
+
+#: apprise/plugins/splunk.py:118
+msgid "Splunk On-Call"
+msgstr "Splunk On-Call"
+
+#: apprise/plugins/splunk.py:173
+msgid "Target Routing Key"
+msgstr "Kunci penghalaan sasaran"
+
+#: apprise/plugins/splunk.py:180
+msgid "Entity ID"
+msgstr "ID entiti"
+
+#: apprise/plugins/spugpush.py:49
+msgid "SpugPush"
+msgstr "SpugPush"
+
+#: apprise/plugins/streamlabs.py:126
+msgid "Alert Type"
+msgstr "Jenis amaran"
+
+#: apprise/plugins/streamlabs.py:132
+msgid "Image Link"
+msgstr "Pautan imej"
+
+#: apprise/plugins/streamlabs.py:137
+msgid "Sound Link"
+msgstr "Pautan bunyi"
+
+#: apprise/plugins/streamlabs.py:148
+msgid "Special Text Color"
+msgstr "Warna teks khas"
+
+#: apprise/plugins/streamlabs.py:154
+msgid "Amount"
+msgstr "Jumlah"
+
+#: apprise/plugins/streamlabs.py:160
+msgid "Currency"
+msgstr "Mata wang"
+
+#: apprise/plugins/streamlabs.py:166
+msgid "Name"
+msgstr "Nama"
+
+#: apprise/plugins/streamlabs.py:172
+msgid "Identifier"
+msgstr "Pengenal"
+
+#: apprise/plugins/synology.py:118
+msgid "Upload"
+msgstr "Muat naik"
+
+#: apprise/plugins/syslog.py:168
+msgid "Log to STDERR"
+msgstr "Rekod ke STDERR"
+
+#: apprise/plugins/telegram.py:373
+msgid "Target Chat ID"
+msgstr "ID sembang sasaran"
+
+#: apprise/plugins/telegram.py:396
+msgid "Detect Bot Owner"
+msgstr "Kesan pemilik bot"
+
+#: apprise/plugins/telegram.py:402
+msgid "Silent Notification"
+msgstr "Pemberitahuan senyap"
+
+#: apprise/plugins/telegram.py:407
+msgid "Web Page Preview"
+msgstr "Pratonton halaman web"
+
+#: apprise/plugins/telegram.py:412
+msgid "Topic Thread ID"
+msgstr "ID bebenang topik"
+
+#: apprise/plugins/telegram.py:419
+msgid "Markdown Version"
+msgstr "Versi Markdown"
+
+#: apprise/plugins/telegram.py:428
+msgid "Content Placement"
+msgstr "Penempatan kandungan"
+
+#: apprise/plugins/telegram.py:434
+msgid "Rich Message Template Path"
+msgstr "Laluan templat mesej berformat"
+
+#: apprise/plugins/telnyx.py:132
+msgid "Messaging Profile ID"
+msgstr "ID profil pemesejan"
+
+#: apprise/plugins/threema.py:86
+msgid "Gateway ID"
+msgstr "ID get laluan"
+
+#: apprise/plugins/threema.py:111
+msgid "Target Threema ID"
+msgstr "ID Threema sasaran"
+
+#: apprise/plugins/trigv.py:160
+msgid "API Hostname"
+msgstr "Nama hos API"
+
+#: apprise/plugins/trigv.py:186
+msgid "Image URL"
+msgstr "URL imej"
+
+#: apprise/plugins/trigv.py:196
+msgid "Event type"
+msgstr "Jenis peristiwa"
+
+#: apprise/plugins/trigv.py:200
+msgid "Priority (Pushover compatibility)"
+msgstr "Keutamaan (keserasian Pushover)"
+
+#: apprise/plugins/twilio.py:201
+msgid "Notification Method: sms or call"
+msgstr "Kaedah pemberitahuan: sms atau panggilan"
+
+#: apprise/plugins/twitter.py:164
+msgid "Consumer Key"
+msgstr "Kunci pengguna API"
+
+#: apprise/plugins/twitter.py:170
+msgid "Consumer Secret"
+msgstr "Rahsia pengguna API"
+
+#: apprise/plugins/twitter.py:182
+msgid "Access Secret"
+msgstr "Rahsia akses"
+
+#: apprise/plugins/viber.py:50
+msgid "Viber"
+msgstr "Viber"
+
+#: apprise/plugins/viber.py:82
+msgid "Authentication Token"
+msgstr "Token pengesahan"
+
+#: apprise/plugins/viber.py:88
+msgid "Receiver IDs"
+msgstr "ID penerima"
+
+#: apprise/plugins/viber.py:106
+msgid "Bot Avatar URL"
+msgstr "URL avatar bot"
+
+#: apprise/plugins/voipms.py:84
+msgid "User Email"
+msgstr "E-mel pengguna"
+
+#: apprise/plugins/vapid/__init__.py:189 apprise/plugins/vonage.py:134
+msgid "ttl"
+msgstr "ttl"
+
+#: apprise/plugins/webexteams.py:179
+msgid "Bot Access Token"
+msgstr "Token akses bot"
+
+#: apprise/plugins/webexteams.py:185
+msgid "Room IDs"
+msgstr "ID bilik"
+
+#: apprise/plugins/wechat.py:175
+msgid "Corp ID"
+msgstr "ID syarikat"
+
+#: apprise/plugins/wechat.py:182
+msgid "App Secret"
+msgstr "Rahsia aplikasi"
+
+#: apprise/plugins/wechat.py:190
+msgid "Agent ID"
+msgstr "ID ejen"
+
+#: apprise/plugins/wechat.py:206
+msgid "Target Department"
+msgstr "Bahagian sasaran"
+
+#: apprise/plugins/wechat.py:213
+msgid "Target Tag"
+msgstr "Tanda sasaran"
+
+#: apprise/plugins/wecombot.py:100
+msgid "Bot Webhook Key"
+msgstr "Kunci webhook bot"
+
+#: apprise/plugins/whatsapp.py:135
+msgid "From Phone ID"
+msgstr "ID telefon penghantar"
+
+#: apprise/plugins/windows.py:62
+msgid "A local Microsoft Windows environment is required."
+msgstr "Persekitaran Microsoft Windows tempatan diperlukan."
+
+#: apprise/plugins/workflows.py:151
+msgid "Workflow ID"
+msgstr "ID aliran kerja"
+
+#: apprise/plugins/workflows.py:159
+msgid "Signature"
+msgstr "Tandatangan"
+
+#: apprise/plugins/workflows.py:182
+msgid "Use Power Automate URL"
+msgstr "Guna URL Power Automate"
+
+#: apprise/plugins/workflows.py:189
+msgid "Power Automate Routing ID"
+msgstr "ID penghalaan Power Automate"
+
+#: apprise/plugins/workflows.py:196
+msgid "Wrap Text"
+msgstr "Balut teks"
+
+#: apprise/plugins/workflows.py:211
+msgid "API Version"
+msgstr "Versi API"
+
+#: apprise/plugins/wpush.py:167
+msgid "Topics"
+msgstr "Topik"
+
+#: apprise/plugins/wpush.py:201
+msgid "Group / Option Code"
+msgstr "Kod kumpulan atau pilihan"
+
+#: apprise/plugins/wxpusher.py:122
+msgid "App Token"
+msgstr "Token aplikasi"
+
+#: apprise/plugins/wxpusher.py:134
+msgid "Target User ID"
+msgstr "ID pengguna sasaran"
+
+#: apprise/plugins/youlmk.py:159
+msgid "Token or Key"
+msgstr "Token atau kunci"
+
+#: apprise/plugins/youlmk.py:183
+msgid "Info Priority"
+msgstr "Keutamaan maklumat"
+
+#: apprise/plugins/youlmk.py:189
+msgid "Success Priority"
+msgstr "Keutamaan kejayaan"
+
+#: apprise/plugins/youlmk.py:195
+msgid "Warning Priority"
+msgstr "Keutamaan amaran"
+
+#: apprise/plugins/youlmk.py:201
+msgid "Failure Priority"
+msgstr "Keutamaan kegagalan"
+
+#: apprise/plugins/youlmk.py:216
+msgid "Link Label"
+msgstr "Label pautan"
+
+#: apprise/plugins/zoom.py:146
+msgid "Verification Token"
+msgstr "Token pengesahan"
+
+#: apprise/plugins/zulip.py:149
+msgid "Target Stream"
+msgstr "Strim sasaran"
+
+#: apprise/plugins/email/base.py:188
+msgid "SMTP Server"
+msgstr "Pelayan SMTP"
+
+#: apprise/plugins/email/base.py:193 apprise/plugins/xmpp/base.py:150
+msgid "Secure Mode"
+msgstr "Mod selamat"
+
+#: apprise/plugins/email/base.py:205
+msgid "PGP Security Mode"
+msgstr "Mod keselamatan PGP"
+
+#: apprise/plugins/email/base.py:212
+msgid "PGP Public Key Path"
+msgstr "Laluan kunci awam PGP"
+
+#: apprise/plugins/email/base.py:220
+msgid "PGP Private Key Path"
+msgstr "Laluan kunci peribadi PGP"
+
+#: apprise/plugins/email/base.py:228
+msgid "Web Key Directory"
+msgstr "Direktori kunci web"
+
+#: apprise/plugins/email/base.py:234
+msgid "Inline Attachments"
+msgstr "Lampiran terbenam"
+
+#: apprise/plugins/email/base.py:239
+msgid "To Email"
+msgstr "E-mel penerima"
+
+#: apprise/plugins/fcm/__init__.py:149
+msgid "OAuth2 KeyFile"
+msgstr "Fail kunci OAuth2"
+
+#: apprise/plugins/fcm/__init__.py:194
+msgid "Custom Image URL"
+msgstr "URL imej tersuai"
+
+#: apprise/plugins/fcm/__init__.py:206
+msgid "Notification Color"
+msgstr "Warna pemberitahuan"
+
+#: apprise/plugins/fcm/__init__.py:216
+msgid "Data Entries"
+msgstr "Entri data"
+
+#: apprise/plugins/irc/base.py:160
+msgid "Real Name"
+msgstr "Nama sebenar"
+
+#: apprise/plugins/irc/base.py:161
+msgid "Nickname"
+msgstr "Nama panggilan"
+
+#: apprise/plugins/irc/base.py:163
+msgid "Join Channels"
+msgstr "Sertai saluran"
+
+#: apprise/plugins/irc/base.py:168
+msgid "Auth Mode"
+msgstr "Mod pengesahan"
+
+#: apprise/plugins/matrix/base.py:344
+msgid "Target Room Alias"
+msgstr "Alias bilik sasaran"
+
+#: apprise/plugins/matrix/base.py:367
+msgid "Server Discovery"
+msgstr "Penemuan pelayan"
+
+#: apprise/plugins/matrix/base.py:372
+msgid "Force Home Server on Room IDs"
+msgstr "Paksa pelayan asal pada ID bilik"
+
+#: apprise/plugins/matrix/base.py:389
+msgid "Matrix API Version"
+msgstr "Versi API Matrix"
+
+#: apprise/plugins/matrix/base.py:401
+msgid "End-to-End Encryption"
+msgstr "Penyulitan hujung ke hujung"
+
+#: apprise/plugins/matrix/base.py:406
+msgid "Automatic Device Verification"
+msgstr "Pengesahan peranti automatik"
+
+#: apprise/plugins/vapid/__init__.py:203
+msgid "PEM Private KeyFile"
+msgstr "Fail kunci peribadi PEM"
+
+#: apprise/plugins/vapid/__init__.py:209
+msgid "Subscripion File"
+msgstr "Fail langganan"
+
+#: apprise/plugins/xmpp/base.py:145
+msgid "XMPP Server"
+msgstr "Pelayan XMPP"
+
+#: apprise/plugins/xmpp/base.py:157
+msgid "Get Roster"
+msgstr "Dapatkan senarai kenalan"
+
+#: apprise/plugins/xmpp/base.py:162
+msgid "Use Subject"
+msgstr "Guna subjek"
+
+#: apprise/plugins/xmpp/base.py:167
+msgid "Keep Connection Alive"
+msgstr "Kekalkan sambungan"
+
+#: apprise/plugins/xmpp/base.py:173
+msgid "MUC Nickname"
+msgstr "Nama panggilan MUC"
+
+#: apprise/plugins/xmpp/base.py:177
+msgid "SCRAM-PLUS Channel Binding"
+msgstr "Pengikatan saluran SCRAM-PLUS"

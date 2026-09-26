@@ -68,6 +68,46 @@ def test_timezone():
         AppriseAsset(_tzinfo=timezone.utc)
 
 
+def test_language():
+    "asset: language() testing"
+    # None leaves the detection of the language up to Apprise
+    assert AppriseAsset().language is None
+
+    # Both the 2 and the 5 letter forms are accepted; a region is stored
+    # upper case and the language lower case no matter how it arrives
+    for entry in ("en", "EN", " en "):
+        assert AppriseAsset(language=entry).language == "en"
+
+    for entry in ("en-CA", "en_CA", "EN-ca", "en_ca"):
+        assert AppriseAsset(language=entry).language == "en_CA"
+
+    # A script or any other extra part is dropped, leaving the language
+    assert AppriseAsset(language="zh-Hans").language == "zh"
+    assert AppriseAsset(language="zh-Hans-CN").language == "zh"
+
+    # Only the first entry of an Accept-Language styled value is used
+    asset = AppriseAsset(language="en-US,en;q=0.9,de;q=0.5")
+    assert asset.language == "en_US"
+
+    # An empty value is the same as not providing one at all
+    assert AppriseAsset(language="").language is None
+    assert AppriseAsset(language="   ").language is None
+
+    # Anything we can not make sense of is a configuration error
+    for entry in ("garbage", "!", 42, {}, object()):
+        with pytest.raises(AppriseImproperlyConfigured):
+            AppriseAsset(language=entry)
+
+    # The language is locked in once the asset is built; a new language
+    # means a new asset
+    with pytest.raises(AttributeError):
+        AppriseAsset().language = "fr"
+
+    # The private field cannot bypass the validated language argument.
+    with pytest.raises(AppriseImproperlyConfigured):
+        AppriseAsset(_language="garbage")
+
+
 def test_service_timeout():
     "asset: service_timeout() testing"
 

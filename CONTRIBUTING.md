@@ -95,6 +95,57 @@ ruff format .             # Apply code style
 
 ---
 
+## 🌍 Translations
+
+Apprise presents its human readable strings (the names of the settings each
+service accepts) in the language of whoever is running it. Every language
+lives in its own directory under `apprise/i18n/`.
+
+Start by seeing where help is needed:
+
+```bash
+python packaging/i18n_status.py
+```
+
+Each language is listed with how much of it is translated, followed by a
+bullet for every string still waiting on someone. The report also names the
+exact file to edit.
+
+To improve an existing translation:
+
+1. Open `apprise/i18n/<language>/LC_MESSAGES/apprise.po` for your language.
+2. Fill in the `msgstr ""` under each `msgid` you want to translate. Leave
+   the `msgid` lines alone; they are the English source text.
+3. Remove any `#, fuzzy` comment once you have confirmed the translation
+   below it. A fuzzy entry is a machine guess and Apprise ignores it.
+4. Rebuild and check your work:
+
+```bash
+tox -e i18n            # refresh the .pot and every .po file
+tox -e compile         # build the .mo files Apprise loads
+tox -e i18n-status     # confirm nothing is left behind
+```
+
+To start a brand new language, let Babel create the catalog for you so its
+header carries the right `Language`, `Language-Team`, and `Plural-Forms`
+values for that language:
+
+```bash
+tox -e i18n            # build apprise/i18n/apprise.pot first
+pybabel init --domain=apprise -i apprise/i18n/apprise.pot \
+    -d apprise/i18n -l <language>
+```
+
+Name the directory after the language code, such as `de` or `ja`. A region
+may be added when a language needs one (`pt_BR`), and Apprise falls back to
+the plain language when no catalog exists for the region. Then translate it
+the same way as above.
+
+Only text a person reads gets translated. Anything a program reads, such as
+a status code or a key in a JSON response, stays in English.
+
+---
+
 ## 🧰 Optional: Using VS Code
 
 1. Open the repo: `code .`

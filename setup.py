@@ -32,10 +32,39 @@
 # Refer to tox for everything else; this will be removed once RHEL9 support
 # is dropped.
 #
+import glob
 import os
 import re
 
 from setuptools import find_packages, setup
+from setuptools.command.build_py import build_py
+
+
+class BuildPyWithTranslations(build_py):
+    """Compile the translation catalogs before building the package.
+
+    The ``.mo`` files are not kept in git, so without this a build from a
+    git checkout ships no translations.
+    """
+
+    def run(self) -> None:
+        # Babel is already a build requirement (see pyproject.toml)
+        from babel.messages.mofile import write_mo
+        from babel.messages.pofile import read_po
+
+        # Compile each language's catalog next to its source
+        pattern = os.path.join("apprise", "i18n", "*", "LC_MESSAGES", "*.po")
+        for po_path in glob.glob(pattern):
+            # Read our human-editable catalog
+            with open(po_path, "rb") as po_file:
+                catalog = read_po(po_file)
+
+            # Write the compiled copy that gettext actually reads
+            with open(po_path[:-3] + ".mo", "wb") as mo_file:
+                write_mo(mo_file, catalog)
+
+        # Now build as normal; package_data picks up the .mo files
+        super().run()
 
 
 def read_version() -> str:
@@ -53,6 +82,7 @@ def read_version() -> str:
 # versions of the distribution only
 setup(
     name="apprise",
+    cmdclass={"build_py": BuildPyWithTranslations},
     version=read_version(),
     packages=find_packages(exclude=["tests*", "packaging*"]),
     entry_points={
