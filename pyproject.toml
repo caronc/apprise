@@ -264,12 +264,19 @@ all-plugins = [
     # Provides smpp:// support
     "smpplib",
 
-    # For xmpp:// support
-    "slixmpp >= 1.16.0",
+    # For xmpp:// support (slixmpp 1.16.0+ needs Python 3.11 or newer)
+    "slixmpp >= 1.16.0; python_version >= '3.11'",
 ]
 windows = [
     "pywin32",
     "tzdata",
+]
+
+[dependency-groups]
+# Development environment for uv; "uv sync" installs this group by default.
+# Dependency groups are never published, so PyPI users are unaffected.
+dev = [
+    "apprise[dev,all-plugins]",
 ]
 
 [project.urls]

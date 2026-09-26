@@ -59,6 +59,18 @@ pip install '.[dev]'
 pip install -e '.[dev]'
 ```
 
+If you use [uv](https://docs.astral.sh/uv/), one command sets up a `.venv`
+with every dev tool and plugin dependency:
+```bash
+uv sync
+uv run pytest
+```
+
+`tox` also works through uv:
+```bash
+uvx --with tox-uv tox -e qa
+```
+
 ---
 
 ## 🧪 Running Tests

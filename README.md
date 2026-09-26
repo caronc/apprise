@@ -260,6 +260,15 @@ The easiest way is to install Apprise from PyPI:
 pip install apprise
 ```
 
+If you use [uv](https://docs.astral.sh/uv/), you can install the `apprise` command in its own isolated environment, or add Apprise to your uv project:
+```bash
+# Install the apprise command
+uv tool install apprise
+
+# Or add it to your own project
+uv add apprise
+```
+
 Apprise is also packaged as an RPM and available through [EPEL](https://docs.fedoraproject.org/en-US/epel/) supporting CentOS, Redhat, Rocky, Oracle Linux, etc.
 ```bash
 # Follow instructions on https://docs.fedoraproject.org/en-US/epel
