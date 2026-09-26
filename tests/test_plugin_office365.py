@@ -1096,7 +1096,7 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
 
 @mock.patch("requests.get")
 @mock.patch("requests.post")
-def test_plugin_office365_inline_attachment_content_type(mock_post, mock_get):
+def test_plugin_office365_inline_mimetype(mock_post, mock_get):
     """NotifyOffice365() inline attachments carry their real MIME type."""
 
     # Initialize some generic (but valid) tokens
@@ -1137,7 +1137,7 @@ def test_plugin_office365_inline_attachment_content_type(mock_post, mock_get):
         is True
     )
 
-    # call 0 is the token request; call 1 is the sendMail
+    # The token request comes first, then the sendMail call
     assert mock_post.call_count == 2
     assert (
         mock_post.call_args_list[1][0][0]
@@ -1148,9 +1148,7 @@ def test_plugin_office365_inline_attachment_content_type(mock_post, mock_get):
     attachments = posted["message"]["attachments"]
     assert len(attachments) == 1
 
-    # The attachment must advertise the file's real MIME type; not a
-    # placeholder.  The large-attachment path (upload_attachment()) already
-    # sends attachment.mimetype here.
+    # The attachment carries the file's real MIME type
     assert attachments[0]["contentType"] == attach[0].mimetype
     assert attachments[0]["contentType"] == "image/gif"
 
