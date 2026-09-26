@@ -678,10 +678,30 @@ def test_plugin_ses_session_token_via_password_field():
     assert obj3.aws_session_token == TEST_SESSION_TOKEN
 
 
-def test_plugin_ses_url_keeps_cc_names():
+def test_plugin_ses_cc_bcc_invalid():
+    """NotifySES() drops invalid CC and BCC entries."""
+    # A list is used because parse_emails() already filters invalid
+    # entries out of a comma-separated string before they are checked.
+    obj = NotifySES(
+        access_key_id="T1JJ3T3L2",
+        secret_access_key="A1BRTD4JD/TIiajkdnlazkcevi7FQ",
+        region_name="us-west-2",
+        from_addr="user@example.com",
+        targets=["new@example.com"],
+        cc=["good@example.com", "notanemail"],
+        bcc=["bcc@example.com", "alsonotanemail"],
+    )
+
+    # Only the valid CC and BCC entries were kept
+    assert obj.cc == {"good@example.com"}
+    assert obj.bcc == {"bcc@example.com"}
+
+
+def test_plugin_ses_cc_names():
     """NotifySES() url() keeps the display names of CC addresses."""
     obj = Apprise.instantiate(
-        "ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/new@example.com"
+        "ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/"
+        "us-west-2/new@example.com"
         "?cc=Chris<l2g@nuxref.com>,plain@example.com"
     )
     assert isinstance(obj, NotifySES)
@@ -699,7 +719,7 @@ def test_plugin_ses_url_keeps_cc_names():
     assert obj2.names["plain@example.com"] is False
 
 
-def test_plugin_ses_url_keeps_cc_names_with_spaces():
+def test_plugin_ses_cc_names_with_spaces():
     """NotifySES() url() keeps CC display names that contain spaces."""
     obj = NotifySES(
         access_key_id="T1JJ3T3L2",
@@ -717,3 +737,12 @@ def test_plugin_ses_url_keeps_cc_names_with_spaces():
     assert obj2.cc == {"l2g@nuxref.com"}
     assert obj2.bcc == {"jane@example.com"}
     assert obj2.names["l2g@nuxref.com"] == "Chris Smith"
+
+    # A BCC name with a space is kept whole when read from a URL
+    obj3 = Apprise.instantiate(
+        "ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/"
+        "us-west-2/new@example.com?bcc=Jane%20Doe<jane@example.com>"
+    )
+    assert isinstance(obj3, NotifySES)
+    assert obj3.bcc == {"jane@example.com"}
+    assert obj3.names["jane@example.com"] == "Jane Doe"

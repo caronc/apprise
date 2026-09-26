@@ -589,7 +589,7 @@ def test_plugin_mailgun_cc_bcc_invalid_branch():
     assert len(obj.bcc) == 1
 
 
-def test_plugin_mailgun_url_keeps_cc_names():
+def test_plugin_mailgun_cc_names():
     """NotifyMailgun() url() keeps the display names of CC addresses."""
     obj = Apprise.instantiate(
         "mailgun://user@localhost.localdomain/apikey/new@example.com"

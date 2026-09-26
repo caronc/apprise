@@ -547,7 +547,7 @@ def test_plugin_sparkpost_cc_bcc_invalid_branch():
     assert len(obj.bcc) == 1
 
 
-def test_plugin_sparkpost_url_keeps_cc_names():
+def test_plugin_sparkpost_cc_names():
     """NotifySparkPost() url() keeps the display names of CC addresses."""
     obj = Apprise.instantiate(
         "sparkpost://user@localhost.localdomain/apikey/new@example.com"

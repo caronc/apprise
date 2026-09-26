@@ -373,7 +373,7 @@ def test_plugin_smtp2go_cc_bcc_invalid_branch():
     assert len(obj.bcc) == 1
 
 
-def test_plugin_smtp2go_url_keeps_cc_names():
+def test_plugin_smtp2go_cc_names():
     """NotifySMTP2Go() url() keeps the display names of CC addresses."""
     obj = Apprise.instantiate(
         "smtp2go://user@localhost.localdomain/apikey/new@example.com"
