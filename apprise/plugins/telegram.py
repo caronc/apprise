@@ -910,6 +910,12 @@ class NotifyTelegram(NotifyBase):
         backtick_runs = commonmark_index_backtick_runs(body)
         # Pick a temporary marker that does not occur in the message.
         sentinel = commonmark_pick_emphasis_sentinel(body)
+
+        def _orphan_bracket(idx):
+            # A "[" that opens no link is literal text. v1 escapes it only
+            # outside a span, which is known once the scan is done.
+            out[idx] = "\\[" if strict else f"{sentinel}[1{sentinel}"
+
         # Bound the total work spent scanning labeled-link destinations.
         scan_budget = commonmark_new_scan_budget(body)
 
@@ -951,8 +957,13 @@ class NotifyTelegram(NotifyBase):
                     i = close + run
                     continue
 
-                # Preserve unmatched backticks, escaping them only in v2.
-                out.append(("\\`" if strict else "`") * run)
+                if strict:
+                    # Escape unmatched backticks in v2.
+                    out.append("\\`" * run)
+                else:
+                    # v1 escapes them only outside a span; the emphasis
+                    # spans around them are known once the scan is done.
+                    out.append(f"{sentinel}`{run}{sentinel}")
                 i = j
                 continue
 
@@ -1011,9 +1022,7 @@ class NotifyTelegram(NotifyBase):
                     continue
 
                 # Same reasoning as the angle-dest case above.
-                idx = link_stack.pop()
-                if strict:
-                    out[idx] = "\\" + out[idx]
+                _orphan_bracket(link_stack.pop())
 
             # Drop autolink brackets and escape its URL for the selected mode.
             if ch == "<":
@@ -1032,10 +1041,8 @@ class NotifyTelegram(NotifyBase):
             # mode. Retire the innermost pending "[" so a later, unrelated
             # "](" cannot incorrectly reuse it as its own opener.
             if ch == "]" and link_stack:
-                idx = link_stack.pop()
-                if strict:
-                    # Escape the orphaned "[" so it cannot match as markup.
-                    out[idx] = "\\" + out[idx]
+                # Escape the orphaned "[" so it cannot match as markup.
+                _orphan_bracket(link_stack.pop())
 
             # Escape non-link punctuation required by strict MarkdownV2.
             if strict and ch in "]()":
@@ -1061,9 +1068,8 @@ class NotifyTelegram(NotifyBase):
             i += 1
 
         # Escape dangling "[" markers before span cleanup changes indexes.
-        if strict:
-            for idx in link_stack:
-                out[idx] = "\\" + out[idx]
+        for idx in link_stack:
+            _orphan_bracket(idx)
 
         # Resolve all recorded runs using CommonMark matching rules.
         commonmark_match_emphasis(delimiters)
@@ -1079,13 +1085,28 @@ class NotifyTelegram(NotifyBase):
             for kind, is_strong in closes:
                 tagged.append((kind, is_strong, strict or depth == 1))
                 depth -= 1
+            # Unmatched markers of this run sit between its closes and opens.
+            descriptor["depth"] = depth
             for kind, is_strong in reversed(opens):
                 tagged.append((kind, is_strong, strict or depth == 0))
                 depth += 1
             descriptor["events"] = tagged
+            descriptor["depth_after"] = depth
+
+        # Span depth at the current position of the substitution pass.
+        state = {"depth": 0}
 
         def _substitute(match):
-            descriptor = delimiters[int(match.group(1))]
+            kind = match.group(1)
+            if kind:
+                # A literal v1 "`" or "[" opens an entity that never ends
+                # unless it is escaped. Text inside a v1 span is taken
+                # literally, so it stays as is there.
+                marker = ("\\" + kind) if state["depth"] == 0 else kind
+                return marker * int(match.group(2))
+
+            descriptor = delimiters[int(match.group(2))]
+            state["depth"] = descriptor["depth_after"]
             char = descriptor["char"]
             close_part = "".join(
                 "*" if is_strong else "_"
@@ -1097,13 +1118,16 @@ class NotifyTelegram(NotifyBase):
                 for kind, is_strong, visible in descriptor["events"]
                 if kind == "open" and visible
             )
-            # Escape unmatched literal markers only in MarkdownV2.
-            marker = ("\\" + char) if strict else char
+            # Telegram rejects an unmatched marker as an entity that never
+            # ends. MarkdownV2 escapes it everywhere; v1 recognizes the escape
+            # only outside a span and reads text inside a span literally.
+            escape = strict or descriptor["depth"] == 0
+            marker = ("\\" + char) if escape else char
             leftover = marker * descriptor["numdelims"]
             return close_part + leftover + open_part
 
         marker_re = re.compile(
-            re.escape(sentinel) + r"(\d+)" + re.escape(sentinel)
+            re.escape(sentinel) + r"([`[]?)(\d+)" + re.escape(sentinel)
         )
         text = marker_re.sub(_substitute, "".join(out))
 

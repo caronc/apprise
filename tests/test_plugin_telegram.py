@@ -1819,7 +1819,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
     stray_body = "[label] and ](http://x.com/a(b)c) end"
     assert (
         NotifyTelegram._commonmark_to_telegram(stray_body, strict=False)
-        == "[label] and ](http://x.com/a(b)c) end"
+        == r"\[label] and ](http://x.com/a(b)c) end"
     )
     assert NotifyTelegram._commonmark_to_telegram(stray_body, strict=True) == (
         "\\[label\\] and \\]\\(http://x\\.com/a\\(b\\)c\\) end"
@@ -1841,12 +1841,12 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         == "\\[label\\]\\(unterminated"
     )
 
-    # Telegram v1 leaves the rejected destination literal.
+    # Telegram v1 keeps the rejected destination as literal text.
     assert (
         NotifyTelegram._commonmark_to_telegram(
             "[label](has space)", strict=False
         )
-        == "[label](has space)"
+        == r"\[label](has space)"
     )
 
     # An unfinished angle destination follows the same v2 fallback.
@@ -1857,12 +1857,12 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         == "\\[label\\]\\(\\<https://unterminated"
     )
 
-    # Telegram v1 also leaves the unfinished angle destination literal.
+    # Telegram v1 also keeps the unfinished angle destination literal.
     assert (
         NotifyTelegram._commonmark_to_telegram(
             "[label](<https://unterminated", strict=False
         )
-        == "[label](<https://unterminated"
+        == r"\[label](<https://unterminated"
     )
 
     # Escape a dangling "[" during end-of-scan cleanup.
@@ -1906,17 +1906,17 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         == "[label](https://example.com/a_\\(b\\))"
     )
 
-    # Preserve an opener with no closer.
-    assert NotifyTelegram._commonmark_to_telegram("****x") == "****x"
+    # Keep an opener with no closer as literal (escaped) text.
+    assert NotifyTelegram._commonmark_to_telegram("****x") == r"\*\*\*\*x"
 
-    # Preserve a run that is neither left- nor right-flanking.
-    assert NotifyTelegram._commonmark_to_telegram("******") == "******"
+    # Keep a run that is neither left- nor right-flanking as literal text.
+    assert NotifyTelegram._commonmark_to_telegram("******") == r"\*" * 6
 
-    # Preserve unmatched markers in a complete body.
+    # Keep unmatched markers in a complete body as literal text.
     f1 = NotifyTelegram._commonmark_to_telegram
-    assert f1("***italic text") == "***italic text"
-    assert f1("**text") == "**text"
-    assert f1("**") == "**"
+    assert f1("***italic text") == r"\*\*\*italic text"
+    assert f1("**text") == r"\*\*text"
+    assert f1("**") == r"\*\*"
 
     # User-provided Private Use text must not collide in either Markdown mode.
     marker = chr(0xE000)
@@ -1934,10 +1934,11 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         NotifyTelegram._commonmark_to_telegram("a" * 9 + "*", strict=True)
         == "a" * 9 + "\\*"
     )
-    # Legacy v1 does not enforce universal escaping.
+    # Legacy v1 also escapes a literal marker outside a span, or Telegram
+    # rejects it as an entity that never ends.
     assert (
         NotifyTelegram._commonmark_to_telegram("a" * 9 + "_", strict=False)
-        == "a" * 9 + "_"
+        == "a" * 9 + "\\_"
     )
 
     # Preserve genuine underscore-based italics.
@@ -1978,9 +1979,10 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         "\\*\\_"
     )
 
-    # Preserve unrelated unmatched delimiter families.
+    # Keep unrelated unmatched delimiter families as literal text.
     assert (
-        NotifyTelegram._commonmark_to_telegram("**_a", strict=False) == "**_a"
+        NotifyTelegram._commonmark_to_telegram("**_a", strict=False)
+        == r"\*\*\_a"
     )
 
     # Do not close asterisk emphasis with an underscore.
@@ -2012,9 +2014,10 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         == "*a*\\_"
     )
 
-    # Preserve unmatched mixed delimiter families.
+    # Keep unmatched mixed delimiter families as literal text.
     assert (
-        NotifyTelegram._commonmark_to_telegram("*__a", strict=False) == "*__a"
+        NotifyTelegram._commonmark_to_telegram("*__a", strict=False)
+        == r"\*\_\_a"
     )
 
     # A run wide enough to supply both kinds of emphasis nests regular
@@ -2053,6 +2056,59 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
     payload = loads(mock_post.call_args_list[-1][1]["data"])
     assert payload["text"] == "*hello*"
     mock_post.reset_mock()
+
+
+def test_plugin_telegram_v1_unmatched_markers_escaped():
+    """Legacy Markdown rejects an entity marker that never closes.
+
+    Telegram answers "can't parse entities" for a lone "_", "*", "`" or "["
+    outside an entity, and reads text inside an entity literally.
+    """
+    f1 = NotifyTelegram._commonmark_to_telegram
+
+    # CommonMark literals outside a span are escaped.
+    assert f1("Backup of app_data failed") == r"Backup of app\_data failed"
+    assert f1("snake_case_name") == r"snake\_case\_name"
+    assert f1("5 * 3 = 15") == r"5 \* 3 = 15"
+    assert f1("a lone ` tick") == r"a lone \` tick"
+    assert f1("x ``` y") == r"x \`\`\` y"
+
+    # Text inside a visible span is left as is.
+    assert f1("**disk a_b** on c_d") == r"*disk a_b* on c\_d"
+    assert f1("_it a*b_ x*y") == r"_it a*b_ x\*y"
+    assert f1("**a ` b** c") == "*a ` b* c"
+    assert f1("**[a** b") == "*[a* b"
+
+    # A "[" that opens no link is escaped too.
+    assert f1("[ERROR] disk full") == r"\[ERROR] disk full"
+    assert f1("a [b") == r"a \[b"
+
+    # Real markup and code spans are unchanged.
+    assert f1("**bold** and _it_") == "*bold* and _it_"
+    assert f1("`code_x` y_z") == r"`code_x` y\_z"
+
+    # MarkdownV2 output is unchanged.
+    assert f1("app_data", strict=True) == r"app\_data"
+    assert f1("a ` b", strict=True) == r"a \` b"
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_v1_markdown_body_with_underscore(mock_post):
+    """A Markdown body is sent in legacy Markdown with its literals escaped."""
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = dumps({"ok": True, "result": True})
+
+    aobj = Apprise()
+    aobj.add("tgram://123456789:abcdefg_hijklmnop/12345")
+    assert aobj.notify(
+        title="Backup",
+        body="Backup of app_data failed",
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["parse_mode"] == "MARKDOWN"
+    assert payload["text"] == "*Backup*\n" r"Backup of app\_data failed"
 
 
 @mock.patch("requests.post")
