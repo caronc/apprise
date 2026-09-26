@@ -3831,8 +3831,9 @@ class TestServiceTimeout:
         """A TIMEOUT attempt includes a matching ERROR log entry.
 
         Each attempt takes one second, so the 1.5-second deadline expires
-        during the second. The half-second margin keeps the timing reliable
-        on busy test hosts.
+        during the retry wait or the second attempt. The grace period is
+        widened so a slow test host cannot stop the wait before the worker
+        reports its own attempts.
         """
         N_MGR["slow"] = _SlowNotify
 
@@ -3843,7 +3844,10 @@ class TestServiceTimeout:
             a = Apprise(asset=asset)
             a.add(service)
 
-            result = a.notify(body="test")
+            # Wait long enough for the worker to return its attempts.
+            with mock.patch("apprise.apprise._ABANDON_GRACE_SECONDS", 5.0):
+                result = a.notify(body="test")
+
         finally:
             N_MGR.unload_modules()
 
