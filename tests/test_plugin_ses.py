@@ -676,3 +676,44 @@ def test_plugin_ses_session_token_via_password_field():
 
     obj3 = NotifySES(**results3)
     assert obj3.aws_session_token == TEST_SESSION_TOKEN
+
+
+def test_plugin_ses_url_keeps_cc_names():
+    """NotifySES() url() keeps the display names of CC addresses."""
+    obj = Apprise.instantiate(
+        "ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/new@example.com"
+        "?cc=Chris<l2g@nuxref.com>,plain@example.com"
+    )
+    assert isinstance(obj, NotifySES)
+    assert obj.names["l2g@nuxref.com"] == "Chris"
+    assert obj.names["plain@example.com"] is False
+
+    url = obj.url()
+    assert "Chris%3Al2g%40nuxref.com" in url
+
+    # The names survive a round trip through url()
+    obj2 = Apprise.instantiate(url)
+    assert isinstance(obj2, NotifySES)
+    assert obj2.cc == obj.cc
+    assert obj2.names["l2g@nuxref.com"] == "Chris"
+    assert obj2.names["plain@example.com"] is False
+
+
+def test_plugin_ses_url_keeps_cc_names_with_spaces():
+    """NotifySES() url() keeps CC display names that contain spaces."""
+    obj = NotifySES(
+        access_key_id="T1JJ3T3L2",
+        secret_access_key="A1BRTD4JD/TIiajkdnlazkcevi7FQ",
+        region_name="us-west-2",
+        from_addr="user@example.com",
+        targets=["new@example.com"],
+        cc=["Chris Smith <l2g@nuxref.com>"],
+        bcc=["Jane Doe <jane@example.com>"],
+    )
+    assert obj.names["l2g@nuxref.com"] == "Chris Smith"
+
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifySES)
+    assert obj2.cc == {"l2g@nuxref.com"}
+    assert obj2.bcc == {"jane@example.com"}
+    assert obj2.names["l2g@nuxref.com"] == "Chris Smith"

@@ -877,7 +877,7 @@ class NotifySES(NotifyBase):
             params["cc"] = ",".join(
                 [
                     "{}{}".format(
-                        "" if not e not in self.names else f"{self.names[e]}:",
+                        "" if not self.names.get(e) else f"{self.names[e]}:",
                         e,
                     )
                     for e in self.cc
@@ -1028,11 +1028,11 @@ class NotifySES(NotifyBase):
 
         # Handle Carbon Copy Addresses
         if "cc" in results["qsd"] and len(results["qsd"]["cc"]):
-            results["cc"] = NotifySES.parse_list(results["qsd"]["cc"])
+            results["cc"] = results["qsd"]["cc"]
 
         # Handle Blind Carbon Copy Addresses
         if "bcc" in results["qsd"] and len(results["qsd"]["bcc"]):
-            results["bcc"] = NotifySES.parse_list(results["qsd"]["bcc"])
+            results["bcc"] = results["qsd"]["bcc"]
 
         # Handle From Address handling
         if "from" in results["qsd"] and len(results["qsd"]["from"]):
