@@ -58,6 +58,7 @@ except ImportError:
 from ..attachment.base import AttachBase
 from ..common import NotifyFormat, NotifyType
 from ..conversion import convert_between
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -197,6 +198,14 @@ class NotifyPushover(NotifyBase):
     # Pushover uses the http protocol with JSON requests
     notify_url = "https://api.pushover.net/1/messages.json"
 
+    # Pushover can send plain text, HTML, or Markdown-derived HTML.
+    # Plain text remains the default.
+    notify_format = (
+        NotifyFormat.TEXT,
+        NotifyFormat.HTML,
+        NotifyFormat.MARKDOWN,
+    )
+
     # Support attachments
     attachment_support = True
 
@@ -316,8 +325,8 @@ class NotifyPushover(NotifyBase):
 
     def __init__(
         self,
-        user_key,
-        token,
+        user_key=None,
+        token=None,
         targets=None,
         priority=None,
         sound=None,
@@ -337,14 +346,14 @@ class NotifyPushover(NotifyBase):
         if not self.token:
             msg = f"An invalid Pushover Access Token ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # User Key (associated with project)
         self.user_key = validate_regex(user_key)
         if not self.user_key:
             msg = f"An invalid Pushover User Key ({user_key}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Track our valid devices and groups separately
         targets = parse_list(targets)
@@ -421,7 +430,7 @@ class NotifyPushover(NotifyBase):
                     "Pushover emergency interval must be at least 30 seconds."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             if self.expire < 0 or self.expire > 10800:
                 msg = (
@@ -429,7 +438,7 @@ class NotifyPushover(NotifyBase):
                     "0 to 10800 seconds."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # End-to-end encryption: validate and store the encryption key.
         # The key must be exactly 64 hex characters (256-bit AES key).
@@ -443,7 +452,7 @@ class NotifyPushover(NotifyBase):
                     "got {} chars".format(len(_key))
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             self.encryption_key = _key
         else:
@@ -514,6 +523,8 @@ class NotifyPushover(NotifyBase):
         title="",
         notify_type=NotifyType.INFO,
         attach=None,
+        body_format=None,
+        body_passthrough=None,
         **kwargs,
     ):
         """Perform Pushover Notification."""
@@ -552,11 +563,13 @@ class NotifyPushover(NotifyBase):
         if self.supplemental_url_title:
             base_payload["url_title"] = self.supplemental_url_title
 
-        if self.notify_format == NotifyFormat.HTML:
+        if body_format == NotifyFormat.HTML:
             # https://pushover.net/api#html
             base_payload["html"] = 1
 
-        elif self.notify_format == NotifyFormat.MARKDOWN:
+        elif body_format == NotifyFormat.MARKDOWN and not body_passthrough:
+            # Pushover has no native Markdown; convert declared Markdown
+            # to HTML and leave undeclared sources untouched.
             base_payload["message"] = convert_between(
                 NotifyFormat.MARKDOWN, NotifyFormat.HTML, body
             )
@@ -609,28 +622,44 @@ class NotifyPushover(NotifyBase):
         # Build per-target payloads:
         #  - devices: one call with user=user_key, device=dev1,dev2,...
         #  - groups: one call per group with user=group_key
+        # Each entry is paired with what identifies it, because a group
+        # key and an account key could otherwise read the same.
         payloads = []
         if self.devices:
             payloads.append(
-                {
-                    **base_payload,
-                    "user": self.user_key,
-                    "device": ",".join(self.devices),
-                }
+                (
+                    ("account", self.user_key),
+                    {
+                        **base_payload,
+                        "user": self.user_key,
+                        "device": ",".join(self.devices),
+                    },
+                )
             )
         for group_key in self.groups:
             payloads.append(
-                {
-                    **base_payload,
-                    "user": group_key,
-                }
+                (
+                    ("group", group_key),
+                    {
+                        **base_payload,
+                        "user": group_key,
+                    },
+                )
             )
 
         has_error = False
-        for payload in payloads:
+        for recipient, payload in payloads:
+            # Skip a recipient that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(recipient):
+                continue
+
             if attach and self.attachment_support:
                 # Create a copy of our payload
                 payload_ = payload.copy()
+
+                # Tracks whether every attachment made it out
+                attach_ok = True
 
                 # Send with attachments
                 for no, attachment in enumerate(attach):
@@ -638,9 +667,18 @@ class NotifyPushover(NotifyBase):
                         # To handle multiple attachments, clean up our message
                         payload_["message"] = attachment.name
 
+                    attachment_key = ("attachment", recipient, no)
+                    if self.is_delivered(attachment_key):
+                        payload_["title"] = ""
+                        payload_["sound"] = PushoverSound.NONE
+                        continue
+
                     if not self._send(payload_, attachment):
                         # Mark our failure
                         has_error = True
+                        attach_ok = False
+                    else:
+                        self.mark_delivered(attachment_key)
 
                     # Clear our title if previously set
                     payload_["title"] = ""
@@ -649,9 +687,16 @@ class NotifyPushover(NotifyBase):
                     # uploaded afterwards
                     payload_["sound"] = PushoverSound.NONE
 
-            else:
-                if not self._send(payload):
-                    has_error = True
+                if not attach_ok:
+                    # Leave this recipient unmarked so a retry tries again
+                    continue
+
+            elif not self._send(payload):
+                has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this recipient.
+            self.mark_delivered(recipient)
 
         return not has_error
 

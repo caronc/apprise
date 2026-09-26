@@ -49,6 +49,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
@@ -230,7 +231,7 @@ class NotifyTwilio(NotifyBase):
                 f"An invalid Twilio Account SID ({account_sid}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The Authentication Token associated with the account
         self.auth_token = validate_regex(
@@ -242,7 +243,7 @@ class NotifyTwilio(NotifyBase):
                 f"({auth_token}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The API Key associated with the account (optional)
         self.apikey = validate_regex(
@@ -266,7 +267,7 @@ class NotifyTwilio(NotifyBase):
                     "is invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.method = self.template_args["method"]["default"]
 
@@ -278,7 +279,7 @@ class NotifyTwilio(NotifyBase):
                 f"({source}) is invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # prepare our default mode to use for all numbers that follow in
         # target definitions
@@ -298,7 +299,7 @@ class NotifyTwilio(NotifyBase):
                 "message mode Whatsapp."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         result = is_phone_no(result.group("phoneno"), min_len=5)
         if not result:
@@ -307,7 +308,7 @@ class NotifyTwilio(NotifyBase):
                 f"({source}) is invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store The Source Phone # and/or short-code
         self.source = result["full"]
@@ -322,7 +323,7 @@ class NotifyTwilio(NotifyBase):
                     f"({source}) is invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # else... it as a short code so we're okay
 
@@ -416,6 +417,15 @@ class NotifyTwilio(NotifyBase):
             # Get our target to notify
             (mode, target) = targets.pop(0)
 
+            # The same phone number can be reached over more than one
+            # mode, so the mode forms part of what identifies it.
+            delivery_key = (mode, target)
+
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(delivery_key):
+                continue
+
             # Prepare our user
             if mode is TwilioMessageMode.TEXT:
                 payload["From"] = self.source
@@ -507,6 +517,9 @@ class NotifyTwilio(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(delivery_key)
 
         return not has_error
 

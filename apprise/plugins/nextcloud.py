@@ -32,7 +32,7 @@ import re
 import requests
 
 from ..common import NotifyType, PersistentStoreMode
-from ..exception import AppriseException
+from ..exception import AppriseImproperlyConfigured, ApprisePluginException
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list
@@ -52,7 +52,7 @@ IS_USER = re.compile(
 )
 
 
-class NextcloudGroupDiscoveryException(AppriseException):
+class NextcloudGroupDiscoveryException(ApprisePluginException):
     """Apprise Nextcloud Group Discovery Exception Class."""
 
 
@@ -237,7 +237,7 @@ class NotifyNextcloud(NotifyBase):
                     f"At invalid Nextcloud version ({version}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
 
         # Support URL Prefix
         self.url_prefix = (
@@ -430,6 +430,11 @@ class NotifyNextcloud(NotifyBase):
             return False
 
         for target in targets:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             # Prepare our Payload
             payload = {
                 "shortMessage": title if title else self.app_desc,
@@ -443,6 +448,10 @@ class NotifyNextcloud(NotifyBase):
             if not is_okay:
                 # Toggle our status
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 

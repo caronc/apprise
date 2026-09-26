@@ -41,6 +41,7 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.common import OverflowMode
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.discord import NotifyDiscord
 
 logging.disable(logging.CRITICAL)
@@ -53,21 +54,21 @@ apprise_url_tests = (
     (
         "discord://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # An invalid url
     (
         "discord://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No webhook_token specified
     (
         "discord://%s" % ("i" * 24),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Provide both an webhook id and a webhook token
@@ -177,14 +178,14 @@ apprise_url_tests = (
         "discord://{}/{}?flags=-1".format("i" * 24, "t" * 64),
         {
             # invalid flags specified (variation 1)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "discord://{}/{}?flags=invalid".format("i" * 24, "t" * 64),
         {
             # invalid flags specified (variation 2)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # different format support
@@ -343,7 +344,10 @@ def test_plugin_discord_notifications(mock_post):
     instance = NotifyDiscord(**results)
     assert isinstance(instance, NotifyDiscord)
 
-    response = instance.send(body=body)
+    # Direct send() bypasses notify(), so pass the URL-resolved format.
+    response = instance.send(
+        body=body, body_format=instance.resolve_format(None)
+    )
     assert response is True
     assert mock_post.call_count == 1
 
@@ -540,17 +544,17 @@ def test_plugin_discord_general(mock_sleep, mock_post):
     }
 
     # Invalid webhook id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyDiscord(webhook_id=None, webhook_token=webhook_token)
     # Invalid webhook id (whitespace)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyDiscord(webhook_id="  ", webhook_token=webhook_token)
 
     # Invalid webhook token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyDiscord(webhook_id=webhook_id, webhook_token=None)
     # Invalid webhook token (whitespace)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyDiscord(webhook_id=webhook_id, webhook_token="   ")
 
     obj = NotifyDiscord(
@@ -566,7 +570,9 @@ def test_plugin_discord_general(mock_sleep, mock_post):
 
     # This call includes an image with it's payload:
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -580,7 +586,9 @@ def test_plugin_discord_general(mock_sleep, mock_post):
 
     # This call includes an image with it's payload:
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -650,7 +658,9 @@ def test_plugin_discord_general(mock_sleep, mock_post):
 
     # This call includes an image with it's payload:
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -741,11 +751,13 @@ def test_plugin_discord_general(mock_sleep, mock_post):
     NotifyDiscord.discord_max_fields = 1
 
     assert (
-        a.notify(
-            body=test_markdown,
-            title="title",
-            notify_type=NotifyType.INFO,
-            body_format=NotifyFormat.TEXT,
+        bool(
+            a.notify(
+                body=test_markdown,
+                title="title",
+                notify_type=NotifyType.INFO,
+                body_format=NotifyFormat.TEXT,
+            )
         )
         is True
     )
@@ -769,8 +781,10 @@ def test_plugin_discord_general(mock_sleep, mock_post):
     )
     assert isinstance(obj, NotifyDiscord)
     assert (
-        obj.notify(
-            body=test_markdown, title="title", notify_type=NotifyType.INFO
+        bool(
+            obj.notify(
+                body=test_markdown, title="title", notify_type=NotifyType.INFO
+            )
         )
         is False
     )
@@ -801,8 +815,10 @@ def test_plugin_discord_general(mock_sleep, mock_post):
 
     # Use our test markdown string during a notification
     assert (
-        obj.notify(
-            body=test_markdown, title="title", notify_type=NotifyType.INFO
+        bool(
+            obj.notify(
+                body=test_markdown, title="title", notify_type=NotifyType.INFO
+            )
         )
         is True
     )
@@ -822,21 +838,25 @@ def test_plugin_discord_general(mock_sleep, mock_post):
 
     # This call includes an image with it's payload:
     assert (
-        a.notify(
-            body=test_markdown,
-            title="title",
-            notify_type=NotifyType.INFO,
-            body_format=NotifyFormat.TEXT,
+        bool(
+            a.notify(
+                body=test_markdown,
+                title="title",
+                notify_type=NotifyType.INFO,
+                body_format=NotifyFormat.TEXT,
+            )
         )
         is True
     )
 
     assert (
-        a.notify(
-            body=test_markdown,
-            title="title",
-            notify_type=NotifyType.INFO,
-            body_format=NotifyFormat.MARKDOWN,
+        bool(
+            a.notify(
+                body=test_markdown,
+                title="title",
+                notify_type=NotifyType.INFO,
+                body_format=NotifyFormat.MARKDOWN,
+            )
         )
         is True
     )
@@ -844,7 +864,7 @@ def test_plugin_discord_general(mock_sleep, mock_post):
     # Toggle our logo availability
     a.asset.image_url_logo = None
     assert (
-        a.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(a.notify(body="body", title="title", notify_type=NotifyType.INFO))
         is True
     )
 
@@ -860,7 +880,7 @@ def test_plugin_discord_general(mock_sleep, mock_post):
     )
 
     # This call includes an image with it's payload:
-    assert a.notify(body="test", title="title") is True
+    assert bool(a.notify(body="test", title="title")) is True
 
     assert mock_post.call_count == 1
     response = mock_post.call_args_list[0][1]
@@ -953,17 +973,19 @@ def test_plugin_discord_markdown_extra(mock_post):
 
     # This call includes an image with it's payload:
     assert (
-        a.notify(
-            body=test_markdown,
-            title="title",
-            notify_type=NotifyType.INFO,
-            body_format=NotifyFormat.TEXT,
+        bool(
+            a.notify(
+                body=test_markdown,
+                title="title",
+                notify_type=NotifyType.INFO,
+                body_format=NotifyFormat.TEXT,
+            )
         )
         is True
     )
 
     assert (
-        a.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(a.notify(body="body", title="title", notify_type=NotifyType.INFO))
         is True
     )
 
@@ -998,11 +1020,13 @@ def test_plugin_discord_attachments(mock_post):
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1023,10 +1047,12 @@ def test_plugin_discord_attachments(mock_post):
 
     # Test notifications with mentions and attachments in it
     assert (
-        obj.notify(
-            body="Say hello to <@1234>!",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="Say hello to <@1234>!",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1049,11 +1075,13 @@ def test_plugin_discord_attachments(mock_post):
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -1107,7 +1135,8 @@ def test_plugin_discord_markdown_fields_batches_exactly(mock_post):
     )
     assert isinstance(obj, NotifyDiscord)
 
-    assert obj.send(body=body) is True
+    # Direct send() bypasses notify(), so pass the URL-resolved format.
+    assert obj.send(body=body, body_format=obj.resolve_format(None)) is True
 
     # H1, H2, H3 => 3 fields => 3 posts (since max_fields=1)
     assert mock_post.call_count == 3
@@ -1129,7 +1158,8 @@ def test_plugin_discord_markdown_ping_is_additive(mock_post):
     )
     obj = NotifyDiscord(**results)
 
-    assert obj.send(body=body) is True
+    # Direct send() bypasses notify(), so pass the URL-resolved format.
+    assert obj.send(body=body, body_format=obj.resolve_format(None)) is True
     assert mock_post.call_count == 1
 
     payload = loads(mock_post.call_args_list[0][1]["data"])
@@ -1179,7 +1209,11 @@ def test_plugin_discord_markdown_no_mentions_has_no_allow_mentions(mock_post):
     )
     obj = NotifyDiscord(**results)
 
-    assert obj.send(body="Hello world") is True
+    # Direct send() bypasses notify(), so pass the URL-resolved format.
+    assert (
+        obj.send(body="Hello world", body_format=obj.resolve_format(None))
+        is True
+    )
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
     assert "allow_mentions" not in payload
@@ -1228,7 +1262,7 @@ def test_plugin_discord_attach_memory(mock_post):
         mimetype="text/html",
     )
 
-    assert obj.notify(body="Test", attach=mem) is True
+    assert bool(obj.notify(body="Test", attach=mem)) is True
     assert mock_post.call_count >= 1
 
 
@@ -1256,9 +1290,11 @@ def test_plugin_discord_html_to_markdown_format(mock_post):
     # Notify with an HTML body; the framework should convert it
     # to Markdown before dispatching to Discord
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )
@@ -1300,7 +1336,11 @@ def test_plugin_discord_template_content(mock_post, tmpdir):
 
     # Notification must succeed
     assert (
-        obj.notify(body="hello", title="world", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(
+                body="hello", title="world", notify_type=NotifyType.INFO
+            )
+        )
         is True
     )
     assert mock_post.called is True
@@ -1341,8 +1381,10 @@ def test_plugin_discord_template_embeds(mock_post, tmpdir):
 
     # Notification must succeed
     assert (
-        obj.notify(
-            body="my body", title="my title", notify_type=NotifyType.INFO
+        bool(
+            obj.notify(
+                body="my body", title="my title", notify_type=NotifyType.INFO
+            )
         )
         is True
     )
@@ -1390,12 +1432,12 @@ def test_plugin_discord_template_tokens(tmpdir):
 
 
 def test_plugin_discord_template_token_invalid():
-    """NotifyDiscord() non-dict tokens raises TypeError."""
+    """NotifyDiscord() rejects template tokens that are not a dictionary."""
 
     webhook_id = "A" * 24
     webhook_token = "B" * 64
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyDiscord(
             webhook_id=webhook_id,
             webhook_token=webhook_token,
@@ -1404,7 +1446,7 @@ def test_plugin_discord_template_token_invalid():
 
 
 def test_plugin_discord_template_add_failure():
-    """NotifyDiscord() template add() failure raises TypeError."""
+    """NotifyDiscord() rejects a template attachment it cannot add."""
 
     webhook_id = "A" * 24
     webhook_token = "B" * 64
@@ -1415,7 +1457,7 @@ def test_plugin_discord_template_add_failure():
             "apprise.plugins.discord.AppriseAttachment.add",
             return_value=False,
         ),
-        pytest.raises(TypeError),
+        pytest.raises(AppriseImproperlyConfigured),
     ):
         NotifyDiscord(
             webhook_id=webhook_id,
@@ -1453,7 +1495,7 @@ def test_plugin_discord_template_inaccessible(mock_post, tmpdir):
 
     # Notification must fail; no HTTP call should be made
     assert (
-        obj.notify(body="test", title="t", notify_type=NotifyType.INFO)
+        bool(obj.notify(body="test", title="t", notify_type=NotifyType.INFO))
         is False
     )
     assert mock_post.called is False
@@ -1486,7 +1528,9 @@ def test_plugin_discord_template_oserror(mock_post, tmpdir):
     # Patch open() to raise OSError when the template is read
     with mock.patch("builtins.open", side_effect=OSError):
         assert (
-            obj.notify(body="test", title="t", notify_type=NotifyType.INFO)
+            bool(
+                obj.notify(body="test", title="t", notify_type=NotifyType.INFO)
+            )
             is False
         )
     assert mock_post.called is False
@@ -1518,7 +1562,7 @@ def test_plugin_discord_template_invalid_json(mock_post, tmpdir):
 
     # Notification must fail due to parse error
     assert (
-        obj.notify(body="test", title="t", notify_type=NotifyType.INFO)
+        bool(obj.notify(body="test", title="t", notify_type=NotifyType.INFO))
         is False
     )
     assert mock_post.called is False
@@ -1550,7 +1594,7 @@ def test_plugin_discord_template_not_dict(mock_post, tmpdir):
 
     # Notification must fail because the root is not a dict
     assert (
-        obj.notify(body="test", title="t", notify_type=NotifyType.INFO)
+        bool(obj.notify(body="test", title="t", notify_type=NotifyType.INFO))
         is False
     )
     assert mock_post.called is False
@@ -1580,7 +1624,7 @@ def test_plugin_discord_template_payload_validation(mock_post, tmpdir):
     )
     assert isinstance(obj, NotifyDiscord)
     assert (
-        obj.notify(body="test", title="t", notify_type=NotifyType.INFO)
+        bool(obj.notify(body="test", title="t", notify_type=NotifyType.INFO))
         is False
     )
     assert mock_post.called is False
@@ -1593,7 +1637,7 @@ def test_plugin_discord_template_payload_validation(mock_post, tmpdir):
     )
     assert isinstance(obj, NotifyDiscord)
     assert (
-        obj.notify(body="test", title="t", notify_type=NotifyType.INFO)
+        bool(obj.notify(body="test", title="t", notify_type=NotifyType.INFO))
         is False
     )
 
@@ -1605,7 +1649,7 @@ def test_plugin_discord_template_payload_validation(mock_post, tmpdir):
     )
     assert isinstance(obj, NotifyDiscord)
     assert (
-        obj.notify(body="test", title="t", notify_type=NotifyType.INFO)
+        bool(obj.notify(body="test", title="t", notify_type=NotifyType.INFO))
         is False
     )
     assert mock_post.called is False
@@ -1637,7 +1681,7 @@ def test_plugin_discord_template_bad_embeds(mock_post, tmpdir):
 
     # Notification must fail because the embed entry is not a dict
     assert (
-        obj.notify(body="test", title="t", notify_type=NotifyType.INFO)
+        bool(obj.notify(body="test", title="t", notify_type=NotifyType.INFO))
         is False
     )
     assert mock_post.called is False
@@ -1667,7 +1711,7 @@ def test_plugin_discord_template_send_failure(mock_post, tmpdir):
         headers={},
     )
     assert (
-        obj.notify(body="test", title="t", notify_type=NotifyType.INFO)
+        bool(obj.notify(body="test", title="t", notify_type=NotifyType.INFO))
         is False
     )
     assert mock_post.called is True
@@ -1700,11 +1744,13 @@ def test_plugin_discord_template_with_attachments(mock_post, tmpdir):
     # Attach a test file
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
     assert (
-        obj.notify(
-            body="test",
-            title="t",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="test",
+                title="t",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )

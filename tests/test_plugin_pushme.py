@@ -31,6 +31,7 @@ import logging
 from helpers import AppriseURLTester
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pushme import NotifyPushMe
 
 logging.disable(logging.CRITICAL)
@@ -40,13 +41,13 @@ apprise_url_tests = (
     (
         "pushme://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pushme://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Token specified

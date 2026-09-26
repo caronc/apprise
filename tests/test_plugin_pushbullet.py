@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pushbullet import NotifyPushBullet
 
 logging.disable(logging.CRITICAL)
@@ -49,13 +50,13 @@ apprise_url_tests = (
     (
         "pbul://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pbul://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # APIkey
@@ -274,7 +275,7 @@ def test_plugin_pushbullet_attachments(mock_post):
     obj = Apprise.instantiate(f"pbul://{access_token}/?format=markdown")
 
     # Send a good attachment
-    assert obj.notify(body="test", attach=attach) is True
+    assert bool(obj.notify(body="test", attach=attach)) is True
 
     # Test our call count
     assert mock_post.call_count == 4
@@ -306,7 +307,7 @@ def test_plugin_pushbullet_attachments(mock_post):
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     # Send our attachments
-    assert obj.notify(body="test", attach=attach) is True
+    assert bool(obj.notify(body="test", attach=attach)) is True
 
     # Test our call count
     assert mock_post.call_count == 7
@@ -348,7 +349,7 @@ def test_plugin_pushbullet_attachments(mock_post):
     # An invalid attachment will cause a failure
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     attach = AppriseAttachment(path)
-    assert obj.notify(body="test", attach=attach) is False
+    assert bool(obj.notify(body="test", attach=attach)) is False
 
     # Test our call count
     assert mock_post.call_count == 0
@@ -439,9 +440,9 @@ def test_plugin_pushbullet_edge_cases(mock_post, mock_get):
     mock_get.content = b""
 
     # Invalid Access Token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushBullet(accesstoken=None)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushBullet(accesstoken="     ")
 
     obj = NotifyPushBullet(accesstoken=accesstoken, targets=recipients)

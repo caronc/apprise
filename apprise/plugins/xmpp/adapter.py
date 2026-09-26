@@ -43,6 +43,7 @@ from typing import Any, Callable, Optional
 import certifi
 
 from ...compat import dataclass_compat as dataclass
+from ...exception import AppriseException, AppriseImproperlyConfigured
 from .common import SECURE_MODES, SecureXMPPMode
 
 # Default our global support flag
@@ -63,13 +64,19 @@ except ImportError:
     FuturesTimeoutError = Exception  # type: ignore[misc]
 
 
-class XMPPChannelBindingError(Exception):
+class XMPPChannelBindingError(AppriseException):
     """SASL SCRAM-PLUS channel-binding authentication failure.
 
     Raised when the server rejects authentication because TLS
     channel-binding data (tls-unique or tls-exporter) was unavailable
     or mismatched.  Callers may retry with SCRAM-PLUS disabled.
     """
+
+    def __init__(
+        self,
+        message="SASL SCRAM-PLUS channel-binding authentication failed.",
+    ):
+        super().__init__(message)
 
 
 @dataclass(frozen=True, slots=True)
@@ -619,7 +626,7 @@ class SlixmppAdapter:
                 # Resolve connection behaviour from secure mode
                 mode_cfg = SECURE_MODES.get(self.config.secure)
                 if not mode_cfg:
-                    raise ValueError(
+                    raise AppriseImproperlyConfigured(
                         f"Unsupported XMPP secure mode: {self.config.secure}"
                     )
 
@@ -809,7 +816,7 @@ class SlixmppAdapter:
 
             mode_cfg = SECURE_MODES.get(self.config.secure)
             if not mode_cfg:
-                raise ValueError(
+                raise AppriseImproperlyConfigured(
                     f"Unsupported XMPP secure mode: {self.config.secure}"
                 )
 

@@ -37,6 +37,7 @@ import json
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_bool, parse_phone_no
@@ -142,7 +143,7 @@ class NotifyBulkVS(NotifyBase):
         if not (self.user and self.password):
             msg = "A BulkVS user/pass was not provided."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         result = is_phone_no(source)
         if not result:
@@ -150,7 +151,7 @@ class NotifyBulkVS(NotifyBase):
                 f"The Account (From) Phone # specified ({source}) is invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Tidy source
         self.source = result["full"]
@@ -229,6 +230,11 @@ class NotifyBulkVS(NotifyBase):
         while len(targets):
             # Get our target to notify
             target = targets.pop(0)
+
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
 
             # Prepare our user
             payload["To"] = target
@@ -318,6 +324,9 @@ class NotifyBulkVS(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 

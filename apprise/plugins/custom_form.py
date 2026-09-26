@@ -29,7 +29,8 @@ import re
 
 import requests
 
-from ..common import NotifyImageSize, NotifyType
+from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import URL_PATH_SAFE_CHARS
@@ -97,6 +98,14 @@ class NotifyForm(NotifyBase):
 
     # Support attachments
     attachment_support = True
+
+    # Pass-through Notify Formats. The endpoint receives whichever body
+    # representation Apprise resolved for this send.
+    notify_format = (
+        NotifyFormat.TEXT,
+        NotifyFormat.HTML,
+        NotifyFormat.MARKDOWN,
+    )
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
@@ -214,7 +223,7 @@ class NotifyForm(NotifyBase):
         if self.method not in METHODS:
             msg = f"The method specified ({method}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Custom File Attachment Over-Ride Support
         if not isinstance(attach_as, str):
@@ -227,7 +236,7 @@ class NotifyForm(NotifyBase):
             if not result:
                 msg = f"The attach-as specified ({attach_as}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             self.attach_as = ""
             self.attach_multi_support = False

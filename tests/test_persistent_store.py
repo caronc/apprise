@@ -41,7 +41,7 @@ import zlib
 
 import pytest
 
-from apprise import exception
+from apprise import Apprise, exception
 from apprise.asset import AppriseAsset
 from apprise.persistent_store import (
     CacheJSONEncoder,
@@ -49,6 +49,7 @@ from apprise.persistent_store import (
     PersistentStore,
     PersistentStoreMode,
 )
+from apprise.plugins.base import NotifyBase
 
 logging.disable(logging.CRITICAL)
 
@@ -95,10 +96,10 @@ def test_persistent_storage_asset(tmpdir):
 def test_persistent_storage_bad_mode(tmpdir):
     """Persistent Storage Bad Mode Testing."""
     # Create ourselves an attachment object set in Memory Mode only
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         PersistentStore(namespace="abc", path=str(tmpdir), mode="invalid")
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         AppriseAsset(storage_mode="invalid")
 
 
@@ -110,7 +111,7 @@ def test_disabled_persistent_storage(tmpdir):
     )
     assert pc.read() is None
     assert pc.read("mykey") is None
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         # Invalid key specified
         pc.read("!invalid")
     assert pc.write("data") is False
@@ -147,33 +148,33 @@ def test_disabled_persistent_storage(tmpdir):
     # After all of the above, nothing was done to the directory
     assert len(os.listdir(str(tmpdir))) == 0
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         # invalid persistent store specified
         PersistentStore(namespace="abc", path=str(tmpdir), mode="garbage")
 
 
 def test_persistent_storage_init(tmpdir):
     """Test storage initialization."""
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         PersistentStore(namespace="", path=str(tmpdir))
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         PersistentStore(namespace=None, path=str(tmpdir))
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         PersistentStore(namespace="_", path=str(tmpdir))
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         PersistentStore(namespace=".", path=str(tmpdir))
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         PersistentStore(namespace="-", path=str(tmpdir))
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         PersistentStore(namespace="_abc", path=str(tmpdir))
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         PersistentStore(namespace=".abc", path=str(tmpdir))
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         PersistentStore(namespace="-abc", path=str(tmpdir))
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         PersistentStore(namespace="%", path=str(tmpdir))
 
 
@@ -210,7 +211,7 @@ def test_persistent_storage_general(tmpdir):
     # i min in the future
     assert pc.set("key", "value", 60)
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         assert pc.set("key", "value", "invalid")
 
     pc = PersistentStore(namespace=namespace, path=str(tmpdir))
@@ -314,7 +315,7 @@ def test_persistent_storage_flush_mode(tmpdir):
     # Setting the same value and explictly marking the field as not being
     # perisistent
     pc.set("key-xx", "abc123", persistent=False)
-    # Changing it's value doesn't alter the persistent flag
+    # Changing its value does not alter the persistent flag.
     pc["key-xx"] = "def678"
     # Setting it twice
     pc["key-xx"] = "def678"
@@ -548,7 +549,7 @@ def test_persistent_storage_flush_mode(tmpdir):
         expires=datetime.now() - timedelta(days=1),
     )
 
-    # It's actually there... but it's expired so our persistent
+    # The expired persistent entry still exists on disk.
     # storage is behaving as it should
     assert "expired" not in pc
     assert pc.get("expired") is None
@@ -1010,14 +1011,14 @@ def test_persistent_custom_io(tmpdir):
     # Initialize it for memory only
     pc = PersistentStore(path=str(tmpdir))
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         pc.open("!invalid#-Key")
 
     # We can't open the file as it does not exist
     with pytest.raises(FileNotFoundError):
         pc.open("valid-key")
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         # Bad data
         pc.open(1234)
 
@@ -1071,13 +1072,13 @@ def test_persistent_custom_io(tmpdir):
             pass
 
     # Writing
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         pc.write(1234)
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         pc.write(None)
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         pc.write(True)
 
     pc = PersistentStore(str(tmpdir))
@@ -1100,7 +1101,7 @@ def test_persistent_custom_io(tmpdir):
         mock_file.side_effect = OSError
         assert pc.write(b"test") is False
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         pc.write(b"data", key="!invalid#-Key")
 
     pc.delete()
@@ -1180,6 +1181,19 @@ def test_persistent_custom_io(tmpdir):
         mock.patch("os.unlink", side_effect=FileNotFoundError()),
     ):
         assert pc.write(b"test") is False
+
+
+def test_persistent_memory_open_uses_apprise_exception(tmpdir):
+    """Opening memory-only storage raises the compatible Apprise error."""
+    store = PersistentStore(
+        path=str(tmpdir),
+        mode=PersistentStoreMode.MEMORY,
+    )
+
+    with pytest.raises(exception.AppriseFileNotFound) as error:
+        store.open("key")
+
+    assert isinstance(error.value, FileNotFoundError)
 
 
 def test_persistent_storage_cache_object(tmpdir):
@@ -1531,7 +1545,7 @@ def test_persistent_storage_disk_prune(tmpdir):
     assert pc.get("key-t01") is None
     assert pc.read() is None
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseImproperlyConfigured):
         # provide garbage in namespace field and we're going to have a problem
         PersistentStore.disk_prune(
             namespace=object, path=str(tmpdir), expires=0, action=True
@@ -1697,3 +1711,52 @@ def test_persistent_storage_disk_changes(tmpdir):
     shutil.rmtree(pc.path)
     assert not os.path.isdir(pc.path)
     assert pc.set("key-t01", "value")
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "json://localhost/",
+        "xml://localhost/",
+        "form://localhost/",
+        "mailtos://user:pass@example.com/a@b.com",
+    ],
+)
+def test_persistent_storage_disabled_per_url(url, tmpdir):
+    """``store=no`` keeps the identifier but writes nothing to disk.
+
+    Services with read-only identifiers must switch storage mode without
+    trying to replace that identifier.
+    """
+    asset = AppriseAsset(
+        storage_path=str(tmpdir), storage_mode=PersistentStoreMode.FLUSH
+    )
+
+    service = Apprise.instantiate(f"{url}?store=no", asset=asset)
+    assert isinstance(service, NotifyBase)
+
+    # The identifier is still worked out as usual
+    assert service.url_id()
+
+    # ...but everything it remembers is kept in memory
+    assert service.store.mode is PersistentStoreMode.MEMORY
+
+    service.store.set("key", "value")
+    service.flush_store()
+    assert os.listdir(str(tmpdir)) == []
+
+    # ...and the setting is written back out so it survives a round trip
+    assert "store=no" in service.url()
+
+
+def test_persistent_storage_writes_to_disk_when_left_on(tmpdir):
+    """The same service with storage left on does use the disk."""
+    asset = AppriseAsset(
+        storage_path=str(tmpdir), storage_mode=PersistentStoreMode.FLUSH
+    )
+
+    service = Apprise.instantiate("json://localhost/", asset=asset)
+    service.store.set("key", "value")
+    service.flush_store()
+
+    assert os.listdir(str(tmpdir)) == [service.url_id()]

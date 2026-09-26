@@ -35,7 +35,8 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise import Apprise, AppriseAsset, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.bluesky import NotifyBlueSky
 
 # Disable logging for a cleaner testing output
@@ -56,20 +57,20 @@ apprise_url_tests = (
         "bluesky://",
         {
             # Missing user and app_pass
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "bluesky://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "bluesky://app-pw",
         {
             # Missing User
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -226,6 +227,20 @@ apprise_url_tests = (
 )
 
 
+def _chunked(response):
+    """Let a mocked response be read in chunks, the way requests does."""
+
+    def iter_content(chunk_size=None):
+        content = response.content
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+
+        return iter([content] if content else [])
+
+    response.iter_content.side_effect = iter_content
+    return response
+
+
 def good_response(data=None):
     """Prepare a good response."""
     response = Mock()
@@ -263,7 +278,7 @@ def good_response(data=None):
         "ratelimit-remaining": "1000",
     }
 
-    return response
+    return _chunked(response)
 
 
 def bad_response(data=None):
@@ -279,7 +294,7 @@ def bad_response(data=None):
     )
     response.headers = {}
     response.status_code = requests.codes.internal_server_error
-    return response
+    return _chunked(response)
 
 
 @pytest.fixture
@@ -473,7 +488,7 @@ def test_plugin_bluesky_general(mocker):
 def test_plugin_bluesky_edge_cases():
     """NotifyBlueSky() Edge Cases."""
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyBlueSky()
 
 
@@ -503,11 +518,13 @@ def test_plugin_bluesky_attachments_basic(
 
     # Send our notification
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -548,6 +565,7 @@ def test_plugin_bluesky_attachments_bad_message_response(
     good_message_response,
     bad_message_response,
 ):
+    """Verify a failed message response fails attachment delivery."""
 
     mock_get.return_value = good_message_response
     mock_post.side_effect = [
@@ -562,11 +580,13 @@ def test_plugin_bluesky_attachments_bad_message_response(
 
     # Our notification will fail now since our message will error out.
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -602,6 +622,7 @@ def test_plugin_bluesky_attachments_upload_fails(
     good_media_response,
     good_message_response,
 ):
+    """Verify a failed media upload fails attachment delivery."""
 
     # Test case where upload fails.
     mock_get.return_value = good_message_response
@@ -613,11 +634,13 @@ def test_plugin_bluesky_attachments_upload_fails(
 
     # Send our notification; it will fail because of the message response.
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -653,6 +676,7 @@ def test_plugin_bluesky_attachments_invalid_attachment(
     good_message_response,
     good_media_response,
 ):
+    """Verify an invalid attachment is rejected cleanly."""
 
     mock_get.return_value = good_message_response
     mock_post.side_effect = [good_message_response, good_media_response]
@@ -665,11 +689,13 @@ def test_plugin_bluesky_attachments_invalid_attachment(
 
     # An invalid attachment will cause a failure.
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -702,6 +728,7 @@ def test_plugin_bluesky_attachments_multiple_batch(
     good_message_response,
     good_media_response,
 ):
+    """Verify multiple attachments are uploaded and sent as one batch."""
 
     mock_get.return_value = good_message_response
     mock_post.side_effect = [
@@ -730,11 +757,13 @@ def test_plugin_bluesky_attachments_multiple_batch(
     ]
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -806,11 +835,13 @@ def test_plugin_bluesky_attachments_multiple_batch(
     ]
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -861,6 +892,7 @@ def test_plugin_bluesky_auth_failure(
     good_message_response,
     bad_message_response,
 ):
+    """Verify authentication failures prevent message delivery."""
 
     mock_get.return_value = good_message_response
     mock_post.return_value = bad_message_response
@@ -869,7 +901,9 @@ def test_plugin_bluesky_auth_failure(
     obj = Apprise.instantiate(bluesky_url)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -924,7 +958,7 @@ def test_plugin_bluesky_did_web_and_plc_resolution(
     mock_post.side_effect = [session_response, post_response]
 
     obj = Apprise.instantiate(bluesky_url)
-    assert obj.notify(body="Resolved PLC Flow") is True
+    assert bool(obj.notify(body="Resolved PLC Flow")) is True
 
     # Reset for did:web test
     identity_response = good_response({"did": "did:web:example.com"})
@@ -944,14 +978,14 @@ def test_plugin_bluesky_did_web_and_plc_resolution(
     mock_post.side_effect = [session_response, post_response]
 
     obj = Apprise.instantiate(bluesky_url)
-    assert obj.notify(body="Resolved WEB Flow") is True
+    assert bool(obj.notify(body="Resolved WEB Flow")) is True
 
     # Invalid DID scheme
     bad_did_response = good_response({"did": "did:unsupported:scheme"})
 
     mock_get.side_effect = [bad_did_response]
     obj = Apprise.instantiate(bluesky_url)
-    assert obj.notify(body="fail due to bad scheme") is False
+    assert bool(obj.notify(body="fail due to bad scheme")) is False
 
 
 @patch("requests.get")
@@ -999,3 +1033,188 @@ def test_plugin_bluesky_missing_pds_endpoint(mock_get):
     mock_get.side_effect = [identity_response, incomplete_pds_response]
     obj = NotifyBlueSky(user="handle", password="app-pw")
     assert obj.get_identifier() == (False, False)
+
+
+@patch("requests.post")
+@patch("requests.get")
+def test_plugin_bluesky_rejects_unsafe_pds(mock_get, mock_post):
+    """Reject unsafe PDS addresses from a DID document."""
+    for endpoint in (
+        # An unencrypted address
+        "http://evil.example.com",
+        # Embedded credentials
+        "https://attacker:secret@evil.example.com",
+        # Not a host we can make sense of
+        "https://-nope-.example.com",
+    ):
+        identity_response = good_response({"did": "did:plc:abcdefg1234567"})
+        plc_response = good_response(
+            {
+                "service": [
+                    {
+                        "type": "AtprotoPersonalDataServer",
+                        "serviceEndpoint": endpoint,
+                    }
+                ]
+            }
+        )
+
+        mock_get.side_effect = [identity_response, plc_response]
+        obj = NotifyBlueSky(user="handle", password="app-pw")
+        assert obj.get_identifier() == (False, False)
+
+    # Our login details were never sent anywhere
+    assert mock_post.call_count == 0
+
+
+@patch("requests.post")
+@patch("requests.get")
+def test_plugin_bluesky_malformed_did_document(mock_get, mock_post):
+    """Reject malformed DID documents without raising exceptions."""
+    # The DID document could not be fetched at all
+    mock_get.side_effect = [
+        good_response({"did": "did:plc:abcdefg1234567"}),
+        bad_response(),
+    ]
+    obj = NotifyBlueSky(user="handle", password="app-pw")
+    assert obj.get_identifier() == (False, False)
+
+    # The identity lookup did not hand us an object
+    mock_get.side_effect = [good_response(["not", "an", "object"])]
+    obj = NotifyBlueSky(user="handle", password="app-pw")
+    assert obj.get_identifier() == (False, False)
+
+    # The DID itself is not a string
+    mock_get.side_effect = [good_response({"did": {"nested": "object"}})]
+    obj = NotifyBlueSky(user="handle", password="app-pw")
+    assert obj.get_identifier() == (False, False)
+
+    # The service entry is not shaped the way we expect
+    for service in (
+        # Not a list
+        "AtprotoPersonalDataServer",
+        # Entries that are not objects
+        ["string", 42, None],
+        # An entry with no type at all
+        [{"serviceEndpoint": "https://example.pds.io"}],
+        # Our type, but nothing to reach
+        [{"type": "AtprotoPersonalDataServer"}],
+    ):
+        mock_get.side_effect = [
+            good_response({"did": "did:plc:abcdefg1234567"}),
+            good_response({"service": service}),
+        ]
+        obj = NotifyBlueSky(user="handle", password="app-pw")
+        assert obj.get_identifier() == (False, False)
+
+    # Our login details were never sent anywhere
+    assert mock_post.call_count == 0
+
+
+@patch("requests.post")
+@patch("requests.get")
+def test_plugin_bluesky_login_protects_password(mock_get, mock_post):
+    """Keep the login password out of logs and redirected requests."""
+    mock_get.side_effect = [
+        good_response({"did": "did:plc:abcdefg1234567"}),
+        good_response(
+            {
+                "service": [
+                    {
+                        "type": "AtprotoPersonalDataServer",
+                        "serviceEndpoint": "https://example.pds.io",
+                    }
+                ]
+            }
+        ),
+    ]
+    mock_post.return_value = good_response()
+
+    obj = NotifyBlueSky(user="handle", password="app-pw")
+    assert obj.login() is True
+
+    # A redirect is never followed while our password is in flight
+    assert mock_post.call_args[1]["allow_redirects"] is False
+
+
+@patch("requests.post")
+@patch("requests.get")
+def test_plugin_bluesky_discovery_is_unauthenticated(mock_get, mock_post):
+    """
+    NotifyBlueSky() - our session token is not handed to a lookup service
+    """
+    mock_get.side_effect = [
+        good_response({"did": "did:web:someone-elses.host"}),
+        good_response(
+            {
+                "service": [
+                    {
+                        "type": "AtprotoPersonalDataServer",
+                        "serviceEndpoint": "https://example.pds.io",
+                    }
+                ]
+            }
+        ),
+    ]
+    mock_post.return_value = good_response()
+
+    # Pretend we already hold a session from an earlier notification
+    obj = NotifyBlueSky(user="handle", password="app-pw")
+    obj._NotifyBlueSky__access_token = "secret-token"
+
+    assert obj.get_identifier() != (False, False)
+
+    # Neither lookup carried our token
+    for call in mock_get.call_args_list:
+        assert "Authorization" not in call[1]["headers"]
+
+    # ...but a call to our own server still does
+    obj._fetch("https://example.pds.io/xrpc/test", payload="{}")
+    assert "Authorization" in mock_post.call_args[1]["headers"]
+
+
+@patch("requests.post")
+def test_plugin_bluesky_secure_logging_controls_payload(mock_post):
+    """
+    NotifyBlueSky() - hiding the login payload follows secure_logging
+    """
+    mock_post.return_value = good_response()
+
+    obj = NotifyBlueSky(user="handle", password="app-pw")
+    with patch.object(obj, "logger") as logger:
+        obj._fetch("https://example.pds.io/x", payload="pw", credentials=True)
+
+    logged = [
+        str(c) for c in logger.debug.call_args_list if "Payload" in str(c)
+    ]
+    assert "<hidden>" in logged[0]
+
+    # Turning secure logging off puts it back for troubleshooting
+    obj = NotifyBlueSky(
+        user="handle",
+        password="app-pw",
+        asset=AppriseAsset(secure_logging=False),
+    )
+    with patch.object(obj, "logger") as logger:
+        obj._fetch("https://example.pds.io/x", payload="pw", credentials=True)
+
+    logged = [
+        str(c) for c in logger.debug.call_args_list if "Payload" in str(c)
+    ]
+    assert "<hidden>" not in logged[0]
+
+
+@patch("requests.get")
+def test_plugin_bluesky_oversized_lookup(mock_get):
+    """Discard an oversized lookup response and close its stream."""
+    flood = Mock()
+    flood.status_code = requests.codes.ok
+    flood.headers = {}
+    flood.iter_content.return_value = iter([b"x" * 600000, b"x" * 600000])
+    mock_get.return_value = flood
+
+    obj = NotifyBlueSky(user="handle", password="app-pw")
+    assert obj.get_identifier() == (False, False)
+
+    # We stopped reading rather than holding on to all of it
+    flood.close.assert_called_once()

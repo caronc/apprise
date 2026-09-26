@@ -36,6 +36,7 @@ from typing import Any, Optional
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list, validate_regex
@@ -127,7 +128,7 @@ class NotifyViber(NotifyBase):
         if not self.token:
             msg = "An invalid Viber authentication token was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Sender name is required by the API; provide a safe default
         sourcev = (source or "").strip()
@@ -225,6 +226,11 @@ class NotifyViber(NotifyBase):
         has_error = False
 
         for dest in self.targets:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(dest):
+                continue
+
             payload["receiver"] = dest
 
             self.throttle()
@@ -297,6 +303,9 @@ class NotifyViber(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(dest)
 
         return not has_error
 

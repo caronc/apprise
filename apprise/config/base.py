@@ -35,10 +35,13 @@ import yaml
 
 from .. import common, plugins
 from ..asset import AppriseAsset
+from ..exception import AppriseImproperlyConfigured, AppriseTemplateError
+from ..locale import AppriseLocale
 from ..logger import logging
 from ..manager_config import ConfigurationManager
 from ..manager_plugins import NotificationManager
 from ..tag import AppriseTag
+from ..template import NotifyTemplate
 from ..url import URL_TOKEN_ALIASES, URLBase
 from ..utils.cwe312 import cwe312_loggable
 from ..utils.parse import (
@@ -48,23 +51,21 @@ from ..utils.parse import (
     parse_list,
     parse_urls,
 )
+from ..utils.template import (
+    TemplatePlaceholderMap,
+    TemplateSchema,
+)
 from ..utils.time import zoneinfo
+from ..utils.yaml import (
+    YAML_REAPPLY_SKIP,
+    dropped_template,
+    template_in_schema,
+    template_references,
+    templated_tag,
+)
 
 # Test whether token is valid or not
 VALID_TOKEN = re.compile(r"(?P<token>[a-z0-9][a-z0-9_]+)", re.I)
-
-# Keys excluded from the YAML-token re-apply that happens after
-# post_process_parse_url_results() inside config_parse_yaml().
-#
-# 'tag'/'tags': assembled as a merged set (YAML tags + global_tags) by the
-# while loop before post_process runs; re-applying the raw YAML string would
-# replace the set with a string.  YAML accepts both spellings ('tag:' and
-# 'tags:'); both are excluded so neither overwrites the assembled set.
-#
-# 'asset': written programmatically from the Python asset parameter at
-# that point in the while loop; VALID_TOKEN does not strip it, so a
-# user-written YAML 'asset:' key would otherwise overwrite the object.
-_YAML_REAPPLY_SKIP = frozenset(("tag", "tags", "asset"))
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
@@ -106,43 +107,33 @@ class ConfigBase(URLBase):
         insecure_includes: bool = False,
         **kwargs: object,
     ) -> None:
-        """Initialize some general logging and common server arguments that
-        will keep things consistent when working with the configurations that
-        inherit this class.
+        """Initialize behavior shared by all configuration plugins.
 
-        By default we cache our responses so that subsiquent calls does not
-        cause the content to be retrieved again.  For local file references
-        this makes no difference at all.  But for remote content, this does
-        mean more then one call can be made to retrieve the (same) data.  This
-        method can be somewhat inefficient if disabled.  Only disable caching
-        if you understand the consequences.
+        ``cache=True`` retains parsed services after the first read.
+        ``cache=False`` reads and parses the source whenever :meth:`services`
+        is called, and a non-negative integer retains results for that many
+        seconds. Reloading is especially significant for an ``http://`` or
+        ``https://`` source because it performs another network request.
 
-        You can alternatively set the cache value to an int identifying the
-        number of seconds the previously retrieved can exist for before it
-        should be considered expired.
+        ``recursion`` controls how many levels of ``include`` entries are
+        followed. Zero ignores all includes; one reads sources included by this
+        source; two also follows includes found in those child sources, and so
+        on. A low limit protects against unexpectedly large or circular trees.
 
-        recursion defines how deep we recursively handle entries that use the
-        `include` keyword. This keyword requires us to fetch more configuration
-        from another source and add it to our existing compilation. If the
-        file we remotely retrieve also has an `include` reference, we will only
-        advance through it if recursion is set to 2 deep.  If set to zero
-        it is off.  There is no limit to how high you set this value. It would
-        be recommended to keep it low if you do intend to use it.
+        Each configuration plugin declares an
+        :class:`~apprise.common.ContentIncludeMode`. ``ALWAYS`` sources may be
+        included normally, ``NEVER`` sources cannot be included, and ``STRICT``
+        sources may only be included by a compatible source type. For example,
+        a local ``file://`` configuration can include another local file, but
+        an ``http://`` configuration cannot include a local file.
+        ``insecure_includes=True`` relaxes the ``STRICT`` compatibility check,
+        effectively treating strict sources as always includable; it never
+        overrides ``NEVER``. This is useful when trusted in-memory content must
+        include a local file, but it should not be enabled for untrusted input.
 
-        insecure_include by default are disabled. When set to True, all
-        Apprise Config files marked to be in STRICT mode are treated as being
-        in ALWAYS mode.
-
-        Take a file:// based configuration for example, only a file:// based
-        configuration can include another file:// based one. because it is set
-        to STRICT mode. If an http:// based configuration file attempted to
-        include a file:// one it woul fail. However this include would be
-        possible if insecure_includes is set to True.
-
-        There are cases where a self hosting apprise developer may wish to load
-        configuration from memory (in a string format) that contains 'include'
-        entries (even file:// based ones).  In these circumstances if you want
-        these 'include' entries to be honored, this value must be set to True.
+        Additional keyword arguments are handled by :class:`URLBase`. The
+        optional ``encoding`` and ``format`` values select the source encoding
+        and force ``text`` or ``yaml`` parsing respectively.
         """
 
         super().__init__(**kwargs)
@@ -153,7 +144,7 @@ class ConfigBase(URLBase):
         self._cached_time = None
 
         # Tracks previously loaded content for speed
-        self._cached_servers = None
+        self._cached_services = None
 
         # Initialize our recursion value
         self.recursion = recursion
@@ -177,7 +168,7 @@ class ConfigBase(URLBase):
             except (AttributeError, ValueError):
                 err = f"An invalid config format ({fmt}) was specified."
                 self.logger.warning(err)
-                raise TypeError(err) from None
+                raise AppriseImproperlyConfigured(err) from None
 
         # Set our cache flag; it can be True or a (positive) integer
         try:
@@ -185,29 +176,40 @@ class ConfigBase(URLBase):
             if self.cache < 0:
                 err = f"A negative cache value ({cache}) was specified."
                 self.logger.warning(err)
-                raise TypeError(err)
+                raise AppriseImproperlyConfigured(err)
 
         except (ValueError, TypeError):
             err = f"An invalid cache value ({cache}) was specified."
             self.logger.warning(err)
-            raise TypeError(err) from None
+            raise AppriseImproperlyConfigured(err) from None
 
         return
 
-    def servers(
+    def services(
         self,
         asset: AppriseAsset | None = None,
         **kwargs: object,
     ) -> list[plugins.NotifyBase]:
-        """Performs reads loaded configuration and returns all of the services
-        that could be parsed and loaded."""
+        """Read, parse, and return all services defined by this source.
+
+        A valid cache is returned immediately. Otherwise :meth:`read` obtains
+        the raw text, the selected text or YAML parser creates service plugins,
+        and any permitted ``include`` entries are loaded recursively. Included
+        services are appended to the direct services in the returned list.
+
+        ``asset`` overrides the source's asset for newly parsed services and is
+        propagated to included sources. A read failure or source with no
+        usable content returns an empty list. The result becomes this object's
+        mutable cache; methods such as ``len()``, iteration, indexing, and
+        :meth:`pop` all operate on that same list.
+        """
 
         if not self.expired():
             # We already have cached results to return; use them
-            return self._cached_servers
+            return self._cached_services
 
         # Our cached response object
-        self._cached_servers = []
+        self._cached_services = []
 
         # read() causes the child class to do whatever it takes for the
         # config plugin to load the data source and return unparsed content
@@ -218,7 +220,7 @@ class ConfigBase(URLBase):
             self._cached_time = time.time()
 
             # Nothing more to do; return our empty cache list
-            return self._cached_servers
+            return self._cached_services
 
         # Our Configuration format uses a default if one wasn't one detected
         # or enfored.
@@ -235,14 +237,14 @@ class ConfigBase(URLBase):
         asset = asset if isinstance(asset, AppriseAsset) else self.asset
 
         # Execute our config parse function which always returns a tuple
-        # of our servers and our configuration
-        servers, configs = fn(content=content, asset=asset)
+        # of our services and our configuration
+        services, configs = fn(content=content, asset=asset)
 
         # Free memory
         del content
 
-        # Add entry to our server list
-        self._cached_servers.extend(servers)
+        # Add entry to our service list
+        self._cached_services.extend(services)
 
         # Configuration files were detected; recursively populate them
         # If we have been configured to do so
@@ -275,11 +277,10 @@ class ConfigBase(URLBase):
                 # CWE-312 (Secure Logging) Handling
                 loggable_url = cwe312_loggable(url, asset.secure_logging)
 
-                # Parse our url details of the server object as dictionary
-                # containing all of the information parsed from our URL
+                # Parse the included configuration URL into constructor args.
                 results = C_MGR[schema].parse_url(url)
                 if not results:
-                    # Failed to parse the server URL
+                    # The included configuration URL could not be parsed.
                     self.logger.error(
                         f"Unparseable include URL {loggable_url}"
                     )
@@ -329,9 +330,8 @@ class ConfigBase(URLBase):
                     self.logger.debug(f"Loading Exception: {e!s}")
                     continue
 
-                # if we reach here, we can now add this servers found
-                # in this configuration file to our list
-                self._cached_servers.extend(cfg_plugin.servers(asset=asset))
+                # Add services found in the included configuration.
+                self._cached_services.extend(cfg_plugin.services(asset=asset))
 
             else:
                 # CWE-312 (Secure Logging) Handling
@@ -342,9 +342,9 @@ class ConfigBase(URLBase):
                     loggable_url,
                 )
 
-        if self._cached_servers:
+        if self._cached_services:
             self.logger.debug(
-                f"Loaded {len(self._cached_servers)} entries from"
+                f"Loaded {len(self._cached_services)} entries from"
                 f" {self.url(privacy=asset.secure_logging)}"
             )
         else:
@@ -356,7 +356,7 @@ class ConfigBase(URLBase):
         # Set the time our content was cached at
         self._cached_time = time.time()
 
-        return self._cached_servers
+        return self._cached_services
 
     def read(self) -> str | None:
         """This object should be implimented by the child classes."""
@@ -365,7 +365,7 @@ class ConfigBase(URLBase):
     def expired(self) -> bool:
         """Simply returns True if the configuration should be considered as
         expired or False if content should be retrieved."""
-        if isinstance(self._cached_servers, list) and self.cache:
+        if isinstance(self._cached_services, list) and self.cache:
             # We have enough reason to look further into our cached content
             # and verify it has not expired.
             if self.cache is True:
@@ -537,10 +537,13 @@ class ConfigBase(URLBase):
         # Define what a valid line should look like.
         # The tag group allows an optional "N:" priority prefix so that
         # "2:endpoint=ntfy://..." is recognised as TEXT format.
+        # A tag group assignment such as "family=me,wife" carries tags instead
+        # of a URL on the right hand side; it is TEXT format as well.
         valid_line_re = re.compile(
             r"^\s*(?P<line>([;#]+(?P<comment>.*))|"
             r"(?P<text>((?P<tag>[ \t,a-z0-9_:-]+)=)?[a-z0-9]+://.*)|"
-            r"((?P<yaml>[a-z0-9]+):.*))?$",
+            r"((?P<yaml>[a-z0-9]+):.*)|"
+            r"(?P<assign>[ \t,a-z0-9_:-]+=[a-z0-9, \t_-]+))?$",
             re.I,
         )
 
@@ -578,7 +581,7 @@ class ConfigBase(URLBase):
                 )
                 break
 
-            elif result.group("text"):
+            elif result.group("text") or result.group("assign"):
                 config_format = common.ConfigFormat.TEXT
                 ConfigBase.logger.debug(
                     f"Detected TEXT configuration based on line {line}."
@@ -641,8 +644,8 @@ class ConfigBase(URLBase):
         """Parse the specified content as though it were a simple text file
         only containing a list of URLs.
 
-        Return a tuple that looks like (servers, configs) where:
-          - servers contains a list of loaded notification plugins
+        Return a tuple that looks like (services, configs) where:
+          - services contains a list of loaded notification plugins
           - configs contains a list of additional configuration files
             referenced.
 
@@ -669,7 +672,7 @@ class ConfigBase(URLBase):
             <Group(s)>=<Tag(s)>
         """
         # A list of loaded Notification Services
-        servers = []
+        services = []
 
         # A list of additional configuration files referenced using
         # the include keyword
@@ -859,10 +862,10 @@ class ConfigBase(URLBase):
                 continue
 
             # if we reach here, we successfully loaded our data
-            servers.append(plugin)
+            services.append(plugin)
 
         # Return what was loaded
-        return (servers, configs)
+        return (services, configs)
 
     @staticmethod
     def config_parse_yaml(
@@ -872,8 +875,8 @@ class ConfigBase(URLBase):
         """Parse the specified content as though it were a yaml file
         specifically formatted for Apprise.
 
-        Return a tuple that looks like (servers, configs) where:
-          - servers contains a list of loaded notification plugins
+        Return a tuple that looks like (services, configs) where:
+          - services contains a list of loaded notification plugins
           - configs contains a list of additional configuration files
             referenced.
 
@@ -881,7 +884,7 @@ class ConfigBase(URLBase):
         """
 
         # A list of loaded Notification Services
-        servers = []
+        services = []
 
         # A list of additional configuration files referenced using
         # the include keyword
@@ -894,7 +897,8 @@ class ConfigBase(URLBase):
         preloaded = []
 
         try:
-            # Load our data (safely)
+            # Load our data safely. PyYAML keeps the last value when a mapping
+            # repeats a key, matching Apprise's long-standing behavior.
             result = yaml.load(content, Loader=yaml.SafeLoader)
 
         except (
@@ -906,6 +910,14 @@ class ConfigBase(URLBase):
             ConfigBase.logger.error("Invalid Apprise YAML data specified.")
             ConfigBase.logger.debug(f"YAML Exception:{os.linesep}{e}")
             return ([], [])
+
+        # The host decides whether this configuration may use templates.
+        asset = asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+        ConfigBase.logger.debug(
+            "Apprise YAML template variables are {}.".format(
+                "enabled" if asset.allow_templates else "disabled"
+            )
+        )
 
         if not isinstance(result, dict):
             # Invalid content
@@ -926,7 +938,38 @@ class ConfigBase(URLBase):
         #
         # global asset object
         #
-        asset = asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+        #
+        # template root directive
+        #
+        # Only declared variables are replaced; other ${...} text is literal.
+        #
+        template_schema = TemplateSchema()
+        placeholders = None
+
+        entries = None
+        if asset.allow_templates:
+            # Disabled templates leave the section and markers untouched.
+            entries = result.get("template", None)
+
+        if entries is not None:
+            try:
+                template_schema = TemplateSchema.parse(entries)
+
+            except AppriseTemplateError as e:
+                ConfigBase.logger.error(
+                    f"Invalid Apprise YAML template section. {e}"
+                )
+                return ([], [])
+
+            if template_schema:
+                try:
+                    placeholders = TemplatePlaceholderMap(
+                        template_schema, content
+                    )
+
+                except AppriseTemplateError as e:
+                    ConfigBase.logger.error(str(e))
+                    return ([], [])
 
         # Prepare our default timezone
         default_timezone = asset.tzinfo
@@ -950,8 +993,32 @@ class ConfigBase(URLBase):
                     'Ignored invalid timezone "%r"', raw_tz
                 )
 
+            # A missing value leaves the language of the asset we were
+            # given alone; it is not reset here.
+            raw_lang = tokens.get("language", tokens.get("lang"))
+            if isinstance(raw_lang, str) and raw_lang.strip():
+                language = AppriseLocale.normalize_language(raw_lang)
+                if not language:
+                    ConfigBase.logger.warning(
+                        'Ignored invalid language "%s"', raw_lang
+                    )
+
+                else:
+                    asset._language = language
+
+            elif raw_lang is not None:
+                # %r quotes a string on its own, so no quotes are added
+                # around it here.
+                ConfigBase.logger.warning(
+                    "Ignored invalid language %r", raw_lang
+                )
+
             # Iterate over remaining tokens
             for k, v in tokens.items():
+                if k in ("lang", "language", "timezone", "tz"):
+                    # These validated settings were already applied above.
+                    continue
+
                 if k.startswith("_") or k.endswith("_"):
                     # Entries are considered reserved if they start or end
                     # with an underscore
@@ -1092,6 +1159,32 @@ class ConfigBase(URLBase):
             # Not a problem; we simply have no urls
             urls = []
 
+        # Explaining declaration mistakes requires walking every URL value.
+        # Keep that optional work behind DEBUG even though an unused
+        # declaration is emitted as a warning within a debugging session.
+        explain = asset.allow_templates and ConfigBase.logger.isEnabledFor(
+            logging.DEBUG
+        )
+        if explain:
+            # This is guidance only: undeclared ${NAME} text remains literal,
+            # and unused declarations are valid. Inspect the already-parsed
+            # URL values so helpful diagnostics do not require a custom YAML
+            # loader or a second parse solely to recover source locations.
+            referenced = template_references(urls)
+            declared = set(template_schema.names)
+
+            for name in sorted(referenced - declared):
+                ConfigBase.logger.debug(
+                    "Template entry '{}' is not defined in the template"
+                    " section; it is kept as written.".format(name)
+                )
+
+            for name in sorted(declared - referenced):
+                ConfigBase.logger.warning(
+                    "Template entry '{}' is defined but not referenced by a"
+                    " service entry.".format(name)
+                )
+
         # Iterate over each URL
         for no, url in enumerate(urls):
             # Our results object is what we use to instantiate our object if
@@ -1103,6 +1196,21 @@ class ConfigBase(URLBase):
 
             if isinstance(url, str):
                 # We're just a simple URL string...
+                if placeholders and template_in_schema(
+                    url, template_schema.names
+                ):
+                    # The schema selects the temporary plugin parser before a
+                    # template value exists. Allowing it to vary would make the
+                    # same configuration change type at notification time.
+                    ConfigBase.logger.error(
+                        "Template variables are not permitted in URL schemas"
+                        " (YAML entry #{})".format(no + 1)
+                    )
+                    continue
+
+                if placeholders:
+                    url = placeholders.encode_url(url)
+
                 schema = GET_SCHEMA_RE.match(url)
                 if schema is None:
                     # Log invalid entries so that maintainer of config
@@ -1119,6 +1227,16 @@ class ConfigBase(URLBase):
                     url, secure_logging=asset.secure_logging
                 )
                 if results_ is None:
+                    if placeholders and placeholders.used(url):
+                        # Some services must validate this field while parsing.
+                        ConfigBase.logger.error(
+                            "A template variable can not be used at this"
+                            " position for {}://, entry #{}".format(
+                                schema.group("schema").lower(), no + 1
+                            )
+                        )
+                        continue
+
                     # url_to_dict() already logged an error with the URL;
                     # repeat at debug level with entry number for context.
                     ConfigBase.logger.debug(
@@ -1126,8 +1244,20 @@ class ConfigBase(URLBase):
                     )
                     continue
 
-                # add our results to our global set
-                results.append((results_, {}))
+                # Parsing can succeed while silently dropping a marker.
+                offender = dropped_template(url, results_, placeholders)
+                if offender:
+                    # Do not keep a partially parsed template entry.
+                    ConfigBase.logger.error(
+                        "Template variable '{}' can not be used at this"
+                        " position for {}://, entry #{}".format(
+                            offender, schema.group("schema").lower(), no + 1
+                        )
+                    )
+                    continue
+
+                # A plain URL string has no settings written under it.
+                results.append((results_, {}, {}))
 
             elif isinstance(url, dict):
                 # We are a url string with additional unescaped options. In
@@ -1140,12 +1270,47 @@ class ConfigBase(URLBase):
                 # Track the URL to-load
                 url_ = None
 
+                # Keep the original key for matching sibling YAML settings.
+                url_key = None
+
                 # Track last acquired schema
                 schema = None
 
+                # Distinguish a forbidden variable schema from an ordinary
+                # mapping that simply contains no recognizable URL key.
+                invalid_schema = False
+
                 for key, tokens_ in it:
+                    if (
+                        placeholders
+                        and isinstance(key, str)
+                        and "://" in key
+                        and template_in_schema(key, template_schema.names)
+                    ):
+                        # Mapping-style URL keys obey the same fixed-schema
+                        # rule as plain URL strings. The quick separator check
+                        # only distinguishes URL-shaped keys from literal YAML
+                        # setting names. template_in_schema() locates the first
+                        # separator itself and rejects a declared marker only
+                        # when that marker occurs before it, so a later :// in
+                        # the path cannot bypass this check.
+                        ConfigBase.logger.error(
+                            "Template variables are not permitted in URL"
+                            " schemas (YAML entry #{})".format(no + 1)
+                        )
+                        invalid_schema = True
+                        break
+
+                    encoded = (
+                        placeholders.encode_url(key) if placeholders else key
+                    )
+
+                    if not isinstance(encoded, str):
+                        # Non-text sibling settings cannot identify a URL.
+                        continue
+
                     # Test our schema
-                    schema_ = GET_SCHEMA_RE.match(key)
+                    schema_ = GET_SCHEMA_RE.match(encoded)
                     if schema_ is None:
                         # Non-schema key -- may be a sibling token sitting
                         # before the URL key in the YAML mapping.  Sibling
@@ -1157,13 +1322,17 @@ class ConfigBase(URLBase):
                     schema = schema_.group("schema").lower()
 
                     # Store our URL and Schema Regex
-                    url_ = key
+                    url_ = encoded
+                    url_key = key
 
                     # Update our token assignment
                     tokens = tokens_
 
                     # We're done
                     break
+
+                if invalid_schema:
+                    continue
 
                 if url_ is None:
                     # the loop above failed to match anything
@@ -1172,22 +1341,16 @@ class ConfigBase(URLBase):
                     )
                     continue
 
-                # Collect sibling tokens from the entire mapping,
-                # excluding only the URL key itself.  Using the full
-                # url.items() dict (rather than the remaining iterator)
-                # ensures siblings that appear *before* the URL key in
-                # the YAML mapping are captured too.  YAML does not
-                # guarantee key order within a mapping, so order must
-                # not matter here.
+                # Read sibling settings from the whole mapping, not just the
+                # items that follow the URL key. YAML mapping order must not
+                # affect the result.
                 #
-                # In YAML, keys at the same indentation level as
-                # the schema URL key become siblings in the same
-                # mapping dict rather than children of the URL key.
-                # We treat these sibling keys as token overrides
-                # that sit above URL-parsed values (priority 3) and
-                # below explicitly-nested child tokens (priority 1).
+                # Settings are applied from highest to lowest priority:
+                #   1. Child settings nested below the URL
+                #   2. Sibling settings beside the URL
+                #   3. Values parsed from the URL and its query string
                 #
-                # This means both YAML forms produce the same result:
+                # This lets both of the following YAML forms work:
                 #
                 #   # sibling form (same indentation)
                 #   - mailtos://_:
@@ -1199,23 +1362,67 @@ class ConfigBase(URLBase):
                 #       smtp: smtp.example.com
                 #       from: no-reply@example.com
                 sibling_tokens = {
-                    k: v for k, v in url.items() if k not in (url_, "schema")
+                    k: v
+                    for k, v in url.items()
+                    if k not in (url_key, "schema")
                 }
+                if placeholders:
+                    # Template YAML values, but keep setting names literal.
+                    try:
+                        sibling_tokens = placeholders.encode_obj(
+                            sibling_tokens
+                        )
+                        tokens = placeholders.encode_obj(tokens)
+
+                    except AppriseTemplateError as e:
+                        ConfigBase.logger.error(
+                            "Could not prepare template values for entry"
+                            " #{}. {}".format(no + 1, e)
+                        )
+                        continue
 
                 results_ = plugins.url_to_dict(
                     url_, secure_logging=asset.secure_logging
                 )
                 if results_ is None:
+                    if placeholders and placeholders.used(url_):
+                        # Report placeholders rejected during URL parsing.
+                        ConfigBase.logger.error(
+                            "A template variable can not be used at this"
+                            " position for {}://, entry #{}".format(
+                                schema, no + 1
+                            )
+                        )
+                        continue
+
                     # Setup dictionary
                     results_ = {
                         # Minimum requirements
                         "schema": schema,
                     }
 
+                else:
+                    # Check the parsed URL before applying YAML settings.
+                    offender = dropped_template(url_, results_, placeholders)
+                    if offender:
+                        # Settings underneath cannot repair a lost URL marker.
+                        ConfigBase.logger.error(
+                            "Template variable '{}' can not be used at this"
+                            " position for {}://, entry #{}".format(
+                                offender, schema, no + 1
+                            )
+                        )
+                        continue
+
                 if isinstance(tokens, (list, tuple, set)):
-                    # Pre-process sibling tokens once before the loop
-                    # so each per-entry copy already has template
-                    # mappings resolved (smtp -> smtp_host, etc.)
+                    # Keep YAML names before aliases are mapped (smtp to
+                    # smtp_host). Name and from can both feed from_addr,
+                    # so a listing must show which name was written.
+                    written_ = dict(sibling_tokens) if sibling_tokens else {}
+
+                    # Normalize shared sibling settings once before expanding
+                    # the list. Each entry then starts with the same mapped
+                    # values, such as smtp becoming smtp_host.
                     if sibling_tokens and schema in N_MGR:
                         sibling_tokens = ConfigBase._special_token_handler(
                             schema, sibling_tokens
@@ -1239,6 +1446,10 @@ class ConfigBase(URLBase):
                             if "schema" in entries:
                                 del entries["schema"]
 
+                            # Add this entry's written names over shared ones.
+                            written_entry = dict(written_)
+                            written_entry.update(entries)
+
                             # support our special tokens
                             if schema in N_MGR:
                                 entries = ConfigBase._special_token_handler(
@@ -1248,29 +1459,30 @@ class ConfigBase(URLBase):
                             # Extend our dictionary with our new entries
                             r.update(entries)
 
-                            # Record the YAML contributions for this entry
-                            # so post_process_parse_url_results() cannot
-                            # overwrite them (enforces YAML > qsd priority).
+                            # Keep every YAML contribution together so later
+                            # URL post-processing cannot overwrite it. Child
+                            # values are added last and therefore keep priority
+                            # over sibling values.
                             yaml_ = {}
                             if sibling_tokens:
                                 yaml_.update(sibling_tokens)
                             yaml_.update(entries)
 
                             # add our results to our global set
-                            results.append((r, yaml_))
+                            results.append((r, yaml_, written_entry))
 
                 elif isinstance(tokens, dict):
-                    # Strip 'schema' from child tokens -- it is determined
-                    # by the URL key's own schema and must not be overridden
-                    # by a child dict value (matching the list-expansion
-                    # branch that does the same via del entries["schema"]).
+                    # The URL key selects the schema. A child setting must not
+                    # replace it, matching the list-expansion path above.
                     tokens.pop("schema", None)
 
-                    # Normalize sibling and child token dicts
-                    # independently before merging, so that an alias key
-                    # in sibling tokens (e.g. 'smtp' -> 'smtp_host') can
-                    # never overwrite a canonical key already set in the
-                    # higher-priority child tokens.
+                    # Record the names as written before any mapping.
+                    written_ = dict(sibling_tokens) if sibling_tokens else {}
+                    written_.update(tokens)
+
+                    # Normalize siblings and children separately before they
+                    # are merged. Otherwise a sibling alias such as smtp could
+                    # map onto smtp_host and replace an explicit child value.
                     if schema in N_MGR:
                         if sibling_tokens:
                             sibling_tokens = ConfigBase._special_token_handler(
@@ -1281,9 +1493,8 @@ class ConfigBase(URLBase):
                             schema, tokens
                         )
 
-                    # Merge sibling tokens as the lower-priority base
-                    # and let the child token dict (the indented value
-                    # of the URL key) override on a per-key basis.
+                    # Merge from lowest to highest YAML priority: siblings
+                    # first, then the settings nested below the URL.
                     if sibling_tokens:
                         merged = sibling_tokens.copy()
                         merged.update(tokens)
@@ -1297,12 +1508,13 @@ class ConfigBase(URLBase):
                     r.update(tokens)
 
                     # add our results to our global set
-                    results.append((r, dict(tokens)))
+                    results.append((r, dict(tokens), written_))
 
                 elif sibling_tokens:
-                    # The URL key had a null child value, but sibling
-                    # keys supply token overrides. Process them the
-                    # same way as a child token dict.
+                    # A URL with a null child can still receive settings from
+                    # sibling keys. Preserve their written names before aliases
+                    # and plugin-specific names are normalized.
+                    written_ = dict(sibling_tokens)
                     if schema in N_MGR:
                         sibling_tokens = ConfigBase._special_token_handler(
                             schema, sibling_tokens
@@ -1316,11 +1528,11 @@ class ConfigBase(URLBase):
                     r.update(sibling_tokens)
 
                     # add our results to our global set
-                    results.append((r, dict(sibling_tokens)))
+                    results.append((r, dict(sibling_tokens), written_))
 
                 else:
                     # add our results to our global set
-                    results.append((results_, {}))
+                    results.append((results_, {}, {}))
 
             else:
                 # Unsupported
@@ -1340,7 +1552,7 @@ class ConfigBase(URLBase):
                 entry += 1
 
                 # Grab our first item
-                results_, yaml_tokens_ = results.popleft()
+                results_, yaml_tokens_, written_tokens_ = results.popleft()
 
                 if results_["schema"] not in N_MGR:
                     # the arguments are invalid or can not be used.
@@ -1382,6 +1594,14 @@ class ConfigBase(URLBase):
                     # Just use the global settings
                     results_["tag"] = global_tags
 
+                if templated_tag(results_, placeholders):
+                    # Template values must not choose notification recipients.
+                    ConfigBase.logger.error(
+                        "Template variables are not permitted in tag/tags"
+                        " (YAML entry #{}, item #{})".format(no + 1, entry)
+                    )
+                    continue
+
                 # A retry count on a service tag is not valid here: per-service
                 # retry belongs on the URL (retry: key) and call-time retry
                 # overrides belong on the notify() filter.
@@ -1401,13 +1621,19 @@ class ConfigBase(URLBase):
                 for key in list(results_.keys()):
                     # Strip out any tokens we know that we can't accept and
                     # warn the user
-                    match = VALID_TOKEN.match(key)
+                    match = (
+                        VALID_TOKEN.match(key)
+                        if isinstance(key, str)
+                        else None
+                    )
                     if not match:
                         ConfigBase.logger.warning(
                             f"Ignoring invalid token ({key}) found in YAML "
                             f"configuration entry #{no + 1}, item #{entry}"
                         )
                         del results_[key]
+                        yaml_tokens_.pop(key, None)
+                        written_tokens_.pop(key, None)
 
                 if ConfigBase.logger.isEnabledFor(logging.TRACE):
                     ConfigBase.logger.trace(
@@ -1423,75 +1649,32 @@ class ConfigBase(URLBase):
                 # Prepare our Asset Object
                 results_["asset"] = asset
 
-                # For the second post_process_parse_url_results call we
-                # need to distinguish two plugin families:
-                #
-                # URLBase-based plugins use the full-mode
-                # utils.parse.parse_url() (simple=False), which always creates
-                # qsd plus the extended qsd dicts (qsd+, qsd-, qsd:).  The
-                # presence of these keys is a reliable indicator that qsd was
-                # already applied once before YAML tokens were merged.
-                #
-                # post_process reads from qsd (verify, redirect, rto, cto,
-                # port, user, password, URL_TOKEN_ALIASES aliases, ...) is
-                # already reflected in results_.  YAML tokens then overrode
-                # those values at higher priority.  Strip qsd entirely so
-                # the second call cannot re-apply any qsd field and undo
-                # the YAML-token values.  The second call will still
-                # normalise types (e.g. string -> bool for 'verify') from
-                # the already-merged results_.  There is intentionally no
-                # hardcoded list of fields to skip here; stripping the whole
-                # qsd is sufficient and avoids coupling this code to the
-                # internals of post_process_parse_url_results().
-                #
-                # @notify-style plugins use a minimal parse_url that does
-                # NOT call post_process, so 'verify' is absent.  Keep qsd
-                # intact for those so verify, redirect, and other fields
-                # still get processed on this second call.
-                #
-                # The original qsd is always restored after the call so
-                # that callers (e.g. the @notify meta dict) can still
-                # inspect the raw query-string values.
+                # Full URL parsers have already applied the query string. Hide
+                # qsd during their second normalization pass so those lower-
+                # priority values cannot overwrite YAML settings. Minimal
+                # @notify results keep qsd because they still need that pass.
                 orig_qsd = results_.get("qsd")
                 if all(
                     k in results_ for k in QSD_FULL_MODE_KEYS
                 ) and isinstance(orig_qsd, dict):
-                    # Full-mode parse_url() always creates all three extended
-                    # qsd dicts (qsd+, qsd-, qsd:), even when the URL has no
-                    # query params.  Simple-mode @notify parse_url() creates
-                    # only qsd.  YAML sibling tokens never inject any of these
-                    # keys.  QSD_FULL_MODE_KEYS is the authoritative list from
-                    # utils/parse.py -- no duplication.
-                    # Strip the full qsd so it cannot overwrite YAML tokens
-                    # on this second post_process call.
+                    # These extra fields reliably identify a full parse result.
                     del results_["qsd"]
 
                 # Handle post processing of result set
                 results_ = URLBase.post_process_parse_url_results(results_)
 
-                # Re-apply YAML tokens on top of post_process results.
-                # For URLBase plugins qsd was stripped above so this is
-                # idempotent.  For @notify plugins qsd was kept intact and
-                # post_process_parse_url_results() will have overwritten any
-                # YAML-token values with qsd values; re-applying here restores
-                # the correct YAML > qsd priority for those plugins too.
-                #
-                # Keys in _YAML_REAPPLY_SKIP are handled specially by the
-                # while loop above and must not be overwritten here.
+                # Restore YAML's priority after either normalization path.
+                # Special keys were already assembled and stay untouched.
                 if yaml_tokens_:
                     results_.update(
                         {
                             k: v
                             for k, v in yaml_tokens_.items()
-                            if k not in _YAML_REAPPLY_SKIP
+                            if k not in YAML_REAPPLY_SKIP
                         }
                     )
 
-                # Restore the original qsd so the full meta dict is
-                # available downstream regardless of which branch above ran.
-                # post_process_parse_url_results() never adds a 'qsd' key, so
-                # the elif branch (orig_qsd is None but qsd appeared) cannot
-                # occur and is omitted intentionally.
+                # Keep the original query mapping available downstream.
                 if orig_qsd is not None:
                     results_["qsd"] = orig_qsd
 
@@ -1499,6 +1682,7 @@ class ConfigBase(URLBase):
                 preloaded.append(
                     {
                         "results": results_,
+                        "settings": written_tokens_,
                         "entry": no + 1,
                         "item": entry,
                     }
@@ -1528,6 +1712,28 @@ class ConfigBase(URLBase):
                 ):
                     results["tag"].add(group)
 
+            if placeholders:
+                needed = placeholders.used(results)
+                if not needed:
+                    # Restore any escaped but undeclared ${NAME} text.
+                    results = placeholders.substitute(results, {})
+
+                else:
+                    # Keep the entry pending until its values are available.
+                    services.append(
+                        NotifyTemplate(
+                            results=results,
+                            placeholders=placeholders,
+                            schema=template_schema,
+                            names=needed,
+                            settings=entry["settings"],
+                            asset=results.get("asset"),
+                            entry=entry["entry"],
+                            item=entry["item"],
+                        )
+                    )
+                    continue
+
             # Now we generate our plugin
             try:
                 # Attempt to create an instance of our plugin using the
@@ -1550,10 +1756,10 @@ class ConfigBase(URLBase):
                 continue
 
             # if we reach here, we successfully loaded our data
-            servers.append(plugin)
+            services.append(plugin)
 
         preloaded.clear()
-        return (servers, configs)
+        return (services, configs)
 
     def pop(self, index: int = -1) -> object:
         """Removes an indexed Notification Service from the stack and returns
@@ -1562,16 +1768,16 @@ class ConfigBase(URLBase):
         By default, the last element of the list is removed.
         """
 
-        if not isinstance(self._cached_servers, list):
+        if not isinstance(self._cached_services, list):
             # Generate ourselves a list of content we can pull from
-            self.servers()
+            self.services()
 
         # Pop the element off of the stack
-        return self._cached_servers.pop(index)
+        return self._cached_services.pop(index)
 
     def clear_cache(self) -> None:
         """Cleans cache"""
-        self._cached_servers = None
+        self._cached_services = None
         self._cached_time = None
 
     @staticmethod
@@ -1608,7 +1814,7 @@ class ConfigBase(URLBase):
             matches = {
                 k[1:]: str(v)
                 for k, v in tokens.items()
-                if k.startswith(prefix)
+                if isinstance(k, str) and k.startswith(prefix)
             }
 
             if not matches:
@@ -1621,7 +1827,9 @@ class ConfigBase(URLBase):
 
             # strip out processed tokens
             tokens = {
-                k: v for k, v in tokens.items() if not k.startswith(prefix)
+                k: v
+                for k, v in tokens.items()
+                if not isinstance(k, str) or not k.startswith(prefix)
             }
 
             # Update our entries
@@ -1712,37 +1920,40 @@ class ConfigBase(URLBase):
         return tokens
 
     def __getitem__(self, index: int) -> object:
-        """Returns the indexed server entry associated with the loaded
-        notification servers."""
-        if not isinstance(self._cached_servers, list):
+        """Return the cached service at ``index``, loading it if necessary."""
+        if not isinstance(self._cached_services, list):
             # Generate ourselves a list of content we can pull from
-            self.servers()
+            self.services()
 
-        return self._cached_servers[index]
+        return self._cached_services[index]
 
     def __iter__(self) -> object:
-        """Returns an iterator to our server list."""
-        if not isinstance(self._cached_servers, list):
+        """Iterate over cached services, loading the source if necessary."""
+        if not isinstance(self._cached_services, list):
             # Generate ourselves a list of content we can pull from
-            self.servers()
+            self.services()
 
-        return iter(self._cached_servers)
+        return iter(self._cached_services)
 
     def __len__(self) -> int:
-        """Returns the total number of servers loaded."""
-        if not isinstance(self._cached_servers, list):
-            # Generate ourselves a list of content we can pull from
-            self.servers()
+        """Return the number of parsed services, loading when necessary.
 
-        return len(self._cached_servers)
+        The configuration source itself is not counted. Services obtained from
+        permitted nested includes are included in the total.
+        """
+        if not isinstance(self._cached_services, list):
+            # Generate ourselves a list of content we can pull from
+            self.services()
+
+        return len(self._cached_services)
 
     def __bool__(self) -> bool:
         """Allows the Apprise object to be wrapped in an 'if statement'.
 
         True is returned if our content was downloaded correctly.
         """
-        if not isinstance(self._cached_servers, list):
+        if not isinstance(self._cached_services, list):
             # Generate ourselves a list of content we can pull from
-            self.servers()
+            self.services()
 
-        return bool(self._cached_servers)
+        return bool(self._cached_services)

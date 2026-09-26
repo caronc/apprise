@@ -31,6 +31,7 @@ import logging
 from helpers import AppriseURLTester
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.notica import NotifyNotica
 
 logging.disable(logging.CRITICAL)
@@ -40,13 +41,13 @@ apprise_url_tests = (
     (
         "notica://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "notica://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Native URL

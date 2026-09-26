@@ -60,6 +60,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -125,7 +126,7 @@ class NotifyWeComBot(NotifyBase):
         if not self.key:
             msg = f"An invalid WeCom Bot Webhook Key ({key}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Prepare our notification URL now:
         self.api_url = self.notify_url.format(

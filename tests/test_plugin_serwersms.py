@@ -38,6 +38,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.serwersms import NotifySerwerSMS
 
 # Attachment test fixtures directory
@@ -57,35 +58,35 @@ apprise_url_tests = (
         "serwersms://",
         {
             # Missing credentials
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "serwersms://:@/",
         {
             # Empty credentials
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "serwersms://user@SenderA/+48123456789",
         {
             # Missing password
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "serwersms://user:pass@/+48123456789",
         {
             # Missing sender (empty host)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "serwersms://user:pass@!!invalid!!",
         {
             # Invalid sender name (fails regex)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -189,11 +190,11 @@ def test_plugin_serwersms_init(mock_post):
     """NotifySerwerSMS() Initialisation tests."""
 
     # Missing username
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySerwerSMS(sender="SenderA", targets=["+48123456789"])
 
     # Missing password
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySerwerSMS(
             user="user",
             sender="SenderA",
@@ -201,7 +202,7 @@ def test_plugin_serwersms_init(mock_post):
         )
 
     # Missing sender
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySerwerSMS(
             user="user",
             password="pass",
@@ -209,7 +210,7 @@ def test_plugin_serwersms_init(mock_post):
         )
 
     # Invalid sender (too long - >11 chars)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySerwerSMS(
             user="user",
             password="pass",
@@ -218,7 +219,7 @@ def test_plugin_serwersms_init(mock_post):
         )
 
     # Invalid sender (starts with non-alphanumeric)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySerwerSMS(
             user="user",
             password="pass",
@@ -689,7 +690,7 @@ def test_plugin_serwersms_mms_phone_success(mock_post):
     attach = AppriseAttachment.instantiate(
         os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     )
-    assert obj.notify(body="MMS test", attach=attach) is True
+    assert bool(obj.notify(body="MMS test", attach=attach)) is True
     assert mock_post.call_count == 1
 
     # Confirm multipart files kwarg was set (MMS endpoint used)
@@ -727,7 +728,7 @@ def test_plugin_serwersms_mms_group_success(mock_post):
     attach = AppriseAttachment.instantiate(
         os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     )
-    assert obj.notify(body="Group MMS", attach=attach) is True
+    assert bool(obj.notify(body="Group MMS", attach=attach)) is True
     assert mock_post.call_count == 1
 
     # Confirm group_id was sent as a form field
@@ -757,7 +758,7 @@ def test_plugin_serwersms_mms_guard1_inaccessible(mock_post):
 
     # Simulate file being inaccessible (bool(attachment) -> False)
     with mock.patch("os.path.isfile", return_value=False):
-        assert obj.notify(body="Test", attach=attach) is False
+        assert bool(obj.notify(body="Test", attach=attach)) is False
 
     # No HTTP call should have been made
     assert mock_post.call_count == 0
@@ -783,7 +784,7 @@ def test_plugin_serwersms_mms_guard2_oserror(mock_post):
     )
 
     with mock.patch("builtins.open", side_effect=OSError("IO fail")):
-        assert obj.notify(body="Test", attach=attach) is False
+        assert bool(obj.notify(body="Test", attach=attach)) is False
 
     # No HTTP call should have been made
     assert mock_post.call_count == 0
@@ -807,7 +808,7 @@ def test_plugin_serwersms_mms_http_error(mock_post):
     attach = AppriseAttachment.instantiate(
         os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     )
-    assert obj.notify(body="Test", attach=attach) is False
+    assert bool(obj.notify(body="Test", attach=attach)) is False
     assert mock_post.call_count == 1
 
 
@@ -831,7 +832,7 @@ def test_plugin_serwersms_mms_api_failure_with_error(mock_post):
     attach = AppriseAttachment.instantiate(
         os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     )
-    assert obj.notify(body="Test", attach=attach) is False
+    assert bool(obj.notify(body="Test", attach=attach)) is False
 
 
 @mock.patch("requests.post")
@@ -852,7 +853,7 @@ def test_plugin_serwersms_mms_api_failure_no_error(mock_post):
     attach = AppriseAttachment.instantiate(
         os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     )
-    assert obj.notify(body="Test", attach=attach) is False
+    assert bool(obj.notify(body="Test", attach=attach)) is False
 
 
 @mock.patch("requests.post")
@@ -874,7 +875,7 @@ def test_plugin_serwersms_mms_bad_json(mock_post):
         os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     )
     # Bad JSON -> content = {} -> success absent -> False
-    assert obj.notify(body="Test", attach=attach) is False
+    assert bool(obj.notify(body="Test", attach=attach)) is False
 
 
 @mock.patch("requests.post")
@@ -896,7 +897,7 @@ def test_plugin_serwersms_mms_null_json(mock_post):
     attach = AppriseAttachment.instantiate(
         os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     )
-    assert obj.notify(body="Test", attach=attach) is False
+    assert bool(obj.notify(body="Test", attach=attach)) is False
 
 
 @mock.patch("requests.post")
@@ -915,4 +916,4 @@ def test_plugin_serwersms_mms_request_exception(mock_post):
     attach = AppriseAttachment.instantiate(
         os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     )
-    assert obj.notify(body="Test", attach=attach) is False
+    assert bool(obj.notify(body="Test", attach=attach)) is False

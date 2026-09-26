@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAsset, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.youlmk import NotifyYouLMK, youlmk_priority
 
 logging.disable(logging.CRITICAL)
@@ -50,21 +51,21 @@ apprise_url_tests = (
         "youlmk://",
         {
             # No token specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "youlmk://invalid",
         {
             # Neither a ylk_ token nor a k_ key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "youlmk://ylk_tooshort",
         {
             # The token's shape is ylk_ and 32 characters
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -103,7 +104,7 @@ apprise_url_tests = (
         f"youlmk://{TOKEN}?priority=bogus",
         {
             # An unknown priority
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -117,7 +118,7 @@ apprise_url_tests = (
         f"youlmk://{TOKEN}?warning=bogus",
         {
             # An unknown per-type priority
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -198,23 +199,23 @@ def test_plugin_youlmk_edge_cases():
     """NotifyYouLMK() Edge Cases."""
 
     # No token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyYouLMK(token=None)
 
     # An empty token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyYouLMK(token="  ")
 
     # The wrong shape
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyYouLMK(token="ylk_" + "x" * 31)
 
     # A bad forced priority
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyYouLMK(token=TOKEN, priority="bogus")
 
     # A bad per-type priority
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyYouLMK(token=TOKEN, failure="bogus")
 
     # Both shapes are accepted, and the case of the token is kept

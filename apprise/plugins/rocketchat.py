@@ -32,6 +32,7 @@ import re
 import requests
 
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, parse_list
@@ -230,7 +231,7 @@ class NotifyRocketChat(NotifyBase):
         if self.mode and self.mode not in ROCKETCHAT_AUTH_MODES:
             msg = f"The authentication mode specified ({mode}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Detect our mode if it wasn't specified
         if not self.mode:
@@ -257,12 +258,12 @@ class NotifyRocketChat(NotifyBase):
                 else "user/apikey"
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         elif self.mode == RocketChatAuthMode.WEBHOOK and not self.webhook:
             msg = "No Rocket.Chat Incoming Webhook was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if self.mode == RocketChatAuthMode.TOKEN:
             # Set our headers for further communication
@@ -304,7 +305,7 @@ class NotifyRocketChat(NotifyBase):
         ):
             msg = "No Rocket.Chat room and/or channels specified to notify."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Prepare our avatar setting
         # - if specified; that trumps all
@@ -491,11 +492,21 @@ class NotifyRocketChat(NotifyBase):
         while len(channels) > 0:
             # Get Channel
             channel = channels.pop(0)
+
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(channel):
+                continue
+
             payload["channel"] = channel
 
             if not self._send(payload, notify_type=notify_type, **kwargs):
                 # toggle flag
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(channel)
 
         # Create a copy of our room id's to notify against
         rooms = list(self.rooms)
@@ -503,11 +514,21 @@ class NotifyRocketChat(NotifyBase):
         while len(rooms):
             # Get Room
             room = rooms.pop(0)
+
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(room):
+                continue
+
             payload["roomId"] = room
 
             if not self._send(payload, notify_type=notify_type, **kwargs):
                 # toggle flag
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(room)
 
         if self.mode == RocketChatAuthMode.BASIC:
             # logout

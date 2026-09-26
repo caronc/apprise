@@ -34,6 +34,7 @@ import requests
 
 from .. import exception
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
@@ -257,7 +258,7 @@ class NotifySMSEagle(NotifyBase):
                 f" ({token if token else self.user}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         #
         # Priority
@@ -300,7 +301,7 @@ class NotifySMSEagle(NotifyBase):
                     f"An invalid SMSEagle priority ({priority}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
 
             # store our successfully looked up priority
             self.priority = SMSEAGLE_PRIORITY_MAP[result]
@@ -311,7 +312,7 @@ class NotifySMSEagle(NotifyBase):
         ):
             msg = f"An invalid SMSEagle priority ({priority}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate our targerts
         for target in parse_phone_no(targets):
@@ -494,6 +495,12 @@ class NotifySMSEagle(NotifyBase):
 
             targets = getattr(self, f"target_{category}s")
             for index in range(0, len(targets), batch_size):
+                # Skip a batch that already went out so a retry does
+                # not deliver it to those recipients twice.
+                delivery_key = (category, index)
+                if self.is_delivered(delivery_key):
+                    continue
+
                 # Prepare our recipients
                 payload["params"][notify_by[category]["target"]] = ",".join(
                     targets[index : index + batch_size]
@@ -630,6 +637,9 @@ class NotifySMSEagle(NotifyBase):
                     # Mark our failure
                     has_error = True
                     continue
+
+                # Delivered; a retry can safely skip this batch.
+                self.mark_delivered(delivery_key)
 
         return not has_error
 

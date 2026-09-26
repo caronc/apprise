@@ -29,6 +29,12 @@ System Administrators and DevOps who wish to send a notification now no longer n
 
 Visit the [Official Documentation](https://appriseit.com/getting-started/) site for more information on Apprise.
 
+# How It Works
+
+Apprise provides one consistent URL format and notification interface for your apps, automation, and infrastructure. Use the CLI or core library directly, or relay through Apprise API, to deliver notifications to a very [large amount of supported services](https://appriseit.com/services/).
+
+[![Apprise overview showing notification sources, entry points, and supported destinations](Apprise-overview.png)](Apprise-overview.png)
+
 # Table of Contents
 <!--ts-->
 * [Supported Notifications](#supported-notifications)
@@ -61,7 +67,7 @@ The table below identifies the services this tool supports and some example serv
 
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
-| [Apprise API](https://appriseit.com/services/apprise_api/)  | apprise:// or apprises:// | (TCP) 80 or 443 | apprise://hostname/Token
+| [Apprise API](https://appriseit.com/services/apprise_api/)  | apprise:// or apprises:// | (TCP) 80 or 443 | apprise://hostname/Token<br/>apprise://:password@hostname/Token<br/>apprise://user:password@hostname/Token
 | [AWS SES](https://appriseit.com/services/ses/)  | ses://   | (TCP) 443   | ses://user@domain/AccessKeyID/AccessSecretKey/RegionName<br/>ses://user@domain/AccessKeyID/AccessSecretKey/RegionName/email1/email2/emailN
 | [Bark](https://appriseit.com/services/bark/)  | bark://   | (TCP) 80 or 443   | bark://hostname<br />bark://hostname/device_key<br />bark://hostname/device_key1/device_key2/device_keyN<br/>barks://hostname<br />barks://hostname/device_key<br />barks://hostname/device_key1/device_key2/device_keyN
 | [Blink(1)](https://appriseit.com/services/blink1/) | blink1:// | USB | blink1://<br />blink1://serial/
@@ -69,6 +75,7 @@ The table below identifies the services this tool supports and some example serv
 | [Brevo](https://appriseit.com/services/brevo/) | brevo://  | (TCP) 443   | brevo://APIToken:FromEmail/<br />brevo://APIToken:FromEmail/ToEmail<br />brevo://APIToken:FromEmail/ToEmail1/ToEmail2/ToEmailN/
 | [Chanify](https://appriseit.com/services/chanify/) | chantify://    | (TCP) 443    | chantify://token
 | [Amazon Chime](https://appriseit.com/services/chime/) | chime://   | (TCP) 443   | chime://WebhookID/Token
+| [Delta Chat](https://appriseit.com/services/deltachat/) | deltachat:// or deltachats:// | (TCP) 25 or 587 | deltachat://user:pass@smtp.example.com/friend@example.org<br />deltachats://user:pass@smtp.example.com/friend1@example.org/friend2@example.org
 | [Discord](https://appriseit.com/services/discord/)  | discord://   | (TCP) 443   | discord://webhook_id/webhook_token<br />discord://avatar@webhook_id/webhook_token
 | [Dot.](https://appriseit.com/services/dot/)  | dot:// | (TCP) 443 | dot://apikey@device_id/text/<br />dot://apikey@device_id/image/<br />**Note**: `device_id` is the Quote/0 hardware serial
 | [Emby](https://appriseit.com/services/emby/)  | emby:// or embys:// | (TCP) 8096 | emby://user@hostname/<br />emby://user:password@hostname
@@ -199,6 +206,7 @@ SMS Notifications for the most part do not have a both a `title` and `body`.  Th
 | [httpSMS](https://appriseit.com/services/httpsms/) | httpsms://  | (TCP) 443   | httpsms://ApiKey@FromPhoneNo<br/>httpsms://ApiKey@FromPhoneNo/ToPhoneNo<br/>httpsms://ApiKey@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Kavenegar](https://appriseit.com/services/kavenegar/) | kavenegar://  | (TCP) 443   | kavenegar://ApiKey/ToPhoneNo<br/>kavenegar://FromPhoneNo@ApiKey/ToPhoneNo<br/>kavenegar://ApiKey/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN
 | [MessageBird](https://appriseit.com/services/messagebird/) | msgbird://  | (TCP) 443   | msgbird://ApiKey/FromPhoneNo<br/>msgbird://ApiKey/FromPhoneNo/ToPhoneNo<br/>msgbird://ApiKey/FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
+| [Mobile Message](https://appriseit.com/services/mobilemessage/) | mobilemessage:// or mobilemsg://  | (TCP) 443   | mobilemessage://ApiUser:ApiPass@SenderID/ToPhoneNo<br/>mobilemessage://ApiUser:ApiPass@SenderID/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [MSG91](https://appriseit.com/services/msg91/) | msg91://  | (TCP) 443   | msg91://TemplateID@AuthKey/ToPhoneNo<br/>msg91://TemplateID@AuthKey/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Plivo](https://appriseit.com/services/plivo/) | plivo://  | (TCP) 443   | plivo://AuthID@Token@FromPhoneNo<br/>plivo://AuthID@Token/FromPhoneNo/ToPhoneNo<br/>plivo://AuthID@Token/FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [RingCentral](https://appriseit.com/services/ringcentral/) | ringc://  | (TCP) 443   | ringc://SourcePhoneNo:Password@ClientID/ClientSecret<br/>ringc://SourcePhoneNo:JWTToken@ClientID/ClientSecret/ToPhoneNo<br/>ringc://SourcePhoneNo:JWTToken@ClientID/ClientSecret/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
@@ -252,6 +260,15 @@ The easiest way is to install Apprise from PyPI:
 pip install apprise
 ```
 
+If you use [uv](https://docs.astral.sh/uv/), you can install the `apprise` command in its own isolated environment, or add Apprise to your uv project:
+```bash
+# Install the apprise command
+uv tool install apprise
+
+# Or add it to your own project
+uv add apprise
+```
+
 Apprise is also packaged as an RPM and available through [EPEL](https://docs.fedoraproject.org/en-US/epel/) supporting CentOS, Redhat, Rocky, Oracle Linux, etc.
 ```bash
 # Follow instructions on https://docs.fedoraproject.org/en-US/epel
@@ -267,11 +284,10 @@ You can also check out the [Graphical version of Apprise](https://github.com/car
 
 # Command Line Usage
 
-A small command line interface (CLI) tool is also provided with this package called *apprise*. If you know the server urls you wish to notify, you can simply provide them all on the command line and send your notifications that way:
+A command line tool named *apprise* is included. Provide one or more service URLs to send a notification:
+
 ```bash
-# Send a notification to as many servers as you want
-# as you can easily chain one after another (the -vv provides some
-# additional verbosity to help let you know what is going on):
+# Send to several services. The -vv option shows additional details.
 apprise -vv -t 'my title' -b 'my notification body' \
    'mailto://myemail:mypass@gmail.com' \
    'pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b'
@@ -338,6 +354,72 @@ apprise -vv -t 'my title' -b 'my notification body' \
    --config=https://localhost/my/apprise/config
 ```
 
+## CLI Template Variables
+
+A YAML configuration can leave a value out of a URL and have it filled in
+later, which lets you keep the configuration in version control without the
+secrets in it.
+
+Write `${NAME}` where the value belongs and declare every name you use in a
+`template:` section:
+
+```yaml
+template:
+  # A default is used unless the call supplies a value
+  smtp_host: smtp.example.com
+  # No default: the call or environment must fill this name
+  api_key:
+
+urls:
+  - sendgrid://${API_KEY}:noreply@example.com/you@example.com:
+      - tag: alerts
+```
+
+Apprise looks for each value in this order and stops at the first answer:
+
+1. a value passed with `--template-var` (`-tv`)
+2. the default written in the `template:` section
+3. the environment variable `APPRISE_TEMPLATE_<NAME>`
+
+The environment is the last resort, so it only ever fills in a name the
+`template:` section declared without a default.
+
+Values supplied for a call or through the environment are trimmed. If one is
+blank afterwards, it reads as not supplied and the next source above applies.
+A default written in the configuration stays as written. Use `name: ""` for an
+explicit empty-string default; `name:` means the value is required.
+
+```bash
+# Supply it directly
+apprise --config=apprise.yml --tag=alerts \
+   --template-var api_key=your-secret-key \
+   --body="Hello"
+
+# Or leave it in the environment
+export APPRISE_TEMPLATE_API_KEY=your-secret-key
+apprise --config=apprise.yml --tag=alerts --body="Hello"
+```
+
+A service missing a required value is skipped while other services continue;
+Apprise then exits with status `4`. Use `--dry-run` to check required values
+without sending anything.
+
+Only names declared under `template:` are replaced. Names ignore case, values
+keep their original case, and each value may be up to 1,024 characters.
+Undeclared `${...}` text remains unchanged, preventing similar text in an
+existing password from being replaced by accident. Extra supplied names are
+accepted and ignored.
+
+Variables may be placed directly in a URL or in a named YAML setting. URL
+markers can change any field, including the destination; whole-host markers
+also accept `user@host` and `user:pass@host`. A named setting changes only its
+option, so prefer it for values supplied by less-trusted callers.
+
+Variables cannot replace the service before `://`, a setting name, or a
+`tag:`/`tags:` value. Services and tags must be known before values are filled
+in. Template variables apply only to YAML configuration; TEXT configuration
+is unchanged.
+
 ## CLI Tagging Support
 
 Apprise allows you to tag your services in your configuration to organize them (e.g., `family`, `devops`, `critical`). You can then filter which services to notify using the `--tag` (`-g`) switch.
@@ -364,7 +446,7 @@ Tags also support an optional **priority prefix** and **retry suffix**. In your 
 * **Escalation (no prefix)**: `-g alerts` dispatches priority-1 entries first. If they all succeed, Apprise returns early and never runs the priority-5 fallbacks. A failure in the lower-priority group triggers the next group as an escalation chain.
 * **Exclusive (with prefix)**: `-g "2:alerts"` notifies *only* services whose `alerts` tag has priority 2. No other priority levels are triggered.
 * **Per-call retry**: `-g "alerts:3"` retries each matched service up to 3 times on failure (overrides the service's own retry setting for this call only).
-* **Combined**: `-g "2:alerts:3"` -- exclusive priority-2 filter with up to 3 retries.
+* **Combined**: `-g "2:alerts:3"` selects only priority-2 services and allows up to 3 retries.
 
 ```bash
 # Escalation: priority-1 first; skip priority-5 if all succeed
@@ -456,6 +538,7 @@ Those using the Command Line Interface (CLI) can also leverage environment varia
 |  `APPRISE_CONFIG_PATH`  | Explicitly specify the config search path to use (overriding the default). The path(s) defined here must point to the absolute filename to open/reference. Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
 |  `APPRISE_PLUGIN_PATH`  | Explicitly specify the custom plugin search path to use (overriding the default). Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
 |  `APPRISE_STORAGE_PATH` | Explicitly specify the persistent storage path to use (overriding the default).
+|  `APPRISE_TEMPLATE_<NAME>` | Supply a value for a `${NAME}` used by a YAML configuration. For example `APPRISE_TEMPLATE_API_KEY` fills in `${API_KEY}`. A value passed with `--template-var` (`-tv`) takes priority over this.
 
 # Developer API Usage
 
@@ -466,7 +549,7 @@ import apprise
 # Create an Apprise instance
 apobj = apprise.Apprise()
 
-# Add all of the notification services by their server url.
+# Add notification services by URL.
 # A sample email notification:
 apobj.add('mailto://myuserid:mypass@gmail.com')
 
@@ -533,6 +616,37 @@ apobj.notify(
     tag='all',
 )
 ```
+
+## API Template Variables
+
+After loading a templated YAML configuration, developers can supply its values
+when sending:
+
+```python
+apobj.notify(
+    body='what a great notification service!',
+    title='my notification title',
+    template={'api_key': 'your-secret-key'},
+)
+```
+
+The per-call mapping takes priority over `APPRISE_TEMPLATE_<NAME>` environment
+variables and defaults in the YAML file. Names are case-insensitive, and extra
+names are accepted and ignored.
+
+Templates are enabled by default. To turn them off, use the same disabled asset
+for the configuration and its Apprise object:
+
+```python
+asset = apprise.AppriseAsset(allow_templates=False)
+config = apprise.AppriseConfig(asset=asset)
+apobj = apprise.Apprise(asset=asset)
+apobj.add(config)
+```
+
+When disabled, the `template:` section and template environment variables are
+ignored, and `${NAME}` remains unchanged. A configuration cannot enable this
+feature itself.
 
 ## API File Attachments
 

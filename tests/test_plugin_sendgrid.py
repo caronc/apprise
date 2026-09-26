@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.sendgrid import NotifySendGrid
 
 logging.disable(logging.CRITICAL)
@@ -77,7 +78,7 @@ apprise_url_tests = (
         "sendgrid://invalid-api-key+*-d:user@example.com",
         {
             # An invalid API Key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -199,15 +200,15 @@ def test_plugin_sendgrid_edge_cases(mock_post, mock_get):
     """NotifySendGrid() Edge Cases."""
 
     # no apikey
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendGrid(apikey=None, from_email="user@example.com")
 
     # invalid from email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendGrid(apikey="abcd", from_email="!invalid")
 
     # no email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendGrid(apikey="abcd", from_email=None)
 
     # Invalid To email address
@@ -244,11 +245,13 @@ def test_plugin_sendgrid_attachments(mock_post, mock_get):
     obj = Apprise.instantiate("sendgrid://abcd:user@example.com")
     assert isinstance(obj, NotifySendGrid)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -259,11 +262,13 @@ def test_plugin_sendgrid_attachments(mock_post, mock_get):
     # Try again in a use case where we can't access the file
     with mock.patch("os.path.isfile", return_value=False):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -271,11 +276,13 @@ def test_plugin_sendgrid_attachments(mock_post, mock_get):
     # Try again in a use case where we can't access the file
     with mock.patch("builtins.open", side_effect=OSError):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )

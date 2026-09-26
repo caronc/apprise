@@ -36,6 +36,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_phone_no,
@@ -156,7 +157,7 @@ class NotifyPlivo(NotifyBase):
                 "invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.token = validate_regex(
             token, *self.template_tokens["token"]["regex"]
@@ -167,13 +168,13 @@ class NotifyPlivo(NotifyBase):
                 "invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         result = is_phone_no(source)
         if not result:
             msg = f"The Plivo source specified ({source}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our source; enforce E.164 format
         self.source = f"+{result['full']}"
@@ -235,6 +236,11 @@ class NotifyPlivo(NotifyBase):
         batch_size = 1 if not self.batch else self.default_batch_size
 
         for index in range(0, len(self.targets), batch_size):
+            # Skip a batch that already went out so a retry does
+            # not deliver it to those recipients twice.
+            if self.is_delivered(index):
+                continue
+
             # Prepare our phone no (< delimits more then one)
             payload["recipients"] = ",".join(
                 self.targets[index : index + batch_size]
@@ -314,6 +320,9 @@ class NotifyPlivo(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this batch.
+            self.mark_delivered(index)
 
         return not has_error
 

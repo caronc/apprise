@@ -28,12 +28,17 @@
 import contextlib
 from itertools import chain
 from json import dumps
-import os
 import time
 
 import requests
 
-from ...common import NotifyImageSize, NotifyType, PersistentStoreMode
+from ...common import (
+    JSON_COMPACT_SEPARATORS,
+    NotifyImageSize,
+    NotifyType,
+    PersistentStoreMode,
+)
+from ...exception import AppriseImproperlyConfigured
 from ...locale import gettext_lazy as _
 from ...utils import pem as _pem
 from ...utils.base64 import base64_urlencode
@@ -134,9 +139,6 @@ class NotifyVapid(NotifyBase):
     # 43200 = 12 hours
     vapid_jwt_expiration_sec = 43200
 
-    # Subscription file
-    vapid_subscription_file = "subscriptions.json"
-
     # Remember expired endpoints when the subscription file cannot be updated.
     vapid_retired_key = "retired"
 
@@ -214,13 +216,6 @@ class NotifyVapid(NotifyBase):
                 "default": True,
                 "map_to": "include_image",
             },
-            # A newly expired subscription is non-fatal by default when
-            # another target succeeds. Set this to no to report the failure.
-            "ignore_expired": {
-                "name": _("Ignore Expired Subscriptions"),
-                "type": "bool",
-                "default": True,
-            },
         },
     )
 
@@ -233,7 +228,6 @@ class NotifyVapid(NotifyBase):
         subfile=None,
         include_image=None,
         ttl=None,
-        ignore_expired=None,
         **kwargs,
     ):
         """Initialize Vapid Messaging."""
@@ -253,7 +247,6 @@ class NotifyVapid(NotifyBase):
 
         # default subscriptions
         self.subscriptions = {}
-        self.subscriptions_loaded = False
         self.private_key_loaded = False
 
         # Set our Time to Live Flag
@@ -269,15 +262,7 @@ class NotifyVapid(NotifyBase):
             ):
                 msg = f"The Vapid TTL specified ({self.ttl}) is out of range."
                 self.logger.warning(msg)
-                raise TypeError(msg)
-
-        # Ignore newly reported expirations when another target succeeds.
-        # Retrying may duplicate messages to healthy targets.
-        self.ignore_expired = (
-            self.template_args["ignore_expired"]["default"]
-            if ignore_expired is None
-            else ignore_expired
-        )
+                raise AppriseImproperlyConfigured(msg)
 
         # Place a thumbnail image inline with the message body
         self.include_image = (
@@ -290,7 +275,7 @@ class NotifyVapid(NotifyBase):
         if not result:
             msg = f"An invalid Vapid Subscriber({subscriber}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
         self.subscriber = result["full_email"]
 
         # Store our Mode/service
@@ -309,13 +294,10 @@ class NotifyVapid(NotifyBase):
             # Invalid region specified
             msg = f"The Vapid mode specified ({mode}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # Our Private keyfile
         self.keyfile = keyfile
-
-        # Our Subscription file
-        self.subfile = subfile
 
         # Keep explicit paths in generated URLs, but omit internal storage.
         self.subfile_specified = subfile is not None
@@ -323,27 +305,24 @@ class NotifyVapid(NotifyBase):
         # Prepare our PEM Object
         self.pem = _pem.ApprisePEMController(self.store.path, asset=self.asset)
 
-        # Create our subscription object
-        self.subscriptions = subscription.WebPushSubscriptionManager(
-            asset=self.asset
+        # Memory-only setups have no storage directory
+        store_path = (
+            None
+            if self.store.mode == PersistentStoreMode.MEMORY
+            else self.store.path
         )
 
-        if (
-            self.subfile is None
-            and self.store.mode != PersistentStoreMode.MEMORY
-            and self.asset.pem_autogen
-        ):
-            self.subfile = os.path.join(
-                self.store.path, self.vapid_subscription_file
-            )
-            if not os.path.exists(self.subfile) and self.subscriptions.write(
-                self.subfile
-            ):
-                self.logger.info(
-                    "Vapid auto-generated %s/%s",
-                    os.path.basename(self.store.path),
-                    self.vapid_subscription_file,
-                )
+        # Use the storage directory unless the user supplied a file
+        self.subscriptions = subscription.WebPushSubscriptionManager(
+            store_path, subfile=subfile, asset=self.asset
+        )
+
+        if self.asset.pem_autogen:
+            # Leave a starter file behind to fill in
+            self.subscriptions.autogen()
+
+        # Our Subscription file (there may not be one)
+        self.subfile = self.subscriptions.subscription_file
 
         # Acquire our targets for parsing
         self.targets = parse_list(targets)
@@ -355,34 +334,38 @@ class NotifyVapid(NotifyBase):
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform Vapid Notification."""
-        if not self.private_key_loaded and (
-            (
-                self.keyfile
-                and not self.pem.private_key(autogen=False, autodetect=False)
-                and not self.pem.load_private_key(self.keyfile)
-            )
-            or (not self.keyfile and not self.pem)
-        ):
-            self.logger.warning(
-                "Provided Vapid/WebPush (PEM) Private Key file could "
-                "not be loaded."
-            )
+        if not self.private_key_loaded:
+            # Load the key only on the first notification
             self.private_key_loaded = True
-            return False
-        else:
-            self.private_key_loaded = True
+
+            loaded = (
+                (
+                    self.pem.private_key(autogen=False, autodetect=False)
+                    or self.pem.load_private_key(self.keyfile)
+                )
+                if self.keyfile
+                else bool(self.pem)
+            )
+
+            if not loaded:
+                self.logger.warning(
+                    "Provided Vapid/WebPush (PEM) Private Key file could "
+                    "not be loaded."
+                )
+                return False
 
         if not self.targets:
             # There is no one to notify; we're done
             self.logger.warning("There are no Vapid targets to notify")
             return False
 
-        if not self.subscriptions_loaded and self.subfile:
-            # Toggle our loaded flag to prevent trying again later
-            self.subscriptions_loaded = True
-            if not self.subscriptions.load(
-                self.subfile, byte_limit=self.max_vapid_subfile_size
-            ):
+        if self.subfile and not self.subscriptions.loaded:
+            # A failed load is not attempted again on the next notification
+            loaded = self.subscriptions.load(
+                byte_limit=self.max_vapid_subfile_size
+            )
+
+            if not loaded:
                 self.logger.warning(
                     "Provided Vapid/WebPush subscriptions file could not be "
                     "loaded."
@@ -423,6 +406,14 @@ class NotifyVapid(NotifyBase):
         targets = list(self.targets)
         while len(targets):
             target = targets.pop(0)
+
+            # An endpoint reached on an earlier attempt is left alone, but
+            # it still counts as delivered so a retry does not report that
+            # nothing was sent.
+            if self.is_delivered(target):
+                delivered += 1
+                continue
+
             if target not in self.subscriptions:
                 self.logger.warning(
                     "Dropped Vapid user "
@@ -498,9 +489,9 @@ class NotifyVapid(NotifyBase):
                     )
                     expired.append(target)
 
-                    if not self.ignore_expired:
-                        # The caller chose to treat expiration as a failure.
-                        has_error = True
+                    # The endpoint is gone for good.  It is pruned below,
+                    # so no retry will reach for it again.
+                    has_error = True
 
                 elif r.status_code not in (
                     requests.codes.ok,
@@ -533,6 +524,9 @@ class NotifyVapid(NotifyBase):
                 else:
                     self.logger.info("Sent %s Vapid notification.", self.mode)
                     delivered += 1
+
+                    # Delivered; a retry can safely skip this endpoint.
+                    self.mark_delivered(target)
 
             except requests.RequestException as e:
                 self.logger.warning(
@@ -599,7 +593,6 @@ class NotifyVapid(NotifyBase):
             "mode": self.mode,
             "ttl": str(self.ttl),
             "image": "yes" if self.include_image else "no",
-            "ignore_expired": "yes" if self.ignore_expired else "no",
         }
 
         if self.keyfile:
@@ -686,14 +679,6 @@ class NotifyVapid(NotifyBase):
             )
         )
 
-        # Get our Ignore Expired Flag
-        results["ignore_expired"] = parse_bool(
-            results["qsd"].get(
-                "ignore_expired",
-                NotifyVapid.template_args["ignore_expired"]["default"],
-            )
-        )
-
         # The 'to' makes it easier to use yaml configuration
         if "to" in results["qsd"] and len(results["qsd"]["to"]):
             results["targets"] += NotifyVapid.parse_list(results["qsd"]["to"])
@@ -730,10 +715,10 @@ class NotifyVapid(NotifyBase):
 
         # Base64 URL encode header and payload
         header_b64 = base64_urlencode(
-            dumps(header, separators=(",", ":")).encode("utf-8")
+            dumps(header, separators=JSON_COMPACT_SEPARATORS).encode("utf-8")
         )
         payload_b64 = base64_urlencode(
-            dumps(payload, separators=(",", ":")).encode("utf-8")
+            dumps(payload, separators=JSON_COMPACT_SEPARATORS).encode("utf-8")
         )
         signing_input = f"{header_b64}.{payload_b64}".encode()
         signature_b64 = base64_urlencode(self.pem.sign(signing_input))

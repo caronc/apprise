@@ -35,6 +35,7 @@ import requests
 
 import apprise
 from apprise import NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.join import JoinPriority, NotifyJoin
 
 logging.disable(logging.CRITICAL)
@@ -44,14 +45,14 @@ apprise_url_tests = (
     (
         "join://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # API Key + bad url
     (
         "join://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # APIkey; no device
@@ -191,11 +192,11 @@ def test_plugin_join_edge_cases(mock_post, mock_get):
     NotifyJoin(apikey=apikey, targets=None)
 
     # Initializes the plugin with an invalid apikey
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyJoin(apikey=None)
 
     # Whitespace also acts as an invalid apikey
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyJoin(apikey="   ")
 
     # Initializes the plugin with devices set to a set
@@ -211,7 +212,8 @@ def test_plugin_join_edge_cases(mock_post, mock_get):
     # Test notifications without a body or a title; nothing to send
     # so we return False
     assert (
-        p.notify(body=None, title=None, notify_type=NotifyType.INFO) is False
+        bool(p.notify(body=None, title=None, notify_type=NotifyType.INFO))
+        is False
     )
 
 
@@ -254,11 +256,11 @@ def test_plugin_join_config_files(mock_post):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 7 servers from that
+    # We should be able to read our 7 services from that
     # 3x low
     # 3x emerg
     # 1x invalid (so takes on normal priority)
-    assert len(ac.servers()) == 7
+    assert len(ac.services()) == 7
     assert len(aobj) == 7
     assert len(list(aobj.find(tag="low"))) == 3
     for s in aobj.find(tag="low"):
@@ -276,4 +278,4 @@ def test_plugin_join_config_files(mock_post):
     assert next(aobj.find(tag="join_invalid")).priority == JoinPriority.NORMAL
 
     # Notifications work
-    assert aobj.notify(title="title", body="body") is True
+    assert bool(aobj.notify(title="title", body="body")) is True

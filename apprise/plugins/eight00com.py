@@ -53,6 +53,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
 from .base import NotifyBase
@@ -158,14 +159,14 @@ class NotifyEight00com(NotifyBase):
         if not self.token:
             msg = "An 800.com Personal Access Token must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate the from (source) phone number
         result = is_phone_no(source)
         if not result:
             msg = "The 800.com from phone # ({}) is invalid.".format(source)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our source number as digits only
         self.source = result["full"]
@@ -224,6 +225,11 @@ class NotifyEight00com(NotifyBase):
             # Pop the next recipient
             target = targets.pop(0)
 
+            # Skip a target that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             # Build the E.164-style sender and recipient strings
             sender = "+{}".format(self.source)
             recipient = "+{}".format(target)
@@ -240,11 +246,15 @@ class NotifyEight00com(NotifyBase):
                     sender, recipient, body, attach, headers
                 ):
                     has_error = True
+                    continue
 
-            else:
+            elif not self._send_sms(sender, recipient, body, headers):
                 # Send as a plain SMS
-                if not self._send_sms(sender, recipient, body, headers):
-                    has_error = True
+                has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 

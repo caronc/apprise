@@ -47,6 +47,7 @@ from json import dumps, loads
 import requests
 
 from ..common import NotifyType, PersistentStoreMode
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_uuid, parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -350,7 +351,7 @@ class NotifyJira(NotifyBase):
         if not self.apikey:
             msg = "An invalid Jira API Key ({}) was specified.".format(apikey)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The Priority of the message
         self.priority = (
@@ -366,24 +367,22 @@ class NotifyJira(NotifyBase):
             )
         )
 
-        # Store our region
-        try:
-            self.region_name = (
-                self.jira_default_region
-                if region_name is None
-                else region_name.lower()
+        # Normalize string regions; reject all other values below.
+        self.region_name = (
+            self.jira_default_region
+            if region_name is None
+            else (
+                region_name.lower() if isinstance(region_name, str) else None
             )
+        )
 
-            if self.region_name not in JIRA_REGIONS:
-                # allow the outer except to handle this common response
-                raise
-        except:
+        if self.region_name not in JIRA_REGIONS:
             # Invalid region specified
             msg = "The Jira region specified ({}) is invalid.".format(
                 region_name
             )
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg)
 
         if action and isinstance(action, str):
             self.action = next(
@@ -394,7 +393,7 @@ class NotifyJira(NotifyBase):
                     action
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.action = self.template_args["action"]["default"]
 
@@ -410,7 +409,7 @@ class NotifyJira(NotifyBase):
                         "is invalid.".format(_k)
                     )
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
 
                 _v_lower = _v.lower()
                 v = next(
@@ -423,7 +422,7 @@ class NotifyJira(NotifyBase):
                         "specified ({}) is invalid.".format(k, _v)
                     )
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
 
                 # Update our mapping
                 self.mapping[k] = v
@@ -663,11 +662,19 @@ class NotifyJira(NotifyBase):
             if self.user:
                 payload["user"] = self.user
 
-            # reset our request IDs - we will re-populate them
-            request_ids = []
-
             length = len(self.targets) if self.targets else 1
+            indices = range(0, length, self.batch_size)
+
+            # Start a new ID list unless an earlier attempt completed a batch
+            if not any(self.is_delivered(index) for index in indices):
+                request_ids = []
+
             for index in range(0, length, self.batch_size):
+                # Skip a batch that already accepted this message so
+                # a retry does not deliver it twice.
+                if self.is_delivered(index):
+                    continue
+
                 if self.targets:
                     # If there were no targets identified, then we simply
                     # just iterate once without the responders set
@@ -684,6 +691,10 @@ class NotifyJira(NotifyBase):
 
                 else:
                     has_error = True
+                    continue
+
+                # Delivered; a retry can safely skip this batch.
+                self.mark_delivered(index)
 
             # Store our entries for a maximum of 60 days
             self.store.set(key, request_ids, expires=60 * 60 * 24 * 60)

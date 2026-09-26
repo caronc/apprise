@@ -1,0 +1,2192 @@
+# Thai translations for apprise.
+# Copyright (C) 2026 Chris Caron
+# This file is distributed under the same license as the apprise project.
+# Chris Caron <lead2gold@gmail.com>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: apprise 1.13.1\n"
+"Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
+"POT-Creation-Date: 2026-08-30 22:08-0400\n"
+"PO-Revision-Date: 2026-09-25 12:00-0400\n"
+"Last-Translator: Chris Caron <lead2gold@gmail.com>\n"
+"Language: th\n"
+"Language-Team: th <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: apprise/attachment/base.py:97 apprise/url.py:158
+msgid "Verify SSL"
+msgstr "ตรวจสอบ SSL"
+
+#: apprise/url.py:168
+msgid "Follow Redirects"
+msgstr "ติดตามการเปลี่ยนเส้นทาง"
+
+#: apprise/url.py:178
+msgid "Socket Read Timeout"
+msgstr "เวลารอการอ่านซ็อกเก็ต"
+
+#: apprise/url.py:192
+msgid "Socket Connect Timeout"
+msgstr "เวลารอการเชื่อมต่อซ็อกเก็ต"
+
+#: apprise/attachment/base.py:83
+msgid "Cache Age"
+msgstr "อายุของแคช"
+
+#: apprise/attachment/base.py:89
+msgid "Forced Mime Type"
+msgstr "ชนิด MIME ที่บังคับใช้"
+
+#: apprise/attachment/base.py:93
+msgid "Forced File Name"
+msgstr "ชื่อไฟล์ที่บังคับใช้"
+
+#: apprise/attachment/file.py:41 apprise/config/file.py:41
+msgid "Local File"
+msgstr "ไฟล์ในเครื่อง"
+
+#: apprise/attachment/http.py:50 apprise/config/http.py:55
+msgid "Web Based"
+msgstr "อยู่บนเว็บ"
+
+#: apprise/attachment/memory.py:46 apprise/config/memory.py:37
+msgid "Memory"
+msgstr "หน่วยความจำ"
+
+#: apprise/plugins/__init__.py:282
+msgid "Schema"
+msgstr "สคีมา"
+
+#: apprise/plugins/__init__.py:421
+msgid "No dependencies."
+msgstr "ไม่มีสิ่งที่ต้องติดตั้งเพิ่ม"
+
+#: apprise/plugins/__init__.py:424
+msgid "Packages are required to function."
+msgstr "ต้องติดตั้งแพ็กเกจเพื่อให้ใช้งานได้"
+
+#: apprise/plugins/__init__.py:428
+msgid "Packages are recommended to improve functionality."
+msgstr "แนะนำให้ติดตั้งแพ็กเกจเพื่อเพิ่มความสามารถ"
+
+#: apprise/plugins/africas_talking.py:133
+msgid "App User Name"
+msgstr "ชื่อผู้ใช้ของแอป"
+
+#: apprise/plugins/africas_talking.py:139 apprise/plugins/brevo.py:159
+#: apprise/plugins/burstsms.py:105 apprise/plugins/clicksend.py:99
+#: apprise/plugins/dot.py:136 apprise/plugins/evolution.py:120
+#: apprise/plugins/exotel.py:214 apprise/plugins/fcm/__init__.py:144
+#: apprise/plugins/flowtriq.py:113 apprise/plugins/httpsms.py:78
+#: apprise/plugins/jira.py:231 apprise/plugins/join.py:141
+#: apprise/plugins/kavenegar.py:116 apprise/plugins/kumulos.py:88
+#: apprise/plugins/mailersend.py:128 apprise/plugins/mailgun.py:140
+#: apprise/plugins/messagebird.py:79 apprise/plugins/notifyre.py:131
+#: apprise/plugins/octopush.py:137 apprise/plugins/one_signal.py:114
+#: apprise/plugins/opsgenie.py:229 apprise/plugins/pagerduty.py:132
+#: apprise/plugins/pinglet.py:138 apprise/plugins/pingram.py:182
+#: apprise/plugins/postmark.py:118 apprise/plugins/prowl.py:122
+#: apprise/plugins/resend.py:108 apprise/plugins/resend.py:146
+#: apprise/plugins/sendgrid.py:117 apprise/plugins/seven.py:76
+#: apprise/plugins/simplepush.py:102 apprise/plugins/smsmanager.py:107
+#: apprise/plugins/smtp2go.py:119 apprise/plugins/sparkpost.py:170
+#: apprise/plugins/splunk.py:166 apprise/plugins/techuluspush.py:98
+#: apprise/plugins/telnyx.py:88 apprise/plugins/trigv.py:143
+#: apprise/plugins/twilio.py:195 apprise/plugins/vapid/__init__.py:162
+#: apprise/plugins/vonage.py:81 apprise/plugins/wpush.py:158
+msgid "API Key"
+msgstr "คีย์ API"
+
+#: apprise/plugins/africas_talking.py:146 apprise/plugins/fortysixelks.py:107
+msgid "Target Phone"
+msgstr "โทรศัพท์ปลายทาง"
+
+#: apprise/plugins/africas_talking.py:151 apprise/plugins/aprs.py:188
+#: apprise/plugins/bark.py:179 apprise/plugins/brevo.py:176
+#: apprise/plugins/bulksms.py:138 apprise/plugins/bulkvs.py:111
+#: apprise/plugins/burstsms.py:132 apprise/plugins/clickatell.py:91
+#: apprise/plugins/clicksend.py:113 apprise/plugins/d7networks.py:111
+#: apprise/plugins/dapnet.py:139 apprise/plugins/dingtalk.py:116
+#: apprise/plugins/eight00com.py:129 apprise/plugins/email/base.py:168
+#: apprise/plugins/evolution.py:149 apprise/plugins/exotel.py:191
+#: apprise/plugins/fcm/__init__.py:169 apprise/plugins/flock.py:126
+#: apprise/plugins/fortysixelks.py:112 apprise/plugins/home_assistant.py:155
+#: apprise/plugins/httpsms.py:98 apprise/plugins/humhub.py:150
+#: apprise/plugins/irc/base.py:150 apprise/plugins/join.py:173
+#: apprise/plugins/kavenegar.py:136 apprise/plugins/kook.py:177
+#: apprise/plugins/line.py:94 apprise/plugins/mailersend.py:145
+#: apprise/plugins/mailgun.py:151 apprise/plugins/mastodon.py:203
+#: apprise/plugins/matrix/base.py:350 apprise/plugins/mattermost.py:195
+#: apprise/plugins/messagebird.py:100 apprise/plugins/mobilemessage.py:145
+#: apprise/plugins/mqtt.py:178 apprise/plugins/msg91.py:124
+#: apprise/plugins/nextcloud.py:148 apprise/plugins/nextcloudtalk.py:102
+#: apprise/plugins/notifiarr.py:104 apprise/plugins/notifyre.py:144
+#: apprise/plugins/ntfy.py:242 apprise/plugins/octopush.py:154
+#: apprise/plugins/office365.py:288 apprise/plugins/one_signal.py:142
+#: apprise/plugins/pingram.py:205 apprise/plugins/plivo.py:115
+#: apprise/plugins/postmark.py:134 apprise/plugins/pushbullet.py:106
+#: apprise/plugins/pushed.py:108 apprise/plugins/pushover.py:261
+#: apprise/plugins/pushsafer.py:377 apprise/plugins/pushy.py:98
+#: apprise/plugins/reddit.py:171 apprise/plugins/resend.py:125
+#: apprise/plugins/revolt.py:113 apprise/plugins/ringcentral.py:220
+#: apprise/plugins/rocketchat.py:168 apprise/plugins/sendgrid.py:134
+#: apprise/plugins/sendpulse.py:141 apprise/plugins/serwersms.py:162
+#: apprise/plugins/seven.py:89 apprise/plugins/sfr.py:114
+#: apprise/plugins/signal_api.py:139 apprise/plugins/sinch.py:141
+#: apprise/plugins/slack.py:287 apprise/plugins/smpp.py:129
+#: apprise/plugins/smsc.py:157 apprise/plugins/smseagle.py:173
+#: apprise/plugins/smsmanager.py:120 apprise/plugins/sns.py:171
+#: apprise/plugins/telegram.py:379 apprise/plugins/telnyx.py:108
+#: apprise/plugins/threema.py:116 apprise/plugins/trigv.py:156
+#: apprise/plugins/twilio.py:175 apprise/plugins/twist.py:124
+#: apprise/plugins/twitter.py:194 apprise/plugins/vapid/__init__.py:168
+#: apprise/plugins/voipms.py:109 apprise/plugins/vonage.py:109
+#: apprise/plugins/wechat.py:219 apprise/plugins/whatsapp.py:167
+#: apprise/plugins/wxpusher.py:140 apprise/plugins/xmpp/base.py:135
+#: apprise/plugins/zulip.py:154
+msgid "Targets"
+msgstr "ปลายทาง"
+
+#: apprise/plugins/africas_talking.py:167
+msgid "From"
+msgstr "ผู้ส่ง"
+
+#: apprise/plugins/africas_talking.py:173
+msgid "SMS Mode"
+msgstr "โหมด SMS"
+
+#: apprise/plugins/africas_talking.py:182 apprise/plugins/bulksms.py:171
+#: apprise/plugins/bulkvs.py:132 apprise/plugins/burstsms.py:167
+#: apprise/plugins/clicksend.py:131 apprise/plugins/d7networks.py:145
+#: apprise/plugins/dapnet.py:168 apprise/plugins/exotel.py:223
+#: apprise/plugins/home_assistant.py:172 apprise/plugins/jira.py:283
+#: apprise/plugins/mailgun.py:188 apprise/plugins/mastodon.py:248
+#: apprise/plugins/mobilemessage.py:182 apprise/plugins/octopush.py:174
+#: apprise/plugins/one_signal.py:189 apprise/plugins/opsgenie.py:308
+#: apprise/plugins/plivo.py:138 apprise/plugins/signal_api.py:161
+#: apprise/plugins/smseagle.py:212 apprise/plugins/smsmanager.py:153
+#: apprise/plugins/smtp2go.py:152 apprise/plugins/sparkpost.py:210
+#: apprise/plugins/twitter.py:219
+msgid "Batch Mode"
+msgstr "โหมดรวมชุด"
+
+#: apprise/plugins/apprise_api.py:126 apprise/plugins/bark.py:153
+#: apprise/plugins/custom_form.py:140 apprise/plugins/custom_json.py:122
+#: apprise/plugins/custom_xml.py:122 apprise/plugins/emby.py:86
+#: apprise/plugins/enigma2.py:111 apprise/plugins/evolution.py:126
+#: apprise/plugins/flowtriq.py:119 apprise/plugins/fluxer.py:181
+#: apprise/plugins/gotify.py:130 apprise/plugins/growl.py:140
+#: apprise/plugins/home_assistant.py:124 apprise/plugins/humhub.py:139
+#: apprise/plugins/irc/base.py:118 apprise/plugins/kodi.py:96
+#: apprise/plugins/lametric.py:461 apprise/plugins/mastodon.py:181
+#: apprise/plugins/matrix/base.py:305 apprise/plugins/mattermost.py:161
+#: apprise/plugins/misskey.py:118 apprise/plugins/mqtt.py:150
+#: apprise/plugins/nextcloud.py:116 apprise/plugins/nextcloudtalk.py:75
+#: apprise/plugins/notica.py:127 apprise/plugins/notifico.py:167
+#: apprise/plugins/ntfy.py:212 apprise/plugins/parseplatform.py:91
+#: apprise/plugins/pinglet.py:144 apprise/plugins/pushdeer.py:76
+#: apprise/plugins/pushjet.py:72 apprise/plugins/rocketchat.py:121
+#: apprise/plugins/rsyslog.py:181 apprise/plugins/signal_api.py:98
+#: apprise/plugins/smseagle.py:136 apprise/plugins/sogs.py:209
+#: apprise/plugins/synology.py:85 apprise/plugins/workflows.py:139
+#: apprise/plugins/xmpp/base.py:102
+msgid "Hostname"
+msgstr "ชื่อโฮสต์"
+
+#: apprise/plugins/apprise_api.py:131 apprise/plugins/bark.py:158
+#: apprise/plugins/custom_form.py:145 apprise/plugins/custom_json.py:127
+#: apprise/plugins/custom_xml.py:127 apprise/plugins/email/base.py:157
+#: apprise/plugins/emby.py:91 apprise/plugins/enigma2.py:116
+#: apprise/plugins/evolution.py:131 apprise/plugins/flowtriq.py:124
+#: apprise/plugins/fluxer.py:185 apprise/plugins/gotify.py:141
+#: apprise/plugins/growl.py:145 apprise/plugins/home_assistant.py:129
+#: apprise/plugins/humhub.py:144 apprise/plugins/irc/base.py:123
+#: apprise/plugins/kodi.py:101 apprise/plugins/lametric.py:465
+#: apprise/plugins/mastodon.py:191 apprise/plugins/matrix/base.py:310
+#: apprise/plugins/mattermost.py:177 apprise/plugins/misskey.py:128
+#: apprise/plugins/mqtt.py:155 apprise/plugins/nextcloud.py:121
+#: apprise/plugins/nextcloudtalk.py:80 apprise/plugins/notica.py:131
+#: apprise/plugins/notifico.py:171 apprise/plugins/ntfy.py:216
+#: apprise/plugins/parseplatform.py:96 apprise/plugins/pinglet.py:149
+#: apprise/plugins/pushdeer.py:80 apprise/plugins/pushjet.py:77
+#: apprise/plugins/rocketchat.py:126 apprise/plugins/rsyslog.py:186
+#: apprise/plugins/signal_api.py:103 apprise/plugins/smpp.py:109
+#: apprise/plugins/smseagle.py:141 apprise/plugins/sogs.py:214
+#: apprise/plugins/synology.py:90 apprise/plugins/trigv.py:164
+#: apprise/plugins/workflows.py:144 apprise/plugins/xmpp/base.py:107
+msgid "Port"
+msgstr "พอร์ต"
+
+#: apprise/plugins/apprise_api.py:137 apprise/plugins/bark.py:164
+#: apprise/plugins/bluesky.py:125 apprise/plugins/custom_form.py:151
+#: apprise/plugins/custom_json.py:133 apprise/plugins/custom_xml.py:133
+#: apprise/plugins/emby.py:98 apprise/plugins/enigma2.py:122
+#: apprise/plugins/freemobile.py:79 apprise/plugins/home_assistant.py:135
+#: apprise/plugins/jira.py:237 apprise/plugins/kodi.py:107
+#: apprise/plugins/lametric.py:472 apprise/plugins/matrix/base.py:316
+#: apprise/plugins/nextcloud.py:127 apprise/plugins/nextcloudtalk.py:86
+#: apprise/plugins/notica.py:137 apprise/plugins/notifico.py:177
+#: apprise/plugins/ntfy.py:222 apprise/plugins/opsgenie.py:235
+#: apprise/plugins/pushjet.py:89 apprise/plugins/rocketchat.py:132
+#: apprise/plugins/serwersms.py:132 apprise/plugins/signal_api.py:109
+#: apprise/plugins/smpp.py:93 apprise/plugins/synology.py:96
+msgid "Username"
+msgstr "ชื่อผู้ใช้"
+
+#: apprise/plugins/apprise_api.py:141 apprise/plugins/aprs.py:173
+#: apprise/plugins/bark.py:168 apprise/plugins/bluesky.py:130
+#: apprise/plugins/bulksms.py:118 apprise/plugins/bulkvs.py:91
+#: apprise/plugins/custom_form.py:155 apprise/plugins/custom_json.py:137
+#: apprise/plugins/custom_xml.py:137 apprise/plugins/dapnet.py:124
+#: apprise/plugins/email/base.py:147 apprise/plugins/emby.py:102
+#: apprise/plugins/enigma2.py:126 apprise/plugins/freemobile.py:84
+#: apprise/plugins/growl.py:151 apprise/plugins/home_assistant.py:139
+#: apprise/plugins/humhub.py:134 apprise/plugins/irc/base.py:133
+#: apprise/plugins/kodi.py:111 apprise/plugins/matrix/base.py:320
+#: apprise/plugins/mqtt.py:166 apprise/plugins/nextcloud.py:131
+#: apprise/plugins/nextcloudtalk.py:91 apprise/plugins/notica.py:141
+#: apprise/plugins/notifico.py:181 apprise/plugins/ntfy.py:226
+#: apprise/plugins/pushjet.py:93 apprise/plugins/reddit.py:146
+#: apprise/plugins/rocketchat.py:136 apprise/plugins/serwersms.py:137
+#: apprise/plugins/signal_api.py:113 apprise/plugins/simplepush.py:109
+#: apprise/plugins/smpp.py:98 apprise/plugins/smsc.py:144
+#: apprise/plugins/synology.py:100 apprise/plugins/twist.py:102
+#: apprise/plugins/voipms.py:89 apprise/plugins/xmpp/base.py:118
+msgid "Password"
+msgstr "รหัสผ่าน"
+
+#: apprise/plugins/apprise_api.py:146 apprise/plugins/chanify.py:75
+#: apprise/plugins/dingtalk.py:98 apprise/plugins/exotel.py:167
+#: apprise/plugins/feishu.py:81 apprise/plugins/gotify.py:124
+#: apprise/plugins/kook.py:171 apprise/plugins/lauther.py:116
+#: apprise/plugins/mattermost.py:167 apprise/plugins/notica.py:120
+#: apprise/plugins/notifiarr.py:92 apprise/plugins/ntfy.py:231
+#: apprise/plugins/pushme.py:63 apprise/plugins/ryver.py:100
+#: apprise/plugins/serverchan.py:71 apprise/plugins/slack.py:337
+#: apprise/plugins/synology.py:105 apprise/plugins/zulip.py:137
+msgid "Token"
+msgstr "โทเค็น"
+
+#: apprise/plugins/apprise_api.py:160 apprise/plugins/jira.py:302
+#: apprise/plugins/ntfy.py:290 apprise/plugins/opsgenie.py:295
+#: apprise/plugins/pagertree.py:134
+msgid "Tags"
+msgstr "แท็ก"
+
+#: apprise/plugins/apprise_api.py:164
+msgid "Query Method"
+msgstr "วิธีการสอบถาม"
+
+#: apprise/plugins/apprise_api.py:170
+msgid "Apprise API Version"
+msgstr "รุ่นของ Apprise API"
+
+#: apprise/plugins/apprise_api.py:184 apprise/plugins/custom_form.py:184
+#: apprise/plugins/custom_json.py:160 apprise/plugins/custom_xml.py:160
+#: apprise/plugins/enigma2.py:154 apprise/plugins/nextcloud.py:181
+#: apprise/plugins/nextcloudtalk.py:123 apprise/plugins/notica.py:157
+#: apprise/plugins/pagertree.py:143 apprise/plugins/synology.py:130
+msgid "HTTP Header"
+msgstr "ส่วนหัว HTTP"
+
+#: apprise/plugins/aprs.py:168 apprise/plugins/bulksms.py:113
+#: apprise/plugins/bulkvs.py:86 apprise/plugins/clicksend.py:94
+#: apprise/plugins/dapnet.py:119 apprise/plugins/email/base.py:143
+#: apprise/plugins/mailgun.py:130 apprise/plugins/mqtt.py:161
+#: apprise/plugins/reddit.py:141 apprise/plugins/sendpulse.py:112
+#: apprise/plugins/smtp2go.py:109 apprise/plugins/sparkpost.py:160
+msgid "User Name"
+msgstr "ชื่อผู้ใช้"
+
+#: apprise/plugins/aprs.py:179 apprise/plugins/aprs.py:200
+#: apprise/plugins/dapnet.py:130 apprise/plugins/dapnet.py:163
+msgid "Target Callsign"
+msgstr "รหัสเรียกขานปลายทาง"
+
+#: apprise/plugins/aprs.py:205
+msgid "Resend Delay"
+msgstr "เวลาหน่วงก่อนส่งซ้ำ"
+
+#: apprise/plugins/aprs.py:212
+msgid "Locale"
+msgstr "การตั้งค่าภูมิภาค"
+
+#: apprise/plugins/bark.py:173 apprise/plugins/fcm/__init__.py:158
+#: apprise/plugins/home_assistant.py:150 apprise/plugins/pushbullet.py:90
+#: apprise/plugins/pushover.py:249 apprise/plugins/pushsafer.py:367
+#: apprise/plugins/pushy.py:86
+msgid "Target Device"
+msgstr "อุปกรณ์ปลายทาง"
+
+#: apprise/plugins/bark.py:192 apprise/plugins/lametric.py:517
+#: apprise/plugins/lauther.py:139 apprise/plugins/macosx.py:166
+#: apprise/plugins/pushover.py:278 apprise/plugins/pushsafer.py:393
+#: apprise/plugins/pushy.py:111
+msgid "Sound"
+msgstr "เสียง"
+
+#: apprise/plugins/bark.py:197 apprise/plugins/pushward.py:153
+msgid "Level"
+msgstr "ระดับ"
+
+#: apprise/plugins/bark.py:202 apprise/plugins/pushward.py:183
+msgid "Volume"
+msgstr "ระดับเสียง"
+
+#: apprise/plugins/bark.py:208 apprise/plugins/ntfy.py:272
+#: apprise/plugins/pagerduty.py:173
+msgid "Click"
+msgstr "การคลิก"
+
+#: apprise/plugins/bark.py:212 apprise/plugins/pushy.py:115
+msgid "Badge"
+msgstr "ป้าย"
+
+#: apprise/plugins/bark.py:217
+msgid "Category"
+msgstr "หมวดหมู่"
+
+#: apprise/plugins/bark.py:221 apprise/plugins/join.py:159
+#: apprise/plugins/lauther.py:158 apprise/plugins/pagerduty.py:164
+#: apprise/plugins/youlmk.py:222
+msgid "Group"
+msgstr "กลุ่ม"
+
+#: apprise/plugins/bark.py:225 apprise/plugins/dbus.py:229
+#: apprise/plugins/discord.py:215 apprise/plugins/fcm/__init__.py:198
+#: apprise/plugins/flock.py:137 apprise/plugins/fluxer.py:281
+#: apprise/plugins/glib.py:189 apprise/plugins/gnome.py:154
+#: apprise/plugins/growl.py:175 apprise/plugins/join.py:184
+#: apprise/plugins/kodi.py:129 apprise/plugins/line.py:109
+#: apprise/plugins/macosx.py:157 apprise/plugins/matrix/base.py:361
+#: apprise/plugins/mattermost.py:218 apprise/plugins/notifiarr.py:126
+#: apprise/plugins/ntfy.py:258 apprise/plugins/one_signal.py:168
+#: apprise/plugins/pagerduty.py:192 apprise/plugins/ryver.py:125
+#: apprise/plugins/slack.py:305 apprise/plugins/telegram.py:390
+#: apprise/plugins/vapid/__init__.py:214 apprise/plugins/windows.py:106
+#: apprise/plugins/workflows.py:176 apprise/plugins/youlmk.py:229
+msgid "Include Image"
+msgstr "แนบรูปภาพ"
+
+#: apprise/plugins/bark.py:231 apprise/plugins/lauther.py:147
+#: apprise/plugins/mattermost.py:214 apprise/plugins/revolt.py:130
+msgid "Icon URL"
+msgstr "URL ของไอคอน"
+
+#: apprise/plugins/bark.py:235 apprise/plugins/streamlabs.py:120
+msgid "Call"
+msgstr "การโทร"
+
+#: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:310
+msgid "Encryption Key"
+msgstr "คีย์เข้ารหัส"
+
+#: apprise/plugins/base.py:344
+msgid "Overflow Mode"
+msgstr "โหมดเมื่อข้อความยาวเกิน"
+
+#: apprise/plugins/base.py:359
+msgid "Notify Format"
+msgstr "รูปแบบการแจ้งเตือน"
+
+#: apprise/plugins/base.py:375
+msgid "Interpret Emojis"
+msgstr "แปลงอิโมจิ"
+
+#: apprise/plugins/base.py:385
+msgid "Persistent Storage"
+msgstr "ที่จัดเก็บแบบถาวร"
+
+#: apprise/plugins/base.py:395
+msgid "Timezone"
+msgstr "เขตเวลา"
+
+#: apprise/plugins/base.py:404
+msgid "Service Retry"
+msgstr "จำนวนครั้งที่ลองใหม่ของบริการ"
+
+#: apprise/plugins/base.py:412
+msgid "Inter-Retry Wait"
+msgstr "เวลารอระหว่างการลองใหม่"
+
+#: apprise/plugins/base.py:420
+msgid "Optional Service"
+msgstr "บริการที่เลือกใช้ได้"
+
+#: apprise/plugins/blink1.py:152
+msgid "blink(1)"
+msgstr "blink(1)"
+
+#: apprise/plugins/blink1.py:179
+msgid "Serial Number"
+msgstr "หมายเลขเครื่อง"
+
+#: apprise/plugins/blink1.py:189
+msgid "Duration (ms)"
+msgstr "ระยะเวลา (มิลลิวินาที)"
+
+#: apprise/plugins/blink1.py:196
+msgid "Fade Time (ms)"
+msgstr "เวลาหรี่แสง (มิลลิวินาที)"
+
+#: apprise/plugins/blink1.py:203
+msgid "LED Number"
+msgstr "หมายเลขหลอด LED"
+
+#: apprise/plugins/brevo.py:166 apprise/plugins/mailersend.py:135
+#: apprise/plugins/postmark.py:124 apprise/plugins/resend.py:115
+#: apprise/plugins/sendgrid.py:124
+msgid "Source Email"
+msgstr "อีเมลต้นทาง"
+
+#: apprise/plugins/brevo.py:171 apprise/plugins/email/base.py:163
+#: apprise/plugins/mailersend.py:140 apprise/plugins/mailgun.py:146
+#: apprise/plugins/office365.py:283 apprise/plugins/one_signal.py:125
+#: apprise/plugins/pingram.py:189 apprise/plugins/postmark.py:129
+#: apprise/plugins/pushbullet.py:101 apprise/plugins/pushsafer.py:372
+#: apprise/plugins/resend.py:120 apprise/plugins/sendgrid.py:129
+#: apprise/plugins/sendpulse.py:136 apprise/plugins/slack.py:270
+#: apprise/plugins/threema.py:106
+msgid "Target Email"
+msgstr "อีเมลปลายทาง"
+
+#: apprise/plugins/brevo.py:187 apprise/plugins/postmark.py:150
+#: apprise/plugins/ses.py:206
+msgid "Reply To Email"
+msgstr "อีเมลสำหรับตอบกลับ"
+
+#: apprise/plugins/brevo.py:195 apprise/plugins/email/base.py:244
+#: apprise/plugins/mailersend.py:159 apprise/plugins/mailgun.py:180
+#: apprise/plugins/office365.py:308 apprise/plugins/pingram.py:252
+#: apprise/plugins/postmark.py:158 apprise/plugins/resend.py:159
+#: apprise/plugins/sendgrid.py:154 apprise/plugins/sendpulse.py:171
+#: apprise/plugins/ses.py:233 apprise/plugins/smtp2go.py:144
+#: apprise/plugins/sparkpost.py:202
+msgid "Carbon Copy"
+msgstr "สำเนา"
+
+#: apprise/plugins/brevo.py:199 apprise/plugins/email/base.py:248
+#: apprise/plugins/mailersend.py:163 apprise/plugins/mailgun.py:184
+#: apprise/plugins/office365.py:312 apprise/plugins/pingram.py:256
+#: apprise/plugins/postmark.py:162 apprise/plugins/resend.py:163
+#: apprise/plugins/sendgrid.py:158 apprise/plugins/sendpulse.py:175
+#: apprise/plugins/ses.py:237 apprise/plugins/smtp2go.py:148
+#: apprise/plugins/sparkpost.py:206
+msgid "Blind Carbon Copy"
+msgstr "สำเนาลับ"
+
+#: apprise/plugins/bulksms.py:124 apprise/plugins/bulkvs.py:104
+#: apprise/plugins/burstsms.py:125 apprise/plugins/clickatell.py:84
+#: apprise/plugins/clicksend.py:106 apprise/plugins/d7networks.py:104
+#: apprise/plugins/dingtalk.py:111 apprise/plugins/eight00com.py:122
+#: apprise/plugins/evolution.py:142 apprise/plugins/exotel.py:184
+#: apprise/plugins/httpsms.py:91 apprise/plugins/kavenegar.py:129
+#: apprise/plugins/messagebird.py:93 apprise/plugins/mobilemessage.py:138
+#: apprise/plugins/msg91.py:117 apprise/plugins/notifyre.py:137
+#: apprise/plugins/octopush.py:147 apprise/plugins/plivo.py:108
+#: apprise/plugins/ringcentral.py:214 apprise/plugins/serwersms.py:149
+#: apprise/plugins/seven.py:82 apprise/plugins/signal_api.py:125
+#: apprise/plugins/sinch.py:128 apprise/plugins/smpp.py:122
+#: apprise/plugins/smsc.py:150 apprise/plugins/smseagle.py:152
+#: apprise/plugins/smsmanager.py:113 apprise/plugins/sns.py:158
+#: apprise/plugins/telnyx.py:101 apprise/plugins/threema.py:99
+#: apprise/plugins/twilio.py:162 apprise/plugins/voipms.py:102
+#: apprise/plugins/vonage.py:102 apprise/plugins/whatsapp.py:148
+msgid "Target Phone No"
+msgstr "หมายเลขโทรศัพท์ปลายทาง"
+
+#: apprise/plugins/bulksms.py:131 apprise/plugins/nextcloud.py:142
+#: apprise/plugins/pushover.py:255
+msgid "Target Group"
+msgstr "กลุ่มปลายทาง"
+
+#: apprise/plugins/bulksms.py:150 apprise/plugins/bulkvs.py:97
+#: apprise/plugins/bulkvs.py:123 apprise/plugins/clickatell.py:79
+#: apprise/plugins/eight00com.py:115 apprise/plugins/eight00com.py:143
+#: apprise/plugins/fortysixelks.py:101 apprise/plugins/httpsms.py:84
+#: apprise/plugins/httpsms.py:116 apprise/plugins/ringcentral.py:208
+#: apprise/plugins/signal_api.py:118 apprise/plugins/sinch.py:121
+#: apprise/plugins/smpp.py:115 apprise/plugins/smsmanager.py:135
+#: apprise/plugins/telnyx.py:94 apprise/plugins/telnyx.py:126
+#: apprise/plugins/twilio.py:155 apprise/plugins/voipms.py:95
+#: apprise/plugins/vonage.py:95
+msgid "From Phone No"
+msgstr "หมายเลขโทรศัพท์ผู้ส่ง"
+
+#: apprise/plugins/bulksms.py:156
+msgid "Route Group"
+msgstr "กลุ่มการกำหนดเส้นทาง"
+
+#: apprise/plugins/bulksms.py:163 apprise/plugins/d7networks.py:137
+#: apprise/plugins/exotel.py:229 apprise/plugins/mobilemessage.py:164
+msgid "Unicode Characters"
+msgstr "อักขระ Unicode"
+
+#: apprise/plugins/burstsms.py:112 apprise/plugins/threema.py:93
+#: apprise/plugins/vonage.py:88
+msgid "API Secret"
+msgstr "รหัสลับ API"
+
+#: apprise/plugins/burstsms.py:119 apprise/plugins/mobilemessage.py:131
+#: apprise/plugins/smsc.py:172
+msgid "Sender ID"
+msgstr "รหัสผู้ส่ง"
+
+#: apprise/plugins/burstsms.py:153
+msgid "Country"
+msgstr "ประเทศ"
+
+#: apprise/plugins/burstsms.py:162
+msgid "validity"
+msgstr "อายุการใช้งาน"
+
+#: apprise/plugins/chanify.py:48
+msgid "Chanify"
+msgstr "Chanify"
+
+#: apprise/plugins/chime.py:131 apprise/plugins/discord.py:149
+#: apprise/plugins/fluxer.py:202 apprise/plugins/ifttt.py:104
+#: apprise/plugins/zoom.py:140
+msgid "Webhook ID"
+msgstr "รหัส webhook"
+
+#: apprise/plugins/chime.py:137 apprise/plugins/discord.py:155
+#: apprise/plugins/fluxer.py:209 apprise/plugins/google_chat.py:132
+#: apprise/plugins/stackfield.py:93 apprise/plugins/webexteams.py:172
+msgid "Webhook Token"
+msgstr "โทเค็น webhook"
+
+#: apprise/plugins/clickatell.py:46
+msgid "Clickatell"
+msgstr "Clickatell"
+
+#: apprise/plugins/clickatell.py:73 apprise/plugins/eight00com.py:109
+#: apprise/plugins/rocketchat.py:141
+msgid "API Token"
+msgstr "โทเค็น API"
+
+#: apprise/plugins/custom_form.py:167 apprise/plugins/custom_json.py:149
+#: apprise/plugins/custom_xml.py:149
+msgid "Fetch Method"
+msgstr "วิธีการดึงข้อมูล"
+
+#: apprise/plugins/custom_form.py:173
+msgid "Attach File As"
+msgstr "แนบไฟล์ในชื่อ"
+
+#: apprise/plugins/custom_form.py:188 apprise/plugins/custom_json.py:164
+#: apprise/plugins/custom_xml.py:164 apprise/plugins/pagertree.py:147
+msgid "Payload Extras"
+msgstr "ข้อมูลเพิ่มเติมที่ส่งไป"
+
+#: apprise/plugins/custom_form.py:192 apprise/plugins/custom_json.py:168
+#: apprise/plugins/custom_xml.py:168
+msgid "GET Params"
+msgstr "พารามิเตอร์ GET"
+
+#: apprise/plugins/d7networks.py:98
+msgid "API Access Token"
+msgstr "โทเค็นเข้าถึง API"
+
+#: apprise/plugins/d7networks.py:128 apprise/plugins/seven.py:106
+msgid "Originating Address"
+msgstr "ที่อยู่ต้นทาง"
+
+#: apprise/plugins/dapnet.py:151 apprise/plugins/exotel.py:241
+#: apprise/plugins/gotify.py:154 apprise/plugins/growl.py:163
+#: apprise/plugins/jira.py:288 apprise/plugins/join.py:190
+#: apprise/plugins/lametric.py:495 apprise/plugins/lauther.py:133
+#: apprise/plugins/ntfy.py:284 apprise/plugins/opsgenie.py:281
+#: apprise/plugins/pinglet.py:178 apprise/plugins/prowl.py:142
+#: apprise/plugins/pushover.py:272 apprise/plugins/pushsafer.py:388
+#: apprise/plugins/smseagle.py:188 apprise/plugins/youlmk.py:177
+msgid "Priority"
+msgstr "ความสำคัญ"
+
+#: apprise/plugins/dapnet.py:157
+msgid "Transmitter Groups"
+msgstr "กลุ่มเครื่องส่ง"
+
+#: apprise/plugins/dbus.py:157
+msgid "libdbus-1.so.x must be installed."
+msgstr "ต้องติดตั้ง libdbus-1.so.x"
+
+#: apprise/plugins/dbus.py:161
+msgid "DBus Notification"
+msgstr "การแจ้งเตือน DBus"
+
+#: apprise/plugins/dbus.py:205 apprise/plugins/glib.py:166
+#: apprise/plugins/gnome.py:142 apprise/plugins/pagertree.py:129
+#: apprise/plugins/trigv.py:190
+msgid "Urgency"
+msgstr "ความเร่งด่วน"
+
+#: apprise/plugins/dbus.py:217 apprise/plugins/glib.py:177
+msgid "X-Axis"
+msgstr "แกน X"
+
+#: apprise/plugins/dbus.py:223 apprise/plugins/glib.py:183
+msgid "Y-Axis"
+msgstr "แกน Y"
+
+#: apprise/plugins/dingtalk.py:105 apprise/plugins/signl4.py:77
+msgid "Secret"
+msgstr "รหัสลับ"
+
+#: apprise/plugins/discord.py:144 apprise/plugins/flock.py:107
+#: apprise/plugins/fluxer.py:197 apprise/plugins/ryver.py:107
+#: apprise/plugins/slack.py:222 apprise/plugins/viber.py:100
+#: apprise/plugins/zulip.py:125
+msgid "Bot Name"
+msgstr "ชื่อบอท"
+
+#: apprise/plugins/discord.py:168 apprise/plugins/fluxer.py:232
+msgid "Text To Speech"
+msgstr "การอ่านข้อความเป็นเสียง"
+
+#: apprise/plugins/discord.py:173 apprise/plugins/fluxer.py:237
+msgid "Avatar Image"
+msgstr "รูปประจำตัว"
+
+#: apprise/plugins/discord.py:178 apprise/plugins/fluxer.py:242
+#: apprise/plugins/ntfy.py:264
+msgid "Avatar URL"
+msgstr "URL ของรูปประจำตัว"
+
+#: apprise/plugins/discord.py:182 apprise/plugins/fluxer.py:246
+#: apprise/plugins/pushover.py:284 apprise/plugins/trigv.py:181
+msgid "URL"
+msgstr "URL"
+
+#: apprise/plugins/discord.py:191 apprise/plugins/fluxer.py:253
+msgid "Thread ID"
+msgstr "รหัสกระทู้"
+
+#: apprise/plugins/discord.py:195 apprise/plugins/fluxer.py:261
+msgid "Display Footer"
+msgstr "แสดงส่วนท้าย"
+
+#: apprise/plugins/discord.py:200 apprise/plugins/fluxer.py:266
+msgid "Footer Logo"
+msgstr "โลโก้ในส่วนท้าย"
+
+#: apprise/plugins/discord.py:205 apprise/plugins/fluxer.py:271
+msgid "Use Fields"
+msgstr "ใช้ฟิลด์"
+
+#: apprise/plugins/discord.py:210 apprise/plugins/fluxer.py:276
+msgid "Discord Flags"
+msgstr "แฟล็กของ Discord"
+
+#: apprise/plugins/discord.py:224 apprise/plugins/fluxer.py:287
+msgid "Ping Users/Roles"
+msgstr "กล่าวถึงผู้ใช้หรือบทบาท"
+
+#: apprise/plugins/discord.py:228 apprise/plugins/slack.py:344
+#: apprise/plugins/workflows.py:201
+msgid "Template Path"
+msgstr "พาธของแม่แบบ"
+
+#: apprise/plugins/discord.py:236
+msgid "Batch Attachments"
+msgstr "รวมไฟล์แนบเข้าด้วยกัน"
+
+#: apprise/plugins/discord.py:246 apprise/plugins/mailgun.py:202
+#: apprise/plugins/pingram.py:265 apprise/plugins/slack.py:354
+#: apprise/plugins/sparkpost.py:224 apprise/plugins/telegram.py:444
+#: apprise/plugins/workflows.py:222
+msgid "Template Tokens"
+msgstr "โทเค็นของแม่แบบ"
+
+#: apprise/plugins/dot.py:142
+msgid "Device Serial Number"
+msgstr "หมายเลขเครื่องของอุปกรณ์"
+
+#: apprise/plugins/dot.py:155
+msgid "API Mode"
+msgstr "โหมด API"
+
+#: apprise/plugins/dot.py:161
+msgid "Refresh Now"
+msgstr "รีเฟรชทันที"
+
+#: apprise/plugins/dot.py:167
+msgid "Text Signature"
+msgstr "ลายเซ็นข้อความ"
+
+#: apprise/plugins/dot.py:171
+msgid "Icon Base64 (Text API)"
+msgstr "ไอคอนแบบ Base64 (API ข้อความ)"
+
+#: apprise/plugins/dot.py:175
+msgid "Image Base64 (Image API)"
+msgstr "รูปภาพแบบ Base64 (API รูปภาพ)"
+
+#: apprise/plugins/dot.py:180 apprise/plugins/youlmk.py:210
+msgid "Link"
+msgstr "ลิงก์"
+
+#: apprise/plugins/dot.py:184
+msgid "Border"
+msgstr "เส้นขอบ"
+
+#: apprise/plugins/dot.py:191
+msgid "Dither Type"
+msgstr "ชนิดการเกลี่ยสี"
+
+#: apprise/plugins/dot.py:197
+msgid "Dither Kernel"
+msgstr "เคอร์เนลการเกลี่ยสี"
+
+#: apprise/plugins/dot.py:203
+msgid "Task Key"
+msgstr "คีย์ของงาน"
+
+#: apprise/plugins/emby.py:113
+msgid "Modal"
+msgstr "หน้าต่างซ้อน"
+
+#: apprise/plugins/enigma2.py:131 apprise/plugins/fluxer.py:191
+#: apprise/plugins/gotify.py:135 apprise/plugins/mattermost.py:173
+#: apprise/plugins/notica.py:146 apprise/plugins/pinglet.py:155
+msgid "Path"
+msgstr "พาธ"
+
+#: apprise/plugins/enigma2.py:141
+msgid "Server Timeout"
+msgstr "เวลารอของเซิร์ฟเวอร์"
+
+#: apprise/plugins/evolution.py:137
+msgid "Instance Name"
+msgstr "ชื่ออินสแตนซ์"
+
+#: apprise/plugins/exotel.py:161 apprise/plugins/sinch.py:107
+#: apprise/plugins/twilio.py:141
+msgid "Account SID"
+msgstr "SID ของบัญชี"
+
+#: apprise/plugins/exotel.py:173
+msgid "From Phone No / Sender ID"
+msgstr "หมายเลขโทรศัพท์ผู้ส่งหรือรหัสผู้ส่ง"
+
+#: apprise/plugins/exotel.py:234 apprise/plugins/jira.py:276
+#: apprise/plugins/mailgun.py:170 apprise/plugins/opsgenie.py:274
+#: apprise/plugins/pagerduty.py:177 apprise/plugins/pingram.py:227
+#: apprise/plugins/sparkpost.py:192
+msgid "Region Name"
+msgstr "ชื่อภูมิภาค"
+
+#: apprise/plugins/feishu.py:50
+msgid "Feishu"
+msgstr "Feishu"
+
+#: apprise/plugins/flock.py:100 apprise/plugins/twitter.py:176
+msgid "Access Key"
+msgstr "คีย์เข้าถึง"
+
+#: apprise/plugins/flock.py:112
+msgid "To User ID"
+msgstr "ไปยังรหัสผู้ใช้"
+
+#: apprise/plugins/flock.py:119
+msgid "To Channel ID"
+msgstr "ไปยังรหัสช่อง"
+
+#: apprise/plugins/flowtriq.py:130 apprise/plugins/matrix/base.py:383
+msgid "Webhook Path"
+msgstr "พาธของ webhook"
+
+#: apprise/plugins/fcm/__init__.py:183 apprise/plugins/fcm/__init__.py:189
+#: apprise/plugins/fluxer.py:223 apprise/plugins/kook.py:197
+#: apprise/plugins/lametric.py:511 apprise/plugins/mattermost.py:230
+#: apprise/plugins/notifyre.py:158 apprise/plugins/ntfy.py:298
+#: apprise/plugins/office365.py:320 apprise/plugins/pingram.py:233
+#: apprise/plugins/sns.py:203 apprise/plugins/vapid/__init__.py:179
+#: apprise/plugins/webexteams.py:198 apprise/plugins/zoom.py:159
+msgid "Mode"
+msgstr "โหมด"
+
+#: apprise/plugins/fluxer.py:257
+msgid "Thread Name"
+msgstr "ชื่อกระทู้"
+
+#: apprise/plugins/fortysixelks.py:59
+msgid "46elks"
+msgstr "46elks"
+
+#: apprise/plugins/fortysixelks.py:90 apprise/plugins/mobilemessage.py:120
+msgid "API Username"
+msgstr "ชื่อผู้ใช้ API"
+
+#: apprise/plugins/fortysixelks.py:95 apprise/plugins/mobilemessage.py:125
+msgid "API Password"
+msgstr "รหัสผ่าน API"
+
+#: apprise/plugins/freemobile.py:49
+msgid "Free-Mobile"
+msgstr "Free-Mobile"
+
+#: apprise/plugins/glib.py:124
+msgid "libdbus-1.so.x or libdbus-2.so.x must be installed."
+msgstr "ต้องติดตั้ง libdbus-1.so.x หรือ libdbus-2.so.x"
+
+#: apprise/plugins/glib.py:128
+msgid "GLib Notification"
+msgstr "การแจ้งเตือน GLib"
+
+#: apprise/plugins/gnome.py:100
+msgid "A local Gnome environment is required."
+msgstr "ต้องมีสภาพแวดล้อม Gnome ในเครื่อง"
+
+#: apprise/plugins/gnome.py:104
+msgid "Gnome Notification"
+msgstr "การแจ้งเตือน Gnome"
+
+#: apprise/plugins/google_chat.py:120
+msgid "Workspace"
+msgstr "พื้นที่ทำงาน"
+
+#: apprise/plugins/google_chat.py:126
+msgid "Webhook Key"
+msgstr "คีย์ของ webhook"
+
+#: apprise/plugins/google_chat.py:138
+msgid "Thread Key"
+msgstr "คีย์ของกระทู้"
+
+#: apprise/plugins/groupme.py:124
+msgid "Bot ID"
+msgstr "รหัสบอท"
+
+#: apprise/plugins/groupme.py:131 apprise/plugins/line.py:83
+#: apprise/plugins/mastodon.py:186 apprise/plugins/matrix/base.py:325
+#: apprise/plugins/misskey.py:123 apprise/plugins/pushbullet.py:84
+#: apprise/plugins/pushover.py:243 apprise/plugins/smseagle.py:147
+#: apprise/plugins/spugpush.py:69 apprise/plugins/streamlabs.py:106
+#: apprise/plugins/whatsapp.py:122
+msgid "Access Token"
+msgstr "โทเค็นเข้าถึง"
+
+#: apprise/plugins/growl.py:169 apprise/plugins/mqtt.py:196
+#: apprise/plugins/nextcloud.py:163
+msgid "Version"
+msgstr "รุ่น"
+
+#: apprise/plugins/growl.py:181
+msgid "Sticky"
+msgstr "ปักหมุด"
+
+#: apprise/plugins/home_assistant.py:144
+msgid "Long-Lived Access Token"
+msgstr "โทเค็นเข้าถึงอายุยาว"
+
+#: apprise/plugins/home_assistant.py:167
+msgid "Notification ID"
+msgstr "รหัสการแจ้งเตือน"
+
+#: apprise/plugins/home_assistant.py:184
+msgid "Path Prefix"
+msgstr "คำนำหน้าพาธ"
+
+#: apprise/plugins/humhub.py:128
+msgid "Token or Username"
+msgstr "โทเค็นหรือชื่อผู้ใช้"
+
+#: apprise/plugins/ifttt.py:110
+msgid "Events"
+msgstr "เหตุการณ์"
+
+#: apprise/plugins/ifttt.py:130
+msgid "Add Tokens"
+msgstr "เพิ่มโทเค็น"
+
+#: apprise/plugins/ifttt.py:134
+msgid "Remove Tokens"
+msgstr "ลบโทเค็น"
+
+#: apprise/plugins/jira.py:241 apprise/plugins/opsgenie.py:239
+msgid "Target Escalation"
+msgstr "ระดับการส่งต่อปลายทาง"
+
+#: apprise/plugins/jira.py:247 apprise/plugins/opsgenie.py:245
+msgid "Target Schedule"
+msgstr "ตารางเวรปลายทาง"
+
+#: apprise/plugins/irc/base.py:138 apprise/plugins/jira.py:253
+#: apprise/plugins/line.py:89 apprise/plugins/mastodon.py:197
+#: apprise/plugins/matrix/base.py:332 apprise/plugins/nextcloud.py:136
+#: apprise/plugins/one_signal.py:130 apprise/plugins/opsgenie.py:251
+#: apprise/plugins/pushed.py:96 apprise/plugins/rocketchat.py:157
+#: apprise/plugins/slack.py:275 apprise/plugins/twitter.py:188
+#: apprise/plugins/wechat.py:199 apprise/plugins/xmpp/base.py:124
+#: apprise/plugins/zulip.py:144
+msgid "Target User"
+msgstr "ผู้ใช้ปลายทาง"
+
+#: apprise/plugins/jira.py:259 apprise/plugins/opsgenie.py:257
+msgid "Target Team"
+msgstr "ทีมปลายทาง"
+
+#: apprise/plugins/jira.py:265 apprise/plugins/opsgenie.py:263
+msgid "Targets "
+msgstr "ปลายทาง "
+
+#: apprise/plugins/jira.py:294 apprise/plugins/opsgenie.py:287
+msgid "Entity"
+msgstr "เอนทิตี"
+
+#: apprise/plugins/jira.py:298 apprise/plugins/opsgenie.py:291
+msgid "Alias"
+msgstr "ชื่อแทน"
+
+#: apprise/plugins/jira.py:309 apprise/plugins/opsgenie.py:299
+#: apprise/plugins/pagertree.py:119 apprise/plugins/splunk.py:203
+msgid "Action"
+msgstr "การกระทำ"
+
+#: apprise/plugins/jira.py:320 apprise/plugins/opsgenie.py:318
+msgid "Details"
+msgstr "รายละเอียด"
+
+#: apprise/plugins/jira.py:324 apprise/plugins/opsgenie.py:322
+#: apprise/plugins/splunk.py:214
+msgid "Action Mapping"
+msgstr "การจับคู่การกระทำ"
+
+#: apprise/plugins/join.py:148
+msgid "Device ID"
+msgstr "รหัสอุปกรณ์"
+
+#: apprise/plugins/join.py:154
+msgid "Device Name"
+msgstr "ชื่ออุปกรณ์"
+
+#: apprise/plugins/kavenegar.py:123 apprise/plugins/messagebird.py:86
+#: apprise/plugins/notifyre.py:164 apprise/plugins/plivo.py:101
+msgid "Source Phone No"
+msgstr "หมายเลขโทรศัพท์ต้นทาง"
+
+#: apprise/plugins/kodi.py:123 apprise/plugins/streamlabs.py:142
+#: apprise/plugins/windows.py:100
+msgid "Duration"
+msgstr "ระยะเวลา"
+
+#: apprise/plugins/kumulos.py:100
+msgid "Server Key"
+msgstr "คีย์ของเซิร์ฟเวอร์"
+
+#: apprise/plugins/lametric.py:437
+msgid "Device API Key"
+msgstr "คีย์ API ของอุปกรณ์"
+
+#: apprise/plugins/lametric.py:443 apprise/plugins/one_signal.py:103
+#: apprise/plugins/parseplatform.py:102
+msgid "App ID"
+msgstr "รหัสแอป"
+
+#: apprise/plugins/lametric.py:449
+msgid "App Version"
+msgstr "รุ่นของแอป"
+
+#: apprise/plugins/lametric.py:456
+msgid "App Access Token"
+msgstr "โทเค็นเข้าถึงของแอป"
+
+#: apprise/plugins/lametric.py:501
+msgid "Custom Icon"
+msgstr "ไอคอนที่กำหนดเอง"
+
+#: apprise/plugins/lametric.py:505
+msgid "Icon Type"
+msgstr "ชนิดของไอคอน"
+
+#: apprise/plugins/lametric.py:522
+msgid "Cycles"
+msgstr "จำนวนรอบ"
+
+#: apprise/plugins/lark.py:48
+msgid "Lark (Feishu)"
+msgstr "Lark (Feishu)"
+
+#: apprise/plugins/lark.py:68 apprise/plugins/revolt.py:99
+#: apprise/plugins/telegram.py:364
+msgid "Bot Token"
+msgstr "โทเค็นของบอท"
+
+#: apprise/plugins/lauther.py:143 apprise/plugins/wpush.py:211
+msgid "Click URL"
+msgstr "URL เมื่อคลิก"
+
+#: apprise/plugins/lauther.py:151
+msgid "Color"
+msgstr "สี"
+
+#: apprise/plugins/lauther.py:166
+msgid "Route"
+msgstr "เส้นทาง"
+
+#: apprise/plugins/macosx.py:109
+msgid ""
+"Only works with Mac OS X 10.8 and higher. Additionally  requires that /usr/"
+"local/bin/terminal-notifier is locally accessible."
+msgstr ""
+"ใช้งานได้กับ Mac OS X 10.8 ขึ้นไปเท่านั้น และต้องเข้าถึง /usr/local/bin/terminal-"
+"notifier ในเครื่องได้"
+
+#: apprise/plugins/macosx.py:116
+msgid "MacOSX Notification"
+msgstr "การแจ้งเตือน MacOSX"
+
+#: apprise/plugins/macosx.py:170
+msgid "Open/Click URL"
+msgstr "URL ที่จะเปิดหรือคลิก"
+
+#: apprise/plugins/macosx.py:175
+msgid "Terminal-Notifier Version"
+msgstr "รุ่นของ Terminal-Notifier"
+
+#: apprise/plugins/macosx.py:181 apprise/plugins/octopush.py:143
+msgid "Sender"
+msgstr "ผู้ส่ง"
+
+#: apprise/plugins/email/base.py:200 apprise/plugins/mailersend.py:167
+#: apprise/plugins/office365.py:316 apprise/plugins/pingram.py:238
+#: apprise/plugins/resend.py:151
+msgid "Reply To"
+msgstr "ตอบกลับไปที่"
+
+#: apprise/plugins/email/base.py:152 apprise/plugins/mailgun.py:135
+#: apprise/plugins/sendpulse.py:117 apprise/plugins/smtp2go.py:114
+#: apprise/plugins/sparkpost.py:165
+msgid "Domain"
+msgstr "โดเมน"
+
+#: apprise/plugins/email/base.py:183 apprise/plugins/mailgun.py:162
+#: apprise/plugins/postmark.py:145 apprise/plugins/resend.py:141
+#: apprise/plugins/ses.py:211 apprise/plugins/smtp2go.py:136
+#: apprise/plugins/sparkpost.py:187
+msgid "From Name"
+msgstr "ชื่อผู้ส่ง"
+
+#: apprise/plugins/email/base.py:257 apprise/plugins/mailgun.py:198
+#: apprise/plugins/smtp2go.py:162 apprise/plugins/sparkpost.py:220
+msgid "Email Header"
+msgstr "ส่วนหัวอีเมล"
+
+#: apprise/plugins/mastodon.py:217 apprise/plugins/misskey.py:144
+msgid "Visibility"
+msgstr "การมองเห็น"
+
+#: apprise/plugins/mastodon.py:223
+msgid "Spoiler Text"
+msgstr "ข้อความที่ซ่อนไว้"
+
+#: apprise/plugins/mastodon.py:227
+msgid "Idempotency-Key"
+msgstr "Idempotency-Key"
+
+#: apprise/plugins/mastodon.py:231
+msgid "Language Code"
+msgstr "รหัสภาษา"
+
+#: apprise/plugins/mastodon.py:235 apprise/plugins/twitter.py:211
+msgid "Cache Results"
+msgstr "เก็บผลลัพธ์ไว้ในแคช"
+
+#: apprise/plugins/mastodon.py:240
+msgid "Sensitive Attachments"
+msgstr "ไฟล์แนบที่เป็นความลับ"
+
+#: apprise/plugins/mastodon.py:256
+msgid "Ping Users/Tags"
+msgstr "กล่าวถึงผู้ใช้หรือแท็ก"
+
+#: apprise/plugins/irc/base.py:129 apprise/plugins/mattermost.py:157
+#: apprise/plugins/xmpp/base.py:113
+msgid "User"
+msgstr "ผู้ใช้"
+
+#: apprise/plugins/irc/base.py:144 apprise/plugins/mattermost.py:183
+#: apprise/plugins/notifiarr.py:98 apprise/plugins/pushbullet.py:95
+#: apprise/plugins/pushed.py:102 apprise/plugins/rocketchat.py:151
+#: apprise/plugins/slack.py:281 apprise/plugins/trigv.py:151
+#: apprise/plugins/twist.py:113 apprise/plugins/xmpp/base.py:129
+msgid "Target Channel"
+msgstr "ช่องปลายทาง"
+
+#: apprise/plugins/mattermost.py:189 apprise/plugins/twist.py:119
+msgid "Target Channel ID"
+msgstr "รหัสช่องปลายทาง"
+
+#: apprise/plugins/mobilemessage.py:170
+msgid "Max Message Parts"
+msgstr "จำนวนส่วนของข้อความสูงสุด"
+
+#: apprise/plugins/mobilemessage.py:177
+msgid "Custom Reference"
+msgstr "รหัสอ้างอิงที่กำหนดเอง"
+
+#: apprise/plugins/mqtt.py:172
+msgid "Target Queue"
+msgstr "คิวปลายทาง"
+
+#: apprise/plugins/mqtt.py:189
+msgid "QOS"
+msgstr "QOS"
+
+#: apprise/plugins/mqtt.py:202 apprise/plugins/office365.py:270
+#: apprise/plugins/ringcentral.py:193 apprise/plugins/sendpulse.py:122
+msgid "Client ID"
+msgstr "รหัสไคลเอ็นต์"
+
+#: apprise/plugins/mqtt.py:206
+msgid "Use Session"
+msgstr "ใช้เซสชัน"
+
+#: apprise/plugins/mqtt.py:211
+msgid "Retain Messages"
+msgstr "เก็บข้อความไว้"
+
+#: apprise/plugins/msg91.py:103 apprise/plugins/sendpulse.py:158
+msgid "Template ID"
+msgstr "รหัสแม่แบบ"
+
+#: apprise/plugins/msg91.py:110
+msgid "Authentication Key"
+msgstr "คีย์ยืนยันตัวตน"
+
+#: apprise/plugins/msg91.py:139
+msgid "Short URL"
+msgstr "URL แบบสั้น"
+
+#: apprise/plugins/msg91.py:149 apprise/plugins/whatsapp.py:204
+msgid "Template Mapping"
+msgstr "การจับคู่แม่แบบ"
+
+#: apprise/plugins/nextcloud.py:169 apprise/plugins/nextcloudtalk.py:114
+msgid "URL Prefix"
+msgstr "คำนำหน้า URL"
+
+#: apprise/plugins/nextcloudtalk.py:44
+msgid "Nextcloud Talk"
+msgstr "Nextcloud Talk"
+
+#: apprise/plugins/nextcloudtalk.py:97
+msgid "Room ID"
+msgstr "รหัสห้อง"
+
+#: apprise/plugins/notifiarr.py:122
+msgid "Discord Event ID"
+msgstr "รหัสเหตุการณ์ของ Discord"
+
+#: apprise/plugins/notifiarr.py:132 apprise/plugins/pagerduty.py:146
+msgid "Source"
+msgstr "ต้นทาง"
+
+#: apprise/plugins/fcm/__init__.py:154 apprise/plugins/notifico.py:188
+msgid "Project ID"
+msgstr "รหัสโครงการ"
+
+#: apprise/plugins/notifico.py:197
+msgid "Message Hook"
+msgstr "ฮุกของข้อความ"
+
+#: apprise/plugins/notifico.py:212
+msgid "IRC Colors"
+msgstr "สีของ IRC"
+
+#: apprise/plugins/notifico.py:218
+msgid "Prefix"
+msgstr "คำนำหน้า"
+
+#: apprise/plugins/notifyre.py:169
+msgid "Campaign Name"
+msgstr "ชื่อแคมเปญ"
+
+#: apprise/plugins/notifyre.py:173 apprise/plugins/whatsapp.py:129
+msgid "Template Name"
+msgstr "ชื่อแม่แบบ"
+
+#: apprise/plugins/notifyre.py:177
+msgid "Client Reference"
+msgstr "รหัสอ้างอิงของไคลเอ็นต์"
+
+#: apprise/plugins/notifyre.py:181
+msgid "High Quality"
+msgstr "คุณภาพสูง"
+
+#: apprise/plugins/notifyre.py:186
+msgid "Fax Header"
+msgstr "ส่วนหัวของโทรสาร"
+
+#: apprise/plugins/ntfy.py:236 apprise/plugins/pinglet.py:166
+msgid "Topic"
+msgstr "หัวข้อ"
+
+#: apprise/plugins/ntfy.py:254
+msgid "Attach"
+msgstr "ไฟล์แนบ"
+
+#: apprise/plugins/ntfy.py:268
+msgid "Attach Filename"
+msgstr "ชื่อไฟล์แนบ"
+
+#: apprise/plugins/ntfy.py:276
+msgid "Delay"
+msgstr "เวลาหน่วง"
+
+#: apprise/plugins/ntfy.py:280 apprise/plugins/twist.py:108
+msgid "Email"
+msgstr "อีเมล"
+
+#: apprise/plugins/ntfy.py:294
+msgid "Actions"
+msgstr "การกระทำ"
+
+#: apprise/plugins/ntfy.py:307
+msgid "Authentication Type"
+msgstr "ชนิดการยืนยันตัวตน"
+
+#: apprise/plugins/octopush.py:131
+msgid "API Login"
+msgstr "ชื่อเข้าใช้ API"
+
+#: apprise/plugins/octopush.py:179
+msgid "Accept Replies"
+msgstr "รับการตอบกลับ"
+
+#: apprise/plugins/octopush.py:184
+msgid "Purpose"
+msgstr "วัตถุประสงค์"
+
+#: apprise/plugins/octopush.py:190
+msgid "Type"
+msgstr "ชนิด"
+
+#: apprise/plugins/office365.py:258
+msgid "Tenant Domain"
+msgstr "โดเมนของผู้เช่า"
+
+#: apprise/plugins/office365.py:265
+msgid "Account Email or Object ID"
+msgstr "อีเมลของบัญชีหรือรหัสวัตถุ"
+
+#: apprise/plugins/office365.py:277 apprise/plugins/ringcentral.py:200
+#: apprise/plugins/sendpulse.py:129
+msgid "Client Secret"
+msgstr "รหัสลับของไคลเอ็นต์"
+
+#: apprise/plugins/office365.py:326
+msgid "Save to Sent Items"
+msgstr "บันทึกไว้ในรายการที่ส่งแล้ว"
+
+#: apprise/plugins/one_signal.py:109 apprise/plugins/sendgrid.py:147
+msgid "Template"
+msgstr "แม่แบบ"
+
+#: apprise/plugins/one_signal.py:120
+msgid "Target Player ID"
+msgstr "รหัสผู้เล่นปลายทาง"
+
+#: apprise/plugins/one_signal.py:136
+msgid "Include Segment"
+msgstr "รวมกลุ่มเป้าหมาย"
+
+#: apprise/plugins/one_signal.py:156
+msgid "Subtitle"
+msgstr "คำบรรยายรอง"
+
+#: apprise/plugins/one_signal.py:160 apprise/plugins/sfr.py:126
+#: apprise/plugins/whatsapp.py:142
+msgid "Language"
+msgstr "ภาษา"
+
+#: apprise/plugins/one_signal.py:174
+msgid "Enable Contents"
+msgstr "เปิดใช้เนื้อหา"
+
+#: apprise/plugins/one_signal.py:180
+msgid "Decode Template Args"
+msgstr "ถอดรหัสอาร์กิวเมนต์ของแม่แบบ"
+
+#: apprise/plugins/one_signal.py:199
+msgid "Custom Data"
+msgstr "ข้อมูลที่กำหนดเอง"
+
+#: apprise/plugins/one_signal.py:203
+msgid "Postback Data"
+msgstr "ข้อมูลตอบกลับ"
+
+#: apprise/plugins/pagerduty.py:139 apprise/plugins/pushward.py:135
+#: apprise/plugins/spike.py:69
+msgid "Integration Key"
+msgstr "คีย์การเชื่อมต่อ"
+
+#: apprise/plugins/pagerduty.py:152
+msgid "Component"
+msgstr "ส่วนประกอบ"
+
+#: apprise/plugins/pagerduty.py:168
+msgid "Class"
+msgstr "คลาส"
+
+#: apprise/plugins/pagerduty.py:186
+msgid "Severity"
+msgstr "ระดับความรุนแรง"
+
+#: apprise/plugins/pagerduty.py:203
+msgid "Custom Details"
+msgstr "รายละเอียดที่กำหนดเอง"
+
+#: apprise/plugins/pagertree.py:106
+msgid "Integration ID"
+msgstr "รหัสการเชื่อมต่อ"
+
+#: apprise/plugins/pagertree.py:125
+msgid "Third Party ID"
+msgstr "รหัสจากบุคคลที่สาม"
+
+#: apprise/plugins/pagertree.py:151
+msgid "Meta Extras"
+msgstr "ข้อมูลเพิ่มเติมของ Meta"
+
+#: apprise/plugins/parseplatform.py:108
+msgid "Master Key"
+msgstr "คีย์หลัก"
+
+#: apprise/plugins/parseplatform.py:121
+msgid "Device"
+msgstr "อุปกรณ์"
+
+#: apprise/plugins/pinglet.py:161
+msgid "Namespace"
+msgstr "เนมสเปซ"
+
+#: apprise/plugins/pinglet.py:192
+msgid "Badges"
+msgstr "ป้าย"
+
+#: apprise/plugins/pinglet.py:196
+msgid "Metadata"
+msgstr "ข้อมูลกำกับ"
+
+#: apprise/plugins/matrix/base.py:395 apprise/plugins/pingram.py:176
+msgid "Message Type"
+msgstr "ชนิดข้อความ"
+
+#: apprise/plugins/pingram.py:194
+msgid "Target ID"
+msgstr "รหัสปลายทาง"
+
+#: apprise/plugins/pingram.py:200
+msgid "Target SMS"
+msgstr "SMS ปลายทาง"
+
+#: apprise/plugins/pingram.py:222 apprise/plugins/signalgrid.py:102
+msgid "Channels"
+msgstr "ช่อง"
+
+#: apprise/plugins/email/base.py:178 apprise/plugins/pingram.py:243
+#: apprise/plugins/sendpulse.py:152 apprise/plugins/ses.py:164
+msgid "From Email"
+msgstr "อีเมลผู้ส่ง"
+
+#: apprise/plugins/plivo.py:89
+msgid "Auth ID"
+msgstr "รหัสการยืนยันตัวตน"
+
+#: apprise/plugins/plivo.py:95 apprise/plugins/sinch.py:114
+#: apprise/plugins/twilio.py:148
+msgid "Auth Token"
+msgstr "โทเค็นการยืนยันตัวตน"
+
+#: apprise/plugins/prowl.py:129
+msgid "Provider Key"
+msgstr "คีย์ของผู้ให้บริการ"
+
+#: apprise/plugins/pushdeer.py:86
+msgid "Pushkey"
+msgstr "คีย์การแจ้งเตือน"
+
+#: apprise/plugins/pushed.py:84
+msgid "Application Key"
+msgstr "คีย์ของแอปพลิเคชัน"
+
+#: apprise/plugins/pushed.py:90 apprise/plugins/reddit.py:159
+msgid "Application Secret"
+msgstr "รหัสลับของแอปพลิเคชัน"
+
+#: apprise/plugins/pushjet.py:83
+msgid "Secret Key"
+msgstr "คีย์ลับ"
+
+#: apprise/plugins/pushme.py:82 apprise/plugins/signal_api.py:153
+#: apprise/plugins/smseagle.py:194
+msgid "Show Status"
+msgstr "แสดงสถานะ"
+
+#: apprise/plugins/pushover.py:237
+msgid "User Key"
+msgstr "คีย์ของผู้ใช้"
+
+#: apprise/plugins/pushover.py:289
+msgid "URL Title"
+msgstr "ชื่อของ URL"
+
+#: apprise/plugins/pushover.py:294
+msgid "Emergency Retry Interval"
+msgstr "ช่วงเวลาลองใหม่กรณีฉุกเฉิน"
+
+#: apprise/plugins/pushover.py:300
+msgid "Expire"
+msgstr "วันหมดอายุ"
+
+#: apprise/plugins/pushover.py:317
+msgid "E2EE"
+msgstr "E2EE"
+
+#: apprise/plugins/pushplus.py:173
+msgid "Pushplus"
+msgstr "Pushplus"
+
+#: apprise/plugins/pushplus.py:211 apprise/plugins/qq.py:67
+msgid "User Token"
+msgstr "โทเค็นของผู้ใช้"
+
+#: apprise/plugins/pushplus.py:220
+msgid "Group Topics"
+msgstr "หัวข้อของกลุ่ม"
+
+#: apprise/plugins/pushplus.py:241 apprise/plugins/wpush.py:183
+msgid "Channel"
+msgstr "ช่อง"
+
+#: apprise/plugins/pushplus.py:258
+msgid "Webhook Name"
+msgstr "ชื่อของ webhook"
+
+#: apprise/plugins/pushsafer.py:361
+msgid "Private Key"
+msgstr "คีย์ส่วนตัว"
+
+#: apprise/plugins/pushsafer.py:398
+msgid "Vibration"
+msgstr "การสั่น"
+
+#: apprise/plugins/pushward.py:159
+msgid "Info Level"
+msgstr "ระดับข้อมูล"
+
+#: apprise/plugins/pushward.py:165
+msgid "Success Level"
+msgstr "ระดับความสำเร็จ"
+
+#: apprise/plugins/pushward.py:171
+msgid "Warning Level"
+msgstr "ระดับคำเตือน"
+
+#: apprise/plugins/pushward.py:177
+msgid "Failure Level"
+msgstr "ระดับความล้มเหลว"
+
+#: apprise/plugins/pushy.py:80
+msgid "Secret API Key"
+msgstr "คีย์ API ลับ"
+
+#: apprise/plugins/fcm/__init__.py:163 apprise/plugins/pushy.py:92
+#: apprise/plugins/sns.py:164 apprise/plugins/wxpusher.py:129
+msgid "Target Topic"
+msgstr "หัวข้อปลายทาง"
+
+#: apprise/plugins/qq.py:47
+msgid "QQ Push"
+msgstr "QQ Push"
+
+#: apprise/plugins/reddit.py:152
+msgid "Application ID"
+msgstr "รหัสแอปพลิเคชัน"
+
+#: apprise/plugins/reddit.py:166
+msgid "Target Subreddit"
+msgstr "ซับเรดดิตปลายทาง"
+
+#: apprise/plugins/reddit.py:183
+msgid "Kind"
+msgstr "ชนิดเนื้อหา"
+
+#: apprise/plugins/reddit.py:189
+msgid "Flair ID"
+msgstr "รหัสป้ายกำกับ"
+
+#: apprise/plugins/reddit.py:194
+msgid "Flair Text"
+msgstr "ข้อความป้ายกำกับ"
+
+#: apprise/plugins/reddit.py:199
+msgid "NSFW"
+msgstr "NSFW"
+
+#: apprise/plugins/reddit.py:205
+msgid "Is Ad?"
+msgstr "เป็นโฆษณาหรือไม่"
+
+#: apprise/plugins/reddit.py:211
+msgid "Send Replies"
+msgstr "ส่งการตอบกลับ"
+
+#: apprise/plugins/reddit.py:217
+msgid "Is Spoiler"
+msgstr "มีเนื้อหาสปอยล์"
+
+#: apprise/plugins/reddit.py:223
+msgid "Resubmit Flag"
+msgstr "แฟล็กการส่งซ้ำ"
+
+#: apprise/plugins/resend.py:136
+msgid "From Address"
+msgstr "ที่อยู่ผู้ส่ง"
+
+#: apprise/plugins/revolt.py:105
+msgid "Channel ID"
+msgstr "รหัสช่อง"
+
+#: apprise/plugins/revolt.py:132
+msgid "Embed URL"
+msgstr "URL ที่ฝังไว้"
+
+#: apprise/plugins/ringcentral.py:187
+msgid "Token / Password"
+msgstr "โทเค็นหรือรหัสผ่าน"
+
+#: apprise/plugins/ringcentral.py:240
+msgid "Environment"
+msgstr "สภาพแวดล้อม"
+
+#: apprise/plugins/ringcentral.py:253
+msgid "Authentication Mode"
+msgstr "โหมดการยืนยันตัวตน"
+
+#: apprise/plugins/rocketchat.py:147
+msgid "Webhook"
+msgstr "Webhook"
+
+#: apprise/plugins/matrix/base.py:338 apprise/plugins/rocketchat.py:163
+msgid "Target Room ID"
+msgstr "รหัสห้องปลายทาง"
+
+#: apprise/plugins/matrix/base.py:377 apprise/plugins/rocketchat.py:179
+#: apprise/plugins/ryver.py:119
+msgid "Webhook Mode"
+msgstr "โหมด webhook"
+
+#: apprise/plugins/rocketchat.py:184
+msgid "Use Avatar"
+msgstr "ใช้รูปประจำตัว"
+
+#: apprise/plugins/rsyslog.py:174 apprise/plugins/syslog.py:145
+msgid "Facility"
+msgstr "หมวดของระบบ"
+
+#: apprise/plugins/rsyslog.py:204 apprise/plugins/syslog.py:162
+msgid "Log PID"
+msgstr "บันทึก PID"
+
+#: apprise/plugins/ryver.py:94 apprise/plugins/zulip.py:131
+msgid "Organization"
+msgstr "องค์กร"
+
+#: apprise/plugins/sendgrid.py:167 apprise/plugins/sendpulse.py:184
+msgid "Template Data"
+msgstr "ข้อมูลของแม่แบบ"
+
+#: apprise/plugins/serwersms.py:143 apprise/plugins/sfr.py:132
+msgid "Sender Name"
+msgstr "ชื่อผู้ส่ง"
+
+#: apprise/plugins/serwersms.py:156 apprise/plugins/signal_api.py:132
+#: apprise/plugins/smseagle.py:159 apprise/plugins/whatsapp.py:160
+msgid "Target Group ID"
+msgstr "รหัสกลุ่มปลายทาง"
+
+#: apprise/plugins/ses.py:158 apprise/plugins/sns.py:133
+msgid "Session Token"
+msgstr "โทเค็นของเซสชัน"
+
+#: apprise/plugins/ses.py:170 apprise/plugins/sns.py:139
+msgid "Access Key ID"
+msgstr "รหัสคีย์เข้าถึง"
+
+#: apprise/plugins/ses.py:176 apprise/plugins/sns.py:145
+msgid "Secret Access Key"
+msgstr "คีย์เข้าถึงลับ"
+
+#: apprise/plugins/ses.py:182 apprise/plugins/sinch.py:158
+#: apprise/plugins/sns.py:151
+msgid "Region"
+msgstr "ภูมิภาค"
+
+#: apprise/plugins/ses.py:189 apprise/plugins/smtp2go.py:125
+#: apprise/plugins/sparkpost.py:176
+msgid "Target Emails"
+msgstr "อีเมลปลายทาง"
+
+#: apprise/plugins/seven.py:114 apprise/plugins/smseagle.py:204
+msgid "Flash"
+msgstr "แฟลช"
+
+#: apprise/plugins/seven.py:118
+msgid "Label"
+msgstr "ป้ายชื่อ"
+
+#: apprise/plugins/sfr.py:59
+msgid "Société Française du Radiotéléphone"
+msgstr "Société Française du Radiotéléphone"
+
+#: apprise/plugins/sfr.py:91
+msgid "Service ID"
+msgstr "รหัสบริการ"
+
+#: apprise/plugins/sfr.py:96
+msgid "Service Password"
+msgstr "รหัสผ่านของบริการ"
+
+#: apprise/plugins/sfr.py:102
+msgid "Space ID"
+msgstr "รหัสพื้นที่"
+
+#: apprise/plugins/sfr.py:108
+msgid "Recipient Phone Number"
+msgstr "หมายเลขโทรศัพท์ผู้รับ"
+
+#: apprise/plugins/sfr.py:139
+msgid "Media Type"
+msgstr "ชนิดสื่อ"
+
+#: apprise/plugins/sfr.py:146
+msgid "Timeout"
+msgstr "เวลารอ"
+
+#: apprise/plugins/sfr.py:152
+msgid "TTS Voice"
+msgstr "เสียงอ่านข้อความ"
+
+#: apprise/plugins/signalgrid.py:96
+msgid "Client Key"
+msgstr "คีย์ของไคลเอ็นต์"
+
+#: apprise/plugins/signalgrid.py:119
+msgid "Critical Notification"
+msgstr "การแจ้งเตือนสำคัญ"
+
+#: apprise/plugins/signl4.py:90
+msgid "Service"
+msgstr "บริการ"
+
+#: apprise/plugins/signl4.py:94
+msgid "Location"
+msgstr "ตำแหน่ง"
+
+#: apprise/plugins/signl4.py:98
+msgid "Alerting Scenario"
+msgstr "สถานการณ์การแจ้งเตือน"
+
+#: apprise/plugins/signl4.py:102
+msgid "Filtering"
+msgstr "การกรอง"
+
+#: apprise/plugins/signl4.py:107
+msgid "External ID"
+msgstr "รหัสภายนอก"
+
+#: apprise/plugins/signl4.py:111
+msgid "Status"
+msgstr "สถานะ"
+
+#: apprise/plugins/simplepush.py:114
+msgid "Salt"
+msgstr "ค่าสุ่มผสม"
+
+#: apprise/plugins/simplepush.py:127
+msgid "Event"
+msgstr "เหตุการณ์"
+
+#: apprise/plugins/sinch.py:135 apprise/plugins/twilio.py:169
+msgid "Target Short Code"
+msgstr "รหัสสั้นปลายทาง"
+
+#: apprise/plugins/slack.py:230
+msgid "OAuth Access Token"
+msgstr "โทเค็นเข้าถึง OAuth"
+
+#: apprise/plugins/slack.py:239
+msgid "Token A"
+msgstr "โทเค็น A"
+
+#: apprise/plugins/slack.py:248
+msgid "Token B"
+msgstr "โทเค็น B"
+
+#: apprise/plugins/slack.py:257
+msgid "Token C"
+msgstr "โทเค็น C"
+
+#: apprise/plugins/slack.py:264
+msgid "Target Encoded ID"
+msgstr "รหัสปลายทางที่เข้ารหัสไว้"
+
+#: apprise/plugins/slack.py:293
+msgid "Workflow Path"
+msgstr "พาธของกระบวนงาน"
+
+#: apprise/plugins/slack.py:311
+msgid "Include Footer"
+msgstr "แสดงส่วนท้าย"
+
+#: apprise/plugins/slack.py:319
+msgid "Use Blocks"
+msgstr "ใช้บล็อก"
+
+#: apprise/plugins/slack.py:325
+msgid "Include Timestamp"
+msgstr "แสดงเวลาที่บันทึก"
+
+#: apprise/plugins/slack.py:331 apprise/plugins/twitter.py:205
+msgid "Message Mode"
+msgstr "โหมดข้อความ"
+
+#: apprise/plugins/smpp.py:62
+msgid "SMPP"
+msgstr "SMPP"
+
+#: apprise/plugins/smpp.py:104
+msgid "Host"
+msgstr "โฮสต์"
+
+#: apprise/plugins/smsc.py:139
+msgid "Login"
+msgstr "ชื่อเข้าใช้"
+
+#: apprise/plugins/smsc.py:176
+msgid "Transliterate"
+msgstr "ถอดอักษร"
+
+#: apprise/plugins/smseagle.py:166
+msgid "Target Contact"
+msgstr "ผู้ติดต่อปลายทาง"
+
+#: apprise/plugins/smseagle.py:199
+msgid "Test Only"
+msgstr "ทดสอบเท่านั้น"
+
+#: apprise/plugins/smsmanager.py:144
+msgid "Gateway"
+msgstr "เกตเวย์"
+
+#: apprise/plugins/sogs.py:221
+msgid "Public Key"
+msgstr "คีย์สาธารณะ"
+
+#: apprise/plugins/sogs.py:228
+msgid "Seed"
+msgstr "ค่าเริ่มต้นสุ่ม"
+
+#: apprise/plugins/sogs.py:235
+msgid "Rooms"
+msgstr "ห้อง"
+
+#: apprise/plugins/spike.py:49
+msgid "Spike.sh"
+msgstr "Spike.sh"
+
+#: apprise/plugins/splunk.py:118
+msgid "Splunk On-Call"
+msgstr "Splunk On-Call"
+
+#: apprise/plugins/splunk.py:173
+msgid "Target Routing Key"
+msgstr "คีย์กำหนดเส้นทางปลายทาง"
+
+#: apprise/plugins/splunk.py:180
+msgid "Entity ID"
+msgstr "รหัสเอนทิตี"
+
+#: apprise/plugins/spugpush.py:49
+msgid "SpugPush"
+msgstr "SpugPush"
+
+#: apprise/plugins/streamlabs.py:126
+msgid "Alert Type"
+msgstr "ชนิดการแจ้งเตือน"
+
+#: apprise/plugins/streamlabs.py:132
+msgid "Image Link"
+msgstr "ลิงก์รูปภาพ"
+
+#: apprise/plugins/streamlabs.py:137
+msgid "Sound Link"
+msgstr "ลิงก์เสียง"
+
+#: apprise/plugins/streamlabs.py:148
+msgid "Special Text Color"
+msgstr "สีข้อความพิเศษ"
+
+#: apprise/plugins/streamlabs.py:154
+msgid "Amount"
+msgstr "จำนวนเงิน"
+
+#: apprise/plugins/streamlabs.py:160
+msgid "Currency"
+msgstr "สกุลเงิน"
+
+#: apprise/plugins/streamlabs.py:166
+msgid "Name"
+msgstr "ชื่อ"
+
+#: apprise/plugins/streamlabs.py:172
+msgid "Identifier"
+msgstr "ตัวระบุ"
+
+#: apprise/plugins/synology.py:118
+msgid "Upload"
+msgstr "การอัปโหลด"
+
+#: apprise/plugins/syslog.py:168
+msgid "Log to STDERR"
+msgstr "บันทึกไปที่ STDERR"
+
+#: apprise/plugins/telegram.py:373
+msgid "Target Chat ID"
+msgstr "รหัสแชทปลายทาง"
+
+#: apprise/plugins/telegram.py:396
+msgid "Detect Bot Owner"
+msgstr "ตรวจหาเจ้าของบอท"
+
+#: apprise/plugins/telegram.py:402
+msgid "Silent Notification"
+msgstr "การแจ้งเตือนแบบไม่มีเสียง"
+
+#: apprise/plugins/telegram.py:407
+msgid "Web Page Preview"
+msgstr "ตัวอย่างหน้าเว็บ"
+
+#: apprise/plugins/telegram.py:412
+msgid "Topic Thread ID"
+msgstr "รหัสกระทู้ของหัวข้อ"
+
+#: apprise/plugins/telegram.py:419
+msgid "Markdown Version"
+msgstr "รุ่นของ Markdown"
+
+#: apprise/plugins/telegram.py:428
+msgid "Content Placement"
+msgstr "ตำแหน่งของเนื้อหา"
+
+#: apprise/plugins/telegram.py:434
+msgid "Rich Message Template Path"
+msgstr "พาธของแม่แบบข้อความมีรูปแบบ"
+
+#: apprise/plugins/telnyx.py:132
+msgid "Messaging Profile ID"
+msgstr "รหัสโปรไฟล์การส่งข้อความ"
+
+#: apprise/plugins/threema.py:86
+msgid "Gateway ID"
+msgstr "รหัสเกตเวย์"
+
+#: apprise/plugins/threema.py:111
+msgid "Target Threema ID"
+msgstr "รหัส Threema ปลายทาง"
+
+#: apprise/plugins/trigv.py:160
+msgid "API Hostname"
+msgstr "ชื่อโฮสต์ของ API"
+
+#: apprise/plugins/trigv.py:186
+msgid "Image URL"
+msgstr "URL ของรูปภาพ"
+
+#: apprise/plugins/trigv.py:196
+msgid "Event type"
+msgstr "ชนิดของเหตุการณ์"
+
+#: apprise/plugins/trigv.py:200
+msgid "Priority (Pushover compatibility)"
+msgstr "ความสำคัญ (รองรับแบบ Pushover)"
+
+#: apprise/plugins/twilio.py:201
+msgid "Notification Method: sms or call"
+msgstr "วิธีแจ้งเตือน: sms หรือโทร"
+
+#: apprise/plugins/twitter.py:164
+msgid "Consumer Key"
+msgstr "คีย์ของผู้ใช้ API"
+
+#: apprise/plugins/twitter.py:170
+msgid "Consumer Secret"
+msgstr "รหัสลับของผู้ใช้ API"
+
+#: apprise/plugins/twitter.py:182
+msgid "Access Secret"
+msgstr "รหัสลับเข้าถึง"
+
+#: apprise/plugins/viber.py:50
+msgid "Viber"
+msgstr "Viber"
+
+#: apprise/plugins/viber.py:82
+msgid "Authentication Token"
+msgstr "โทเค็นยืนยันตัวตน"
+
+#: apprise/plugins/viber.py:88
+msgid "Receiver IDs"
+msgstr "รหัสผู้รับ"
+
+#: apprise/plugins/viber.py:106
+msgid "Bot Avatar URL"
+msgstr "URL รูปประจำตัวของบอท"
+
+#: apprise/plugins/voipms.py:84
+msgid "User Email"
+msgstr "อีเมลของผู้ใช้"
+
+#: apprise/plugins/vapid/__init__.py:189 apprise/plugins/vonage.py:134
+msgid "ttl"
+msgstr "ttl"
+
+#: apprise/plugins/webexteams.py:179
+msgid "Bot Access Token"
+msgstr "โทเค็นเข้าถึงของบอท"
+
+#: apprise/plugins/webexteams.py:185
+msgid "Room IDs"
+msgstr "รหัสห้อง"
+
+#: apprise/plugins/wechat.py:175
+msgid "Corp ID"
+msgstr "รหัสองค์กร"
+
+#: apprise/plugins/wechat.py:182
+msgid "App Secret"
+msgstr "รหัสลับของแอป"
+
+#: apprise/plugins/wechat.py:190
+msgid "Agent ID"
+msgstr "รหัสเจ้าหน้าที่"
+
+#: apprise/plugins/wechat.py:206
+msgid "Target Department"
+msgstr "แผนกปลายทาง"
+
+#: apprise/plugins/wechat.py:213
+msgid "Target Tag"
+msgstr "แท็กปลายทาง"
+
+#: apprise/plugins/wecombot.py:100
+msgid "Bot Webhook Key"
+msgstr "คีย์ webhook ของบอท"
+
+#: apprise/plugins/whatsapp.py:135
+msgid "From Phone ID"
+msgstr "รหัสโทรศัพท์ผู้ส่ง"
+
+#: apprise/plugins/windows.py:62
+msgid "A local Microsoft Windows environment is required."
+msgstr "ต้องมีสภาพแวดล้อม Microsoft Windows ในเครื่อง"
+
+#: apprise/plugins/workflows.py:151
+msgid "Workflow ID"
+msgstr "รหัสกระบวนงาน"
+
+#: apprise/plugins/workflows.py:159
+msgid "Signature"
+msgstr "ลายเซ็น"
+
+#: apprise/plugins/workflows.py:182
+msgid "Use Power Automate URL"
+msgstr "ใช้ URL ของ Power Automate"
+
+#: apprise/plugins/workflows.py:189
+msgid "Power Automate Routing ID"
+msgstr "รหัสกำหนดเส้นทางของ Power Automate"
+
+#: apprise/plugins/workflows.py:196
+msgid "Wrap Text"
+msgstr "ตัดบรรทัดข้อความ"
+
+#: apprise/plugins/workflows.py:211
+msgid "API Version"
+msgstr "รุ่นของ API"
+
+#: apprise/plugins/wpush.py:167
+msgid "Topics"
+msgstr "หัวข้อ"
+
+#: apprise/plugins/wpush.py:201
+msgid "Group / Option Code"
+msgstr "รหัสกลุ่มหรือตัวเลือก"
+
+#: apprise/plugins/wxpusher.py:122
+msgid "App Token"
+msgstr "โทเค็นของแอป"
+
+#: apprise/plugins/wxpusher.py:134
+msgid "Target User ID"
+msgstr "รหัสผู้ใช้ปลายทาง"
+
+#: apprise/plugins/youlmk.py:159
+msgid "Token or Key"
+msgstr "โทเค็นหรือคีย์"
+
+#: apprise/plugins/youlmk.py:183
+msgid "Info Priority"
+msgstr "ความสำคัญของข้อมูล"
+
+#: apprise/plugins/youlmk.py:189
+msgid "Success Priority"
+msgstr "ความสำคัญของความสำเร็จ"
+
+#: apprise/plugins/youlmk.py:195
+msgid "Warning Priority"
+msgstr "ความสำคัญของคำเตือน"
+
+#: apprise/plugins/youlmk.py:201
+msgid "Failure Priority"
+msgstr "ความสำคัญของความล้มเหลว"
+
+#: apprise/plugins/youlmk.py:216
+msgid "Link Label"
+msgstr "ป้ายชื่อของลิงก์"
+
+#: apprise/plugins/zoom.py:146
+msgid "Verification Token"
+msgstr "โทเค็นการยืนยัน"
+
+#: apprise/plugins/zulip.py:149
+msgid "Target Stream"
+msgstr "สตรีมปลายทาง"
+
+#: apprise/plugins/email/base.py:188
+msgid "SMTP Server"
+msgstr "เซิร์ฟเวอร์ SMTP"
+
+#: apprise/plugins/email/base.py:193 apprise/plugins/xmpp/base.py:150
+msgid "Secure Mode"
+msgstr "โหมดปลอดภัย"
+
+#: apprise/plugins/email/base.py:205
+msgid "PGP Security Mode"
+msgstr "โหมดความปลอดภัยของ PGP"
+
+#: apprise/plugins/email/base.py:212
+msgid "PGP Public Key Path"
+msgstr "พาธของคีย์สาธารณะ PGP"
+
+#: apprise/plugins/email/base.py:220
+msgid "PGP Private Key Path"
+msgstr "พาธของคีย์ส่วนตัว PGP"
+
+#: apprise/plugins/email/base.py:228
+msgid "Web Key Directory"
+msgstr "ไดเรกทอรีคีย์บนเว็บ"
+
+#: apprise/plugins/email/base.py:234
+msgid "Inline Attachments"
+msgstr "ไฟล์แนบแบบฝังในเนื้อหา"
+
+#: apprise/plugins/email/base.py:239
+msgid "To Email"
+msgstr "อีเมลผู้รับ"
+
+#: apprise/plugins/fcm/__init__.py:149
+msgid "OAuth2 KeyFile"
+msgstr "ไฟล์คีย์ OAuth2"
+
+#: apprise/plugins/fcm/__init__.py:194
+msgid "Custom Image URL"
+msgstr "URL รูปภาพที่กำหนดเอง"
+
+#: apprise/plugins/fcm/__init__.py:206
+msgid "Notification Color"
+msgstr "สีของการแจ้งเตือน"
+
+#: apprise/plugins/fcm/__init__.py:216
+msgid "Data Entries"
+msgstr "รายการข้อมูล"
+
+#: apprise/plugins/irc/base.py:160
+msgid "Real Name"
+msgstr "ชื่อจริง"
+
+#: apprise/plugins/irc/base.py:161
+msgid "Nickname"
+msgstr "ชื่อเล่น"
+
+#: apprise/plugins/irc/base.py:163
+msgid "Join Channels"
+msgstr "เข้าร่วมช่อง"
+
+#: apprise/plugins/irc/base.py:168
+msgid "Auth Mode"
+msgstr "โหมดการยืนยันตัวตน"
+
+#: apprise/plugins/matrix/base.py:344
+msgid "Target Room Alias"
+msgstr "ชื่อแทนของห้องปลายทาง"
+
+#: apprise/plugins/matrix/base.py:367
+msgid "Server Discovery"
+msgstr "การค้นหาเซิร์ฟเวอร์"
+
+#: apprise/plugins/matrix/base.py:372
+msgid "Force Home Server on Room IDs"
+msgstr "บังคับใช้เซิร์ฟเวอร์ต้นสังกัดกับรหัสห้อง"
+
+#: apprise/plugins/matrix/base.py:389
+msgid "Matrix API Version"
+msgstr "รุ่นของ API ของ Matrix"
+
+#: apprise/plugins/matrix/base.py:401
+msgid "End-to-End Encryption"
+msgstr "การเข้ารหัสแบบต้นทางถึงปลายทาง"
+
+#: apprise/plugins/matrix/base.py:406
+msgid "Automatic Device Verification"
+msgstr "การยืนยันอุปกรณ์อัตโนมัติ"
+
+#: apprise/plugins/vapid/__init__.py:203
+msgid "PEM Private KeyFile"
+msgstr "ไฟล์คีย์ส่วนตัวแบบ PEM"
+
+#: apprise/plugins/vapid/__init__.py:209
+msgid "Subscripion File"
+msgstr "ไฟล์การสมัครรับข้อมูล"
+
+#: apprise/plugins/xmpp/base.py:145
+msgid "XMPP Server"
+msgstr "เซิร์ฟเวอร์ XMPP"
+
+#: apprise/plugins/xmpp/base.py:157
+msgid "Get Roster"
+msgstr "ดึงรายชื่อผู้ติดต่อ"
+
+#: apprise/plugins/xmpp/base.py:162
+msgid "Use Subject"
+msgstr "ใช้หัวเรื่อง"
+
+#: apprise/plugins/xmpp/base.py:167
+msgid "Keep Connection Alive"
+msgstr "คงการเชื่อมต่อไว้"
+
+#: apprise/plugins/xmpp/base.py:173
+msgid "MUC Nickname"
+msgstr "ชื่อเล่นใน MUC"
+
+#: apprise/plugins/xmpp/base.py:177
+msgid "SCRAM-PLUS Channel Binding"
+msgstr "การผูกช่องทางแบบ SCRAM-PLUS"

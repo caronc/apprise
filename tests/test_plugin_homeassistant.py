@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.home_assistant import NotifyHomeAssistant
 
 logging.disable(logging.CRITICAL)
@@ -44,26 +45,26 @@ apprise_url_tests = (
     (
         "hassio://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "hassio://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "hassios://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No Long Lived Access Token specified
     (
         "hassio://user@localhost",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -144,7 +145,7 @@ apprise_url_tests = (
         "hassios://localhost/long.lived.token?nid=!%",
         {
             # Invalid notification_id
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

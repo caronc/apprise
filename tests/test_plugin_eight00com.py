@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.eight00com import NotifyEight00com
 
 logging.disable(logging.CRITICAL)
@@ -49,22 +50,22 @@ apprise_url_tests = (
     (
         "eight00com://",
         {
-            # No token -> TypeError
-            "instance": TypeError,
+            # Missing token
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "eight00com://:@/",
         {
-            # Empty token -> TypeError
-            "instance": TypeError,
+            # Empty token
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "eight00com://GOODTOKEN@badphone",
         {
-            # Non-numeric from-phone -> TypeError
-            "instance": TypeError,
+            # Non-numeric source phone number
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -161,16 +162,16 @@ def test_plugin_eight00com_init(mock_post):
     response.status_code = requests.codes.ok
     mock_post.return_value = response
 
-    # Missing token -> TypeError
-    with pytest.raises(TypeError):
+    # A token is required.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyEight00com(token=None, source="8005551234")
 
-    # Empty token -> TypeError
-    with pytest.raises(TypeError):
+    # An empty token is invalid.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyEight00com(token="", source="8005551234")
 
-    # Invalid source phone -> TypeError
-    with pytest.raises(TypeError):
+    # The source must be a valid phone number.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyEight00com(token="mytoken", source="notaphone")
 
     # Valid with source only: defaults to texting ourselves
@@ -213,7 +214,7 @@ def test_plugin_eight00com_sms(mock_post):
         source="8005551234",
         targets=["5559876543"],
     )
-    assert obj.notify(body="Test", title="Title") is True
+    assert bool(obj.notify(body="Test", title="Title")) is True
     assert mock_post.call_count == 1
 
     # Verify payload
@@ -234,7 +235,7 @@ def test_plugin_eight00com_sms(mock_post):
         source="8005551234",
         targets=["5559876543", "4445551234"],
     )
-    assert obj.notify(body="Hello") is True
+    assert bool(obj.notify(body="Hello")) is True
     assert mock_post.call_count == 2
 
     mock_post.reset_mock()
@@ -246,20 +247,20 @@ def test_plugin_eight00com_sms(mock_post):
         source="8005551234",
         targets=["5559876543"],
     )
-    assert obj.notify(body="Test") is False
+    assert bool(obj.notify(body="Test")) is False
 
     mock_post.reset_mock()
 
     # Unknown status code -> failure
     response.status_code = 999
-    assert obj.notify(body="Test") is False
+    assert bool(obj.notify(body="Test")) is False
 
     mock_post.reset_mock()
 
     # RequestException -> failure
     mock_post.side_effect = requests.RequestException("Connection error")
     response.status_code = requests.codes.ok
-    assert obj.notify(body="Test") is False
+    assert bool(obj.notify(body="Test")) is False
 
     mock_post.side_effect = None
 
@@ -270,7 +271,7 @@ def test_plugin_eight00com_sms(mock_post):
         targets=["12"],
     )
     mock_post.reset_mock()
-    assert obj.notify(body="Test") is False
+    assert bool(obj.notify(body="Test")) is False
     assert mock_post.call_count == 0
 
 
@@ -374,11 +375,13 @@ def test_plugin_eight00com_attach_success(mock_post):
         os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     )
     assert (
-        obj.notify(
-            body="Test MMS",
-            title="",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="Test MMS",
+                title="",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -420,9 +423,11 @@ def test_plugin_eight00com_attach_multi(mock_post):
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     assert (
-        obj.notify(
-            body="Multi-attachment MMS",
-            attach=attach,
+        bool(
+            obj.notify(
+                body="Multi-attachment MMS",
+                attach=attach,
+            )
         )
         is True
     )
@@ -454,7 +459,7 @@ def test_plugin_eight00com_attach_inaccessible(mock_post):
 
     # Simulate the file being inaccessible (os.path.isfile -> False)
     with mock.patch("os.path.isfile", return_value=False):
-        assert obj.notify(body="Test", attach=attach) is False
+        assert bool(obj.notify(body="Test", attach=attach)) is False
 
     # No HTTP call should have been made
     assert mock_post.call_count == 0
@@ -479,7 +484,7 @@ def test_plugin_eight00com_attach_oserror(mock_post):
     )
 
     with mock.patch("builtins.open", side_effect=OSError("IO fail")):
-        assert obj.notify(body="Test", attach=attach) is False
+        assert bool(obj.notify(body="Test", attach=attach)) is False
 
     # No HTTP call should have been made
     assert mock_post.call_count == 0
@@ -503,7 +508,7 @@ def test_plugin_eight00com_attach_http_error(mock_post):
     attach = AppriseAttachment.instantiate(
         os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     )
-    assert obj.notify(body="Test", attach=attach) is False
+    assert bool(obj.notify(body="Test", attach=attach)) is False
     assert mock_post.call_count == 1
 
 
@@ -522,7 +527,7 @@ def test_plugin_eight00com_attach_request_exception(mock_post):
     attach = AppriseAttachment.instantiate(
         os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     )
-    assert obj.notify(body="Test", attach=attach) is False
+    assert bool(obj.notify(body="Test", attach=attach)) is False
 
 
 @mock.patch("requests.post")
@@ -553,7 +558,7 @@ def test_plugin_eight00com_attach_partial_failure(mock_post):
         os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     )
     # One success and one failure -> overall False
-    assert obj.notify(body="Test", attach=attach) is False
+    assert bool(obj.notify(body="Test", attach=attach)) is False
     assert mock_post.call_count == 2
 
 
@@ -568,7 +573,7 @@ def test_plugin_eight00com_apprise_integration(mock_post):
     # Load via URL
     a = Apprise()
     assert a.add("eight00com://mytoken@8005551234/5559876543") is True
-    assert a.notify(body="Integration test") is True
+    assert bool(a.notify(body="Integration test")) is True
     assert mock_post.call_count == 1
 
     mock_post.reset_mock()
@@ -579,5 +584,5 @@ def test_plugin_eight00com_apprise_integration(mock_post):
         a2.add("eight00com://?token=mytoken&from=8005551234&to=5559876543")
         is True
     )
-    assert a2.notify(body="Integration test 2") is True
+    assert bool(a2.notify(body="Integration test 2")) is True
     assert mock_post.call_count == 1

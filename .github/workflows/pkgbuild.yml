@@ -4,6 +4,8 @@
 name: RPM Packaging
 
 on:
+  # master             - v1.x branch
+  # apprise-v2-release - v2.x branch
   push:
     branches: [main, master, apprise-v1-release, 'release/**']
   pull_request:

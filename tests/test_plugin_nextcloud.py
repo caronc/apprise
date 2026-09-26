@@ -34,7 +34,14 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, AppriseAsset, NotifyType, PersistentStoreMode
-from apprise.plugins.nextcloud import NotifyNextcloud
+from apprise.exception import (
+    AppriseImproperlyConfigured,
+    ApprisePluginException,
+)
+from apprise.plugins.nextcloud import (
+    NextcloudGroupDiscoveryException,
+    NotifyNextcloud,
+)
 
 NEXTCLOUD_GOOD_RESPONSE = dumps(
     {
@@ -44,6 +51,14 @@ NEXTCLOUD_GOOD_RESPONSE = dumps(
         }
     }
 )
+
+
+def test_plugin_nextcloud_discovery_exception():
+    """Nextcloud discovery failures use the common plugin exception."""
+    exc = NextcloudGroupDiscoveryException("discovery failed")
+    assert isinstance(exc, ApprisePluginException)
+    assert exc.error_code == 600
+
 
 logging.disable(logging.CRITICAL)
 
@@ -89,7 +104,7 @@ apprise_url_tests = (
         "ncloud://user@localhost?to=user1,user2&version=invalid",
         {
             # An invalid version was specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
             "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
@@ -97,7 +112,7 @@ apprise_url_tests = (
         "ncloud://user@localhost?to=user1,user2&version=0",
         {
             # An invalid version was specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
             "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
@@ -105,7 +120,7 @@ apprise_url_tests = (
         "ncloud://user@localhost?to=user1,user2&version=-23",
         {
             # An invalid version was specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
             "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
@@ -300,7 +315,9 @@ def test_plugin_nextcloud_url_prefix(mock_post):
     )
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 

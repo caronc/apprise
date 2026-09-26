@@ -56,6 +56,7 @@ from json import dumps, loads
 import requests
 
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -159,7 +160,7 @@ class NotifyGroupMe(NotifyBase):
         if not self.bot_id:
             msg = "A GroupMe bot_id must be specified ({}).".format(bot_id)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store the optional access token (needed for image uploads)
         self.token = validate_regex(token) if token else None

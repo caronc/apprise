@@ -51,6 +51,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_call_sign, parse_bool, parse_call_sign, parse_list
@@ -197,7 +198,7 @@ class NotifyDapnet(NotifyBase):
         if not (self.user and self.password):
             msg = "A Dapnet user/pass was not provided."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Get the transmitter group
         self.txgroups = parse_list(
@@ -249,6 +250,11 @@ class NotifyDapnet(NotifyBase):
         targets = list(self.targets)
 
         for index in range(0, len(targets), batch_size):
+            # Skip a batch that already went out so a retry does not
+            # deliver it to those recipients twice.
+            if self.is_delivered(index):
+                continue
+
             # prepare JSON payload
             payload = {
                 "text": body,
@@ -292,6 +298,7 @@ class NotifyDapnet(NotifyBase):
 
                     # Mark our failure
                     has_error = True
+                    continue
 
                 else:
                     self.logger.info(
@@ -309,6 +316,10 @@ class NotifyDapnet(NotifyBase):
 
                 # Mark our failure
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this batch.
+            self.mark_delivered(index)
 
         return not has_error
 

@@ -45,8 +45,16 @@ from typing import Any, Optional
 import pytest
 
 from apprise import LOGGER_NAME, Apprise, NotifyType
+from apprise.exception import AppriseException, AppriseImproperlyConfigured
 from apprise.plugins.xmpp import adapter as xmpp_adapter, base as xmpp_base
 from apprise.plugins.xmpp.base import NotifyXMPP
+
+
+def test_plugin_xmpp_channel_binding_exception() -> None:
+    """Channel-binding failures use the common Apprise exception."""
+    exc = xmpp_adapter.XMPPChannelBindingError()
+    assert isinstance(exc, AppriseException)
+    assert str(exc) == "SASL SCRAM-PLUS channel-binding authentication failed."
 
 
 def run_on_loop(loop: asyncio.AbstractEventLoop, coro: Any) -> Any:
@@ -267,7 +275,7 @@ def test_slixmpp_unavailable() -> None:
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
 def test_xmpp_invalid_jid() -> None:
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyXMPP(host="example.com", user="bad jid", password="x")
 
 
@@ -343,28 +351,35 @@ def test_xmpp_invalid_targets_logged(
 ) -> None:
     """Invalid XMPP targets are dropped with a warning."""
 
+    # Some test modules disable logging globally at import time
+    # This ensures we're correctly configured for this test.
+    logging.disable(logging.NOTSET)
     caplog.set_level(logging.WARNING, logger=LOGGER_NAME)
     caplog.set_level(logging.WARNING, logger=xmpp_base.__name__)
 
-    # parse_list() tokenises on whitespace, so it is difficult to naturally
-    # feed a whitespace-containing value through.  Patch parse_list() to
-    # return a value that will fail IS_JID validation.
-    monkeypatch.setattr(
-        xmpp_base,
-        "parse_list",
-        lambda _v: ["bad jid", "ok@example.com"],
-        raising=True,
-    )
+    try:
+        # parse_list() tokenises on whitespace, so it is difficult to
+        # naturally feed a whitespace-containing value through.  Patch
+        # parse_list() to return a value that will fail IS_JID validation.
+        monkeypatch.setattr(
+            xmpp_base,
+            "parse_list",
+            lambda _v: ["bad jid", "ok@example.com"],
+            raising=True,
+        )
 
-    n = NotifyXMPP(
-        host="example.com",
-        user="me@example.com",
-        password="x",
-        targets=["ignored"],
-    )
+        n = NotifyXMPP(
+            host="example.com",
+            user="me@example.com",
+            password="x",
+            targets=["ignored"],
+        )
 
-    assert n.targets == [("chat", "ok@example.com")]
-    assert "Dropped invalid XMPP target" in caplog.text
+        assert n.targets == [("chat", "ok@example.com")]
+        assert "Dropped invalid XMPP target" in caplog.text
+
+    finally:
+        logging.disable(logging.CRITICAL)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
@@ -634,7 +649,9 @@ def test_xmpp_apprise_notify_invokes_adapter(
     apobj.add("xmpp://me:secret@example.com/a@example.com")
 
     assert (
-        apobj.notify("hello", title="subject", notify_type=NotifyType.INFO)
+        bool(
+            apobj.notify("hello", title="subject", notify_type=NotifyType.INFO)
+        )
         is True
     )
     assert captured["targets"] == [("chat", "a@example.com")]
@@ -645,7 +662,9 @@ def test_xmpp_apprise_notify_invokes_adapter(
     apobj.add("xmpp://me:secret@example.com/a@example.com?subject=yes")
 
     assert (
-        apobj.notify("hello", title="subject", notify_type=NotifyType.INFO)
+        bool(
+            apobj.notify("hello", title="subject", notify_type=NotifyType.INFO)
+        )
         is True
     )
     assert captured["targets"] == [("chat", "a@example.com")]
@@ -961,7 +980,7 @@ def test_xmpp_normalize_jid() -> None:
         "#room@conference.example.ca", "example.ca"
     ) == ("room@conference.example.ca", True)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # Bad entry
         NotifyXMPP.normalize_jid("", "example.ca")
 
@@ -986,8 +1005,8 @@ def test_xmpp_bridge_logging_safe_lock(
     t = threading.Thread(target=worker, daemon=True)
     t.start()
 
-    # Give worker a moment to pass the outer if and block on the lock
-    time.sleep(0.02)
+    # Allow enough time for the worker to reach the lock, even on busy hosts.
+    time.sleep(0.1)
 
     # Now flip the flag while the lock is still held; when released, worker
     # will acquire the lock and hit the *inner* early-return.
@@ -1280,6 +1299,14 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
     """Cover timeout clean-up branch where shared['loop'] is still None."""
     install_fake_slixmpp(monkeypatch)
 
+    # Some test modules disable logging globally at import time (see
+    # "Disable logging for a cleaner testing output" elsewhere in the
+    # suite). caplog.set_level() only relies on newer pytest versions to
+    # un-suppress that global disable -- older pytest releases (as
+    # packaged for some RPM builds) do not, leaving caplog.text empty
+    # regardless of the level requested. Force logging on explicitly so
+    # this assertion holds under any pytest version or collection order.
+    logging.disable(logging.NOTSET)
     caplog.set_level(logging.WARNING, logger="apprise.xmpp")
 
     # Ensure adapter is enabled
@@ -1380,35 +1407,44 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
     finally:
         # Let the runner proceed and exit
         gate.set()
+        logging.disable(logging.CRITICAL)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
 def test_xmpp_process_unsupported_secure_mode(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Cover unsupported secure mode path (ValueError inside runner)."""
+    """The process runner handles an unsupported secure mode."""
     install_fake_slixmpp(monkeypatch)
+    # See test_xmpp_invalid_targets_logged for why this is needed: older
+    # pytest releases don't un-suppress a prior logging.disable(CRITICAL)
+    # left by another test module's import-time call.
+    logging.disable(logging.NOTSET)
     caplog.set_level(logging.WARNING, logger="apprise.xmpp")
 
-    config = xmpp_adapter.XMPPConfig(
-        jid="me@example.com",
-        password="x",
-        host="example.com",
-        port=5222,
-        secure="invalid",
-        verify_certificate=False,
-    )
+    try:
+        config = xmpp_adapter.XMPPConfig(
+            jid="me@example.com",
+            password="x",
+            host="example.com",
+            port=5222,
+            secure="invalid",
+            verify_certificate=False,
+        )
 
-    a = xmpp_adapter.SlixmppAdapter(
-        config=config,
-        targets=[("chat", "a@example.com")],
-        subject="s",
-        body="b",
-        timeout=5.0,
-    )
+        a = xmpp_adapter.SlixmppAdapter(
+            config=config,
+            targets=[("chat", "a@example.com")],
+            subject="s",
+            body="b",
+            timeout=5.0,
+        )
 
-    assert a.process() is False
-    assert "XMPP send failed" in caplog.text
+        assert a.process() is False
+        assert "XMPP send failed" in caplog.text
+
+    finally:
+        logging.disable(logging.CRITICAL)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
@@ -1417,52 +1453,64 @@ def test_xmpp_process_connect_timeout(
 ) -> None:
     """Cover connect timeout branch (asyncio.TimeoutError)."""
     install_fake_slixmpp(monkeypatch)
+    # See test_xmpp_invalid_targets_logged for why this is needed: older
+    # pytest releases don't un-suppress a prior logging.disable(CRITICAL)
+    # left by another test module's import-time call.
+    logging.disable(logging.NOTSET)
     caplog.set_level(logging.WARNING, logger="apprise.xmpp")
 
-    # Return a Future that never resolves.
-    connect_future: dict[str, Any] = {"fut": None}
+    try:
+        # Return a Future that never resolves.
+        connect_future: dict[str, Any] = {"fut": None}
 
-    def connect_never(self: FakeClientXMPP, **kw: Any) -> asyncio.Future[bool]:
-        fut: asyncio.Future[bool] = self.loop.create_future()
-        connect_future["fut"] = fut
-        return fut
+        def connect_never(
+            self: FakeClientXMPP, **kw: Any
+        ) -> asyncio.Future[bool]:
+            fut: asyncio.Future[bool] = self.loop.create_future()
+            connect_future["fut"] = fut
+            return fut
 
-    monkeypatch.setattr(FakeClientXMPP, "connect", connect_never, raising=True)
+        monkeypatch.setattr(
+            FakeClientXMPP, "connect", connect_never, raising=True
+        )
 
-    # Force wait_for() to raise TimeoutError immediately for this connect
-    # future.
-    real_wait_for = xmpp_adapter.asyncio.wait_for
+        # Force wait_for() to raise TimeoutError immediately for this
+        # connect future.
+        real_wait_for = xmpp_adapter.asyncio.wait_for
 
-    async def wait_for_patched(
-        aw: Any, timeout: Optional[float] = None
-    ) -> Any:
-        if aw is connect_future["fut"]:
-            raise asyncio.TimeoutError()
-        return await real_wait_for(aw, timeout=timeout)
+        async def wait_for_patched(
+            aw: Any, timeout: Optional[float] = None
+        ) -> Any:
+            if aw is connect_future["fut"]:
+                raise asyncio.TimeoutError()
+            return await real_wait_for(aw, timeout=timeout)
 
-    monkeypatch.setattr(
-        xmpp_adapter.asyncio, "wait_for", wait_for_patched, raising=True
-    )
+        monkeypatch.setattr(
+            xmpp_adapter.asyncio, "wait_for", wait_for_patched, raising=True
+        )
 
-    config = xmpp_adapter.XMPPConfig(
-        jid="me@example.com",
-        password="x",
-        host="example.com",
-        port=5222,
-        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
-        verify_certificate=False,
-    )
+        config = xmpp_adapter.XMPPConfig(
+            jid="me@example.com",
+            password="x",
+            host="example.com",
+            port=5222,
+            secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+            verify_certificate=False,
+        )
 
-    a = xmpp_adapter.SlixmppAdapter(
-        config=config,
-        targets=[("chat", "a@example.com")],
-        subject="s",
-        body="b",
-        timeout=5.0,
-    )
+        a = xmpp_adapter.SlixmppAdapter(
+            config=config,
+            targets=[("chat", "a@example.com")],
+            subject="s",
+            body="b",
+            timeout=5.0,
+        )
 
-    assert a.process() is False
-    assert "XMPP connect timed out" in caplog.text
+        assert a.process() is False
+        assert "XMPP connect timed out" in caplog.text
+
+    finally:
+        logging.disable(logging.CRITICAL)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
@@ -1471,70 +1519,78 @@ def test_xmpp_process_session_timeout(
 ) -> None:
     """Cover session timeout branch when waiting on client.disconnected."""
     install_fake_slixmpp(monkeypatch)
+    # See test_xmpp_invalid_targets_logged for why this is needed: older
+    # pytest releases don't un-suppress a prior logging.disable(CRITICAL)
+    # left by another test module's import-time call.
+    logging.disable(logging.NOTSET)
     caplog.set_level(logging.WARNING, logger="apprise.xmpp")
 
-    # Ensure disconnect does not complete the disconnected Future.
-    def disconnect_no_complete(self: FakeClientXMPP) -> None:
-        return None
+    try:
+        # Ensure disconnect does not complete the disconnected Future.
+        def disconnect_no_complete(self: FakeClientXMPP) -> None:
+            return None
 
-    monkeypatch.setattr(
-        FakeClientXMPP, "disconnect", disconnect_no_complete, raising=True
-    )
+        monkeypatch.setattr(
+            FakeClientXMPP, "disconnect", disconnect_no_complete, raising=True
+        )
 
-    # Capture the disconnected future once connect() creates it. It
-    # does not exist yet at __init__ time (see FakeClientXMPP.__init__),
-    # so it must be captured here instead.
-    real_connect = FakeClientXMPP.connect
-    disconnected_future: dict[str, Any] = {"fut": None}
+        # Capture the disconnected future once connect() creates it. It
+        # does not exist yet at __init__ time (see FakeClientXMPP.__init__),
+        # so it must be captured here instead.
+        real_connect = FakeClientXMPP.connect
+        disconnected_future: dict[str, Any] = {"fut": None}
 
-    def connect_capture(self: FakeClientXMPP, **kwargs: Any) -> Any:
-        fut = real_connect(self, **kwargs)
-        disconnected_future["fut"] = self.disconnected
-        return fut
+        def connect_capture(self: FakeClientXMPP, **kwargs: Any) -> Any:
+            fut = real_connect(self, **kwargs)
+            disconnected_future["fut"] = self.disconnected
+            return fut
 
-    monkeypatch.setattr(
-        FakeClientXMPP, "connect", connect_capture, raising=True
-    )
+        monkeypatch.setattr(
+            FakeClientXMPP, "connect", connect_capture, raising=True
+        )
 
-    # Force wait_for() to raise TimeoutError immediately, but only for
-    # the disconnected future -- matching by identity rather than call
-    # order keeps this deterministic even if session_start's own
-    # concurrently-scheduled task (MUC join, etc.) happens to call
-    # wait_for() of its own accord first.
-    real_wait_for = xmpp_adapter.asyncio.wait_for
+        # Force wait_for() to raise TimeoutError immediately, but only for
+        # the disconnected future -- matching by identity rather than call
+        # order keeps this deterministic even if session_start's own
+        # concurrently-scheduled task (MUC join, etc.) happens to call
+        # wait_for() of its own accord first.
+        real_wait_for = xmpp_adapter.asyncio.wait_for
 
-    def wait_for_patched(aw: Any, timeout: Optional[float] = None) -> Any:
-        if aw is disconnected_future["fut"]:
-            # If aw is a coroutine, close it to avoid warnings
-            with contextlib.suppress(Exception):
-                if hasattr(aw, "close"):
-                    aw.close()
-            raise asyncio.TimeoutError()
-        return real_wait_for(aw, timeout=timeout)
+        def wait_for_patched(aw: Any, timeout: Optional[float] = None) -> Any:
+            if aw is disconnected_future["fut"]:
+                # If aw is a coroutine, close it to avoid warnings
+                with contextlib.suppress(Exception):
+                    if hasattr(aw, "close"):
+                        aw.close()
+                raise asyncio.TimeoutError()
+            return real_wait_for(aw, timeout=timeout)
 
-    monkeypatch.setattr(
-        xmpp_adapter.asyncio, "wait_for", wait_for_patched, raising=True
-    )
+        monkeypatch.setattr(
+            xmpp_adapter.asyncio, "wait_for", wait_for_patched, raising=True
+        )
 
-    config = xmpp_adapter.XMPPConfig(
-        jid="me@example.com",
-        password="x",
-        host="example.com",
-        port=5222,
-        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
-        verify_certificate=False,
-    )
+        config = xmpp_adapter.XMPPConfig(
+            jid="me@example.com",
+            password="x",
+            host="example.com",
+            port=5222,
+            secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+            verify_certificate=False,
+        )
 
-    a = xmpp_adapter.SlixmppAdapter(
-        config=config,
-        targets=[("chat", "a@example.com")],
-        subject="s",
-        body="b",
-        timeout=5.0,
-    )
+        a = xmpp_adapter.SlixmppAdapter(
+            config=config,
+            targets=[("chat", "a@example.com")],
+            subject="s",
+            body="b",
+            timeout=5.0,
+        )
 
-    assert a.process() is False
-    assert "XMPP session timed out" in caplog.text
+        assert a.process() is False
+        assert "XMPP session timed out" in caplog.text
+
+    finally:
+        logging.disable(logging.CRITICAL)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
@@ -1763,35 +1819,43 @@ def test_adapter_ensure_keepalive_worker_wait_timeout(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     install_fake_slixmpp(monkeypatch)
+    # See test_xmpp_invalid_targets_logged for why this is needed: older
+    # pytest releases don't un-suppress a prior logging.disable(CRITICAL)
+    # left by another test module's import-time call.
+    logging.disable(logging.NOTSET)
     caplog.set_level(logging.WARNING, logger="apprise.xmpp")
 
-    config = xmpp_adapter.XMPPConfig(
-        jid="me@example.com",
-        password="x",
-        host="example.com",
-        port=5222,
-        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
-        verify_certificate=False,
-    )
-    a = xmpp_adapter.SlixmppAdapter(
-        config=config,
-        targets=[],
-        subject="s",
-        body="b",
-        timeout=0.1,
-        keepalive=True,
-    )
+    try:
+        config = xmpp_adapter.XMPPConfig(
+            jid="me@example.com",
+            password="x",
+            host="example.com",
+            port=5222,
+            secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+            verify_certificate=False,
+        )
+        a = xmpp_adapter.SlixmppAdapter(
+            config=config,
+            targets=[],
+            subject="s",
+            body="b",
+            timeout=0.1,
+            keepalive=True,
+        )
 
-    # Prevent starting a real loop thread
-    monkeypatch.setattr(a, "_keepalive_runner", lambda: None, raising=True)
+        # Prevent starting a real loop thread
+        monkeypatch.setattr(a, "_keepalive_runner", lambda: None, raising=True)
 
-    # Force wait() to fail
-    monkeypatch.setattr(
-        a._loop_ready, "wait", lambda timeout=None: False, raising=True
-    )
+        # Force wait() to fail
+        monkeypatch.setattr(
+            a._loop_ready, "wait", lambda timeout=None: False, raising=True
+        )
 
-    assert a._ensure_keepalive_worker() is False
-    assert "keepalive worker failed to start" in caplog.text
+        assert a._ensure_keepalive_worker() is False
+        assert "keepalive worker failed to start" in caplog.text
+
+    finally:
+        logging.disable(logging.CRITICAL)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
@@ -2826,7 +2890,7 @@ def test_adapter_keepalive_runner_finally_clears_state_when_closing(
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
-def test_adapter_keepalive_runner_session_start_sets_event_even_on_exception(
+def test_adapter_keepalive_session_start_signals_on_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Cover keepalive _Client._session_start() exception handling."""
@@ -3147,13 +3211,10 @@ def test_adapter_keepalive_runner_failed_handlers(
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
-def test_adapter_keepalive_runner_unsupported_secure_mode_hits_valueerror(
+def test_keepalive_runner_rejects_secure_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Cover keepalive runner unsupported secure mode ValueError.
-    The exception is caught internally, but the raise line is executed.
-    """
+    """The keepalive runner handles an unsupported secure mode."""
     install_fake_slixmpp(monkeypatch)
 
     cfg = xmpp_adapter.XMPPConfig(
@@ -3527,7 +3588,7 @@ def test_adapter_send_keepalive_async_returns_false_when_client_none(
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
-def test_adapter_send_message_keepalive_exception_close_failure_suppressed(
+def test_adapter_keepalive_error_suppresses_close_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     install_fake_slixmpp(monkeypatch)
@@ -3580,7 +3641,7 @@ def test_adapter_send_message_keepalive_exception_close_failure_suppressed(
     assert a.send_message(targets=[], subject="s", body="b") is False
 
 
-def test_adapter_send_message_keepalive_false_none_params_does_not_override(
+def test_adapter_keepalive_failure_keeps_default_params(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     install_fake_slixmpp(monkeypatch)
@@ -3648,63 +3709,71 @@ def test_adapter_send_message_keepalive_worker_failure_returns_false(
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
-def test_adapter_send_message_keepalive_timeout_with_no_session_started_event(
+def test_adapter_keepalive_timeout_without_session_event(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     install_fake_slixmpp(monkeypatch)
+    # See test_xmpp_invalid_targets_logged for why this is needed: older
+    # pytest releases don't un-suppress a prior logging.disable(CRITICAL)
+    # left by another test module's import-time call.
+    logging.disable(logging.NOTSET)
     caplog.set_level(logging.WARNING, logger="apprise.xmpp")
 
-    config = xmpp_adapter.XMPPConfig(
-        jid="me@example.com",
-        password="x",
-        host="example.com",
-        port=5222,
-        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
-        verify_certificate=False,
-    )
+    try:
+        config = xmpp_adapter.XMPPConfig(
+            jid="me@example.com",
+            password="x",
+            host="example.com",
+            port=5222,
+            secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+            verify_certificate=False,
+        )
 
-    a = xmpp_adapter.SlixmppAdapter(
-        config=config,
-        targets=[("chat", "a@example.com")],
-        subject="s",
-        body="b",
-        timeout=5.0,
-        keepalive=True,
-    )
+        a = xmpp_adapter.SlixmppAdapter(
+            config=config,
+            targets=[("chat", "a@example.com")],
+            subject="s",
+            body="b",
+            timeout=5.0,
+            keepalive=True,
+        )
 
-    monkeypatch.setattr(
-        a, "_ensure_keepalive_worker", lambda: True, raising=True
-    )
+        monkeypatch.setattr(
+            a, "_ensure_keepalive_worker", lambda: True, raising=True
+        )
 
-    class _Loop:
-        def call_soon_threadsafe(self, cb: Any, *args: Any) -> None:
-            raise AssertionError(
-                "should not be called when _session_started is None"
-            )
+        class _Loop:
+            def call_soon_threadsafe(self, cb: Any, *args: Any) -> None:
+                raise AssertionError(
+                    "should not be called when _session_started is None"
+                )
 
-    a._loop = _Loop()
-    a._session_started = None  # key for branch coverage
+        a._loop = _Loop()
+        a._session_started = None  # key for branch coverage
 
-    class _FutureTimeout:
-        def result(self, timeout: Optional[float] = None) -> Any:
-            raise xmpp_adapter.FuturesTimeoutError()
+        class _FutureTimeout:
+            def result(self, timeout: Optional[float] = None) -> Any:
+                raise xmpp_adapter.FuturesTimeoutError()
 
-    def run_coroutine_threadsafe_timeout(coro: Any, loop: Any) -> Any:
-        # Close coroutine to avoid RuntimeWarning
-        with contextlib.suppress(Exception):
-            coro.close()
-        return _FutureTimeout()
+        def run_coroutine_threadsafe_timeout(coro: Any, loop: Any) -> Any:
+            # Close coroutine to avoid RuntimeWarning
+            with contextlib.suppress(Exception):
+                coro.close()
+            return _FutureTimeout()
 
-    monkeypatch.setattr(
-        xmpp_adapter.asyncio,
-        "run_coroutine_threadsafe",
-        run_coroutine_threadsafe_timeout,
-        raising=True,
-    )
+        monkeypatch.setattr(
+            xmpp_adapter.asyncio,
+            "run_coroutine_threadsafe",
+            run_coroutine_threadsafe_timeout,
+            raising=True,
+        )
 
-    assert a.send_message() is False
-    assert "XMPP keepalive send timed out" in caplog.text
+        assert a.send_message() is False
+        assert "XMPP keepalive send timed out" in caplog.text
+
+    finally:
+        logging.disable(logging.CRITICAL)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
@@ -4015,6 +4084,10 @@ def test_adapter_connect_if_required_connect_ok_false_disconnects(
 ) -> None:
     """Cover _connect_if_required(): connect_ok False path."""
     install_fake_slixmpp(monkeypatch)
+    # See test_xmpp_invalid_targets_logged for why this is needed: older
+    # pytest releases don't un-suppress a prior logging.disable(CRITICAL)
+    # left by another test module's import-time call.
+    logging.disable(logging.NOTSET)
     caplog.set_level(logging.WARNING, logger="apprise.xmpp")
 
     cfg = xmpp_adapter.XMPPConfig(
@@ -4057,6 +4130,7 @@ def test_adapter_connect_if_required_connect_ok_false_disconnects(
         with contextlib.suppress(Exception):
             asyncio.set_event_loop(None)
         loop.close()
+        logging.disable(logging.CRITICAL)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
@@ -5329,11 +5403,19 @@ def test_xmpp_send_catches_channel_binding_error_and_logs(
 
     n = NotifyXMPP(host="example.com", user="me", password="x")
 
-    with caplog.at_level(logging.WARNING, logger="apprise"):
-        result = n.send(body="hi")
+    # See test_xmpp_invalid_targets_logged for why this is needed: older
+    # pytest releases don't un-suppress a prior logging.disable(CRITICAL)
+    # left by another test module's import-time call.
+    logging.disable(logging.NOTSET)
+    try:
+        with caplog.at_level(logging.WARNING, logger="apprise"):
+            result = n.send(body="hi")
 
-    assert result is False
-    assert "scramplus=no" in caplog.text
+        assert result is False
+        assert "scramplus=no" in caplog.text
+
+    finally:
+        logging.disable(logging.CRITICAL)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
@@ -5361,14 +5443,23 @@ def test_xmpp_send_channel_binding_error_scramplus_already_disabled(
         host="example.com", user="me", password="x", scramplus=False
     )
 
-    with caplog.at_level(logging.WARNING, logger="apprise"):
-        result = n.send(body="hi")
+    # See test_xmpp_invalid_targets_logged for why this is needed: older
+    # pytest releases don't un-suppress a prior logging.disable(CRITICAL)
+    # left by another test module's import-time call.
+    logging.disable(logging.NOTSET)
+    try:
+        with caplog.at_level(logging.WARNING, logger="apprise"):
+            result = n.send(body="hi")
 
-    assert result is False
-    # The "Add ?scramplus=no" suggestion must not appear when already set
-    assert "Add ?scramplus=no" not in caplog.text
-    # A compatibility-oriented message must appear instead
-    assert "compatibility" in caplog.text
+        assert result is False
+        # The "Add ?scramplus=no" suggestion must not appear when already
+        # set
+        assert "Add ?scramplus=no" not in caplog.text
+        # A compatibility-oriented message must appear instead
+        assert "compatibility" in caplog.text
+
+    finally:
+        logging.disable(logging.CRITICAL)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")

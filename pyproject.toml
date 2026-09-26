@@ -42,6 +42,7 @@ classifiers = [
 dependencies = [
     # Application dependencies
     "requests",
+    "urllib3",
     "requests-oauthlib",
     "click>=5.0",
     "markdown",
@@ -77,6 +78,7 @@ keywords = [
     "D7Networks",
     "Dapnet",
     "DBus",
+    "Delta Chat",
     "DingTalk",
     "Discord",
     "Dot",
@@ -123,6 +125,7 @@ keywords = [
     "Mattermost",
     "MessageBird",
     "Microsoft",
+    "MobileMessage",
     "Misskey",
     "MQTT",
     "MSG91",
@@ -252,7 +255,7 @@ all-plugins = [
     # Provides mqtt:// support
     "paho-mqtt >= 2.1.0",
 
-     # Pretty Good Privacy (PGP) Provides mailto:// and deltachat:// support
+    # Enables PGP for mailto:// and deltachat://
     "PGPy",
 
     # Provides blink1:// support
@@ -261,12 +264,19 @@ all-plugins = [
     # Provides smpp:// support
     "smpplib",
 
-    # For xmpp:// support
-    "slixmpp >= 1.16.0",
+    # For xmpp:// support (slixmpp 1.16.0+ needs Python 3.11 or newer)
+    "slixmpp >= 1.16.0; python_version >= '3.11'",
 ]
 windows = [
     "pywin32",
     "tzdata",
+]
+
+[dependency-groups]
+# Development environment for uv; "uv sync" installs this group by default.
+# Dependency groups are never published, so PyPI users are unaffected.
+dev = [
+    "apprise[dev,all-plugins]",
 ]
 
 [project.urls]
@@ -341,7 +351,6 @@ ignore = [
   "D100",    # missing docstring in public module
   "D104",    # missing docstring in public package
   "B008",    # do not call `dict()` with keyword args
-  "E722",    # bare except (Apprise uses it reasonably)
   "E741",    # Ambiguous variable name (e.g., l, O, I)
   "W605",    # Invalid escape sequence
   "B026",    # Star-arg play a big part of Apprise; must be accepted for now
@@ -353,6 +362,11 @@ ignore = [
              # of test cases; this will take a while to fix, so turning off
              # for now
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# Our translation report is a command line tool; printing is its whole job
+"packaging/i18n_status.py" = ["T201"]
+"packaging/verify_translations.py" = ["T201"]
 
 [tool.ruff.lint.pyupgrade]
 keep-runtime-typing = true

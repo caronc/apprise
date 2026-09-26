@@ -48,6 +48,7 @@ from typing import Any, Optional
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -137,7 +138,7 @@ class NotifySignalgrid(NotifyBase):
         if not self.client_key:
             msg = "An invalid Signalgrid Client Key was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store the channel(s) we're notifying. No channels is valid at
         # load time; send() will simply have nothing to notify.
@@ -180,8 +181,17 @@ class NotifySignalgrid(NotifyBase):
         # Track whether any channel notification failed
         has_error = False
         for channel in self.targets:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(channel):
+                continue
+
             if not self._send_to_channel(body, title, notify_type, channel):
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(channel)
 
         return not has_error
 

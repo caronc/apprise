@@ -47,12 +47,17 @@ def environ(*remove, **update):
                    add/update.
     """
     env_orig = os.environ.copy()
-    loc_orig = locale.getlocale()
+
+    # Query every category at once. getlocale() is mocked by some tests, and
+    # feeding its stand-in value back would leave the whole process in the C
+    # locale once this block exits.
+    loc_orig = locale.setlocale(locale.LC_ALL)
     try:
         os.environ.update(update)
         for k in remove:
             os.environ.pop(k, None)
         yield
+
     finally:
         os.environ.clear()
         os.environ.update(env_orig)

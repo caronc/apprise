@@ -45,6 +45,7 @@ import json
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_phone_no
@@ -180,13 +181,13 @@ class NotifySFR(NotifyBase):
                 "combination was not provided."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.space_id = space_id
         if not self.space_id:
             msg = "A SFR Space ID is required."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.voice = voice if voice else self.template_args["voice"]["default"]
         self.lang = lang if lang else self.template_args["lang"]["default"]
@@ -226,7 +227,7 @@ class NotifySFR(NotifyBase):
                 "provide as least one valid phone number."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         return
 
@@ -267,6 +268,11 @@ class NotifySFR(NotifyBase):
         while len(targets):
             # Get our target to notify
             target = targets.pop(0)
+
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
 
             # Prepare our target phone no
             base_payload["to"] = target
@@ -366,6 +372,9 @@ class NotifySFR(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 

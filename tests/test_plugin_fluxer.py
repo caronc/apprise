@@ -42,6 +42,7 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.common import OverflowMode
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.fluxer import FluxerMode, NotifyFluxer
 
 logging.disable(logging.CRITICAL)
@@ -63,21 +64,21 @@ apprise_url_tests = (
     (
         "fluxer://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # An invalid url
     (
         "fluxer://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No webhook_token specified
     (
         "fluxer://%s" % ("0" * 10),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Provide both a webhook id and a webhook token
@@ -178,7 +179,7 @@ apprise_url_tests = (
         # Invalid Mode
         "fluxer://jack@{}/{}?mode=invalid".format(*_tokens()),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -231,14 +232,14 @@ apprise_url_tests = (
         "fluxer://{}/{}?flags=-1".format(*_tokens()),
         {
             # invalid flags specified (variation 1)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "fluxer://{}/{}?flags=invalid".format(*_tokens()),
         {
             # invalid flags specified (variation 2)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # different format support
@@ -585,14 +586,14 @@ def test_plugin_fluxer_429(
     webhook_id, webhook_token = _tokens()
 
     # Basic construction checks (keep these, they match plugin validation)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id=None, webhook_token=webhook_token)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id="  ", webhook_token=webhook_token)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id=webhook_id, webhook_token=None)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id=webhook_id, webhook_token="   ")
 
     obj = NotifyFluxer(
@@ -767,18 +768,18 @@ def test_plugin_fluxer_general(
     mock_post.return_value.content = ""
 
     # Invalid webhook id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id=None, webhook_token=webhook_token)
     # Invalid webhook id (whitespace)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id="  ", webhook_token=webhook_token)
 
     # Invalid webhook token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id=webhook_id, webhook_token=None)
 
     # Private mode but no hostname provided
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(
             webhook_id=webhook_id,
             webhook_token=webhook_token,
@@ -881,11 +882,13 @@ def test_plugin_fluxer_general(
     try:
         NotifyFluxer.fluxer_max_fields = 1
         assert (
-            a.notify(
-                body=test_markdown,
-                title="title",
-                notify_type=NotifyType.INFO,
-                body_format=NotifyFormat.TEXT,
+            bool(
+                a.notify(
+                    body=test_markdown,
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    body_format=NotifyFormat.TEXT,
+                )
             )
             is True
         )
@@ -919,8 +922,12 @@ def test_plugin_fluxer_general(
         NotifyFluxer.fluxer_max_fields = 1
 
         assert (
-            obj.notify(
-                body=test_markdown, title="title", notify_type=NotifyType.INFO
+            bool(
+                obj.notify(
+                    body=test_markdown,
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                )
             )
             is False
         )
@@ -953,8 +960,10 @@ def test_plugin_fluxer_general(
 
     # Use our test markdown string during a notification
     assert (
-        obj.notify(
-            body=test_markdown, title="title", notify_type=NotifyType.INFO
+        bool(
+            obj.notify(
+                body=test_markdown, title="title", notify_type=NotifyType.INFO
+            )
         )
         is True
     )
@@ -974,21 +983,25 @@ def test_plugin_fluxer_general(
 
     # This call includes an image with it's payload:
     assert (
-        a.notify(
-            body=test_markdown,
-            title="title",
-            notify_type=NotifyType.INFO,
-            body_format=NotifyFormat.TEXT,
+        bool(
+            a.notify(
+                body=test_markdown,
+                title="title",
+                notify_type=NotifyType.INFO,
+                body_format=NotifyFormat.TEXT,
+            )
         )
         is True
     )
 
     assert (
-        a.notify(
-            body=test_markdown,
-            title="title",
-            notify_type=NotifyType.INFO,
-            body_format=NotifyFormat.MARKDOWN,
+        bool(
+            a.notify(
+                body=test_markdown,
+                title="title",
+                notify_type=NotifyType.INFO,
+                body_format=NotifyFormat.MARKDOWN,
+            )
         )
         is True
     )
@@ -996,7 +1009,7 @@ def test_plugin_fluxer_general(
     # Toggle our logo availability
     a.asset.image_url_logo = None
     assert (
-        a.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(a.notify(body="body", title="title", notify_type=NotifyType.INFO))
         is True
     )
 
@@ -1012,7 +1025,7 @@ def test_plugin_fluxer_general(
     )
 
     # This call includes an image with it's payload:
-    assert a.notify(body="test", title="title") is True
+    assert bool(a.notify(body="test", title="title")) is True
 
     assert mock_post.call_count == 1
     response = mock_post.call_args_list[0][1]
@@ -1088,17 +1101,19 @@ def test_plugin_fluxer_markdown_extra(mock_post):
 
     # This call includes an image with it's payload:
     assert (
-        a.notify(
-            body=test_markdown,
-            title="title",
-            notify_type=NotifyType.INFO,
-            body_format=NotifyFormat.TEXT,
+        bool(
+            a.notify(
+                body=test_markdown,
+                title="title",
+                notify_type=NotifyType.INFO,
+                body_format=NotifyFormat.TEXT,
+            )
         )
         is True
     )
 
     assert (
-        a.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(a.notify(body="body", title="title", notify_type=NotifyType.INFO))
         is True
     )
 
@@ -1107,6 +1122,7 @@ def test_plugin_fluxer_markdown_extra(mock_post):
 def test_plugin_fluxer_markdown_attachments(
     mock_post: mock.MagicMock,
 ) -> None:
+    """Verify Markdown delivery with attachments in webhook mode."""
     # Prepare our tokens
     webhook_id, webhook_token = _tokens()
 
@@ -1132,11 +1148,13 @@ def test_plugin_fluxer_markdown_attachments(
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1157,10 +1175,12 @@ def test_plugin_fluxer_markdown_attachments(
 
     # Test notifications with mentions and attachments in it
     assert (
-        obj.notify(
-            body="Say hello to <@1234>!",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="Say hello to <@1234>!",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1183,11 +1203,13 @@ def test_plugin_fluxer_markdown_attachments(
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -1372,7 +1394,7 @@ def test_plugin_fluxer_threading(mock_post: mock.MagicMock) -> None:
         is True
     )
 
-    assert a.notify(body="test", title="title") is True
+    assert bool(a.notify(body="test", title="title")) is True
 
     kwargs = mock_post.call_args_list[0][1]
     assert "params" in kwargs
@@ -1496,7 +1518,7 @@ def test_plugin_fluxer_attach_memory(mock_post: mock.MagicMock) -> None:
         mimetype="text/html",
     )
 
-    assert obj.notify(body="Test", attach=mem) is True
+    assert bool(obj.notify(body="Test", attach=mem)) is True
     assert mock_post.call_count >= 1
 
 
@@ -1523,9 +1545,11 @@ def test_plugin_fluxer_html_to_markdown_format(mock_post):
     # Notify with an HTML body; the framework should convert it
     # to Markdown before dispatching to Fluxer
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )

@@ -34,6 +34,8 @@ import pytest
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
+from apprise.plugins.base import _delivery_tracker
 from apprise.plugins.humhub import NotifyHumHub
 
 logging.disable(logging.CRITICAL)
@@ -51,35 +53,35 @@ apprise_url_tests = (
     (
         "humhub://hostname",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Token present but no container ID
     (
         "humhub://token@hostname",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid container ID (not numeric)
     (
         "humhubs://token@hostname/invalid",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Negative container ID (not a positive integer)
     (
         "humhubs://token@hostname/-1",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Zero container ID (not a positive integer)
     (
         "humhubs://token@hostname/0",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Valid bearer token + container ID over HTTP (insecure)
@@ -197,23 +199,23 @@ def test_plugin_humhub_init():
     """NotifyHumHub() initialization edge cases."""
 
     # No user/token at all
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyHumHub(user=None, host="hostname", targets=["1"])
 
     # Empty string user
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyHumHub(user="", host="hostname", targets=["1"])
 
     # No containers specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyHumHub(user="token", host="hostname", targets=[])
 
     # None targets
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyHumHub(user="token", host="hostname", targets=None)
 
     # Only invalid targets
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyHumHub(user="token", host="hostname", targets=["bad", "0", "-5"])
 
     # Mixed valid and invalid -- should succeed, dropping the bad ones
@@ -249,7 +251,7 @@ def test_plugin_humhub_bearer_send(mock_post):
     mock_post.return_value.content = b""
 
     obj = NotifyHumHub(user="mytoken", host="localhost", targets=["1"])
-    assert obj.notify(body="Test body") is True
+    assert bool(obj.notify(body="Test body")) is True
 
     # Confirm bearer token header was set
     assert mock_post.called
@@ -271,7 +273,7 @@ def test_plugin_humhub_basic_send(mock_post):
     obj = NotifyHumHub(
         user="admin", password="secret", host="localhost", targets=["1"]
     )
-    assert obj.notify(body="Test body") is True
+    assert bool(obj.notify(body="Test body")) is True
 
     # Confirm basic auth tuple was passed and no Authorization header
     assert mock_post.called
@@ -289,7 +291,7 @@ def test_plugin_humhub_multi_container(mock_post):
     mock_post.return_value.content = b""
 
     obj = NotifyHumHub(user="token", host="localhost", targets=["1", "2", "3"])
-    assert obj.notify(body="Hello") is True
+    assert bool(obj.notify(body="Hello")) is True
 
     # One POST per container
     assert mock_post.call_count == 3
@@ -315,7 +317,7 @@ def test_plugin_humhub_partial_failure(mock_post):
 
     obj = NotifyHumHub(user="token", host="localhost", targets=["1", "2", "3"])
     # Partial failure means overall False
-    assert obj.notify(body="msg") is False
+    assert bool(obj.notify(body="msg")) is False
     assert mock_post.call_count == 3
 
 
@@ -329,15 +331,15 @@ def test_plugin_humhub_http_errors(mock_post):
     mock_post.return_value.content = b"Unauthorized"
 
     obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
-    assert obj.notify(body="msg") is False
+    assert bool(obj.notify(body="msg")) is False
 
     # HTTP 500 Internal Server Error
     mock_post.return_value.status_code = requests.codes.internal_server_error
-    assert obj.notify(body="msg") is False
+    assert bool(obj.notify(body="msg")) is False
 
     # Unknown / unexpected code
     mock_post.return_value.status_code = 999
-    assert obj.notify(body="msg") is False
+    assert bool(obj.notify(body="msg")) is False
 
 
 @mock.patch("requests.post")
@@ -347,7 +349,7 @@ def test_plugin_humhub_request_exception(mock_post):
     mock_post.side_effect = requests.RequestException("Connection refused")
 
     obj = NotifyHumHub(user="token", host="localhost", targets=["1", "2"])
-    assert obj.notify(body="msg") is False
+    assert bool(obj.notify(body="msg")) is False
     # Both containers attempted
     assert mock_post.call_count == 2
 
@@ -414,7 +416,7 @@ def test_plugin_humhub_url_parsing():
 
     # Empty / invalid URL returns None (no host)
     assert NotifyHumHub.parse_url("humhubs://") is None
-    # Only host, no user -- parse_url succeeds; TypeError raised at init
+    # Parsing accepts a host alone; initialization later requires a user.
     result = NotifyHumHub.parse_url("humhubs://hostname/1")
     assert result is not None
 
@@ -445,11 +447,11 @@ def test_plugin_humhub_apprise_integration(mock_post):
 
     aobj = Apprise()
     assert aobj.add("humhubs://mytoken@localhost/1")
-    assert aobj.notify(title="Title", body="Body") is True
+    assert bool(aobj.notify(title="Title", body="Body")) is True
 
     aobj2 = Apprise()
     assert aobj2.add("humhubs://user:pass@localhost/1")
-    assert aobj2.notify(title="Title", body="Body") is True
+    assert bool(aobj2.notify(title="Title", body="Body")) is True
 
 
 @mock.patch("requests.post")
@@ -606,6 +608,42 @@ def test_plugin_humhub_attachment_upload_failure(mock_post):
     obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
     assert obj.send(body="msg", attach=[attachment]) is False
     assert mock_post.call_count == 2
+
+
+@mock.patch("requests.post")
+def test_plugin_humhub_attachment_failure_does_not_repeat_post(mock_post):
+    """An attachment failure does not create a duplicate post."""
+    from io import BytesIO
+
+    create_resp = requests.Request()
+    create_resp.status_code = requests.codes.ok
+    create_resp.content = b'{"id": 3}'
+
+    failed_upload = requests.Request()
+    failed_upload.status_code = requests.codes.internal_server_error
+    failed_upload.content = b"error"
+
+    mock_post.side_effect = [create_resp, failed_upload]
+
+    attachment = mock.MagicMock()
+    attachment.__bool__ = mock.MagicMock(return_value=True)
+    attachment.name = "report.pdf"
+    attachment.open = mock.MagicMock(return_value=BytesIO(b"pdf data"))
+
+    obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        assert obj.send(body="msg", attach=[attachment]) is False
+        assert obj.send(body="msg", attach=[attachment]) is False
+    finally:
+        _delivery_tracker.reset(tracker_token)
+
+    create_calls = [
+        call
+        for call in mock_post.call_args_list
+        if "/api/v1/post/container/1" in call.args[0]
+    ]
+    assert len(create_calls) == 1
 
 
 @mock.patch("requests.post")

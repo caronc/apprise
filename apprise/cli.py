@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import contextlib
 import logging
 import os
 from os.path import exists, isfile
@@ -33,6 +34,7 @@ import re
 import shutil
 import sys
 import textwrap
+import time
 
 import click
 
@@ -40,12 +42,18 @@ from . import (
     Apprise,
     AppriseAsset,
     AppriseConfig,
+    AppriseResultStatus,
     NotificationManager,
+    NotifyTemplate,
     PersistentStore,
     __copyright__,
     __license__,
     __title__,
     __version__,
+)
+from .apprise import (
+    abandoned_call_descriptions,
+    any_abandoned_calls_still_running,
 )
 from .common import (
     NOTIFY_FORMATS,
@@ -60,20 +68,11 @@ from .common import (
 from .logger import logger
 from .utils.disk import bytes_to_str, dir_size, path_decode
 from .utils.parse import GET_SCHEMA_RE, parse_list
+from .utils.template import TEMPLATE_NAME_RE, normalize_name
 
 # By default we allow looking 1 level down recursively in Apprise configuration
 # files.
 DEFAULT_RECURSION_DEPTH = 1
-
-# Default number of days to prune persistent storage
-DEFAULT_STORAGE_PRUNE_DAYS = int(
-    os.environ.get("APPRISE_STORAGE_PRUNE_DAYS", 30)
-)
-
-# The default URL ID Length
-DEFAULT_STORAGE_UID_LENGTH = int(
-    os.environ.get("APPRISE_STORAGE_UID_LENGTH", 8)
-)
 
 # Defines the environment variable to parse if defined. This is ONLY
 # Referenced if:
@@ -89,6 +88,29 @@ DEFAULT_ENV_APPRISE_PLUGIN_PATH = "APPRISE_PLUGIN_PATH"
 
 # Defines the override path for the persistent storage
 DEFAULT_ENV_APPRISE_STORAGE_PATH = "APPRISE_STORAGE_PATH"
+
+# Environment variable controlling the storage retention period
+DEFAULT_ENV_APPRISE_STORAGE_PRUNE_DAYS = "APPRISE_STORAGE_PRUNE_DAYS"
+
+# Environment variable controlling generated storage URL ID length
+DEFAULT_ENV_APPRISE_STORAGE_UID_LENGTH = "APPRISE_STORAGE_UID_LENGTH"
+
+# Default number of days to prune persistent storage
+DEFAULT_STORAGE_PRUNE_DAYS = int(
+    os.environ.get(DEFAULT_ENV_APPRISE_STORAGE_PRUNE_DAYS, 30)
+)
+
+# The default URL ID Length
+DEFAULT_STORAGE_UID_LENGTH = int(
+    os.environ.get(DEFAULT_ENV_APPRISE_STORAGE_UID_LENGTH, 8)
+)
+
+# Grace period for abandoned service calls to finish before forced exit.
+# Normal interpreter shutdown would otherwise wait on those threads.
+CLI_TIMEOUT_EXIT_GRACE_SECONDS = 5.0
+
+# Poll interval while waiting for abandoned service calls to finish.
+CLI_TIMEOUT_EXIT_POLL_INTERVAL = 0.25
 
 # Defines our click context settings adding -h to the additional options that
 # can be specified to get the help menu to come up
@@ -241,9 +263,9 @@ PERSISTENT_STORAGE_MODES = (
     PersistentStorageMode.CLEAR,
 )
 
-if os.environ.get("APPRISE_STORAGE_PATH", "").strip():
+if os.environ.get(DEFAULT_ENV_APPRISE_STORAGE_PATH, "").strip():
     # Override Default Storage Path
-    DEFAULT_STORAGE_PATH = os.environ.get("APPRISE_STORAGE_PATH")
+    DEFAULT_STORAGE_PATH = os.environ.get(DEFAULT_ENV_APPRISE_STORAGE_PATH)
 
 
 def _log_runtime_env():
@@ -348,10 +370,7 @@ class CustomHelpCommand(click.Command):
         # Custom help message
         formatter.write_text("")
         content = (
-            (
-                "Send a notification to all of the specified servers "
-                "identified by their URLs"
-            ),
+            ("Send a notification to the services identified by their URLs"),
             (
                 "the content provided within the title, body and "
                 "notification-type."
@@ -472,6 +491,83 @@ class CustomHelpCommand(click.Command):
 
         # Include any epilog or additional text
         self.format_epilog(ctx, formatter)
+
+
+def _wait_for_abandoned_calls(timeout: float) -> bool:
+    """Wait up to ``timeout`` for abandoned service calls to finish.
+
+    Return ``True`` once no tracked calls remain.
+    """
+    # Log descriptions with private URL details hidden. Background work owned
+    # entirely by a plugin is not tracked here.
+    descriptions = abandoned_call_descriptions()
+    logger.debug(
+        "One or more services timed out. Waiting up to %.1fs more for "
+        "these services to finish: %s",
+        timeout,
+        ", ".join(descriptions)
+        if descriptions
+        else "(no services are still running)",
+    )
+    # Count our short waits so the CLI never exceeds the grace period.
+    elapsed = 0.0
+    while elapsed < timeout:
+        # Stop early as soon as every background call is done.
+        if not any_abandoned_calls_still_running():
+            logger.debug(
+                "Timed-out service calls finished after %.2fs.",
+                elapsed,
+            )
+            return True
+        # The final sleep may be shorter than the normal polling interval.
+        sleep_for = min(CLI_TIMEOUT_EXIT_POLL_INTERVAL, timeout - elapsed)
+        time.sleep(sleep_for)
+        elapsed += sleep_for
+
+    # Check once more in case the final call ended during the last sleep.
+    still_running = any_abandoned_calls_still_running()
+    if still_running:
+        logger.debug(
+            "%.1fs elapsed and some timed-out services are still running; "
+            "exiting now.",
+            timeout,
+        )
+    # Tell the caller whether normal shutdown is now safe.
+    return not still_running
+
+
+def _force_exit(apobj: Apprise, status: AppriseResultStatus) -> None:
+    """Unconditionally end the process, skipping Python's normal
+    shutdown sequence entirely.
+    """
+    # os._exit() skips normal object cleanup, so flush every store first.
+    # A failed flush must not stop the remaining services from trying.
+    for service in apobj:
+        try:
+            logger.trace(
+                "Flushing persistent store for service: %s",
+                service.url(privacy=True),
+            )
+            service.flush_store()
+
+        except Exception as e:
+            logger.warning(
+                "Could not save one service's persistent data before "
+                "exiting; continuing with the remaining services."
+            )
+            logger.debug("Persistent store save error: %s", e)
+
+    # os._exit() skips atexit hooks, so flush logging and stdio manually.
+    # Each flush is independent; one failure should not block the others.
+    with contextlib.suppress(Exception):
+        logging.shutdown()
+    with contextlib.suppress(Exception):
+        sys.stdout.flush()
+    with contextlib.suppress(Exception):
+        sys.stderr.flush()
+
+    # Hard-exit last so abandoned worker threads cannot keep the CLI alive.
+    os._exit(status)
 
 
 @click.command(context_settings=CONTEXT_SETTINGS, cls=CustomHelpCommand)
@@ -601,6 +697,22 @@ class CustomHelpCommand(click.Command):
     help="Specify the default theme.",
 )
 @click.option(
+    "--template-var",
+    "-tv",
+    "template_var",
+    default=None,
+    type=str,
+    multiple=True,
+    metavar="NAME=VALUE",
+    help=(
+        "Supply a value used by a YAML configuration written with "
+        "${NAME}. Use multiple --template-var (-tv) entries for more "
+        "than one. A value not given here is looked for in the "
+        "configuration's own default and then in "
+        "APPRISE_TEMPLATE_<NAME>."
+    ),
+)
+@click.option(
     "--tag",
     "-g",
     default=None,
@@ -612,6 +724,32 @@ class CustomHelpCommand(click.Command):
         "multiple --tag (-g) entries to match ANY tag. Use comma separators "
         "to require ALL tags (strict match). Omit to notify untagged services "
         'only, or use "all" to notify everything.'
+    ),
+)
+@click.option(
+    "--limit",
+    "-L",
+    default=0,
+    type=float,
+    metavar="SECONDS",
+    help=(
+        "Give up on the whole run if it's taking too long, in seconds "
+        "(whole number or decimal, e.g. 2.5). By default (0) there is "
+        "no limit -- see --service-limit to cap each service on its own "
+        "instead."
+    ),
+)
+@click.option(
+    "--service-limit",
+    "-SL",
+    default=None,
+    type=float,
+    metavar="SECONDS",
+    help=(
+        "Give up on any single service if it's taking too long, in "
+        "seconds (whole number or decimal, e.g. 2.5), or 0 to turn this "
+        "off entirely. Leave unset to use Apprise's own default of "
+        f"{AppriseAsset._service_timeout:g} seconds."
     ),
 )
 @click.option(
@@ -678,7 +816,7 @@ class CustomHelpCommand(click.Command):
 @click.argument(
     "urls",
     nargs=-1,
-    metavar="SERVER_URL [SERVER_URL2 [SERVER_URL3]]",
+    metavar="SERVICE_URL [SERVICE_URL2 [SERVICE_URL3]]",
 )
 @click.pass_context
 def main(
@@ -690,9 +828,12 @@ def main(
     urls,
     notification_type,
     theme,
+    template_var,
     tag,
     input_format,
     dry_run,
+    limit,
+    service_limit,
     recursion_depth,
     verbose,
     disable_async,
@@ -707,8 +848,8 @@ def main(
     debug,
     version,
 ):
-    """Send a notification to all of the specified servers identified by their
-    URLs the content provided within the title, body and notification-type.
+    """Send the supplied title, body, and notification type to the services
+    identified by the given URLs or configuration sources.
 
     For a list of all of the supported services and information on how to use
     them, check out https://github.com/caronc/apprise
@@ -801,18 +942,7 @@ def main(
     # Apply Environment Overrides if defined
     #
     config_paths = DEFAULT_CONFIG_PATHS
-    if "APPRISE_CONFIG" in os.environ:
-        # Deprecate (this was from previous versions of Apprise <= 1.9.1)
-        logger.deprecate(
-            "APPRISE_CONFIG environment variable has been changed to "
-            f"{DEFAULT_ENV_APPRISE_CONFIG_PATH}"
-        )
-        logger.debug(
-            "Loading provided APPRISE_CONFIG (deprecated) environment variable"
-        )
-        config_paths = (os.environ.get("APPRISE_CONFIG", "").strip(),)
-
-    elif DEFAULT_ENV_APPRISE_CONFIG_PATH in os.environ:
+    if DEFAULT_ENV_APPRISE_CONFIG_PATH in os.environ:
         logger.debug(
             f"Loading provided {DEFAULT_ENV_APPRISE_CONFIG_PATH} "
             "environment variable"
@@ -820,6 +950,16 @@ def main(
         config_paths = re.split(
             r"[\r\n;]+",
             os.environ.get(DEFAULT_ENV_APPRISE_CONFIG_PATH).strip(),
+        )
+
+    elif "APPRISE_CONFIG" in os.environ:
+        logger.deprecate(
+            "The APPRISE_CONFIG environment variable has been renamed to "
+            f"{DEFAULT_ENV_APPRISE_CONFIG_PATH}"
+        )
+        config_paths = re.split(
+            r"[\r\n;]+",
+            os.environ.get("APPRISE_CONFIG").strip(),
         )
 
     plugin_paths_ = DEFAULT_PLUGIN_PATHS
@@ -886,6 +1026,8 @@ def main(
         storage_idlen=storage_uid_length,
         # Define if we flush to disk as soon as possible or not when required
         storage_mode=storage_mode,
+        # Apply the optional per-service delivery budget to every plugin.
+        service_timeout=service_limit,
     )
 
     # Create our Apprise object
@@ -1074,15 +1216,47 @@ def main(
 
     if not dry_run and not (a or storage_action):
         click.echo(
-            "You must specify at least one server URL or populated "
+            "You must specify at least one service URL or populated "
             "configuration file."
         )
         click.echo("Try 'apprise --help' for more information.")
         ctx.exit(1)
 
-    # each --tag entry comprises of a comma separated 'and' list
-    # we or each of of the --tag and sets specified.
+    # Each --tag value is a comma-separated AND group; values are ORed.
     tags = None if not tag else [parse_list(t) for t in tag]
+
+    # Split once so equals signs remain valid inside the value.
+    template_vars = {}
+
+    # Names are matched without regard to case, so track what we have seen.
+    template_seen = set()
+    for entry in template_var:
+        name, sep, value = entry.partition("=")
+        name = name.strip()
+        if not sep or not TEMPLATE_NAME_RE.match(name):
+            # Only the name is echoed; the rest of the entry may be a
+            # secret and must not reach the screen or a captured log.
+            click.echo(
+                "The --template-var (-tv) name '{}' is not in the"
+                " expected NAME=VALUE format.".format(name)
+            )
+            click.echo("Try 'apprise --help' for more information.")
+
+            # Match Click's exit code for invalid parameters.
+            ctx.exit(2)
+
+        if normalize_name(name) in template_seen:
+            click.echo(
+                "The --template-var (-tv) name '{}' was provided more than"
+                " once.".format(name)
+            )
+            click.echo("Try 'apprise --help' for more information.")
+
+            # Match Click's exit code for invalid parameters.
+            ctx.exit(2)
+
+        template_seen.add(normalize_name(name))
+        template_vars[name] = value
 
     # Determine if we're dealing with URLs or url_ids based on the first
     # entry provided.
@@ -1252,7 +1426,7 @@ def main(
                         click.echo(
                             "{:>10}: {}".format(
                                 "tags",
-                                ", ".join(str(t) for t in entry.tags),
+                                ", ".join(sorted(str(t) for t in entry.tags)),
                             )
                         )
 
@@ -1260,18 +1434,12 @@ def main(
             if action == PersistentStorageMode.CLEAR:
                 storage_prune_days = 0
 
-            # Derive the namespace for disk_prune.  The scoping rules
-            # mirror those for disk_scan:
-            #   - URL filters: resolved plugin uids + any uid-prefix
-            #     strings; empty means no-op (nothing to prune).
-            #   - Tag filters: same scoping — resolved plugin uids + any
-            #     uid-prefix strings; empty means no-op.
-            #   - Plain uid-prefix or no filter: pass through directly.
+            # Match disk-scan filtering when choosing prune namespaces:
+            # - URL and tag filters use resolved UIDs plus explicit prefixes.
+            # - An empty filtered result prunes nothing.
+            # - Otherwise, pass explicit prefixes or no filter through.
             if _had_url_filters or tags:
-                # Scope to the uids that the filtered plugins resolved
-                # to.  If none resolved (e.g. unknown tag), exit early
-                # -- disk_prune() with namespace=None targets ALL
-                # namespaces, so passing None here is not a no-op.
+                # Exit when filters resolve nothing because None prunes all.
                 _prune_ns = list(uids.keys()) + uid_filter_list
                 if not _prune_ns:
                     ctx.exit(0)
@@ -1301,14 +1469,33 @@ def main(
             # if no body was specified, then read from STDIN
             body = click.get_text_stream("stdin").read()
 
-        # now print it out
+        # Send the notification. AppriseResult.status maps directly to the
+        # process exit values handled after the dry-run branch.
+        notify_start = time.monotonic()
         result = a.notify(
             body=body,
             title=title,
             notify_type=notification_type,
             tag=tags,
             attach=attach,
+            template=template_vars,
+            timeout=limit,
         )
+
+        status = result.status
+
+        # Status report
+        logger.debug(
+            "Finished in %.2fs. %d service(s) tried (%s): %d sent / "
+            "%d failed / %d timed out.",
+            time.monotonic() - notify_start,
+            len(result),
+            status.name,
+            result.success_count,
+            result.failed_count,
+            result.timeout_count,
+        )
+
     else:
         # Number of columns to assume in the terminal.  In future, maybe this
         # can be detected and made dynamic. The actual column count is 80, but
@@ -1320,8 +1507,19 @@ def main(
         # we iterated at least once in the loop.
         url = None
 
-        for idx, server in enumerate(a.find(tag=tags)):
-            url = server.url(privacy=True)
+        # Count matching entries that a real run would skip.
+        unresolved = 0
+
+        # Show pending entries and the values they still need.
+        for idx, service in enumerate(a.find(tag=tags, resolve=False)):
+            entry = service
+            if isinstance(service, NotifyTemplate):
+                # Resolve supplied values or display the pending entry.
+                built = Apprise._resolve_template(service, template_vars)
+                if built is not None:
+                    service = built
+
+            url = service.url(privacy=True)
             click.echo(
                 "{: 4d}. {}".format(
                     idx + 1,
@@ -1334,37 +1532,73 @@ def main(
             )
 
             # Share our URL ID
-            click.echo(
-                "{:>10}: {}".format(
-                    "uid",
-                    "- n/a -" if not server.url_id() else server.url_id(),
-                )
-            )
+            if service.url_id():
+                uid = service.url_id()
 
-            if server.tags:
+            elif isinstance(service, NotifyTemplate):
+                # Explain why this pending entry has no identifier.
+                uid = "- template; unresolved, would not send -"
+                unresolved += 1
+
+            else:
+                uid = "- n/a -"
+
+            click.echo("{:>10}: {}".format("uid", uid))
+
+            if service.tags:
                 click.echo(
                     "{:>10}: {}".format(
                         "tags",
-                        ", ".join(str(t) for t in server.tags),
+                        ", ".join(sorted(str(t) for t in service.tags)),
                     )
                 )
 
-        # Initialize a default response of nothing matched, otherwise
-        # if we matched at least one entry, we can return True
-        result = None if url is None else True
+            names = getattr(entry, "template_names", ())
+            if names:
+                required = set(getattr(entry, "template_required", ()))
+                click.echo(
+                    "{:>10}: {}".format(
+                        "template",
+                        ", ".join(
+                            "{} ({})".format(
+                                name,
+                                "required"
+                                if name in required
+                                else "has default",
+                            )
+                            for name in names
+                        ),
+                    )
+                )
 
-    if result is None:
-        # There were no notifications set.  This is a result of just having
-        # empty configuration files and/or being to restrictive when filtering
-        # by specific tag(s)
+        if unresolved:
+            click.echo()
+            click.echo(
+                "{} of {} matched entries could not be resolved and would"
+                " not be sent. Check the log for the reason.".format(
+                    unresolved, idx + 1
+                )
+            )
 
-        # Exit code 3 is used since Click uses exit code 2 if there is an
-        # error with the parameters specified
-        ctx.exit(3)
+        # Dry-run has no AppriseResult, so map its outcome to the same enum.
+        # A missing value maps to the same outcome a real run would give.
+        if url is None:
+            status = AppriseResultStatus.NOMATCH
 
-    elif result is False:
-        # At least 1 notification service failed to send
-        ctx.exit(1)
+        elif not unresolved:
+            status = AppriseResultStatus.SUCCESS
 
-    # else:  We're good!
-    ctx.exit(0)
+        elif unresolved == idx + 1:
+            status = AppriseResultStatus.FAILURE
+
+        else:
+            status = AppriseResultStatus.PARTIAL
+
+    if status == AppriseResultStatus.TIMEOUT and not _wait_for_abandoned_calls(
+        CLI_TIMEOUT_EXIT_GRACE_SECONDS
+    ):
+        _force_exit(a, status)
+
+    # AppriseResultStatus values map directly to CLI exit codes.
+    # Exit code 2 is left to Click for bad command-line parameters.
+    ctx.exit(status)

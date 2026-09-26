@@ -57,6 +57,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_phone_no,
@@ -225,7 +226,7 @@ class NotifyWhatsApp(NotifyBase):
         if not self.token:
             msg = f"An invalid WhatsApp Access Token ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The From Phone ID associated with the account
         self.from_phone_id = validate_regex(
@@ -237,7 +238,7 @@ class NotifyWhatsApp(NotifyBase):
                 f"({from_phone_id}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The template to associate with the message
         if template:
@@ -250,7 +251,7 @@ class NotifyWhatsApp(NotifyBase):
                     f"({template}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # The Template language Code to use
             if language:
@@ -263,7 +264,7 @@ class NotifyWhatsApp(NotifyBase):
                         f"({language}) was specified."
                     )
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
             else:
                 self.language = self.template_tokens["language"]["default"]
         else:
@@ -329,7 +330,7 @@ class NotifyWhatsApp(NotifyBase):
                     f"An invalid Template Component ID ({key}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             if matched.group("id"):
                 #
@@ -350,7 +351,7 @@ class NotifyWhatsApp(NotifyBase):
                         f"(:{key}={val}) was specified."
                     )
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
                 index = matched.group("id")
 
             if index in self.components:
@@ -359,7 +360,7 @@ class NotifyWhatsApp(NotifyBase):
                     f"({key}) was already assigned."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             self.components[index] = map_to
             self.component_keys = self.components.keys()
@@ -463,6 +464,11 @@ class NotifyWhatsApp(NotifyBase):
             # Get our target to notify
             target = targets.pop(0)
 
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             # Group targets are stored with a '#' prefix; phone numbers
             # are stored in E.164 format ('+' prefix).
             if target.startswith("#"):
@@ -563,6 +569,9 @@ class NotifyWhatsApp(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 

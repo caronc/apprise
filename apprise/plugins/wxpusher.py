@@ -40,6 +40,7 @@ import re
 import requests
 
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list, validate_regex
@@ -175,7 +176,7 @@ class NotifyWxPusher(NotifyBase):
         if not self.token:
             msg = f"An invalid WxPusher App Token ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Used for URL generation afterwards only
         self._invalid_targets = []

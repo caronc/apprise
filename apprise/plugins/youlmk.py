@@ -58,6 +58,7 @@ from typing import Any, Optional
 import requests
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, validate_regex
 from .base import NotifyBase
@@ -257,7 +258,7 @@ class NotifyYouLMK(NotifyBase):
         if not self.token:
             msg = f"An invalid YouLMK token or key ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # An explicit priority forces every notification to it
         self.priority = None
@@ -266,7 +267,7 @@ class NotifyYouLMK(NotifyBase):
             if self.priority is None:
                 msg = f"An invalid YouLMK priority ({priority}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Per-notification-type priority mapping; each type may be overridden
         # from the URL, otherwise it falls back to the default
@@ -285,7 +286,7 @@ class NotifyYouLMK(NotifyBase):
             if resolved is None:
                 msg = f"An invalid YouLMK priority ({value}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             self.priority_map[ntype] = resolved
 

@@ -30,6 +30,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list
@@ -131,7 +132,7 @@ class NotifyNextcloudTalk(NotifyBase):
         if self.user is None or self.password is None:
             msg = "A NextCloudTalk User and Password must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our targets
         self.targets = parse_list(targets)
@@ -174,6 +175,11 @@ class NotifyNextcloudTalk(NotifyBase):
         targets = list(self.targets)
         while len(targets):
             target = targets.pop(0)
+
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
 
             # Prepare our Payload
             if not body:
@@ -265,6 +271,9 @@ class NotifyNextcloudTalk(NotifyBase):
                 # track our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 

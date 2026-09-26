@@ -40,6 +40,7 @@ import re
 import requests
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -214,7 +215,7 @@ class NotifyJoin(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Join API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The Priority of the message
         self.priority = int(
@@ -244,6 +245,7 @@ class NotifyJoin(NotifyBase):
         while len(targets):
             # Parse our targets
             target = targets.pop(0)
+
             group_re = IS_GROUP_RE.match(target)
             if group_re:
                 self.targets.append(
@@ -272,6 +274,11 @@ class NotifyJoin(NotifyBase):
         while len(targets):
             # Pop the first element off of our list
             target = targets.pop(0)
+
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
 
             url_args = {
                 "apikey": self.apikey,
@@ -357,6 +364,9 @@ class NotifyJoin(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 
