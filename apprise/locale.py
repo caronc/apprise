@@ -71,13 +71,15 @@ class AppriseLocale:
 
     # Locale regular expression
     #
-    # Accept a two- or three-letter language, with an optional region. A
-    # hyphen or an underscore separates the two. Extra parts and an encoding
-    # suffix are matched so normalization can safely discard them.
+    # Matches a locale such as en_CA.UTF-8 or ca_ES.UTF-8@valencia:
+    # - A 2 or 3 letter language with an optional region (en_CA or en-CA).
+    # - An optional codeset (.UTF-8) and modifier (@euro), both discarded.
+    # - A codeset may hold dots and underscores (C.ANSI_X3.4-1968).
     _local_re = re.compile(
         r"^\s*((?P<ansii>C|POSIX)|(?P<lang>([a-z]{2,3}))"
         r"([_-](?P<country>[a-z0-9]{2,8}))?([_-][a-z0-9]{2,8})*)"
-        r"(\.(?P<enc>[a-z0-9-]+))?\s*$",
+        r"(\.(?P<enc>[a-z0-9._-]+))?"
+        r"(@(?P<modifier>[a-z0-9_-]+))?\s*$",
         re.IGNORECASE,
     )
 
@@ -236,7 +238,8 @@ class AppriseLocale:
 
         Matching is case insensitive. A hyphen or an underscore separates a
         region, so ``en-CA``, ``en_CA``, and ``EN-ca`` all become ``en_CA``.
-        Only the first value of a preference list is used.
+        A codeset or modifier is dropped, so ``en_CA.UTF-8@euro`` becomes
+        ``en_CA``. Only the first value of a preference list is used.
         """
         if not isinstance(lang, str):
             return None

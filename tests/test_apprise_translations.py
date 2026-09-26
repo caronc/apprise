@@ -41,13 +41,28 @@ from apprise import Apprise, AppriseAsset, locale
 
 logging.disable(logging.CRITICAL)
 
+# True when the catalogs have been compiled (tox -e compile).  They are not
+# kept in git and CI does not build them, so add() results depend on this.
+CATALOG_COMPILED = os.path.isfile(
+    os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "apprise",
+        "i18n",
+        "en",
+        "LC_MESSAGES",
+        "apprise.mo",
+    )
+)
+
 
 def test_apprise_trans():
     """
     API: Test apprise locale object
     """
-    lazytrans = locale.LazyTranslation("Token")
-    assert str(lazytrans) == "Token"
+    # Text with no translation reads the same in every language
+    text = "A string Apprise has no translation for"
+    lazytrans = locale.LazyTranslation(text)
+    assert str(lazytrans) == text
 
 
 @pytest.mark.skipif("gettext" not in sys.modules, reason="Requires gettext")
@@ -111,12 +126,14 @@ def test_apprise_trans_gettext_lang_at(mock_getlocale):
     # Set the gettext locale returned by the mock.
     mock_getlocale.return_value = ("en_CA", "UTF-8")
 
-    # This throws internally but we handle it gracefully
-    al = locale.AppriseLocale()
+    # Clear the language variables so only the mock above is detected
+    with environ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE", "LANG"):
+        # This throws internally but we handle it gracefully
+        al = locale.AppriseLocale()
 
-    # Edge Cases
-    assert al.add("en", set_default=False) is True
-    assert al.add("en", set_default=True) is True
+    # We detected en_CA, so plain en needs a compiled catalog
+    assert al.add("en", set_default=False) is CATALOG_COMPILED
+    assert al.add("en", set_default=True) is CATALOG_COMPILED
 
     with al.lang_at("en"):
         # functions still behave as normal
@@ -222,8 +239,30 @@ def test_normalize_language():
     for entry in ("en-CA", "en_CA", "EN-ca", "en-ca"):
         assert locale.AppriseLocale.normalize_language(entry) == "en_CA"
 
-    # An encoding is thrown away
-    assert locale.AppriseLocale.normalize_language("en_CA.UTF-8") == "en_CA"
+    # A codeset (.UTF-8) and modifier (@euro) are both dropped
+    for entry in (
+        "en_CA.UTF-8",
+        "en_CA.utf8",
+        "en_CA.ISO8859-1",
+        "en_CA.ANSI_X3.4-1968",
+        "en_CA@euro",
+        "en_CA.UTF-8@euro",
+    ):
+        assert locale.AppriseLocale.normalize_language(entry) == "en_CA"
+
+    # A modifier is dropped even without a codeset
+    assert locale.AppriseLocale.normalize_language("sr_RS@latin") == "sr_RS"
+    assert locale.AppriseLocale.normalize_language("fr@euro") == "fr"
+
+    # The form locale.normalize() returns for ca_ES@valencia
+    assert (
+        locale.AppriseLocale.normalize_language("ca_ES.UTF-8@valencia")
+        == "ca_ES"
+    )
+
+    # A codeset or modifier on its own is not a language
+    for entry in (".UTF-8", "@euro", "garbage.stuff_more"):
+        assert locale.AppriseLocale.normalize_language(entry) is None
 
     # Anything beyond a 2 letter region is dropped, leaving the language
     assert locale.AppriseLocale.normalize_language("zh-Hans") == "zh"
@@ -249,7 +288,18 @@ def test_normalize_language():
 def test_is_ansii_locale():
     """The C locale is recognized under each of its spellings."""
 
-    for entry in ("C", "c", "POSIX", "posix", "C.UTF-8", "POSIX.UTF-8"):
+    # Every spelling, with or without a codeset or modifier
+    for entry in (
+        "C",
+        "c",
+        "POSIX",
+        "posix",
+        "C.UTF-8",
+        "C.utf8",
+        "C.ANSI_X3.4-1968",
+        "POSIX.UTF-8",
+        "C@euro",
+    ):
         assert locale.AppriseLocale.is_ansii_locale(entry) is True
 
     # A language is not the C locale, including the ones that start with a c
@@ -325,8 +375,25 @@ def test_detect_language_precedence(mock_getlocale):
         # A LANGUAGE list is colon separated; its first entry is used
         assert locale.AppriseLocale.detect_language() == "fr"
 
+    with environ(
+        "LANGUAGE",
+        "LC_ALL",
+        "LC_MESSAGES",
+        "LC_CTYPE",
+        LANG="fr_FR.ISO8859-1@euro",
+    ):
+        # The codeset and modifier are dropped
+        assert locale.AppriseLocale.detect_language() == "fr_FR"
+
     default = locale.AppriseLocale._default_language
-    for value in ("C", "POSIX", "C.UTF-8", "posix"):
+    for value in (
+        "C",
+        "POSIX",
+        "C.UTF-8",
+        "posix",
+        "C.ANSI_X3.4-1968",
+        "C@euro",
+    ):
         with environ(
             "LC_MESSAGES",
             "LC_CTYPE",
@@ -421,31 +488,40 @@ def test_asset_language_honored(mock_translation):
 
 
 @pytest.mark.skipif("gettext" not in sys.modules, reason="Requires gettext")
-def test_apprise_trans_add():
+@mock.patch("locale.getlocale")
+def test_apprise_trans_add(mock_getlocale):
     """
     API: Apprise() Gettext add
 
     """
+    # Used when no language variable is set.  Windows asks the system
+    # first, but always gets a regional answer (en_US), so the checks below
+    # still hold.
+    mock_getlocale.return_value = ("en_CA", "UTF-8")
 
-    # This throws internally but we handle it gracefully
-    al = locale.AppriseLocale()
-    with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", "LANG"):
-        # English is the default/fallback type
+    with environ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE", "LANG"):
+        # We start on en_CA, so plain en needs a compiled catalog
+        al = locale.AppriseLocale()
+        assert al.add("en") is CATALOG_COMPILED
+
+    with environ(
+        "LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE", LANG="C.UTF-8"
+    ):
+        # The C locale starts on our default language, so en is loaded
+        al = locale.AppriseLocale()
+        assert al.lang == locale.AppriseLocale._default_language
         assert al.add("en") is True
 
-    al = locale.AppriseLocale()
-    with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", LANG="C.UTF-8"):
+    with environ(
+        "LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE", LANG="en_CA.UTF-8"
+    ):
         # Test English Environment
-        assert al.add("en") is True
-
-    al = locale.AppriseLocale()
-    with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", LANG="en_CA.UTF-8"):
-        # Test English Environment
-        assert al.add("en") is True
+        al = locale.AppriseLocale()
+        assert al.add("en") is CATALOG_COMPILED
 
         # Double add (copy of above) to access logic that prevents adding it
         # again
-        assert al.add("en") is True
+        assert al.add("en") is CATALOG_COMPILED
 
     # Invalid Language
     assert al.add("bad") is False
@@ -456,7 +532,7 @@ def test_apprise_trans_add():
         assert al.add(entry) is False
 
     # An empty value is not a failure; it selects the default language
-    assert al.add("") is True
+    assert al.add("") is CATALOG_COMPILED
 
 
 @pytest.mark.skipif(

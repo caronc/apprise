@@ -359,6 +359,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Our translation report is a command line tool; printing is its whole job
 "packaging/i18n_status.py" = ["T201"]
+"packaging/verify_translations.py" = ["T201"]
 
 [tool.ruff.lint.pyupgrade]
 keep-runtime-typing = true
