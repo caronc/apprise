@@ -617,6 +617,27 @@ def test_plugin_mailgun_cc_bcc_invalid_branch():
     assert len(obj.bcc) == 1
 
 
+def test_plugin_mailgun_cc_names():
+    """NotifyMailgun() url() keeps the display names of CC addresses."""
+    obj = Apprise.instantiate(
+        "mailgun://user@localhost.localdomain/apikey/new@example.com"
+        "?cc=Chris<l2g@nuxref.com>,plain@example.com"
+    )
+    assert isinstance(obj, NotifyMailgun)
+    assert obj.names["l2g@nuxref.com"] == "Chris"
+    assert obj.names["plain@example.com"] is False
+
+    url = obj.url()
+    assert "Chris%3Al2g%40nuxref.com" in url
+
+    # The names survive a round trip through url()
+    obj2 = Apprise.instantiate(url)
+    assert isinstance(obj2, NotifyMailgun)
+    assert obj2.cc == obj.cc
+    assert obj2.names["l2g@nuxref.com"] == "Chris"
+    assert obj2.names["plain@example.com"] is False
+
+
 def test_plugin_mailgun_non_string_region():
     """Verify a region that isn't a string is rejected cleanly."""
 

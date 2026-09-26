@@ -549,7 +549,7 @@ class NotifySMTP2Go(NotifyBase):
             params["cc"] = ",".join(
                 [
                     "{}{}".format(
-                        "" if not e not in self.names else f"{self.names[e]}:",
+                        "" if not self.names.get(e) else f"{self.names[e]}:",
                         e,
                     )
                     for e in self.cc
