@@ -911,7 +911,7 @@ class NotifyTelegram(NotifyBase):
         # Pick a temporary marker that does not occur in the message.
         sentinel = commonmark_pick_emphasis_sentinel(body)
 
-        def _orphan_bracket(idx):
+        def _orphan_bracket(idx: int) -> None:
             # A "[" that opens no link is literal text. v1 escapes it only
             # outside a span, which is known once the scan is done.
             out[idx] = "\\[" if strict else f"{sentinel}[1{sentinel}"
@@ -1094,19 +1094,20 @@ class NotifyTelegram(NotifyBase):
             descriptor["depth_after"] = depth
 
         # Span depth at the current position of the substitution pass.
-        state = {"depth": 0}
+        span_depth = 0
 
-        def _substitute(match):
+        def _substitute(match: re.Match) -> str:
+            nonlocal span_depth
             kind = match.group(1)
             if kind:
                 # A literal v1 "`" or "[" opens an entity that never ends
                 # unless it is escaped. Text inside a v1 span is taken
                 # literally, so it stays as is there.
-                marker = ("\\" + kind) if state["depth"] == 0 else kind
+                marker = ("\\" + kind) if span_depth == 0 else kind
                 return marker * int(match.group(2))
 
             descriptor = delimiters[int(match.group(2))]
-            state["depth"] = descriptor["depth_after"]
+            span_depth = descriptor["depth_after"]
             char = descriptor["char"]
             close_part = "".join(
                 "*" if is_strong else "_"
