@@ -802,7 +802,7 @@ class NotifyMatrix(NotifyBase):
                 allow_redirects=self.redirects,
             )
             if r.status_code not in (
-                requests.codes.ok, 
+                requests.codes.ok,
                 requests.codes.accepted,
             ):
                 # We had a problem
@@ -2222,7 +2222,7 @@ class NotifyMatrix(NotifyBase):
                     continue
 
                 elif r.status_code not in (
-                    requests.codes.ok, 
+                    requests.codes.ok,
                     requests.codes.accepted,
                 ):
                     # We had a problem
