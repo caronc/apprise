@@ -36,7 +36,9 @@ jobs:
       - name: Create PR (if changed)
         uses: peter-evans/create-pull-request@v8
         with:
-          commit-message: "Update Lines of Code (LoC) badge"
+          # [skip ci] stops the PR from starting the test, CodeQL and
+          # packaging workflows, since only a badge image changed.
+          commit-message: "Update Lines of Code (LoC) badge [skip ci]"
           title: "Update LoC badge"
           body: "Automated update of the Lines of Code badge."
           branch: "automation/loc-badge"
