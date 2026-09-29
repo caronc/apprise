@@ -140,14 +140,14 @@ def test_plugin_matrix_title_overhead_bytes():
     assert plain == json_bytes("# hi\r\n")
 
     html = sizing.title_overhead_bytes("hi", NotifyFormat.HTML, escape_html)
-    assert html == json_bytes("# hi\r\n") + json_bytes("<h1>hi</h1>")
+    assert html == json_bytes("# hi\r\n") + json_bytes("<h1>hi</h1><br/>")
 
     markdown = sizing.title_overhead_bytes(
         "<b>", NotifyFormat.MARKDOWN, escape_html
     )
     escaped = escape_html("<b>", whitespace=False)
     assert markdown == json_bytes("# <b>\r\n") + json_bytes(
-        f"<h1>{escaped}</h1>"
+        f"<h1>{escaped}</h1><br/>"
     )
 
     heavy = sizing.title_overhead_bytes(

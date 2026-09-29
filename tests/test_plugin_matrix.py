@@ -2184,7 +2184,7 @@ def test_plugin_matrix_hookshot_webhook(mock_post):
     assert payload["username"] == "apprise"
     # Undeclared passthrough content remains untouched.
     assert payload["text"] == "Title\r\n<b>Body</b>"
-    assert payload["html"] == "<h1>Title</h1><b>Body</b>"
+    assert payload["html"] == "<h1>Title</h1><br/><b>Body</b>"
 
 
 @mock.patch("requests.post")
@@ -7957,6 +7957,101 @@ def test_plugin_matrix_room_id_returns_none_without_home_server():
     assert result is None
 
 
+@pytest.mark.parametrize("encrypted", [False, True])
+@pytest.mark.parametrize("notify_format", ["html", "markdown"])
+@pytest.mark.parametrize("declare_format", [False, True])
+@pytest.mark.parametrize("title", ["Title & more", ""])
+def test_plugin_matrix_rich_title_separator(
+    encrypted, notify_format, declare_format, title
+):
+    """Titles stay separated in clients that discard heading tags."""
+    from apprise.conversion import html_to_text
+    from apprise.plugins.matrix.e2ee import (
+        MatrixMegOlmSession,
+        MatrixOlmAccount,
+    )
+
+    if encrypted and not CRYPTOGRAPHY_AVAILABLE:
+        pytest.skip("Requires cryptography")
+
+    obj = Apprise.instantiate(
+        "matrixs://user:passwd@localhost/#general"
+        f"?format={notify_format}&e2ee={'yes' if encrypted else 'no'}"
+    )
+    obj.access_token = "tok"
+    obj.user_id = "@user:localhost"
+    obj.home_server = "localhost"
+    obj.device_id = "DEV"
+    captured = {}
+
+    def capture_fetch(path, payload, **kwargs):
+        captured.update(payload)
+        return True, {}, {}
+
+    if encrypted:
+        obj._e2ee_account = MatrixOlmAccount()
+        session = MatrixMegOlmSession()
+        obj.store.set("e2ee_key_shared_!room:localhost", session.session_id)
+
+        def capture_encrypt(event):
+            captured.update(event["content"])
+            return "ciphertext"
+
+        session.encrypt = capture_encrypt
+
+    with (
+        mock.patch.object(obj, "_room_join", return_value="!room:localhost"),
+        mock.patch.object(obj, "_fetch", side_effect=capture_fetch),
+        mock.patch.object(obj, "_e2ee_setup", return_value=True),
+        mock.patch.object(obj, "_e2ee_room_encrypted", return_value=True),
+        mock.patch.object(
+            obj,
+            "_e2ee_get_megolm",
+            return_value=session if encrypted else None,
+        ),
+        mock.patch.object(obj, "_e2ee_save_megolm"),
+    ):
+        kwargs = {"body_format": notify_format} if declare_format else {}
+        assert (
+            bool(obj.notify(title=title, body="Body text", **kwargs)) is True
+        )
+        # Prevent cleanup from logging out against a real homeserver.
+        obj.access_token = None
+
+    # A bridge may discard unsupported headings but preserve explicit breaks.
+    formatted = captured["formatted_body"]
+    simplified = formatted.replace("<h1>", "").replace("</h1>", "")
+    expected = f"{title}\nBody text" if title else "Body text"
+    assert html_to_text(simplified) == expected
+
+
+@mock.patch("requests.post")
+@pytest.mark.parametrize("mode", ["matrix", "t2bot", "hookshot"])
+@pytest.mark.parametrize("notify_format", ["html", "markdown"])
+@pytest.mark.parametrize("title", ["Title & more", ""])
+def test_plugin_matrix_webhook_rich_title_separator(
+    mock_post, mode, notify_format, title
+):
+    """Webhook titles also survive clients that discard heading tags."""
+    from apprise.conversion import html_to_text
+
+    response = _Response()
+    response.status_code = requests.codes.ok
+    response.content = b"{}"
+    mock_post.return_value = response
+    host = "a" * 64 if mode == "t2bot" else "localhost"
+    obj = Apprise.instantiate(
+        f"matrixs://user:token@{host}?mode={mode}&format={notify_format}"
+    )
+    assert bool(obj.notify(title=title, body="Body text")) is True
+
+    payload = loads(mock_post.call_args.kwargs["data"])
+    formatted = payload["html" if mode == "hookshot" else "text"]
+    simplified = formatted.replace("<h1>", "").replace("</h1>", "")
+    expected = f"{title}\nBody text" if title else "Body text"
+    assert html_to_text(simplified) == expected
+
+
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
@@ -7997,7 +8092,7 @@ def test_plugin_matrix_html_plain_fallback(mock_post, mock_get, mock_put):
     )
 
     payload = loads(mock_put.call_args.kwargs["data"])
-    assert payload["formatted_body"] == "<h1>Title</h1><b>Bold</b> text"
+    assert payload["formatted_body"] == "<h1>Title</h1><br/><b>Bold</b> text"
     # The plain-text fallback must not carry the raw markup a second time.
     assert "<b>" not in payload["body"]
     assert "Bold text" in payload["body"]
@@ -8035,7 +8130,7 @@ def test_plugin_matrix_html_passthrough_untouched(
     assert bool(obj.notify(title="Title", body="<b>Bold</b> text")) is True
 
     payload = loads(mock_put.call_args.kwargs["data"])
-    assert payload["formatted_body"] == "<h1>Title</h1><b>Bold</b> text"
+    assert payload["formatted_body"] == "<h1>Title</h1><br/><b>Bold</b> text"
     # Preserve the source when its format is unknown.
     assert payload["body"] == "# Title\r\n<b>Bold</b> text"
 
@@ -8095,7 +8190,9 @@ def test_plugin_matrix_e2ee_html_plain_fallback(mock_post, mock_get, mock_put):
         )
 
     msg_content = captured["event"]["content"]
-    assert msg_content["formatted_body"] == "<h1>Title</h1><b>Bold</b> text"
+    assert (
+        msg_content["formatted_body"] == "<h1>Title</h1><br/><b>Bold</b> text"
+    )
     assert "<b>" not in msg_content["body"]
     assert "Bold text" in msg_content["body"]
 

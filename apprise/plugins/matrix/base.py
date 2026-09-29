@@ -918,7 +918,7 @@ class NotifyMatrix(NotifyBase):
                 title=(
                     ""
                     if not title
-                    else f"<h1>{NotifyMatrix.escape_html(title)}</h1>"
+                    else f"<h1>{NotifyMatrix.escape_html(title)}</h1><br/>"
                 ),
                 body=body,
             )
@@ -979,7 +979,7 @@ class NotifyMatrix(NotifyBase):
                 title=(
                     ""
                     if not title
-                    else f"<h1>{NotifyMatrix.escape_html(title)}</h1>"
+                    else f"<h1>{NotifyMatrix.escape_html(title)}</h1><br/>"
                 ),
                 body=body,
             )
@@ -1272,15 +1272,16 @@ class NotifyMatrix(NotifyBase):
             }
 
             # HTML and rendered Markdown share a formatted body. HTML titles
-            # remain trusted, while Markdown titles are escaped.
+            # remain trusted, while Markdown titles are escaped. The explicit
+            # break preserves separation in clients that discard headings.
             if body_format in (NotifyFormat.HTML, NotifyFormat.MARKDOWN):
                 title_html = (
                     ""
                     if not title
                     else (
-                        f"<h1>{title}</h1>"
+                        f"<h1>{title}</h1><br/>"
                         if body_format == NotifyFormat.HTML
-                        else "<h1>{}</h1>".format(
+                        else "<h1>{}</h1><br/>".format(
                             NotifyMatrix.escape_html(title, whitespace=False)
                         )
                     )
@@ -3041,15 +3042,16 @@ class NotifyMatrix(NotifyBase):
         }
 
         # HTML and rendered Markdown share a formatted body. HTML titles
-        # remain trusted, while Markdown titles are escaped.
+        # remain trusted, while Markdown titles are escaped. The explicit
+        # break preserves separation in clients that discard headings.
         if body_format in (NotifyFormat.HTML, NotifyFormat.MARKDOWN):
             title_html = (
                 ""
                 if not title
                 else (
-                    "<h1>{}</h1>".format(title)
+                    "<h1>{}</h1><br/>".format(title)
                     if body_format == NotifyFormat.HTML
-                    else "<h1>{}</h1>".format(
+                    else "<h1>{}</h1><br/>".format(
                         NotifyMatrix.escape_html(title, whitespace=False)
                     )
                 )
