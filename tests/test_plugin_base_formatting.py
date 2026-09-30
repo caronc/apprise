@@ -3946,6 +3946,41 @@ def test_notify_markdown_general():
     assert elapsed < 10.0
 
 
+@pytest.mark.parametrize(
+    "notify_format, body_format, expected",
+    [
+        (
+            NotifyFormat.HTML,
+            NotifyFormat.HTML,
+            "<b>Title</b><br />\r\nBody text",
+        ),
+        (NotifyFormat.MARKDOWN, NotifyFormat.MARKDOWN, "# Title\nBody text"),
+        (NotifyFormat.MARKDOWN, None, "Title\r\nBody text"),
+        (NotifyFormat.TEXT, NotifyFormat.TEXT, "Title\r\nBody text"),
+    ],
+)
+def test_notify_title_merge_separator(notify_format, body_format, expected):
+    """A title merged into the body always ends with a line break."""
+
+    class TestNotification(NotifyBase):
+        # Force the title to merge into the body
+        title_maxlen = 0
+
+        def notify(self, *args, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    obj = TestNotification()
+    obj.notify_format = notify_format
+
+    chunks = obj._apply_overflow(
+        body="Body text", title="Title", body_format=body_format
+    )
+    assert len(chunks) == 1
+    assert chunks[0]["title"] == ""
+    assert chunks[0]["body"] == expected
+
+
 @mock.patch("requests.request")
 def test_notify_emoji_general(mock_request):
     """
