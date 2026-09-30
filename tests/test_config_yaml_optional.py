@@ -25,13 +25,43 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""Exercise YAML dependency handling in fresh Python interpreters."""
+"""Exercise YAML dependency handling and fresh-interpreter imports."""
 
 import subprocess
 import sys
 from textwrap import dedent
 
 import pytest
+
+from apprise import common
+from apprise.config import ConfigBase
+from apprise.config.memory import ConfigMemory
+
+
+@pytest.mark.parametrize("disable_yaml", [False, True])
+def test_yaml_unavailable_in_current_interpreter(
+    monkeypatch, mocker, disable_yaml
+):
+    """Unavailable YAML warns and leaves URL/text configuration usable."""
+    monkeypatch.setattr(common, "DISABLE_YAML", disable_yaml)
+    monkeypatch.setitem(sys.modules, "yaml", None)
+    warning = mocker.patch.object(ConfigBase.logger, "warning")
+    content = "urls:\n  - json://localhost\n"
+
+    assert ConfigBase.config_parse_yaml(content) == ([], [])
+    warning.assert_called_once_with(
+        "Apprise YAML support is disabled."
+        if disable_yaml
+        else "Apprise YAML support requires the PyYAML package."
+    )
+
+    for config_format in (None, "yaml"):
+        assert len(ConfigMemory(content=content, format=config_format)) == 0
+    for config_format in (None, "text"):
+        assert (
+            len(ConfigMemory(content="json://localhost", format=config_format))
+            == 1
+        )
 
 
 @pytest.mark.parametrize(
