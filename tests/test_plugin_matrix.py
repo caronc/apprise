@@ -8138,6 +8138,54 @@ def test_plugin_matrix_html_passthrough_untouched(
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+def test_plugin_matrix_markdown_title_break(mock_post, mock_get, mock_put):
+    """Only a Markdown body that was not rendered gets a title break."""
+    from apprise.common import NotifyFormat
+
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    request = _Response()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    kwargs = NotifyMatrix.parse_url(
+        "matrix://user:passwd@hostname/#abcd?format=markdown"
+    )
+    obj = NotifyMatrix(**kwargs)
+
+    # No body_format declared: the body is sent as-is, so it needs a break
+    assert bool(obj.notify(title="Title", body="Body text")) is True
+    payload = loads(mock_put.call_args.kwargs["data"])
+    assert payload["formatted_body"] == "<h1>Title</h1><br/>Body text"
+
+    # Declared Markdown is rendered into a paragraph, which already starts
+    # on its own line, so no extra blank line is added
+    assert (
+        bool(
+            obj.notify(
+                title="Title",
+                body="Body text",
+                body_format=NotifyFormat.MARKDOWN,
+            )
+        )
+        is True
+    )
+    payload = loads(mock_put.call_args.kwargs["data"])
+    assert payload["formatted_body"] == "<h1>Title</h1><p>Body text</p>"
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_html_plain_fallback(mock_post, mock_get, mock_put):
     """Encrypted HTML also receives a plain-text fallback."""

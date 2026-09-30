@@ -327,6 +327,8 @@ def title_overhead_bytes(title, body_format, escape_html):
         if body_format == NotifyFormat.HTML
         else escape_html(title, whitespace=False)
     )
+
+    # Always reserve room for the line break that may follow the title.
     formatted_wrapper = f"<h1>{title_html}</h1><br/>"
 
     # Rich messages pay for both the plain and formatted titles.
