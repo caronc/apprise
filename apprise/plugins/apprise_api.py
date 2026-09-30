@@ -28,6 +28,7 @@
 from json import dumps
 import logging
 import re
+from typing import Optional, Union
 
 import requests
 
@@ -88,8 +89,7 @@ class NotifyAppriseAPI(NotifyBase):
     # Support attachments
     attachment_support = True
 
-    # Relay every format unchanged; the downstream Apprise API instance
-    # performs its own format handling.
+    # Relay content unchanged; the downstream Apprise server converts it.
     notify_format = (
         NotifyFormat.TEXT,
         NotifyFormat.HTML,
@@ -305,6 +305,21 @@ class NotifyAppriseAPI(NotifyBase):
             )
         )
 
+    def resolve_format(
+        self, body_format: Optional[Union[str, NotifyFormat]] = None
+    ) -> NotifyFormat:
+        """Keep the caller's format so this relay does not convert content.
+
+        The downstream Apprise server performs the required conversion. With
+        no source format, normal passthrough rules apply.
+        """
+        if body_format in self._formats():
+            # Target the source format so no conversion takes place
+            return NotifyFormat(body_format)
+
+        # No source format; fall back to the normal resolution
+        return super().resolve_format(body_format)
+
     def send(
         self,
         body,
@@ -392,10 +407,17 @@ class NotifyAppriseAPI(NotifyBase):
             "type": notify_type.value,
         }
 
-        if not body_passthrough and body_format is not None:
-            # Relay format only when the caller declared one; otherwise
-            # let the downstream Apprise API server choose its default.
+        if body_passthrough:
+            # For passthrough content, relay an explicit URL format only.
+            if self._format_override is not None:
+                payload["format"] = self._format_override.value
+
+        elif body_format is not None:
+            # Label unchanged content with its declared source format.
             payload["format"] = body_format.value
+
+        if self.__tags:
+            payload["tag"] = self.__tags
 
         if self.method == AppriseAPIMethod.JSON:
             headers["Content-Type"] = "application/json"
@@ -404,9 +426,6 @@ class NotifyAppriseAPI(NotifyBase):
                 payload["attachments"] = attachments
 
             payload = dumps(payload)
-
-        if self.__tags:
-            payload["tag"] = self.__tags
 
         auth = None
         if self.user or self.password:

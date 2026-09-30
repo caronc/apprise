@@ -28,8 +28,10 @@
 import base64
 import contextlib
 import gzip
+from html import escape
 import os as _os
 import re
+from typing import Any, Optional
 
 import requests
 
@@ -57,7 +59,7 @@ except ImportError:
 
 from ..attachment.base import AttachBase
 from ..common import NotifyFormat, NotifyType
-from ..conversion import convert_between
+from ..conversion import HTMLTagReducer, convert_between
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
@@ -171,6 +173,142 @@ PUSHOVER_HTTP_ERROR_MAP = {
 # representing a 256-bit AES key, matching the format required by the
 # Pushover E2EE API: https://pushover.net/api#e2ee
 VALIDATE_ENCRYPTION_KEY = re.compile(r"^[0-9a-f]{64}$", re.I)
+
+# The line break Pushover's apps understand in HTML messages. See:
+# https://support.pushover.net/i76-can-support-for-br-be-added
+PUSHOVER_HTML_BR = "<br>"
+
+# Inline tags Pushover cannot show, and the supported tag used instead.
+# Supported tags are listed at https://pushover.net/api#html
+PUSHOVER_HTML_INLINE_MAP = {
+    "b": "b",
+    "strong": "b",
+    "i": "i",
+    "em": "i",
+    "u": "u",
+    "ins": "u",
+}
+
+# Heading tags; they become bold text on a line of their own
+PUSHOVER_HTML_HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6")
+
+# Block tags that end with a blank line (a paragraph break)
+PUSHOVER_HTML_BLOCKS = (
+    "p",
+    "div",
+    "blockquote",
+    "pre",
+    "table",
+    "ul",
+    "ol",
+    "hr",
+)
+
+# Tags whose text keeps its own line breaks
+PUSHOVER_HTML_LITERAL = ("pre", "code")
+
+# Tags whose content is never shown
+PUSHOVER_HTML_SKIP = ("script", "style", "head", "title")
+
+
+class PushoverHTMLReducer(HTMLTagReducer):
+    """Rewrite HTML so it only uses the markup Pushover supports.
+
+    - b, i, u, font color and a href are kept; strong, em and ins
+      become b, i and u.
+    - Headings become bold text on their own line.
+    - List items become "- " (or "1. ") lines.
+    - Paragraphs, quotes, code blocks and table rows become line breaks.
+    - Any other tag is dropped and only its text is kept.
+    - Every opened tag is closed, so the result is always balanced.
+    """
+
+    INLINE_MAP = PUSHOVER_HTML_INLINE_MAP
+    HEADINGS = PUSHOVER_HTML_HEADINGS
+    SKIP_TAGS = PUSHOVER_HTML_SKIP
+    LINE_BREAK = PUSHOVER_HTML_BR
+
+    def reset(self) -> None:
+        """Clear the reducer state, including the code depth."""
+        super().reset()
+
+        # Depth of tags whose line breaks must be kept
+        self.literal = 0
+
+    def _paragraph(self) -> None:
+        """Leave a blank line, or just a new line inside a list."""
+        self._line()
+        if (
+            self.out
+            and not self.lists
+            and self.out[-2:] != [PUSHOVER_HTML_BR, PUSHOVER_HTML_BR]
+        ):
+            self.out.append(PUSHOVER_HTML_BR)
+
+    def handle_starttag(
+        self, tag: str, attrs: list[tuple[str, Optional[str]]]
+    ) -> None:
+        """Map an opening tag to Pushover markup."""
+        # Attribute lookups ignore empty values
+        super().handle_starttag(
+            tag, [(key, value) for key, value in attrs if value]
+        )
+
+    def _start(self, tag: str, values: dict[str, Optional[str]]) -> None:
+        """Write Pushover's own tags; pass the rest to the base."""
+        if tag == "a" and "href" in values:
+            # Links keep only their destination
+            href = escape(values["href"], quote=True)
+            self._open(tag, "a", f' href="{href}"')
+
+        elif tag == "font" and "color" in values:
+            # Colored text keeps only its color
+            color = escape(values["color"], quote=True)
+            self._open(tag, "font", f' color="{color}"')
+
+        elif tag == "br":
+            # Line breaks are supported as-is
+            self.out.append(PUSHOVER_HTML_BR)
+
+        elif tag == "hr":
+            # A divider becomes a paragraph break
+            self._paragraph()
+
+        else:
+            # Bold, italic, underline, headings, lists, tables and images
+            super()._start(tag, values)
+
+        if tag in PUSHOVER_HTML_LITERAL:
+            # Keep the line breaks of code as they are
+            self.literal += 1
+
+    def _end(self, tag: str) -> None:
+        """Close a tag and add any line break it implies."""
+        if tag in PUSHOVER_HTML_LITERAL:
+            # Stop keeping line breaks
+            self.literal = max(0, self.literal - 1)
+
+        super()._end(tag)
+
+        if tag in PUSHOVER_HTML_BLOCKS:
+            # Blocks end with a blank line
+            self._paragraph()
+
+    def _text(self, data: str) -> None:
+        """Write text with its special characters escaped."""
+        if not self.literal:
+            # Line breaks in HTML source only count as a space
+            super()._text(data)
+            return
+
+        # Keep line breaks from code as HTML line breaks
+        lines = escape(data, quote=False).replace("\r\n", "\n")
+        for no, line in enumerate(lines.split("\n")):
+            if no:
+                self.out.append(PUSHOVER_HTML_BR)
+
+            if line:
+                self.out.append(line)
 
 
 class NotifyPushover(NotifyBase):
@@ -517,6 +655,32 @@ class NotifyPushover(NotifyBase):
             )
             raise
 
+    def dialect_convert(
+        self,
+        body: str,
+        body_format: Optional[NotifyFormat] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> str:
+        """Rewrite a declared body into the HTML Pushover supports.
+
+        - Markdown is turned into HTML first (Pushover has no Markdown).
+        - HTML is reduced to the few tags Pushover shows.
+        - Plain text is returned unchanged.
+        """
+        if body_format == NotifyFormat.MARKDOWN:
+            # Pushover has no Markdown; render it as HTML
+            body = convert_between(
+                NotifyFormat.MARKDOWN, NotifyFormat.HTML, body
+            )
+
+        elif body_format != NotifyFormat.HTML:
+            # Plain text needs no change
+            return body
+
+        # Keep only the tags Pushover supports
+        return PushoverHTMLReducer().reduce(body)
+
     def send(
         self,
         body,
@@ -563,16 +727,12 @@ class NotifyPushover(NotifyBase):
         if self.supplemental_url_title:
             base_payload["url_title"] = self.supplemental_url_title
 
-        if body_format == NotifyFormat.HTML:
+        if body_format == NotifyFormat.HTML or (
+            body_format == NotifyFormat.MARKDOWN and not body_passthrough
+        ):
             # https://pushover.net/api#html
-            base_payload["html"] = 1
-
-        elif body_format == NotifyFormat.MARKDOWN and not body_passthrough:
-            # Pushover has no native Markdown; convert declared Markdown
-            # to HTML and leave undeclared sources untouched.
-            base_payload["message"] = convert_between(
-                NotifyFormat.MARKDOWN, NotifyFormat.HTML, body
-            )
+            # Declared Markdown was already turned into Pushover's HTML by
+            # dialect_convert(); undeclared Markdown is sent untouched.
             base_payload["html"] = 1
 
         if self.priority == PushoverPriority.EMERGENCY:

@@ -507,3 +507,20 @@ def test_plugin_google_chat_dialect_overflow(mock_post):
     assert len(texts) > 1
     for text in texts:
         assert len(text) <= NotifyGoogleChat.body_maxlen
+
+
+@mock.patch("requests.post")
+def test_plugin_google_chat_text_ampersand(mock_post):
+    """Plain text ampersands reach Google Chat as &amp;."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b"{}"
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate("gchat://workspace/key/token")
+    assert obj.notify(body="A & B and AT&amp;T", body_format=NotifyFormat.TEXT)
+
+    # Both the plain and the entity-looking ampersand are escaped once
+    text = loads(mock_post.call_args[1]["data"])["text"]
+    assert text == "A &amp; B and AT&amp;amp;T"

@@ -68,6 +68,7 @@ import requests
 
 from ..attachment.base import AttachBase
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..conversion import commonmark_sections
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
@@ -148,6 +149,11 @@ class NotifyFluxer(NotifyBase):
 
     # Fluxer limit for number of embed fields per message
     fluxer_max_fields = 10
+
+    # Fluxer limits the length of each embed field name and value; see
+    # https://docs.fluxer.app/http-api/messages/
+    fluxer_field_name_maxlen = 256
+    fluxer_field_value_maxlen = 1024
 
     # If our hostname matches the following we automatically enforce cloud
     # mode
@@ -568,19 +574,31 @@ class NotifyFluxer(NotifyBase):
                     body if not title else f"{title}\r\n{body}"
                 ) + payload.get("content", "")
 
-            if not self._send(payload, params=params):
-                # We failed to post our message
-                return False
+            # Skip the message if an earlier attempt already posted it
+            if not self.is_delivered("message"):
+                if not self._send(payload, params=params):
+                    # We failed to post our message
+                    return False
+
+                # Posted; a retry can safely skip it
+                self.mark_delivered("message")
 
             # Send remaining fields (if any)
             if fields:
                 payload["embeds"][0]["description"] = ""
                 for i in range(0, len(fields), self.fluxer_max_fields):
+                    # Each extra message of fields is tracked on its own
+                    if self.is_delivered(("fields", i)):
+                        continue
+
                     payload["embeds"][0]["fields"] = fields[
                         i : i + self.fluxer_max_fields
                     ]
                     if not self._send(payload, params=params):
                         return False
+
+                    # Posted; a retry can safely skip these fields
+                    self.mark_delivered(("fields", i))
 
         if attach and self.attachment_support:
             # Update our payload; the idea is to preserve it's other detected
@@ -603,7 +621,11 @@ class NotifyFluxer(NotifyBase):
             #
             # Send our attachments
             #
-            for attachment in attach:
+            for index, attachment in enumerate(attach):
+                # Skip an attachment an earlier attempt already posted
+                if self.is_delivered(("attach", index)):
+                    continue
+
                 self.logger.info(
                     f"Posting Fluxer Attachment {attachment.name}"
                 )
@@ -611,6 +633,9 @@ class NotifyFluxer(NotifyBase):
                 if not self._send(payload, params=params, attach=attachment):
                     # We failed to post our message
                     return False
+
+                # Posted; a retry can safely skip this attachment
+                self.mark_delivered(("attach", index))
 
         return True
 
@@ -1155,50 +1180,31 @@ class NotifyFluxer(NotifyBase):
 
         return payload
 
-    @staticmethod
+    @classmethod
     def extract_markdown_sections(
+        cls,
         markdown: str,
     ) -> tuple[str, list[dict[str, str]]]:
         """Extract headers and their corresponding sections into embed
         fields."""
 
-        # Search for any header information found without it's own section
-        # identifier
-        match = re.match(
-            r"^\s*(?P<desc>[^\s#]+.*?)(?=\s*$|[\r\n]+\s*#)",
+        # Room left for a section's text once the code block markers
+        # ("```md\n" and "\n```") are wrapped around it
+        description, sections = commonmark_sections(
             markdown,
-            flags=re.S,
+            cls.fluxer_field_name_maxlen,
+            cls.fluxer_field_value_maxlen - 10,
         )
 
-        description = match.group("desc").strip() if match else ""
-        if description:
-            # Strip description from our string since it has been handled
-            # now.
-            markdown = re.sub(re.escape(description), "", markdown, count=1)
-
-        regex = re.compile(
-            r"\s*#[# \t\v]*(?P<name>[^\n]+)(\n|\s*$)"
-            r"\s*((?P<value>[^#].+?)(?=\s*$|[\r\n]+\s*#))?",
-            flags=re.S,
-        )
-
-        common = regex.finditer(markdown)
-        fields: list[dict[str, str]] = []
-        for el in common:
-            d = el.groupdict()
-
-            fields.append(
-                {
-                    "name": d.get("name", "").strip("#`* \r\n\t\v"),
-                    "value": "```{}\n{}```".format(
-                        "md" if d.get("value") else "",
-                        (
-                            d.get("value").strip() + "\n"
-                            if d.get("value")
-                            else ""
-                        ),
-                    ),
-                }
-            )
+        # Show each section as a code block.  An empty one stays empty.
+        fields = [
+            {
+                "name": name,
+                "value": "```md\n{}\n```".format(value.rstrip())
+                if value
+                else "```\n```",
+            }
+            for name, value in sections
+        ]
 
         return description, fields

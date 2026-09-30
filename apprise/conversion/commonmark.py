@@ -32,6 +32,9 @@ from functools import lru_cache
 import re
 import unicodedata
 
+from ..common import NotifyFormat
+from ..utils.format import smart_split
+
 # Keep related constants together and define dependent patterns afterward.
 
 # CommonMark ASCII punctuation; Unicode categories cover other characters.
@@ -134,7 +137,8 @@ def _match_html_block_start(line):
 _ATX_HEADING_SHAPE_RE = re.compile(r"#{1,6}(?:[ \t]+(?P<content>.*))?[ \t]*$")
 
 # Match closing hashes preceded by whitespace at the end of a heading.
-_ATX_CLOSING_SEQUENCE_RE = re.compile(r"[ \t]+#+[ \t]*$")
+# Start at the first space so long runs are scanned only once.
+_ATX_CLOSING_SEQUENCE_RE = re.compile(r"(?<![ \t])[ \t]+#+[ \t]*$")
 
 # Allow several full-body destination scans while keeping total work linear.
 SCAN_BUDGET_MULTIPLIER = 4
@@ -2469,3 +2473,121 @@ def commonmark_materialize_repair(
         next_chunk=(lookahead or None),
         next_chunk_boundary_ch=boundary_next_ch,
     )
+
+
+def _section_text_end(text: str, start: int, tail: int) -> int:
+    """Return where intro or section text that may end at ``start`` ends.
+
+    Text ends at the first spot, at or after ``start``, where either:
+      - only whitespace is left (``tail`` is where that begins), or
+      - a line break is followed by blank space and then a ``#``.
+    """
+    # Check each "#" before the trailing whitespace
+    hash_idx = text.find("#", start, tail)
+    while hash_idx != -1:
+        # Walk back over the whitespace just before this "#"
+        ws_idx = hash_idx
+        while ws_idx > start and text[ws_idx - 1].isspace():
+            ws_idx -= 1
+
+        # The text ends at the first line break in that whitespace
+        for idx in range(ws_idx, hash_idx):
+            if text[idx] in "\r\n":
+                return idx
+
+        # This "#" is not at the start of a line; try the next one
+        hash_idx = text.find("#", hash_idx + 1, tail)
+
+    # Otherwise the text runs up to the trailing whitespace
+    return max(start, tail)
+
+
+def commonmark_sections(
+    markdown: str, name_maxlen: int, value_maxlen: int
+) -> tuple[str, list[tuple[str, str]]]:
+    """Split markdown into its intro text and (heading, text) sections.
+
+    - Headings are cut to ``name_maxlen``.
+    - Long section text continues in more sections of the same name, each
+      at most ``value_maxlen`` long.
+    - A heading with no text below it gets an empty string.
+    """
+    # Text before the first heading becomes the description
+    description = ""
+
+    # Skip the leading whitespace
+    n = len(markdown)
+    idx = 0
+    while idx < n and markdown[idx].isspace():
+        idx += 1
+
+    if idx < n and markdown[idx] != "#":
+        # The description runs until the first heading line
+        tail = len(markdown.rstrip())
+        end = _section_text_end(markdown, idx + 1, tail)
+        description = markdown[idx:end].strip()
+
+    if description:
+        # Strip description from our string since it has been handled
+        # now.
+        markdown = markdown.replace(description, "", 1)
+
+    # Where the trailing whitespace begins
+    n = len(markdown)
+    tail = len(markdown.rstrip())
+
+    # Find each heading and the text written below it.
+    sections: list[tuple[str, str]] = []
+    pos = 0
+    while True:
+        # Every "#" may open a heading
+        hash_idx = markdown.find("#", pos)
+        if hash_idx == -1:
+            break
+
+        # The heading runs to the end of its line
+        line_end = markdown.find("\n", hash_idx)
+        if line_end == -1:
+            line_end = n
+
+        # Skip the "#", space, tab and vertical tab characters after it
+        idx = hash_idx + 1
+        while idx < line_end and markdown[idx] in "# \t\v":
+            idx += 1
+
+        if idx == line_end:
+            if idx == hash_idx + 1:
+                # A lone "#" at the end of a line is not a heading
+                pos = hash_idx + 1
+                continue
+
+            # Keep at least the last character as the heading name
+            idx -= 1
+
+        # Section names have a length limit of their own
+        name = markdown[idx:line_end].strip("#`* \r\n\t\v")[:name_maxlen]
+
+        # Skip the line break and any whitespace after the heading
+        idx = min(line_end + 1, n)
+        while idx < n and markdown[idx].isspace():
+            idx += 1
+
+        # Section text needs two or more characters and no leading "#"
+        text = ""
+        pos = idx
+        if idx + 1 < n and markdown[idx] != "#":
+            pos = _section_text_end(markdown, idx + 2, tail)
+            text = markdown[idx:pos].strip()
+
+        if not text:
+            # A heading with nothing written below it
+            sections.append((name, ""))
+            continue
+
+        # Continue long sections in sections with the same name.
+        sections.extend(
+            (name, part)
+            for part in smart_split(text, value_maxlen, NotifyFormat.TEXT)
+        )
+
+    return description, sections

@@ -26,7 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
-from json import dumps
+from json import dumps, loads
 import logging
 import os
 from unittest import mock
@@ -883,3 +883,74 @@ def test_plugin_kook_apprise_integration(mock_post):
     a = Apprise()
     assert a.add(f"kook://{WEBHOOK_KEY}/?mode=webhook") is True
     assert bool(a.notify(body="webhook message")) is True
+
+
+@mock.patch("requests.post")
+def test_plugin_kook_heading(mock_post):
+    """KMarkdown has no headings, so the title is sent in bold."""
+
+    r = mock.Mock()
+    r.status_code = requests.codes.ok
+    r.content = dumps({"code": 0}).encode()
+    mock_post.return_value = r
+
+    obj = Apprise.instantiate(f"kook://{BOT_TOKEN}/{CHANNEL_ID}")
+    assert obj.notify(
+        title="Deploy", body="done", body_format=NotifyFormat.MARKDOWN
+    )
+    payload = loads(mock_post.call_args[1]["data"])
+    assert payload["content"] == "**Deploy**\ndone"
+
+    # Plain text is never touched
+    assert obj.dialect_convert("# a", NotifyFormat.TEXT) == "# a"
+
+
+@mock.patch("requests.post")
+def test_plugin_kook_attachment_retry(mock_post):
+    """A retry resends only the attachment posts that failed."""
+
+    def _mk_resp(code=0):
+        r = mock.Mock()
+        r.status_code = requests.codes.ok
+        r.content = dumps(
+            {"code": code, "data": {"url": "https://img.kookapp.cn/x.png"}}
+        ).encode()
+        return r
+
+    # A channel and a DM user share one id; the second attachment fails
+    # to reach the DM user on the first attempt only
+    calls = []
+
+    def _post(url, *args, **kwargs):
+        data = kwargs.get("data")
+        calls.append((urlparse(url).path, data and loads(data)))
+        failed = [c for c in calls if c[0].endswith("/direct-message/create")]
+        return _mk_resp(1 if len(failed) == 3 else 0)
+
+    mock_post.side_effect = _post
+
+    aobj = Apprise()
+    assert aobj.add(
+        f"kook://{BOT_TOKEN}/{CHANNEL_ID}/@{CHANNEL_ID}?retry=1&wait=0"
+    )
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.png")
+    assert aobj.notify(body="hello", attach=[path, path])
+
+    paths = [p for p, _ in calls]
+    # Each file is uploaded to the CDN only once
+    assert paths.count("/api/v3/asset/create") == 2
+    # One text and two attachment posts each; the DM retries once
+    assert paths.count("/api/v3/message/create") == 3
+    assert paths.count("/api/v3/direct-message/create") == 4
+
+
+def test_plugin_kook_len():
+    """Bot mode counts every channel and DM user; a webhook counts once."""
+    obj = Apprise.instantiate(f"kook://{BOT_TOKEN}/{CHANNEL_ID}/@{CHANNEL_ID}")
+    assert len(obj) == 2
+
+    obj = Apprise.instantiate(f"kook://{BOT_TOKEN}")
+    assert len(obj) == 1
+
+    obj = Apprise.instantiate(f"kook://{WEBHOOK_KEY}/?mode=webhook")
+    assert len(obj) == 1

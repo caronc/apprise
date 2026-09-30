@@ -503,6 +503,11 @@ class NotifyTwitter(NotifyBase):
                 payloads.append(payload_)
 
         for no, payload in enumerate(payloads, start=1):
+            # Skip a tweet that was already posted so a retry does not
+            # repeat it (X rejects duplicate tweets anyway)
+            if self.is_delivered(no):
+                continue
+
             # Send Tweet via v2 (JSON body required)
             postokay, response = self._fetch(
                 self.twitter_tweet,
@@ -550,6 +555,9 @@ class NotifyTwitter(NotifyBase):
                 no,
                 len(payloads),
             )
+
+            # Posted; a retry can safely skip this tweet.
+            self.mark_delivered(no)
 
         return not has_error
 

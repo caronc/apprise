@@ -25,14 +25,15 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# HTMLParser-based converters: plain-text extraction (HTMLConverter) and
-# HTML-to-CommonMark rendering (HTMLMarkdownConverter). Both are generic --
-# no service-specific markup lives here; see conversion/commonmark.py for
-# the shared CommonMark dialect-repair engine these feed into downstream.
+# Generic HTML parsers for plain text, CommonMark, and reduced tag sets.
+# Service-specific markup belongs in plugins.
 
+from collections import Counter
 import contextlib
+from html import escape
 from html.parser import HTMLParser
 import re
+from typing import Optional
 
 from .commonmark import (
     commonmark_find_backtick_run,
@@ -48,6 +49,10 @@ BLOCKQUOTE_DEPTH_MAX = 4
 # Bound the context-stack depth so adversarially nested HTML cannot
 # exhaust memory.  Frames beyond this limit are silently dropped.
 MAX_FRAME_DEPTH = 200
+
+# Collapse source line breaks and nearby whitespace as HTML does. Starting
+# at the first space keeps long runs efficient.
+HTML_NEWLINE_RE = re.compile(r"(?:(?<![ \t])[ \t]+)?[\r\n]+[ \t]*")
 
 
 class _Marker(str):
@@ -166,6 +171,10 @@ class HTMLConverter(HTMLParser):
 
     def close(self):
         """Finalize the converted content."""
+
+        # Flush trailing text that resembles an unfinished entity, such as
+        # the end of "q&a".
+        HTMLParser.close(self)
 
         # Combine buffered fragments into one string.
         string = "".join(self._finalize(self._result))
@@ -858,6 +867,9 @@ class HTMLMarkdownConverter(HTMLConverter):
 
     def close(self):
         """Recover any frames left open at end-of-document, then finalize."""
+
+        # Flush trailing text before closing frames so it stays inside them.
+        HTMLParser.close(self)
 
         # HTML does not require all tags to be closed, so we walk the stack
         # top-down and synthesize the missing close events for each open frame.
@@ -1658,3 +1670,234 @@ class HTMLMarkdownConverter(HTMLConverter):
         if tag == "body" or tag in self.IGNORE_TAGS:
             # Restore storage flags inherited from the enclosing frame.
             self._pop_to(tag)
+
+
+class HTMLTagReducer(HTMLParser):
+    """Rewrite HTML so it only uses a small set of tags.
+
+    This holds the parts every reducer shares. A subclass sets the class
+    attributes below and handles its own extra tags in ``_start()``,
+    ``_end()`` and ``_text()``, passing anything else back up here.
+
+    - Tags in ``INLINE_MAP`` are written as the tag they map to.
+    - Headings become bold text on their own line.
+    - List items become "- " (or "1. ") lines and table rows become
+      lines with cells split by " | ".
+    - Images are replaced by their alt text.
+    - Anything inside a ``SKIP_TAGS`` tag is hidden.
+    - Any other tag is dropped and only its text is kept.
+    - Every opened tag is closed, so the result is always balanced.
+    """
+
+    # Source tag -> the tag written in its place
+    INLINE_MAP: dict[str, str] = {}
+
+    # Tags written as bold text on a line of their own
+    HEADINGS: tuple[str, ...] = ("h1", "h2", "h3", "h4", "h5", "h6")
+
+    # Tags whose content is never shown
+    SKIP_TAGS: tuple[str, ...] = ("script", "style")
+
+    # What a line break looks like in the output
+    LINE_BREAK = "\n"
+
+    # Characters swapped in text before it is escaped (str.translate)
+    TEXT_MAP: dict[int, str] = {}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+
+    def reset(self) -> None:
+        """Clear the parser and every piece of reducer state."""
+        # HTMLParser calls this from __init__, and reduce() calls it again
+        # so an instance can be reused.
+        super().reset()
+
+        # The rewritten message, one piece at a time
+        self.out: list[str] = []
+
+        # Open output tags as (source tag, written tag) pairs
+        self.open_tags: list[tuple[str, str]] = []
+
+        # Open counts allow quick membership checks.
+        self.open_count: Counter[str] = Counter()
+
+        # One entry per open list; a number for numbered lists, else None
+        self.lists: list[Optional[int]] = []
+
+        # Depth of tags whose content is hidden
+        self.skip = 0
+
+        # Number of cells written on the current table row
+        self.cells = 0
+
+    def _line(self) -> None:
+        """Start a new line unless we are already on an empty one."""
+        if self.out and self.out[-1] != self.LINE_BREAK:
+            self.out.append(self.LINE_BREAK)
+
+    def _open(self, source: str, tag: str, attrs: str = "") -> None:
+        """Write a supported tag and remember it so it gets closed."""
+        self.out.append(f"<{tag}{attrs}>")
+        self.open_tags.append((source, tag))
+        self.open_count[source] += 1
+
+    def _close(self, source: str) -> None:
+        """Close ``source`` and anything opened after it."""
+        # Ignore a closing tag that was never opened
+        if not self.open_count[source]:
+            return
+
+        while True:
+            opened, tag = self.open_tags.pop()
+            self.open_count[opened] -= 1
+            self.out.append(f"</{tag}>")
+            if opened == source:
+                break
+
+    def handle_starttag(
+        self, tag: str, attrs: list[tuple[str, Optional[str]]]
+    ) -> None:
+        """Hide skipped tags; hand every other tag to ``_start()``."""
+        if tag in self.SKIP_TAGS:
+            # Hide everything until this tag closes
+            self.skip += 1
+            return
+
+        self._start(tag, dict(attrs))
+
+    def _start(self, tag: str, values: dict[str, Optional[str]]) -> None:
+        """Write the markup for an opening tag.
+
+        - ``values`` holds the tag's attributes by name.
+        """
+        if tag in self.INLINE_MAP:
+            self._open(tag, self.INLINE_MAP[tag])
+
+        elif tag in self.HEADINGS:
+            # Headings are bold text on their own line
+            self._line()
+            self._open(tag, "b")
+
+        elif tag in ("ul", "ol"):
+            # Lists always begin on a new line
+            self._line()
+            self.lists.append(1 if tag == "ol" else None)
+
+        elif tag == "li":
+            # Each list item is its own line with a bullet or number
+            self._line()
+            number = self.lists[-1] if self.lists else None
+
+            # Indent by nesting depth, capped so very deep nesting can
+            # not make the output grow out of control
+            depth = min(len(self.lists), LIST_DEPTH_MAX)
+            indent = "  " * max(0, depth - 1)
+            if number is None:
+                self.out.append(f"{indent}- ")
+
+            else:
+                self.out.append(f"{indent}{number}. ")
+                self.lists[-1] = number + 1
+
+        elif tag == "tr":
+            # Each table row is its own line
+            self._line()
+            self.cells = 0
+
+        elif tag in ("td", "th"):
+            # Separate the cells of a row
+            if self.cells:
+                self.out.append(" | ")
+
+            self.cells += 1
+
+        elif tag == "img" and values.get("alt"):
+            # Images cannot be shown; keep their description
+            self.out.append(escape(values["alt"], quote=False))
+
+    def handle_startendtag(
+        self, tag: str, attrs: list[tuple[str, Optional[str]]]
+    ) -> None:
+        """Treat ``<br />`` style tags like their opening tag."""
+        if tag in ("br", "hr", "img"):
+            self.handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag: str) -> None:
+        """Show content again after a skipped tag; else call ``_end()``."""
+        if tag in self.SKIP_TAGS:
+            # Show content again once the hidden tag closes
+            self.skip = max(0, self.skip - 1)
+            return
+
+        self._end(tag)
+
+    def _end(self, tag: str) -> None:
+        """Close a tag and end its line when it needs one."""
+        # Close any supported tag this one opened
+        self._close(tag)
+
+        if tag in ("ul", "ol") and self.lists:
+            # Leave this list
+            self.lists.pop()
+
+        if tag in self.HEADINGS or tag in ("ul", "ol", "li", "tr"):
+            # These end their line
+            self._line()
+
+    def handle_data(self, data: str) -> None:
+        """Write text unless it sits inside a skipped tag."""
+        if not self.skip:
+            self._text(data)
+
+    def _text(self, data: str) -> None:
+        """Write text, keeping the line breaks written inside it."""
+        if not data.strip():
+            # Whitespace between tags only lays out the HTML source
+            self._write(HTML_NEWLINE_RE.sub(" ", data))
+            return
+
+        pos = 0
+        for match in HTML_NEWLINE_RE.finditer(data):
+            self._write(data[pos : match.start()])
+            pos = match.end()
+
+            # Count the line breaks, with "\r\n" counting once
+            breaks = (
+                match.group().replace("\r\n", "\n").replace("\r", "\n")
+            ).count("\n")
+            if not self.out or self.out[-1] == self.LINE_BREAK:
+                # A tag already ended this line, or nothing is written yet
+                breaks -= 1
+
+            self.out.extend([self.LINE_BREAK] * max(0, breaks))
+
+        self._write(data[pos:])
+
+    def _write(self, data: str) -> None:
+        """Write one stretch of text with its special characters escaped."""
+        if not self.out or self.out[-1] == self.LINE_BREAK:
+            # Do not start a new line with a space
+            data = data.lstrip()
+
+        if data:
+            self.out.append(escape(data.translate(self.TEXT_MAP), quote=False))
+
+    def reduce(self, html: str) -> str:
+        """Return ``html`` rewritten with only the supported tags."""
+        # Start clean so nothing from an earlier call leaks in
+        self.reset()
+        self.feed(html)
+        self.close()
+
+        # Drop line breaks and spaces left at the very end
+        while self.out and (
+            self.out[-1] == self.LINE_BREAK or not self.out[-1].strip()
+        ):
+            self.out.pop()
+
+        # Close any tag still open so the message stays balanced
+        while self.open_tags:
+            self.out.append(f"</{self.open_tags.pop()[1]}>")
+
+        return "".join(self.out)

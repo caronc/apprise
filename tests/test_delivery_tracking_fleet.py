@@ -370,6 +370,35 @@ FLEET = (
         "12125559999",
         {},
     ),
+    (
+        "rocketchat_webhook",
+        "rockets://web/token@localhost/#chan0001/#chan9999?mode=webhook",
+        "chan0001",
+        "chan9999",
+        {"status": "success"},
+    ),
+    (
+        "webexteams",
+        f"wxteams://{'Bc10' * 50}/Y2lzY29zcGFyazovL3VzL1JPT00vcm9vbTAwMDE"
+        "/Y2lzY29zcGFyazovL3VzL1JPT00vcm9vbTk5OTk/?mode=bot",
+        "Y2lzY29zcGFyazovL3VzL1JPT00vcm9vbTAwMDE",
+        "Y2lzY29zcGFyazovL3VzL1JPT00vcm9vbTk5OTk",
+        {},
+    ),
+    (
+        "plivo",
+        f"plivo://{'a' * 25}@{'b' * 40}/15551230000/15551231111/15551232222",
+        "15551231111",
+        "15551232222",
+        {},
+    ),
+    (
+        "kook",
+        f"kook://{TOKEN}/1111111111/@2222222222",
+        "1111111111",
+        "2222222222",
+        {},
+    ),
 )
 
 # Names only, for readable test ids

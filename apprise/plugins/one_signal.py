@@ -34,6 +34,7 @@
 
 from itertools import chain
 from json import dumps
+from typing import Any
 
 import requests
 
@@ -367,7 +368,13 @@ class NotifyOneSignal(NotifyBase):
             raise AppriseImproperlyConfigured(msg)
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform OneSignal Notification."""
 
         headers = {
@@ -464,24 +471,41 @@ class NotifyOneSignal(NotifyBase):
                     sent_count += len(targets[index : index + self.batch_size])
                     continue
 
-                payload[category] = targets[index : index + self.batch_size]
+                # Acquire our batch of targets
+                batch = targets[index : index + self.batch_size]
+
+                # Users and segments are stored with their @ / # prefix
+                # because url() depends on it. OneSignal expects the bare
+                # value without it.
+                if category in (
+                    OneSignalCategory.USER,
+                    OneSignalCategory.SEGMENT,
+                ):
+                    batch = [t[1:] for t in batch]
+
+                # Give each targeting method a fresh payload so categories
+                # never leak into later requests.
+                # See: https://documentation.onesignal.com/reference/
+                #      push-notification
+                data = dict(payload)
+                data[category] = batch
 
                 # Track our sent count
-                sent_count += len(payload[category])
+                sent_count += len(batch)
 
                 self.logger.debug(
                     "OneSignal POST URL:"
                     f" {self.notify_url} "
                     f"(cert_verify={self.verify_certificate!r})"
                 )
-                self.logger.debug(f"OneSignal Payload: {payload!s}")
+                self.logger.debug(f"OneSignal Payload: {data!s}")
 
                 # Always call throttle before any remote server i/o is made
                 self.throttle()
                 try:
                     r = requests.post(
                         self.notify_url,
-                        data=dumps(payload),
+                        data=dumps(data),
                         headers=headers,
                         verify=self.verify_certificate,
                         timeout=self.request_timeout,

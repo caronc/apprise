@@ -25,26 +25,18 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# Added for Python 3.9 Compatibility
-
-from dataclasses import dataclass as _dataclass
-from typing import Any, Callable, TypeVar
-
-_T = TypeVar("_T")
+"""Tests for Python-Markdown 3.3 (Rocky Linux 9) compatibility."""
 
 
-def dataclass_compat(*dargs: Any, **dkwargs: Any) -> Callable[[_T], _T]:
-    """
-    dataclass() wrapper that drops unsupported kwargs on older Python.
+def test_compat_markdown_escape_placeholders():
+    """Escape placeholders left by older Python-Markdown become valid HTML."""
+    from markdown.util import ETX, STX
 
-    Python 3.9 does not support slots= in dataclasses.dataclass().
-    """
-    try:
-        return _dataclass(*dargs, **dkwargs)
+    from apprise.compat.markdown33 import _UnescapePostprocessor
 
-    except TypeError:
-        # Only strip slots when it is the cause
-        if "slots" in dkwargs:
-            dkwargs.pop("slots", None)
-            return _dataclass(*dargs, **dkwargs)
-        raise
+    # Python-Markdown 3.3 leaves "\&" and "\<" as numbered placeholders
+    text = f"a {STX}38{ETX} b {STX}60{ETX} c"
+    assert _UnescapePostprocessor().run(text) == "a &amp; b &lt; c"
+
+    # Text without placeholders is returned as it was
+    assert _UnescapePostprocessor().run("plain") == "plain"

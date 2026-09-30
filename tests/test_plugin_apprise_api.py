@@ -529,6 +529,103 @@ def test_notify_apprise_api_direct_send_defaults(mock_post):
 
 
 @mock.patch("requests.post")
+def test_notify_apprise_api_forwards_unchanged(mock_post):
+    """Declared sources are relayed byte for byte with their own format."""
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+    mock_post.return_value = okay_response
+
+    # Content that any format conversion would visibly alter
+    samples = {
+        NotifyFormat.TEXT: "a < b & c_d *e* # f",
+        NotifyFormat.HTML: "<b>bold</b> & <i>x_y</i>",
+        NotifyFormat.MARKDOWN: "# Head\n\n**bold** & <tag> _x_",
+    }
+
+    for url in (
+        "apprise://localhost/mytoken1/",
+        "apprise://localhost/mytoken1/?format=html",
+        "apprise://localhost/mytoken1/?format=markdown",
+        "apprise://localhost/mytoken1/?format=text",
+    ):
+        obj = Apprise.instantiate(url)
+        assert isinstance(obj, NotifyAppriseAPI)
+
+        for fmt, body in samples.items():
+            mock_post.reset_mock()
+            assert obj.notify(body=body, title="<t> & *t*", body_format=fmt)
+
+            # The caller's own format wins over ?format=, and neither
+            # the body nor the title was converted.
+            assert mock_post.call_args[1]["data"] == {
+                "title": "<t> & *t*",
+                "body": body,
+                "type": "info",
+                "format": fmt.value,
+            }
+
+
+@mock.patch("requests.post")
+def test_notify_apprise_api_uses_url_format(mock_post):
+    """Undeclared content is relayed as-is, labelled by ?format=."""
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+    mock_post.return_value = okay_response
+
+    body = "<b>x</b> & *y* _z_"
+
+    # No ?format= means no format is relayed at all
+    obj = Apprise.instantiate("apprise://localhost/mytoken1/")
+    assert obj.notify(body=body, title="t")
+    assert mock_post.call_args[1]["data"] == {
+        "title": "t",
+        "body": body,
+        "type": "info",
+    }
+
+    for fmt in ("text", "html", "markdown"):
+        mock_post.reset_mock()
+        obj = Apprise.instantiate(
+            "apprise://localhost/mytoken1/?format={}".format(fmt)
+        )
+        assert obj.notify(body=body, title="t")
+
+        # The URL format describes the untouched content
+        assert mock_post.call_args[1]["data"] == {
+            "title": "t",
+            "body": body,
+            "type": "info",
+            "format": fmt,
+        }
+
+        # ?format= survives a round trip through url()
+        assert "format={}".format(fmt) in obj.url()
+        again = Apprise.instantiate(obj.url())
+        assert again.url() == obj.url()
+
+
+@mock.patch("requests.post")
+def test_notify_apprise_api_json_with_tags(mock_post):
+    """JSON requests carry the tags alongside the message."""
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+    mock_post.return_value = okay_response
+
+    obj = Apprise.instantiate(
+        "apprise://localhost/mytoken1/?method=json&tags=admin,team"
+    )
+    assert isinstance(obj, NotifyAppriseAPI)
+    assert obj.notify(body="body", title="title")
+
+    data = loads(mock_post.call_args[1]["data"])
+    assert sorted(data.pop("tag")) == ["admin", "team"]
+    assert data == {"title": "title", "body": "body", "type": "info"}
+
+
+@mock.patch("requests.post")
 def test_notify_apprise_api_attachments(mock_post):
     """NotifyAppriseAPI() Attachments."""
 

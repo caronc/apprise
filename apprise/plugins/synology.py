@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from json import dumps
+from typing import Any
 
 import requests
 
@@ -232,7 +233,13 @@ class NotifySynology(NotifyBase):
             )
         )
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform Synology Chat Notification."""
 
         # Prepare HTTP Headers
@@ -287,7 +294,9 @@ class NotifySynology(NotifyBase):
         try:
             r = requests.post(
                 url,
-                data=f"payload={dumps(payload)}",
+                # Passing a dict lets requests URL-encode the form value so
+                # characters like &, + and % reach Synology Chat intact
+                data={"payload": dumps(payload)},
                 params=params,
                 headers=headers,
                 auth=auth,

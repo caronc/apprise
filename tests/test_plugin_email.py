@@ -4636,3 +4636,80 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     assert isinstance(obj2, email.NotifyEmail)
     assert obj2.inline is False
     assert "inline" not in obj2.url()
+
+
+def test_plugin_email_subject_line_breaks_are_flattened():
+    """NotifyEmail() turns a multi-line title into a one-line subject."""
+
+    messages = list(
+        email.NotifyEmail.prepare_emails(
+            subject="Build failed\r\non   host1\n\tBcc: evil@example.com",
+            body="body",
+            from_addr=("Apprise", "user@example.com"),
+            to=[(None, "to@example.com")],
+        )
+    )
+    assert len(messages) == 1
+
+    # Only the header block matters here
+    headers = messages[0].body.split("\n\n", 1)[0]
+    assert "Subject: Build failed on host1 Bcc: evil@example.com" in headers
+
+    # No extra header was injected by the line breaks
+    assert "\nBcc:" not in headers
+
+
+def test_plugin_email_pgp_subject_line_breaks_are_flattened():
+    """NotifyEmail() flattens the subject inside PGP encrypted mail too."""
+
+    # Capture the content handed over for encryption
+    pgp = mock.Mock()
+    pgp.encrypt.return_value = "-----BEGIN PGP MESSAGE-----"
+    pgp.autocrypt_header.return_value = None
+
+    with mock.patch.object(email.base._pgp, "PGP_SUPPORT", True):
+        messages = list(
+            email.NotifyEmail.prepare_emails(
+                subject="Build failed\non host1",
+                body="body",
+                from_addr=("Apprise", "user@example.com"),
+                to=[(None, "to@example.com")],
+                pgp=pgp,
+                pgp_mode=email.base.PGPMode.ENCRYPT,
+            )
+        )
+
+    assert len(messages) == 1
+
+    # Both the encrypted copy and the outer message use one line
+    encrypted = pgp.encrypt.call_args[0][0]
+    assert "Subject: Build failed on host1\n" in encrypted
+    assert "Subject: Build failed on host1\n" in messages[0].body
+
+
+def test_plugin_email_retry_skips_delivered_recipients():
+    """NotifyEmail() retries only the recipients that failed."""
+
+    sent = []
+
+    def sendmail(from_addr, to_addrs, body):
+        # Record the recipient and fail only for the second one
+        sent.append(to_addrs[0])
+        return to_addrs[0] != "b@example.com"
+
+    controller = mock.MagicMock()
+    controller.return_value.__enter__.return_value.sendmail.side_effect = (
+        sendmail
+    )
+
+    with mock.patch.object(email.base, "AppriseSMTPController", controller):
+        aobj = Apprise()
+        assert aobj.add(
+            "mailto://user:pass@example.com"
+            "?to=a@example.com,b@example.com&retry=1&wait=0"
+        )
+        assert not aobj.notify(body="body", title="title")
+
+    # The healthy recipient is contacted once, the failing one twice
+    assert sent.count("a@example.com") == 1
+    assert sent.count("b@example.com") == 2

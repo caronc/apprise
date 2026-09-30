@@ -1591,3 +1591,97 @@ def test_plugin_fluxer_botname_round_trip() -> None:
     obj2 = Apprise.instantiate(obj.url())
     assert isinstance(obj2, NotifyFluxer)
     assert obj2.user == "a/b"
+
+
+def test_plugin_fluxer_long_fields() -> None:
+    """Long markdown sections are split to fit embed field limits."""
+
+    # A section made of many short lines breaks on line boundaries
+    lines = "\n".join(f"line {i:04d} of output" for i in range(200))
+    desc, fields = NotifyFluxer.extract_markdown_sections("## Log\n" + lines)
+    assert desc == ""
+    assert len(fields) > 1
+    for field in fields:
+        assert field["name"] == "Log"
+        assert len(field["value"]) <= NotifyFluxer.fluxer_field_value_maxlen
+
+    # Nothing is lost or reordered when the pieces are put back together
+    assert "\n".join(f["value"][6:-4] for f in fields) == lines
+
+    # A single line longer than a field is hard-split, and a very long
+    # heading is trimmed to the field name limit
+    desc, fields = NotifyFluxer.extract_markdown_sections(
+        "# " + "n" * 300 + "\n" + "x" * 2500
+    )
+    assert len(fields) == 3
+    assert fields[0]["name"] == "n" * NotifyFluxer.fluxer_field_name_maxlen
+    assert "".join(f["value"][6:-4] for f in fields) == "x" * 2500
+
+
+@mock.patch("requests.post")
+def test_plugin_fluxer_retry_skips_sent(mock_post: mock.MagicMock) -> None:
+    """A retry only re-posts the pieces that did not arrive."""
+
+    good = mock.Mock(status_code=requests.codes.ok, content=b"", headers={})
+    bad = mock.Mock(
+        status_code=requests.codes.internal_server_error,
+        content=b"",
+        headers={},
+    )
+
+    def upload_answer(*args, **kwargs):
+        # Messages arrive; only the upload of the png file fails
+        files = kwargs.get("files") or {}
+        return (
+            bad if any(f[0].endswith(".png") for f in files.values()) else good
+        )
+
+    mock_post.side_effect = upload_answer
+
+    webhook_id, webhook_token = _tokens()
+    aobj = Apprise()
+    aobj.add(f"fluxer://{webhook_id}/{webhook_token}/?retry=2&wait=0")
+    assert not aobj.notify(
+        body="hello",
+        attach=(
+            os.path.join(TEST_VAR_DIR, "apprise-test.gif"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ),
+    )
+
+    # The message and the gif are posted once; the png on every attempt
+    names = [
+        c[1]["files"]["files[0]"][0] if c[1].get("files") else "message"
+        for c in mock_post.call_args_list
+    ]
+    assert names == [
+        "message",
+        "apprise-test.gif",
+        "apprise-test.png",
+        "apprise-test.png",
+        "apprise-test.png",
+    ]
+
+    # Extra messages of embed fields are tracked one by one too
+    mock_post.reset_mock()
+    calls = []
+
+    def fields_answer(*args, **kwargs):
+        # The third message (the second message of extra fields) fails
+        calls.append(kwargs)
+        return bad if len(calls) == 3 else good
+
+    mock_post.side_effect = fields_answer
+
+    aobj = Apprise()
+    aobj.add(
+        f"fluxer://{webhook_id}/{webhook_token}/"
+        "?format=markdown&retry=1&wait=0"
+    )
+    body = "\n".join(f"# Heading {i}\nvalue {i}" for i in range(25))
+    with mock.patch.object(NotifyFluxer, "fluxer_max_fields", 10):
+        assert aobj.notify(body=body)
+
+    # Three messages of fields, then only the failed one again
+    assert len(calls) == 4
+    assert calls[2]["data"] == calls[3]["data"]

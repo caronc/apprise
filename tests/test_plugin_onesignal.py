@@ -490,7 +490,7 @@ def test_plugin_onesignal_notifications(mock_post):
             "https://github.com/caronc/apprise"
             "/raw/master/apprise/assets/themes/default/apprise-info-32x32.png"
         ),
-        "include_external_user_ids": ["@user"],
+        "include_external_user_ids": ["user"],
     }
 
     mock_post.reset_mock()
@@ -526,7 +526,7 @@ def test_plugin_onesignal_notifications(mock_post):
             "https://github.com/caronc/apprise"
             "/raw/master/apprise/assets/themes/default/apprise-info-32x32.png"
         ),
-        "include_external_user_ids": ["@user"],
+        "include_external_user_ids": ["user"],
     }
 
     # Now set a title
@@ -557,7 +557,7 @@ def test_plugin_onesignal_notifications(mock_post):
             "https://github.com/caronc/apprise"
             "/raw/master/apprise/assets/themes/default/apprise-info-32x32.png"
         ),
-        "include_external_user_ids": ["@user"],
+        "include_external_user_ids": ["user"],
     }
 
     # Test without decoding parameters
@@ -624,3 +624,71 @@ def test_plugin_onesignal_notifications(mock_post):
         "par2": "b64:eyJhIjoxLCJiIjoyfQ",
         "par3": {"a": 1, "b": 2},
     }
+
+
+@mock.patch("requests.post")
+def test_plugin_onesignal_targets_sent_separately(mock_post):
+    """OneSignal() sends each target category in its own clean request."""
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    instance = Apprise.instantiate(
+        "onesignal://appid@apikey/player1/user@example.com/@user1/#segment1/"
+    )
+    assert isinstance(instance, NotifyOneSignal)
+
+    assert instance.notify("hello world") is True
+    assert mock_post.call_count == 4
+
+    # Gather the targeting keys found in each request
+    categories = (
+        "include_player_ids",
+        "include_email_tokens",
+        "include_external_user_ids",
+        "included_segments",
+    )
+    sent = []
+    for call in mock_post.call_args_list:
+        payload = loads(call[1]["data"])
+        sent.append({k: payload[k] for k in categories if k in payload})
+
+    # Only one targeting method is present per request and the
+    # @ / # prefixes are not passed along to OneSignal
+    assert sent == [
+        {"include_player_ids": ["player1"]},
+        {"include_email_tokens": ["user@example.com"]},
+        {"include_external_user_ids": ["user1"]},
+        {"included_segments": ["segment1"]},
+    ]
+
+    # The prefixes are still kept for our URL
+    assert "/%40user1/" in instance.url()
+    assert "/%23segment1" in instance.url()
+
+
+@mock.patch("requests.post")
+def test_plugin_onesignal_retry_skips_delivered(mock_post):
+    """OneSignal() retries only the batch that failed."""
+
+    def respond(*args, **kwargs):
+        # The segment request always fails
+        r = mock.Mock()
+        payload = loads(kwargs["data"])
+        r.status_code = (
+            requests.codes.internal_server_error
+            if "included_segments" in payload
+            else requests.codes.ok
+        )
+        r.content = b""
+        return r
+
+    mock_post.side_effect = respond
+
+    aobj = Apprise()
+    assert aobj.add("onesignal://appid@apikey/@user1/#segment1?retry=1&wait=0")
+    assert not aobj.notify(body="hello world")
+
+    # The user batch went out once, the segment batch was retried
+    sent = [loads(c[1]["data"]) for c in mock_post.call_args_list]
+    assert sum("include_external_user_ids" in p for p in sent) == 1
+    assert sum("included_segments" in p for p in sent) == 2

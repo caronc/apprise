@@ -28,6 +28,7 @@
 # Disable logging for a cleaner testing output
 import logging
 import socket
+from timeit import default_timer
 from unittest import mock
 
 import apprise
@@ -392,3 +393,103 @@ def test_plugin_aprs_config_files():
 
     assert len(ac.services()) == 6
     assert len(aobj) == 6
+
+
+@mock.patch("socket.create_connection")
+def test_plugin_aprs_packet_is_one_line(mock_create_connection):
+    """A title and multi-line body are joined into one APRS line."""
+
+    # A socket object
+    sobj = mock.Mock()
+    sobj.getpeername.return_value = ("localhost", 1234)
+    sobj.recv.return_value = "ping\npong pong DF1JSL-15 verified pong".encode(
+        "latin-1"
+    )
+    sobj.sendall.return_value = True
+
+    # Prepare Mock
+    mock_create_connection.return_value = sobj
+
+    instance = apprise.Apprise.instantiate("aprs://DF1JSL-15:12345@DF1ABC")
+    assert isinstance(instance, NotifyAprs)
+    assert instance.notify(body="line one\r\nline two \n\n three", title="T")
+
+    # The message packet is the one addressed to our target
+    packets = [
+        c[0][0].decode("latin-1")
+        for c in sobj.sendall.call_args_list
+        if b"::DF1ABC" in c[0][0]
+    ]
+    assert len(packets) == 1
+
+    # Only the closing CRLF remains; APRS-IS ends a packet there
+    assert packets[0].endswith(":T line one line two three\r\n")
+    assert packets[0].count("\n") == 1
+    assert "\r" not in packets[0][:-2]
+
+
+@mock.patch("socket.create_connection")
+def test_plugin_aprs_retry_skips_delivered(mock_create_connection):
+    """An APRS retry only re-sends to the call sign that failed."""
+
+    sent = []
+
+    def sendall(data):
+        # Refuse every packet for DF1DEF
+        if b"::DF1DEF" in data:
+            raise OSError("error")
+        sent.append(data)
+        return True
+
+    # A socket object
+    sobj = mock.Mock()
+    sobj.getpeername.return_value = ("localhost", 1234)
+    sobj.recv.return_value = "ping\npong pong DF1JSL-15 verified pong".encode(
+        "latin-1"
+    )
+    sobj.sendall.side_effect = sendall
+
+    # Prepare Mock
+    mock_create_connection.return_value = sobj
+
+    aobj = apprise.Apprise()
+    assert aobj.add("aprs://DF1JSL-15:12345@DF1ABC/DF1DEF?retry=1&wait=0")
+    assert not aobj.notify(body="body")
+
+    # The healthy call sign is contacted exactly once
+    assert len([p for p in sent if b"::DF1ABC" in p]) == 1
+
+
+@mock.patch("socket.create_connection")
+def test_plugin_aprs_long_space_run_is_fast(mock_create_connection):
+    """A long run of tabs with no line break is joined quickly."""
+
+    # A socket object
+    sobj = mock.Mock()
+    sobj.getpeername.return_value = ("localhost", 1234)
+    sobj.recv.return_value = "ping\npong pong DF1JSL-15 verified pong".encode(
+        "latin-1"
+    )
+    sobj.sendall.return_value = True
+
+    # Prepare Mock
+    mock_create_connection.return_value = sobj
+
+    instance = apprise.Apprise.instantiate("aprs://DF1JSL-15:12345@DF1ABC")
+    assert isinstance(instance, NotifyAprs)
+
+    # Call send() directly; notify() would first cut the body to 67
+    # characters and never reach the line joining step
+    start = default_timer()
+    assert instance.send(body="a" + "\t" * 100000 + "b")
+    elapsed = default_timer() - start
+    assert elapsed < 5.0
+
+    # The message packet is still cut to the APRS size limit
+    packets = [
+        c[0][0].decode("latin-1")
+        for c in sobj.sendall.call_args_list
+        if b"::DF1ABC" in c[0][0]
+    ]
+    assert len(packets) == 1
+    assert packets[0].endswith(":a" + "\t" * 66 + "\r\n")

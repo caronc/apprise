@@ -316,7 +316,11 @@ def test_plugin_twilio_auth(mock_post):
     assert third_call[0][0] == (
         f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Calls.json"
     )
-    assert third_call[1]["data"]["Twiml"] == message_contents
+    # Plain text is wrapped in TwiML so the call can speak it
+    assert (
+        third_call[1]["data"]["Twiml"]
+        == f"<Response><Say>{message_contents}</Say></Response>"
+    )
     assert (
         first_call[1]["data"]["From"]
         == second_call[1]["data"]["From"]
@@ -391,3 +395,161 @@ def test_plugin_twilio_edge_cases(mock_post):
 
     # We will fail with the above error code
     assert bool(obj.notify("title", "body", "info")) is False
+
+
+@mock.patch("requests.post")
+def test_plugin_twilio_call_twiml_body_kept_intact(mock_post):
+    """A TwiML call body is sent untouched even when a title is given."""
+
+    response = mock.Mock()
+    response.content = b"{}"
+    response.status_code = requests.codes.created
+    mock_post.return_value = response
+
+    twiml = "<Response><Say>Disk full</Say></Response>"
+    aobj = Apprise()
+    assert aobj.add(
+        "twilio://AC{}:{}@15551233456/15559876543?method=call".format(
+            "a" * 32, "b" * 32
+        )
+    )
+    assert aobj.notify(body=twiml, title="Alert")
+
+    # The title is not placed in front of the TwiML document
+    assert mock_post.call_args[1]["data"]["Twiml"] == twiml
+
+    # Without a title the TwiML document is sent as it was given
+    assert aobj.notify(body=twiml)
+    assert mock_post.call_args[1]["data"]["Twiml"] == twiml
+
+
+@mock.patch("requests.post")
+def test_plugin_twilio_call_text_is_spoken(mock_post):
+    """A plain text call body and its title become escaped TwiML."""
+
+    response = mock.Mock()
+    response.content = b"{}"
+    response.status_code = requests.codes.created
+    mock_post.return_value = response
+
+    aobj = Apprise()
+    assert aobj.add(
+        "twilio://AC{}:{}@15551233456/15559876543?method=call".format(
+            "a" * 32, "b" * 32
+        )
+    )
+    assert aobj.notify(body="Disk < 5% & falling", title="Alert")
+
+    assert mock_post.call_args[1]["data"]["Twiml"] == (
+        "<Response><Say>Alert</Say>"
+        "<Say>Disk &lt; 5% &amp; falling</Say></Response>"
+    )
+
+
+@pytest.mark.parametrize(
+    "body, twiml",
+    [
+        # Plain text is spoken
+        ("all good <3", "<Response><Say>all good &lt;3</Say></Response>"),
+        # Anything starting with "<" is relayed for Twilio to validate,
+        # including a document that opens with a comment or declaration
+        (
+            "<!-- generated -->\n<Response><Say>Hi</Say></Response>",
+            "<!-- generated -->\n<Response><Say>Hi</Say></Response>",
+        ),
+        (
+            '<?xml version="1.0"?>\n<Response><Say>Hi</Say></Response>',
+            '<?xml version="1.0"?>\n<Response><Say>Hi</Say></Response>',
+        ),
+        ("  <Response/>", "  <Response/>"),
+        ("<3 all good", "<3 all good"),
+    ],
+)
+@mock.patch("requests.post")
+def test_plugin_twilio_call_twiml_detection(mock_post, body, twiml):
+    """A body starting with "<" is relayed as TwiML; text is spoken."""
+
+    response = mock.Mock()
+    response.content = b"{}"
+    response.status_code = requests.codes.created
+    mock_post.return_value = response
+
+    aobj = Apprise()
+    assert aobj.add(
+        "twilio://AC{}:{}@15551233456/15559876543?method=call".format(
+            "a" * 32, "b" * 32
+        )
+    )
+    assert aobj.notify(body=body)
+    assert mock_post.call_args[1]["data"]["Twiml"] == twiml
+
+
+@mock.patch("requests.post")
+def test_plugin_twilio_sms_title_joins_body(mock_post):
+    """An SMS still carries the title at the top of its body."""
+
+    response = mock.Mock()
+    response.content = b"{}"
+    response.status_code = requests.codes.created
+    mock_post.return_value = response
+
+    aobj = Apprise()
+    assert aobj.add(
+        "twilio://AC{}:{}@15551233456/15559876543".format("a" * 32, "b" * 32)
+    )
+    assert aobj.notify(body="body", title="title")
+    assert mock_post.call_args[1]["data"]["Body"] == "title\r\nbody"
+
+
+@mock.patch("requests.post")
+def test_plugin_twilio_call_say_injection(mock_post):
+    """Text cannot close the Say element early."""
+
+    response = mock.Mock()
+    response.content = b"{}"
+    response.status_code = requests.codes.created
+    mock_post.return_value = response
+
+    aobj = Apprise()
+    assert aobj.add(
+        "twilio://AC{}:{}@15551233456/15559876543?method=call".format(
+            "a" * 32, "b" * 32
+        )
+    )
+    expected = (
+        "<Response><Say>t&lt;/Say&gt;&lt;Hangup/&gt;</Say>"
+        "<Say>b&lt;/Say&gt;&lt;Play&gt;x&lt;/Play&gt;</Say></Response>"
+    )
+
+    # Both a declared text body and undeclared content are escaped
+    for body_format in ("text", None):
+        assert aobj.notify(
+            body="b</Say><Play>x</Play>",
+            title="t</Say><Hangup/>",
+            body_format=body_format,
+        )
+        assert mock_post.call_args[1]["data"]["Twiml"] == expected
+
+
+@pytest.mark.parametrize("overflow", ["split", "truncate"])
+@mock.patch("requests.post")
+def test_plugin_twilio_call_twiml_not_split(mock_post, overflow):
+    """Valid TwiML within Twilio's limit is sent whole as one call."""
+
+    response = mock.Mock()
+    response.content = b"{}"
+    response.status_code = requests.codes.created
+    mock_post.return_value = response
+
+    aobj = Apprise()
+    assert aobj.add(
+        "twilio://AC{}:{}@15551233456/15559876543?method=call"
+        "&overflow={}".format("a" * 32, "b" * 32, overflow)
+    )
+
+    # A 3900 character TwiML document, with a long title that is ignored
+    twiml = "<Response><Say>{}</Say></Response>".format("x" * 3868)
+    assert len(twiml) == 3900
+    assert aobj.notify(body=twiml, title="t" * 250, body_format="text")
+    assert mock_post.call_count == 1
+    assert mock_post.call_args[1]["data"]["Twiml"] == twiml

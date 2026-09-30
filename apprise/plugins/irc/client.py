@@ -322,7 +322,13 @@ class IRCClient:
     def privmsg(self, target: str, message: str, timeout: float) -> None:
         """Handle the sending of private messages."""
         deadline = time.monotonic() + float(timeout)
-        self._queue(f"PRIVMSG {target} :{message}")
+
+        # IRC ends every command at a line break, so each line of the
+        # message is sent as its own PRIVMSG; blank lines are skipped.
+        for line in message.splitlines():
+            if line.strip():
+                self._queue(f"PRIVMSG {target} :{line}")
+
         self._flush(deadline)
         self._handshake(self._tick(deadline), prefix="")
 

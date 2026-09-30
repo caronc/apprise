@@ -26,8 +26,10 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+from json import loads
 import logging
 from unittest import mock
+from urllib.parse import parse_qs
 
 from helpers import AppriseURLTester
 import requests
@@ -220,4 +222,32 @@ def test_plugin_synology_edge_cases(mock_post):
     details = mock_post.call_args_list[0]
     assert details[0][0] == "http://localhost:8080/webapi/entry.cgi"
 
-    assert details[1]["data"].startswith("payload=")
+    assert set(details[1]["data"].keys()) == {"payload"}
+
+
+@mock.patch("requests.post")
+def test_plugin_synology_payload_is_url_encoded(mock_post):
+    """NotifySynology() keeps &, + and % intact in the message."""
+
+    response = mock.Mock()
+    response.content = b'{"success": true}'
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    instance = NotifySynology(
+        **NotifySynology.parse_url("synology://localhost/token")
+    )
+    assert instance.send(body="AT&T 50% off + more", title="Deal") is True
+
+    # Encode the form exactly the way requests would send it
+    details = mock_post.call_args_list[0]
+    body = (
+        requests.Request("POST", details[0][0], data=details[1]["data"])
+        .prepare()
+        .body
+    )
+
+    # The decoded form holds the complete, unaltered message
+    form = parse_qs(body)
+    assert list(form.keys()) == ["payload"]
+    assert "AT&T 50% off + more" in loads(form["payload"][0])["text"]

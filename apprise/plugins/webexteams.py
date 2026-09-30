@@ -464,6 +464,13 @@ class NotifyWebexTeams(NotifyBase):
 
         # --- Multipart attachment(s) ---
         for no, attachment in enumerate(attach, start=1):
+            # Each attachment is its own post (the first also carries the
+            # message body); track them per room so a retry only re-sends
+            # the ones that failed
+            attach_key = (room_id, no)
+            if self.is_delivered(attach_key):
+                continue
+
             if not attachment:
                 self.logger.error(
                     "Could not access Webex Teams attachment"
@@ -538,6 +545,9 @@ class NotifyWebexTeams(NotifyBase):
                     f" {attachment.name} to room {room_id}."
                 )
 
+                # Delivered; a retry can safely skip this attachment.
+                self.mark_delivered(attach_key)
+
             except requests.RequestException as e:
                 self.logger.warning(
                     "A Connection error occurred posting"
@@ -598,6 +608,11 @@ class NotifyWebexTeams(NotifyBase):
             ),
             params=NotifyWebexTeams.urlencode(params),
         )
+
+    def __len__(self) -> int:
+        """Returns the number of targets associated with this notification."""
+        # Webhook mode (or a bot with no rooms) still counts as one
+        return len(self.targets) if self.targets else 1
 
     @staticmethod
     def parse_url(url):

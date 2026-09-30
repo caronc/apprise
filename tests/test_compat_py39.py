@@ -36,43 +36,44 @@ import pytest
 from apprise.plugins.irc import protocol
 
 
-def test_compat_dataclass_no_exception():
-    """dataclass_compat() py39 returns dataclass result on success."""
-    # protocol.dataclass is a compat wrapper around apprise.compat._dataclass.
-    # Patch the underlying dataclass binding to simulate older Python
-    # behaviour where slots= is unsupported.
-    with mock.patch("apprise.compat._dataclass") as m:
+def test_compat_dataclass_keeps_slots():
+    """dataclass_compat() passes slots= through on Python 3.10+."""
+    # protocol.dataclass is a compat wrapper around
+    # apprise.compat.py39._dataclass.
+    with (
+        mock.patch("apprise.compat.py39._HAS_SLOTS", True),
+        mock.patch("apprise.compat.py39._dataclass") as m,
+    ):
         sentinel = object()
         m.return_value = sentinel
 
-        result = protocol.dataclass(frozen=True, slots=True)
-
-        assert result is sentinel
+        assert protocol.dataclass(frozen=True, slots=True) is sentinel
         m.assert_called_once_with(frozen=True, slots=True)
 
 
-def test_compat_dataclass_strips_slots_on_typeerror():
-    """dataclass_compat() py39 strips slots= and retries after TypeError."""
-    with mock.patch("apprise.compat._dataclass") as m:
+def test_compat_dataclass_drops_slots():
+    """dataclass_compat() drops slots= on Python 3.9."""
+    with (
+        mock.patch("apprise.compat.py39._HAS_SLOTS", False),
+        mock.patch("apprise.compat.py39._dataclass") as m,
+    ):
         sentinel = object()
-        m.side_effect = [TypeError("unsupported"), sentinel]
+        m.return_value = sentinel
 
-        result = protocol.dataclass(frozen=True, slots=True)
-
-        assert result is sentinel
-        assert m.call_count == 2
-
-        # First call includes slots
-        assert m.call_args_list[0].kwargs == {"frozen": True, "slots": True}
-
-        # Second call must omit slots
-        assert m.call_args_list[1].kwargs == {"frozen": True}
+        assert protocol.dataclass(frozen=True, slots=True) is sentinel
+        m.assert_called_once_with(frozen=True)
 
 
-def test_compat_dataclass_reraises_when_no_slots():
-    """dataclass_compat() re-raises TypeError when slots is not present."""
-    with mock.patch("apprise.compat._dataclass") as m:
+def test_compat_dataclass_errors_not_hidden():
+    """dataclass_compat() never retries or hides a TypeError."""
+    with (
+        mock.patch("apprise.compat.py39._HAS_SLOTS", True),
+        mock.patch("apprise.compat.py39._dataclass") as m,
+    ):
         m.side_effect = TypeError("boom")
 
         with pytest.raises(TypeError):
-            protocol.dataclass(frozen=True)
+            protocol.dataclass(frozen=True, slots=True)
+
+        # The call was made once, with slots still requested
+        m.assert_called_once_with(frozen=True, slots=True)

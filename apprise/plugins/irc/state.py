@@ -43,7 +43,7 @@ from dataclasses import field
 from enum import Enum, auto
 from typing import Optional
 
-from ...compat import dataclass_compat as dataclass
+from ...compat.py39 import dataclass_compat as dataclass
 from .protocol import IRCMessage, extract_welcome_nick
 
 

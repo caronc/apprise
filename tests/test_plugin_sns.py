@@ -29,6 +29,7 @@
 import logging
 import sys
 from unittest import mock
+from urllib.parse import parse_qs
 
 from helpers import AppriseURLTester
 import pytest
@@ -795,7 +796,7 @@ def test_plugin_sns_mode_detection():
         targets=["#MyTopic"],
     )
     assert obj.mode == SNSMode.TOPIC
-    assert obj.title_maxlen == 100
+    assert obj.title_maxlen == 99
     assert obj.body_maxlen == 256000
 
     # Phone targets -> SMS mode auto-detected
@@ -920,6 +921,21 @@ def test_plugin_sns_topic_mode_send(mock_post):
     assert bool(obj.notify(title="", body="My Body")) is True
     assert "Subject=" not in publish_data.get("data", "")
 
+    # Line breaks and control characters become single spaces
+    publish_data.clear()
+    assert (
+        bool(obj.notify(title="Build\r\n failed\x07\ton host1", body="b"))
+        is True
+    )
+    subject = parse_qs(publish_data["data"])["Subject"]
+    assert subject == ["Build failed on host1"]
+
+    # The Subject always stays under 100 characters
+    publish_data.clear()
+    assert obj.send(title="t" * 150, body="b") is True
+    subject = parse_qs(publish_data["data"])["Subject"]
+    assert subject == ["t" * 99]
+
 
 @mock.patch("requests.post")
 def test_plugin_sns_topic_mode_phone_forced(mock_post):
@@ -1002,3 +1018,48 @@ def test_plugin_sns_mode_url_round_trip():
     obj3 = NotifySNS(**results)
     # Auto-detected from phone target
     assert obj3.mode == SNSMode.SMS
+
+
+@mock.patch("requests.post")
+def test_plugin_sns_retry_skips_delivered_topics(mock_post):
+    """NotifySNS() retries only the topics that failed."""
+
+    published = []
+
+    def side_effect(url, data, **kwargs):
+        """Return an ARN on CreateTopic; fail publishing to BadTopic."""
+        robj = mock.Mock()
+        robj.status_code = requests.codes.ok
+        robj.text = ""
+        robj.content = b""
+        form = parse_qs(data)
+        if form["Action"] == ["CreateTopic"]:
+            robj.text = (
+                "<CreateTopicResponse><CreateTopicResult><TopicArn>"
+                "arn:aws:sns:us-east-2:000000000000:{}"
+                "</TopicArn></CreateTopicResult></CreateTopicResponse>"
+            ).format(form["Name"][0])
+
+        else:
+            arn = form["TopicArn"][0]
+            published.append(arn)
+            if arn.endswith("BadTopic"):
+                robj.status_code = requests.codes.internal_server_error
+
+        return robj
+
+    mock_post.side_effect = side_effect
+
+    aobj = Apprise()
+    assert aobj.add(
+        "sns://{}/{}/{}/%23GoodTopic/%23BadTopic?retry=1&wait=0".format(
+            TEST_ACCESS_KEY_ID, TEST_ACCESS_KEY_SECRET, TEST_REGION
+        )
+    )
+    assert not aobj.notify(title="title", body="body")
+
+    # The healthy topic is published once, the failing one twice
+    good = [a for a in published if a.endswith("GoodTopic")]
+    bad = [a for a in published if a.endswith("BadTopic")]
+    assert len(good) == 1
+    assert len(bad) == 2

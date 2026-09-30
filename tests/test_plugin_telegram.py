@@ -32,6 +32,7 @@ from json import dumps, loads
 import logging
 import os
 import re
+from timeit import default_timer
 from unittest import mock
 from urllib.parse import urlparse
 
@@ -51,6 +52,7 @@ from apprise.plugins.base import _delivery_tracker
 from apprise.plugins.telegram import (
     NotifyTelegram,
     TelegramGroupResult,
+    TelegramHTMLReducer,
     TelegramMediaKind,
 )
 
@@ -1052,10 +1054,10 @@ def test_plugin_telegram_formatting(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert (
-        payload["text"] == "<b>\r\n<b>🚨 Another Change detected for "
+        payload["text"] == "<b><b>🚨 Another Change detected for "
         "<i>Apprise Test Title</i></b>\r\n</b>\r\n<i>"
         '<a href="http://localhost">Apprise Body Title</a>'
-        '</i> had <a href="http://127.0.0.2">a change</a>\r\n'
+        '</i> had <a href="http://127.0.0.2">a change</a>'
     )
 
     # Now we'll test an edge case where a title was defined, but after
@@ -1352,7 +1354,7 @@ def test_plugin_telegram_formatting(mock_post):
     # Test that everything is escaped properly in a HTML mode
     assert (
         payload["text"]
-        == "<b>Test Message Title</b>\r\nTest Message Body\r\nok\r\n"
+        == "<b>Test Message Title</b>\r\nTest Message Body\r\nok"
     )
 
 
@@ -1423,8 +1425,8 @@ def test_plugin_telegram_html_formatting(mock_post):
     # Test that everything is escaped properly in a HTML mode
     assert (
         payload["text"]
-        == "<b>\r\n<b>'information'</b>\r\n</b>\r\n<i>\"This is in Italic\""
-        "</i>\r\n<b>      Headings are dropped and converted to bold</b>\r\n"
+        == "<b><b>'information'</b>\r\n</b>\r\n<i>\"This is in Italic\""
+        "</i>\r\n<b>      Headings are dropped and converted to bold</b>"
     )
 
     mock_post.reset_mock()
@@ -1459,9 +1461,9 @@ def test_plugin_telegram_html_formatting(mock_post):
     payload = loads(mock_post.call_args_list[0][1]["data"])
     assert (
         payload["text"]
-        == "\r\n<b>Bootstrap 101 Template</b>\r\n<b>My Title</b>\r\n"
-        "<b>Heading 1</b>\r\n-Bullet 1\r\n-Bullet 2\r\n-Bullet 3\r\n"
-        "-Bullet 1\r\n-Bullet 2\r\n-Bullet 3\r\n<b>Heading 2</b>\r\n"
+        == "<b>Bootstrap 101 Template</b>\r\n<b>My Title</b>\r\n"
+        "<b>Heading 1</b>\r\n- Bullet 1\r\n- Bullet 2\r\n- Bullet 3\r\n"
+        "1. Bullet 1\r\n2. Bullet 2\r\n3. Bullet 3\r\n<b>Heading 2</b>\r\n"
         "A div entry\r\nA div entry\r\n"
         "<pre><code class=\"language-python\">print('hello')</code></pre>\r\n"
         "<b>Heading 3</b>\r\n<b>Heading 4</b>\r\n<b>Heading 5</b>\r\n"
@@ -1485,16 +1487,153 @@ def test_plugin_telegram_html_heading_padding_needs_source(
     aobj = Apprise()
     assert aobj.add("tgram://123456789:abcdefg_hijklmnop/12345678")
 
-    # Declared HTML: heading gets padded on both sides.
+    # Declared HTML: the heading sits on its own line.
     assert aobj.notify(body=body, body_format=NotifyFormat.HTML)
     payload = loads(mock_post.call_args_list[-1][1]["data"])
-    assert payload["text"] == "\r\n<b>Heading</b>\r\nBody text here"
+    assert payload["text"] == "<b>Heading</b>\r\nBody text here"
     mock_post.reset_mock()
 
     # Undeclared input resolves to HTML but remains unpadded.
     assert aobj.notify(body=body)
     payload = loads(mock_post.call_args_list[-1][1]["data"])
     assert payload["text"] == "<b>Heading</b>Body text here"
+
+
+def test_plugin_telegram_html_reduced_to_supported_tags():
+    """HTML is rewritten to the tags Telegram accepts."""
+
+    def reduce(html):
+        return TelegramHTMLReducer().reduce(html)
+
+    # Supported tags are kept; their aliases are mapped
+    assert (
+        reduce(
+            "<strong>a</strong><em>b</em><ins>c</ins><strike>d</strike>"
+            "<del>e</del><s>f</s><tg-spoiler>g</tg-spoiler>"
+        )
+        == "<b>a</b><i>b</i><u>c</u><s>d</s><s>e</s><s>f</s>"
+        "<tg-spoiler>g</tg-spoiler>"
+    )
+
+    # Spoiler spans are kept; other spans only keep their text
+    assert (
+        reduce('<span class="x tg-spoiler">a</span> <span class="y">b</span>')
+        == "<tg-spoiler>a</tg-spoiler> b"
+    )
+
+    # Links and custom emoji keep only the attribute Telegram needs
+    assert (
+        reduce('<a href="http://e.com?a=1&amp;b=2" rel="x">l</a> <a>n</a>')
+        == '<a href="http://e.com?a=1&amp;b=2">l</a> n'
+    )
+    assert (
+        reduce('<tg-emoji emoji-id="5368">x</tg-emoji><tg-emoji>y</tg-emoji>')
+        == '<tg-emoji emoji-id="5368">x</tg-emoji>y'
+    )
+
+    # Links are never nested
+    assert (
+        reduce('<a href="http://a">x <a href="http://b">y</a></a>')
+        == '<a href="http://a">x y</a>'
+    )
+
+    # Code blocks keep their language, but no formatting inside them
+    assert (
+        reduce(
+            '<pre><code class="language-py">a <b>&lt;</b>\n b</code></pre>'
+            '<code class="language-py">c</code>'
+        )
+        == '<pre><code class="language-py">a &lt;\n b</code></pre>\r\n'
+        "<code>c</code>"
+    )
+
+    # A character reference that decodes to nothing adds nothing to code
+    assert reduce("<pre>&#1;</pre>x") == "<pre></pre>x"
+
+    # Quotes are never nested and can be expandable
+    assert (
+        reduce(
+            "<blockquote expandable>a<blockquote>b</blockquote></blockquote>"
+        )
+        == "<blockquote expandable>a\r\nb</blockquote>"
+    )
+
+    # Hidden content, images, tables, dividers and unknown tags
+    assert (
+        reduce(
+            '<script>bad()</script><style>x</style><img alt="pic" src="a">'
+            '<img src="b"><hr/><table><tr><th>a</th><th>b</th></tr>'
+            "<tr><td>1</td><td>2</td></tr></table><font>c</font>"
+        )
+        == "pic\r\na | b\r\n1 | 2\r\nc"
+    )
+
+    # Nested and numbered lists
+    assert (
+        reduce(
+            "<ul><li>a<ul><li>b</li></ul></li></ul>"
+            "<ol><li>one</li><li>two</li></ol>"
+        )
+        == "- a\r\n  - b\r\n1. one\r\n2. two"
+    )
+    assert reduce("<li>orphan</li>") == "- orphan"
+
+    # Unsupported spaces become plain ones
+    assert reduce("a&nbsp;b&emsp;c&nbspd") == "a b   c d"
+
+    # Stray, crossed and unclosed tags still give balanced output
+    assert reduce("</b>stray <b>open <i>both") == (
+        "stray <b>open <i>both</i></b>"
+    )
+    assert reduce("<b>x <i>y</b> z</i>") == "<b>x <i>y</i></b> z"
+
+    # Self-closed tags other than br, hr and img are ignored
+    assert reduce("a<b/>c") == "ac"
+
+    # A list closed without being opened only ends the line
+    assert reduce("a</ul>b") == "a\r\nb"
+
+    # Blank input stays blank
+    assert reduce("   \n  ") == ""
+
+
+def test_plugin_telegram_dialect_leaves_text_alone():
+    """Formats Telegram does not render pass through unchanged."""
+
+    obj = NotifyTelegram(bot_token="123456789:abcdefg_hijklmnop", targets=1)
+    assert obj.dialect_convert("<b>&</b>", NotifyFormat.TEXT) == "<b>&</b>"
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_balances_split_html(mock_post):
+    """Split HTML pieces only hold balanced, supported tags."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = "{}"
+
+    aobj = Apprise()
+    assert aobj.add(
+        "tgram://123456789:abcdefg_hijklmnop/12345678?overflow=split"
+    )
+
+    body = (
+        "<h1>Title</h1>" + "<p><strong>bold</strong> <em>word</em></p>" * 300
+    )
+    assert aobj.notify(body=body, body_format=NotifyFormat.HTML)
+
+    texts = [
+        loads(call[1]["data"])["text"] for call in mock_post.call_args_list
+    ]
+    assert len(texts) > 1
+    for text in texts:
+        assert len(text) <= NotifyTelegram.body_maxlen
+
+        # Only Telegram's own tags remain, and each one is closed
+        tags = re.findall(r"</?([a-z-]+)", text)
+        assert set(tags) <= {"b", "i"}
+        assert text.count("<b>") == text.count("</b>")
+        assert text.count("<i>") == text.count("</i>")
 
 
 @mock.patch("requests.post")
@@ -3113,6 +3252,24 @@ def test_plugin_telegram_template_request_exception(mock_post, tmpdir):
     assert (
         obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
     )
+
+
+def test_plugin_telegram_html_reducer_many_open_tags_is_fast():
+    """Thousands of open tags or empty lines are reduced quickly."""
+
+    # Every open tag is still closed at the end
+    start = default_timer()
+    result = TelegramHTMLReducer().reduce("<b>" * 33333)
+    elapsed = default_timer() - start
+    assert result == "<b>" * 33333 + "</b>" * 33333
+    assert elapsed < 5.0
+
+    # Empty tags followed by many blocks add no blank lines
+    start = default_timer()
+    result = TelegramHTMLReducer().reduce("<b></b>" * 20000 + "<p>" * 20000)
+    elapsed = default_timer() - start
+    assert result == "<b></b>" * 20000
+    assert elapsed < 5.0
 
 
 def telegram_album_obj(targets=None):

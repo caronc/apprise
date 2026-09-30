@@ -1892,3 +1892,184 @@ def test_plugin_discord_botname_round_trip():
         assert isinstance(obj2, NotifyDiscord)
         assert obj2.user == botname
         assert obj.url_identifier == obj2.url_identifier
+
+
+@mock.patch("requests.post")
+def test_plugin_discord_markdown_content(mock_post):
+    """Markdown input uses embeds only when markdown was requested."""
+
+    response = mock.Mock()
+    response.content = ""
+    response.status_code = requests.codes.ok
+    response.headers = {}
+    mock_post.return_value = response
+
+    webhook_id = "A" * 24
+    webhook_token = "B" * 64
+    body = "## Summary\nAll **good** <@123>"
+
+    # A plain URL posts markdown input as regular content, which Discord
+    # renders as markdown on its own; no pings are pulled from the body
+    aobj = Apprise()
+    aobj.add(f"discord://{webhook_id}/{webhook_token}/")
+    assert aobj.notify(
+        title="Build", body=body, body_format=NotifyFormat.MARKDOWN
+    )
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert "embeds" not in payload
+    assert "allow_mentions" not in payload
+    assert payload["content"] == f"Build\r\n{body}"
+
+    # Asking for markdown (directly, or through ?url= or ?thread=)
+    # switches over to embeds
+    for extra in ("format=markdown", "url=https://a.ca", "thread=12345"):
+        mock_post.reset_mock()
+        aobj = Apprise()
+        aobj.add(f"discord://{webhook_id}/{webhook_token}/?{extra}")
+        assert aobj.notify(
+            title="Build", body=body, body_format=NotifyFormat.MARKDOWN
+        )
+        assert mock_post.call_count == 1
+        payload = loads(mock_post.call_args_list[0][1]["data"])
+        assert payload["embeds"][0]["title"] == "Build"
+        assert payload["embeds"][0]["fields"][0]["name"] == "Summary"
+        assert payload["allow_mentions"]["users"] == ["123"]
+
+
+def test_plugin_discord_long_fields():
+    """Long markdown sections are split to fit embed field limits."""
+
+    # A section made of many short lines breaks on line boundaries
+    lines = "\n".join(f"line {i:04d} of output" for i in range(200))
+    desc, fields = NotifyDiscord.extract_markdown_sections("## Log\n" + lines)
+    assert desc == ""
+    assert len(fields) > 1
+    for field in fields:
+        assert field["name"] == "Log"
+        assert len(field["value"]) <= NotifyDiscord.discord_field_value_maxlen
+        assert field["value"].startswith("```md\n")
+        assert field["value"].endswith("\n```")
+
+    # Nothing is lost or reordered when the pieces are put back together
+    assert "\n".join(f["value"][6:-4] for f in fields) == lines
+
+    # A single line longer than a field is hard-split, and a very long
+    # heading is trimmed to the field name limit
+    desc, fields = NotifyDiscord.extract_markdown_sections(
+        "# " + "n" * 300 + "\n" + "x" * 2500
+    )
+    assert len(fields) == 3
+    assert fields[0]["name"] == "n" * NotifyDiscord.discord_field_name_maxlen
+    assert all(
+        len(f["value"]) <= NotifyDiscord.discord_field_value_maxlen
+        for f in fields
+    )
+    assert "".join(f["value"][6:-4] for f in fields) == "x" * 2500
+
+
+@mock.patch("requests.post")
+def test_plugin_discord_retry_skips_sent(mock_post, tmpdir):
+    """A retry only re-posts the pieces that did not arrive."""
+
+    good = mock.Mock()
+    good.content = ""
+    good.status_code = requests.codes.ok
+    good.headers = {}
+
+    bad = mock.Mock()
+    bad.content = ""
+    bad.status_code = requests.codes.internal_server_error
+    bad.headers = {}
+
+    def answer(*args, **kwargs):
+        # Messages arrive, attachment uploads always fail
+        return bad if kwargs.get("files") else good
+
+    mock_post.side_effect = answer
+
+    webhook_id = "A" * 24
+    webhook_token = "B" * 64
+
+    aobj = Apprise()
+    aobj.add(f"discord://{webhook_id}/{webhook_token}/?retry=2&wait=0")
+    assert not aobj.notify(
+        body="hello",
+        attach=os.path.join(TEST_VAR_DIR, "apprise-test.gif"),
+    )
+
+    # The message is posted once; the upload is tried on every attempt
+    texts = [c for c in mock_post.call_args_list if not c[1].get("files")]
+    uploads = [c for c in mock_post.call_args_list if c[1].get("files")]
+    assert len(texts) == 1
+    assert len(uploads) == 3
+
+    # Extra messages of embed fields are tracked one by one too
+    mock_post.reset_mock()
+    calls = []
+
+    def fields_answer(*args, **kwargs):
+        # The third message (the second message of extra fields) fails
+        calls.append(kwargs)
+        return bad if len(calls) == 3 else good
+
+    mock_post.side_effect = fields_answer
+
+    aobj = Apprise()
+    aobj.add(
+        f"discord://{webhook_id}/{webhook_token}/"
+        "?format=markdown&retry=1&wait=0"
+    )
+    body = "\n".join(f"# Heading {i}\nvalue {i}" for i in range(25))
+    with mock.patch.object(NotifyDiscord, "discord_max_fields", 10):
+        assert aobj.notify(body=body)
+
+    # Three messages of fields, then only the failed one again
+    assert len(calls) == 4
+    assert calls[2]["data"] == calls[3]["data"]
+
+    # A template message is only posted once as well
+    mock_post.reset_mock()
+    mock_post.side_effect = answer
+    aobj = Apprise()
+    template = tmpdir.join("discord.json")
+    template.write('{"content": "{{app_body}}"}')
+    aobj.add(
+        f"discord://{webhook_id}/{webhook_token}/?retry=1&wait=0"
+        f"&template={template!s}"
+    )
+    assert not aobj.notify(
+        body="hello",
+        attach=os.path.join(TEST_VAR_DIR, "apprise-test.gif"),
+    )
+    texts = [c for c in mock_post.call_args_list if not c[1].get("files")]
+    assert len(texts) == 1
+
+    # Attachment batches that already arrived are not uploaded again
+    mock_post.reset_mock()
+
+    def upload_answer(*args, **kwargs):
+        # Only the upload of the png file fails
+        files = kwargs.get("files") or []
+        return bad if any(f[1][0].endswith(".png") for f in files) else good
+
+    mock_post.side_effect = upload_answer
+    aobj = Apprise()
+    aobj.add(f"discord://{webhook_id}/{webhook_token}/?batch=no&retry=1")
+    assert not aobj.notify(
+        body="hello",
+        attach=(
+            os.path.join(TEST_VAR_DIR, "apprise-test.gif"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ),
+    )
+    names = [
+        c[1]["files"][0][1][0]
+        for c in mock_post.call_args_list
+        if c[1].get("files")
+    ]
+    assert names == [
+        "apprise-test.gif",
+        "apprise-test.png",
+        "apprise-test.png",
+    ]

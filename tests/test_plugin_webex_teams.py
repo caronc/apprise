@@ -325,9 +325,11 @@ def test_plugin_webex_teams_bot_mode():
         access_token=BOT_TOKEN, targets=[ROOM_ID, ROOM_ID2]
     )
     assert len(obj3.targets) == 2
+    assert len(obj3) == 2
 
     # No room IDs -> loads fine, but send() returns False
     obj_no_rooms = NotifyWebexTeams(access_token=BOT_TOKEN, targets=[])
+    assert len(obj_no_rooms) == 1
     assert isinstance(obj_no_rooms, NotifyWebexTeams)
     assert obj_no_rooms.send(body="test") is False
 
@@ -740,3 +742,78 @@ def test_plugin_webex_teams_html_to_markdown_format(mock_post):
     # "markdown" key, since notify_format is MARKDOWN by default
     payload = loads(mock_post.call_args_list[0][1]["data"])
     assert payload["markdown"] == "**hello** *world*"
+
+
+@mock.patch("apprise.plugins.base.time.sleep")
+@mock.patch("requests.post")
+def test_plugin_webex_teams_bot_attach_retry(mock_post, mock_sleep):
+    """A retry re-sends only the attachment post that failed."""
+
+    good = mock.Mock()
+    good.status_code = requests.codes.ok
+    good.content = b""
+
+    bad = mock.Mock()
+    bad.status_code = requests.codes.internal_server_error
+    bad.content = b""
+
+    # Attachment 1 (with the body) posts, attachment 2 fails, then the
+    # retry only needs to post attachment 2
+    mock_post.side_effect = [good, bad, good]
+
+    aobj = Apprise()
+    assert aobj.add(
+        f"wxteams://{BOT_TOKEN}/{ROOM_ID}/?mode=bot&retry=2&wait=0"
+    )
+
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.gif"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ]
+    )
+    assert bool(aobj.notify(body="body", attach=attach)) is True
+
+    # The body and first file went out once; the second file was retried
+    assert mock_post.call_count == 3
+    names = [call[1]["files"]["files"][0] for call in mock_post.call_args_list]
+    assert names == [
+        "apprise-test.gif",
+        "apprise-test.png",
+        "apprise-test.png",
+    ]
+
+    # Only the first post carried the message body
+    assert "markdown" in mock_post.call_args_list[0][1]["data"]
+    assert "markdown" not in mock_post.call_args_list[2][1]["data"]
+
+
+@mock.patch("apprise.plugins.base.time.sleep")
+@mock.patch("requests.post")
+def test_plugin_webex_teams_bot_room_retry(mock_post, mock_sleep):
+    """A retry only re-posts to the room that failed."""
+
+    good = mock.Mock()
+    good.status_code = requests.codes.ok
+    good.content = b""
+
+    bad = mock.Mock()
+    bad.status_code = requests.codes.internal_server_error
+    bad.content = b""
+
+    # The first room accepts; the second fails once and then accepts
+    mock_post.side_effect = [good, bad, good]
+
+    aobj = Apprise()
+    assert aobj.add(
+        f"wxteams://{BOT_TOKEN}/{ROOM_ID}/{ROOM_ID2}/?retry=2&wait=0"
+    )
+    assert bool(aobj.notify(body="body")) is True
+
+    rooms = [
+        loads(call[1]["data"])["roomId"] for call in mock_post.call_args_list
+    ]
+
+    # The first room was notified once; the second one was retried
+    first, second = aobj[0].targets
+    assert rooms == [first, second, second]

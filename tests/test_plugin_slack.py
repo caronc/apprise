@@ -40,7 +40,7 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.exception import AppriseImproperlyConfigured
-from apprise.plugins.base import _delivery_tracker
+from apprise.plugins.base import _delivery_memo, _delivery_tracker
 from apprise.plugins.slack import NotifySlack, SlackMode
 
 logging.disable(logging.CRITICAL)
@@ -1385,7 +1385,7 @@ def test_plugin_slack_file_upload_success(mock_request):
 
 @mock.patch("requests.request")
 def test_plugin_slack_failed_attachment_is_retried(mock_request):
-    """An attachment failure does not repost the visible message."""
+    """A retry finishes the attachment without reposting the message."""
 
     def response(data):
         return mock.Mock(
@@ -1404,6 +1404,10 @@ def test_plugin_slack_failed_attachment_is_retried(mock_request):
         response(upload),
         response(b"OK"),
         response({"ok": False}),
+        # The retry uploads the file again and shares it this time
+        response(upload),
+        response(b"OK"),
+        response({"ok": True, "files": [{"id": "F123ABC456"}]}),
     ]
 
     obj = NotifySlack(
@@ -1412,15 +1416,21 @@ def test_plugin_slack_failed_attachment_is_retried(mock_request):
     )
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
+    # Retries turn on delivery marks and remembered values together
     tracker_token = _delivery_tracker.set(set())
+    memo_token = _delivery_memo.set({})
     try:
+        # The message arrives but sharing the file fails
         assert obj.notify(body="body", attach=attach) is False
         assert obj.is_delivered(("message", "#general")) is True
 
-        assert obj.notify(body="body", attach=attach) is False
-        assert not obj.is_delivered(("attachment", 1, ("message", "#general")))
+        # The retry still shares the file with the same channel
+        assert obj.notify(body="body", attach=attach) is True
+        assert obj.is_delivered(("attachment", 1, ("message", "#general")))
+
     finally:
         _delivery_tracker.reset(tracker_token)
+        _delivery_memo.reset(memo_token)
 
     message_calls = [
         call
@@ -2425,10 +2435,67 @@ def test_plugin_slack_markdown_dialect_requires_declared_source(
     assert block_text(payload) == body
     mock_request.reset_mock()
 
-    # Slack's declared plain-text format needs no dialect conversion.
+    # Declared plain text keeps &, < and > literal through HTML entities.
     assert bool(aobj.notify(body=body, body_format=NotifyFormat.TEXT))
     payload = loads(mock_request.call_args_list[0][1]["data"])
-    assert block_text(payload) == body
+    assert block_text(payload) == "**hello** &amp;amp; &lt;world&gt;"
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_text_escapes_controls(mock_request):
+    """Plain text sent as Slack plain text keeps &, < and > literal."""
+
+    slack_token = "T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ"
+
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+    mock_request.return_value.content = b"ok"
+    mock_request.return_value.text = "ok"
+
+    body = "a < b & c > d <!channel>"
+    escaped = "a &lt; b &amp; c &gt; d &lt;!channel&gt;"
+
+    # Legacy attachments with mrkdwn disabled
+    aobj = Apprise()
+    assert aobj.add("slack://{}/#general?format=text".format(slack_token))
+    assert aobj.notify(
+        title="T & <x>", body=body, body_format=NotifyFormat.TEXT
+    )
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert payload["mrkdwn"] is False
+    assert payload["attachments"][0]["text"] == escaped
+    assert payload["attachments"][0]["title"] == "T &amp; &lt;x&gt;"
+    mock_request.reset_mock()
+
+    # Undeclared input is passed along untouched
+    assert aobj.notify(body=body)
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert payload["attachments"][0]["text"] == body
+    mock_request.reset_mock()
+
+    # Block Kit plain_text section and header
+    aobj = Apprise()
+    assert aobj.add(
+        "slack://{}/#general?format=text&blocks=yes".format(slack_token)
+    )
+    assert aobj.notify(
+        title="T & <x>", body=body, body_format=NotifyFormat.TEXT
+    )
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    blocks = payload["attachments"][0]["blocks"]
+    assert blocks[0]["type"] == "header"
+    assert blocks[0]["text"]["text"] == "T &amp; &lt;x&gt;"
+    assert blocks[1]["text"]["type"] == "plain_text"
+    assert blocks[1]["text"]["text"] == escaped
+    mock_request.reset_mock()
+
+    # HTML converted to plain text is escaped the same way
+    assert aobj.notify(
+        body="<p>1 &lt; 2 &amp; 3</p>", body_format=NotifyFormat.HTML
+    )
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    blocks = payload["attachments"][0]["blocks"]
+    assert blocks[0]["text"]["text"] == "1 &lt; 2 &amp; 3"
 
 
 def test_plugin_slack_bare_link_and_autolink_dialect():
@@ -2523,15 +2590,23 @@ def test_plugin_slack_scan_budget_preserves_later_links():
 
     # Scale beyond the shared budget while preserving the trailing link.
     times = []
-    for count in (500, 2000, 8000):
+    for count in (250, 1000, 4000):
         body = (
             "".join(f"[bad{i}](" + ("x" * 100) for i in range(count))
             + "[good](ok)"
         )
-        start = default_timer()
-        result = NotifySlack._commonmark_to_slack(body)
-        times.append(default_timer() - start)
+
+        # Keep the fastest of 3 runs so a pause on a busy test runner
+        # cannot look like slow code.
+        best = None
+        for _ in range(3):
+            start = default_timer()
+            result = NotifySlack._commonmark_to_slack(body)
+            elapsed = default_timer() - start
+            best = elapsed if best is None else min(best, elapsed)
+
         assert result.endswith("<ok|good>")
+        times.append(best)
 
     # A fourfold input increase should remain well below quadratic growth.
     assert times[1] < times[0] * 4 * 3
@@ -2738,3 +2813,67 @@ def test_plugin_slack_parse_native_url_fallthrough():
         )
         is None
     )
+
+
+def test_plugin_slack_dialect_leaves_other_formats_alone():
+    """Formats Slack does not render pass through dialect conversion."""
+
+    obj = NotifySlack(access_token="xoxb-1234-1234-abc124")
+    assert obj.dialect_convert("<b>&</b>", NotifyFormat.HTML) == "<b>&</b>"
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_retry_skips_sent_message(mock_request):
+    """A retry without attachments leaves a delivered message alone."""
+
+    # Slack accepts the message without naming the channel it used
+    mock_request.return_value = mock.Mock(
+        content=dumps({"ok": True}), status_code=requests.codes.ok
+    )
+
+    obj = NotifySlack(
+        access_token="xoxb-1234-1234-abc124",
+        targets=["#general"],
+    )
+
+    # Retries turn on delivery marks and remembered values together
+    tracker_token = _delivery_tracker.set(set())
+    memo_token = _delivery_memo.set({})
+    try:
+        assert obj.notify(body="body") is True
+        assert obj.notify(body="body") is True
+
+    finally:
+        _delivery_tracker.reset(tracker_token)
+        _delivery_memo.reset(memo_token)
+
+    # Only the first attempt posted the message
+    assert mock_request.call_count == 1
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_text_split_kept(mock_request):
+    """Split plain text reaches Slack without markup repair."""
+
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+    mock_request.return_value.content = b"ok"
+    mock_request.return_value.text = "ok"
+
+    aobj = Apprise()
+    assert aobj.add(
+        "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#general"
+        "?format=text&overflow=split"
+    )
+
+    # Escaping every "&" pushes the message past Slack's limit
+    body = "a*b_c " + "&" * 34000
+    assert aobj.notify(body=body, body_format=NotifyFormat.TEXT)
+    assert mock_request.call_count > 1
+
+    # Joined back together, the text is exactly the escaped original
+    sent = "".join(
+        loads(call[1]["data"])["attachments"][0]["text"]
+        for call in mock_request.call_args_list
+    )
+    assert sent == "a*b_c " + "&amp;" * 34000

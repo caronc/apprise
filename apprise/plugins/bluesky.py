@@ -32,6 +32,7 @@
 # 4. Assemble your Apprise URL like:
 #       bluesky://handle@you-token-here
 #
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
 import re
@@ -253,7 +254,9 @@ class NotifyBlueSky(NotifyBase):
 
         if blobs:
             for no, blob in enumerate(blobs, start=1):
-                payload_ = payload.copy()
+                # Deep copy so each post gets its own record; a shallow
+                # copy would share one record between every post
+                payload_ = deepcopy(payload)
                 if no > 1:
                     #
                     # multiple instances
@@ -278,7 +281,12 @@ class NotifyBlueSky(NotifyBase):
         else:
             payloads.append(payload)
 
-        for payload in payloads:
+        for no, payload in enumerate(payloads, start=1):
+            # Skip a post that was already created so a retry does not
+            # publish it twice
+            if self.is_delivered(no):
+                continue
+
             # Send Login Information
             postokay, response = self._fetch(
                 url,
@@ -292,6 +300,10 @@ class NotifyBlueSky(NotifyBase):
                 #   'message': 'reason'
                 # }
                 return False
+
+            # Posted; a retry can safely skip this post.
+            self.mark_delivered(no)
+
         return True
 
     def get_identifier(self, user=None):
