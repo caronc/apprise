@@ -801,7 +801,10 @@ class NotifyMatrix(NotifyBase):
                 timeout=self.request_timeout,
                 allow_redirects=self.redirects,
             )
-            if r.status_code != requests.codes.ok:
+            if r.status_code not in (
+                requests.codes.ok,
+                requests.codes.accepted,
+            ):
                 # We had a problem
                 status_str = NotifyMatrix.http_response_code_lookup(
                     r.status_code, MATRIX_HTTP_ERROR_MAP
@@ -2218,7 +2221,10 @@ class NotifyMatrix(NotifyBase):
                     # Try again
                     continue
 
-                elif r.status_code != requests.codes.ok:
+                elif r.status_code not in (
+                    requests.codes.ok,
+                    requests.codes.accepted,
+                ):
                     # We had a problem
                     if ok_status and r.status_code in ok_status:
                         # Caller declared this status code acceptable

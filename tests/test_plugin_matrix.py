@@ -2242,6 +2242,23 @@ def test_plugin_matrix_slack_webhook_markdown_untouched(mock_post):
     assert payload["attachments"][0]["text"] == "**Body**"
 
 
+@mock.patch("requests.post")
+def test_plugin_matrix_hookshot_accepted(mock_post):
+    """Hookshot's queued 202 Accepted reply counts as a successful send."""
+
+    response = _Response()
+    response.status_code = requests.codes.accepted
+    response.content = b'{"ok":true}'
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        "matrixs://apprise:supersecret@hookshot.example?mode=hookshot"
+    )
+    assert obj is not None
+    assert bool(obj.notify(title="Title", body="Body")) is True
+    assert mock_post.call_count == 1
+
+
 def test_plugin_matrix_hookshot_path_normalization():
     """Hookshot webhook paths normalize missing leading slashes."""
 
