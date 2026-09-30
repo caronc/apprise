@@ -25,7 +25,10 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from hashlib import sha256
+import hmac
 from json import dumps
+import secrets
 
 import requests
 
@@ -65,6 +68,8 @@ class NotifyNextcloudTalk(NotifyBase):
     templates = (
         "{schema}://{user}:{password}@{host}/{targets}",
         "{schema}://{user}:{password}@{host}:{port}/{targets}",
+        "{schema}://{host}/{targets}?secret={secret}",
+        "{schema}://{host}:{port}/{targets}?secret={secret}",
     )
 
     # Define our template tokens
@@ -93,6 +98,12 @@ class NotifyNextcloudTalk(NotifyBase):
                 "private": True,
                 "required": True,
             },
+            "secret": {
+                "name": _("Secret"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
             "target_room_id": {
                 "name": _("Room ID"),
                 "type": "string",
@@ -110,6 +121,7 @@ class NotifyNextcloudTalk(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
+            "secret": {"alias_of": "secret"},
             "url_prefix": {
                 "name": _("URL Prefix"),
                 "type": "string",
@@ -125,12 +137,20 @@ class NotifyNextcloudTalk(NotifyBase):
         },
     }
 
-    def __init__(self, targets=None, headers=None, url_prefix=None, **kwargs):
+    def __init__(
+        self,
+        targets=None,
+        headers=None,
+        url_prefix=None,
+        secret=None,
+        **kwargs,
+    ):
         """Initialize Nextcloud Talk Object."""
         super().__init__(**kwargs)
 
-        if self.user is None or self.password is None:
-            msg = "A NextCloudTalk User and Password must be specified."
+        self.secret = secret
+        if not self.secret and (self.user is None or self.password is None):
+            msg = "Specify a Nextcloud Talk user and password or bot secret."
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
 
@@ -197,8 +217,8 @@ class NotifyNextcloudTalk(NotifyBase):
 
             # Nextcloud Talk URL
             notify_url = (
-                "{schema}://{host}/{url_prefix}"
-                f"/ocs/v2.php/apps/spreed/api/v1/chat/{target}"
+                "{schema}://{host}{url_prefix}"
+                "/ocs/v2.php/apps/spreed/api/v1/{endpoint}"
             )
 
             notify_url = notify_url.format(
@@ -208,8 +228,12 @@ class NotifyNextcloudTalk(NotifyBase):
                     if not isinstance(self.port, int)
                     else f"{self.host}:{self.port}"
                 ),
-                url_prefix=self.url_prefix,
-                target=target,
+                url_prefix=f"/{self.url_prefix}" if self.url_prefix else "",
+                endpoint=(
+                    f"bot/{target}/message"
+                    if self.secret
+                    else f"chat/{target}"
+                ),
             )
 
             self.logger.debug(
@@ -219,6 +243,15 @@ class NotifyNextcloudTalk(NotifyBase):
             )
             self.logger.debug("Nextcloud Talk Payload: %s", payload)
 
+            if self.secret:
+                random = secrets.token_hex(32)
+                headers["X-Nextcloud-Talk-Bot-Random"] = random
+                headers["X-Nextcloud-Talk-Bot-Signature"] = hmac.new(
+                    self.secret.encode("utf-8"),
+                    (random + payload["message"]).encode("utf-8"),
+                    sha256,
+                ).hexdigest()
+
             # Always call throttle before any remote server i/o is made
             self.throttle()
 
@@ -227,7 +260,7 @@ class NotifyNextcloudTalk(NotifyBase):
                     notify_url,
                     data=dumps(payload),
                     headers=headers,
-                    auth=(self.user, self.password),
+                    auth=None if self.secret else (self.user, self.password),
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
                     allow_redirects=self.redirects,
@@ -290,6 +323,7 @@ class NotifyNextcloudTalk(NotifyBase):
             self.password,
             self.host,
             self.port,
+            self.secret,
         )
 
     def url(self, privacy=False, *args, **kwargs):
@@ -303,12 +337,21 @@ class NotifyNextcloudTalk(NotifyBase):
         if self.url_prefix:
             params["url_prefix"] = self.url_prefix
 
+        if self.secret:
+            params["secret"] = self.pprint(
+                self.secret, privacy, mode=PrivacyMode.Secret, quote=False
+            )
+
         # Determine Authentication
-        auth = "{user}:{password}@".format(
-            user=NotifyNextcloudTalk.quote(self.user, safe=""),
-            password=self.pprint(
-                self.password, privacy, mode=PrivacyMode.Secret, safe=""
-            ),
+        auth = (
+            ""
+            if self.secret
+            else "{user}:{password}@".format(
+                user=NotifyNextcloudTalk.quote(self.user, safe=""),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
+            )
         )
 
         default_port = 443 if self.secure else 80
@@ -348,6 +391,9 @@ class NotifyNextcloudTalk(NotifyBase):
         results["targets"] = NotifyNextcloudTalk.split_path(
             results["fullpath"]
         )
+
+        if "secret" in results["qsd"]:
+            results["secret"] = results["qsd"]["secret"]
 
         # Support URL Prefixes
         if "url_prefix" in results["qsd"] and len(

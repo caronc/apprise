@@ -26,10 +26,15 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+from hashlib import sha256
+import hmac
+import json
 import logging
 from unittest import mock
+from urllib.parse import parse_qs, urlparse
 
 from helpers import AppriseURLTester
+import pytest
 import requests
 
 from apprise import Apprise, NotifyType
@@ -250,4 +255,89 @@ def test_plugin_nextcloud_talk_url_prefix(mock_post):
         mock_post.call_args_list[0][0][0]
         == "http://localhost/a/longer/path/abcd/"
         "ocs/v2.php/apps/spreed/api/v1/chat/admin"
+    )
+
+
+@pytest.mark.parametrize(
+    "body,title", [("Hello \u4e16\u754c", "Task"), ("", "Done"), ("", "")]
+)
+@mock.patch("requests.post")
+def test_nextcloud_talk_bot_signature(mock_post, body, title):
+    """Bot authentication signs the message, not its JSON serialization."""
+    mock_post.return_value.status_code = requests.codes.created
+    secret = "test-bot-secret"
+    obj = NotifyNextcloudTalk(
+        host="localhost",
+        secret=secret,
+        targets="room1",
+        url_prefix="nextcloud",
+    )
+    assert obj.send(body=body, title=title)
+    args, kwargs = mock_post.call_args
+    assert args[0].endswith(
+        "/nextcloud/ocs/v2.php/apps/spreed/api/v1/bot/room1/message"
+    )
+    assert kwargs["auth"] is None
+    message = json.loads(kwargs["data"])["message"]
+    headers = kwargs["headers"]
+    random = headers["X-Nextcloud-Talk-Bot-Random"]
+    assert len(random) == 64
+    expected = hmac.new(
+        secret.encode(), (random + message).encode(), sha256
+    ).hexdigest()
+    assert headers["X-Nextcloud-Talk-Bot-Signature"] == expected
+    assert headers["OCS-APIRequest"] == "true"
+
+
+def test_nextcloud_talk_bot_url_roundtrip():
+    """Bot secrets survive URL encoding and are hidden in privacy output."""
+    obj = NotifyNextcloudTalk(
+        host="localhost", secret="a+b&c/%2Ftest", targets="room1"
+    )
+    restored = Apprise.instantiate(obj.url())
+    assert restored.secret == obj.secret
+    assert restored.targets == obj.targets
+    assert restored.url_identifier == obj.url_identifier
+    assert parse_qs(urlparse(obj.url(privacy=True)).query)["secret"] == [
+        "****"
+    ]
+    assert obj.secret not in obj.url(privacy=True)
+    assert Apprise.instantiate("nctalk://localhost/room1?secret=") is None
+
+
+@mock.patch("requests.post")
+def test_nextcloud_talk_bot_retry_only_failed_targets(mock_post):
+    """Accepted rooms are not sent a second copy during a retry."""
+    accepted = mock.Mock(status_code=201)
+    rejected = mock.Mock(status_code=401, content=b"unauthorized")
+    mock_post.side_effect = [accepted, rejected, accepted]
+    obj = NotifyNextcloudTalk(
+        host="localhost",
+        secret="secret",
+        targets="room1,room2",
+        retry=1,
+        wait=0,
+    )
+    app = Apprise()
+    app.add(obj)
+    assert bool(app.notify(body="hello"))
+    assert mock_post.call_count == 3
+    assert [c.args[0].split("/")[-2] for c in mock_post.call_args_list] == [
+        "room1",
+        "room2",
+        "room2",
+    ]
+
+
+@mock.patch("requests.post")
+def test_nextcloud_talk_user_auth_unchanged(mock_post):
+    """Password URLs still use the chat API and Basic authentication."""
+    mock_post.return_value.status_code = requests.codes.created
+    obj = Apprise.instantiate("nctalk://user:password@localhost/room1")
+    assert obj.send(body="hello")
+    assert mock_post.call_args.args[0].endswith("/chat/room1")
+    assert mock_post.call_args.kwargs["auth"] == ("user", "password")
+    assert (
+        "X-Nextcloud-Talk-Bot-Signature"
+        not in mock_post.call_args.kwargs["headers"]
     )
