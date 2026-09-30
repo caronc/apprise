@@ -31,8 +31,6 @@ import os
 import re
 import time
 
-import yaml
-
 from .. import common, plugins
 from ..asset import AppriseAsset
 from ..exception import AppriseImproperlyConfigured, AppriseTemplateError
@@ -882,6 +880,20 @@ class ConfigBase(URLBase):
 
         You may optionally associate an asset with the notification.
         """
+
+        if common.DISABLE_YAML:
+            ConfigBase.logger.warning("Apprise YAML support is disabled.")
+            return ([], [])
+
+        try:
+            # URL and text configuration users do not need the YAML parser.
+            import yaml
+
+        except ImportError:
+            ConfigBase.logger.warning(
+                "Apprise YAML support requires the PyYAML package."
+            )
+            return ([], [])
 
         # A list of loaded Notification Services
         services = []

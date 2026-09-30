@@ -617,6 +617,28 @@ apobj.notify(
 )
 ```
 
+### Disabling YAML Configuration
+
+Applications that only use notification URLs or text configuration can disable
+YAML parsing before loading configuration:
+
+```python
+import apprise
+from apprise import common
+
+common.DISABLE_YAML = True
+```
+
+This process-wide switch defaults to `False`. PyYAML is imported only when YAML
+configuration is parsed. Disabled YAML configuration loads no services or
+includes and logs a warning; notification URLs and text configuration continue
+to work. Set the switch before loading any configuration, since previously
+loaded services may be cached.
+
+Standard installations still install PyYAML. Applications that vendor Apprise
+may omit it if they do not use YAML configuration. If YAML is requested without
+PyYAML installed, Apprise logs a warning and loads no services or includes.
+
 ## API Template Variables
 
 After loading a templated YAML configuration, developers can supply its values

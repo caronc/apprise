@@ -1739,7 +1739,7 @@ def test_apprise_cli_dry_run_failure(tmpdir):
 def test_config_yaml_loader_failure_is_reported():
     """A YAML loader failure returns an empty configuration."""
     with mock.patch(
-        "apprise.config.base.yaml.load",
+        "yaml.load",
         side_effect=AttributeError("no loader"),
     ):
         assert ConfigBase.config_parse_yaml("urls:\n  - json://a/\n") == (

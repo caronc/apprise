@@ -117,6 +117,10 @@ class ConfigFormat(str, Enum):
 # Define our configuration formats mostly used for verification
 CONFIG_FORMATS: frozenset[str] = frozenset(e.value for e in ConfigFormat)
 
+# Applications that only use URLs or text configuration may disable YAML.
+# Keep support enabled by default; this does not change package dependencies.
+DISABLE_YAML = False
+
 
 class ContentIncludeMode(str, Enum):
     """The different Content inclusion modes.
