@@ -25,6 +25,8 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from json import loads
+
 # Disable logging for a cleaner testing output
 import logging
 from unittest import mock
@@ -33,6 +35,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise import Apprise
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.flock import NotifyFlock
 
@@ -251,3 +254,52 @@ def test_plugin_flock_edge_cases(mock_post, mock_get):
     # Whitespace also acts as an invalid token value
     with pytest.raises(AppriseImproperlyConfigured):
         NotifyFlock(token="   ")
+
+
+@mock.patch("requests.post")
+@pytest.mark.parametrize("notify_format", ["text", "markdown"])
+def test_plugin_flock_title_break(mock_post, notify_format):
+    """The title is kept on its own line above the body."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b"{}"
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(f"flock://{'a' * 24}?format={notify_format}")
+
+    # A title is bolded and followed by a line break
+    assert bool(obj.notify(title="Title & more", body="Body")) is True
+    payload = loads(mock_post.call_args.kwargs["data"])
+    assert payload["flockml"] == (
+        "<flockml><b>Title &amp; more</b><br/>Body</flockml>"
+    )
+
+    # Without a title, no break is added
+    assert bool(obj.notify(body="Body")) is True
+    payload = loads(mock_post.call_args.kwargs["data"])
+    assert payload["flockml"] == "<flockml>Body</flockml>"
+
+
+@mock.patch("requests.post")
+def test_plugin_flock_html_title(mock_post):
+    """An HTML message keeps its title, escaped, above the body."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b"{}"
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(f"flock://{'a' * 24}?format=html")
+
+    # The title is escaped while the HTML body is sent untouched
+    assert bool(obj.notify(title="Title & more", body="<i>Body</i>")) is True
+    payload = loads(mock_post.call_args.kwargs["data"])
+    assert payload["flockml"] == (
+        "<flockml><b>Title &amp; more</b><br/><i>Body</i></flockml>"
+    )
+
+    # Without a title, only the body is sent
+    assert bool(obj.notify(body="<i>Body</i>")) is True
+    payload = loads(mock_post.call_args.kwargs["data"])
+    assert payload["flockml"] == "<flockml><i>Body</i></flockml>"

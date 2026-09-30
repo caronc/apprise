@@ -205,16 +205,16 @@ class NotifyFlock(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        if self.notify_format == NotifyFormat.HTML:
-            body = f"<flockml>{body}</flockml>"
+        # The title always arrives as plain text, so escape it for FlockML
+        title = NotifyFlock.escape_html(title, whitespace=False)
 
-        else:
-            title = NotifyFlock.escape_html(title, whitespace=False)
+        # An HTML body is already FlockML-ready; anything else is escaped
+        if self.notify_format != NotifyFormat.HTML:
             body = NotifyFlock.escape_html(body, whitespace=False)
 
-            body = "<flockml>{}{}</flockml>".format(
-                "" if not title else f"<b>{title}</b><br/>", body
-            )
+        body = "<flockml>{}{}</flockml>".format(
+            "" if not title else f"<b>{title}</b><br/>", body
+        )
 
         payload = {
             "token": self.token,
