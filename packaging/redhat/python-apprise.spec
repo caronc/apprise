@@ -86,7 +86,7 @@ notification services. It supports sending alerts to platforms such as: \
 `RSyslog`, `SendGrid`, \
 `SendPulse`, `ServerChan`, `SerwerSMS`, `Session Open Group Server`, \
 `Seven`, `SFR`, \
-`Signal`, `Signalgrid`, `SIGNL4`, `SimplePush`, \
+`Signal`, `Signalgrid`, `SIGNL4`, `Simplepush`, \
 `Sinch`, `Slack`, `SMPP`, `SMSC`, `SMSEagle`, `SMS Manager`, `SMTP2Go`, \
 `SparkPost`, `Splunk`, `Spike`, `Spug Push`, `Stackfield`, `Super Toasty`, \
 `Streamlabs`, `Stride`, \
@@ -163,6 +163,7 @@ Requires: python3dist(certifi)
 Requires: python3dist(pyyaml)
 
 Recommends: python3dist(hidapi)
+Recommends: python3dist(pynacl)
 Recommends: python3dist(paho-mqtt) >= 2.1.0
 Recommends: python3dist(slixmpp)
 
