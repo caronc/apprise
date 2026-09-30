@@ -902,6 +902,7 @@ class NotifyMatrix(NotifyBase):
         title="",
         notify_type=NotifyType.INFO,
         body_format=None,
+        body_passthrough=None,
         **kwargs,
     ):
         """Format the payload for a Matrix based message."""
@@ -917,11 +918,21 @@ class NotifyMatrix(NotifyBase):
 
         # Declared Markdown is already HTML; passthrough content is unchanged.
         if body_format in (NotifyFormat.HTML, NotifyFormat.MARKDOWN):
+            # Rendered Markdown already starts on its own line. Any other
+            # body needs a break so clients that drop headings keep the
+            # title separate.
+            title_break = (
+                "<br/>"
+                if body_format != NotifyFormat.MARKDOWN or body_passthrough
+                else ""
+            )
             payload["text"] = "{title}{body}".format(
                 title=(
                     ""
                     if not title
-                    else f"<h1>{NotifyMatrix.escape_html(title)}</h1>"
+                    else "<h1>{}</h1>{}".format(
+                        NotifyMatrix.escape_html(title), title_break
+                    )
                 ),
                 body=body,
             )
@@ -978,11 +989,22 @@ class NotifyMatrix(NotifyBase):
             payload["text"] = (
                 plain_body if not title else f"{title}\r\n{plain_body}"
             )
+
+            # Rendered Markdown already starts on its own line. Any other
+            # body needs a break so clients that drop headings keep the
+            # title separate.
+            title_break = (
+                "<br/>"
+                if body_format != NotifyFormat.MARKDOWN or body_passthrough
+                else ""
+            )
             payload["html"] = "{title}{body}".format(
                 title=(
                     ""
                     if not title
-                    else f"<h1>{NotifyMatrix.escape_html(title)}</h1>"
+                    else "<h1>{}</h1>{}".format(
+                        NotifyMatrix.escape_html(title), title_break
+                    )
                 ),
                 body=body,
             )
@@ -1288,6 +1310,15 @@ class NotifyMatrix(NotifyBase):
                         )
                     )
                 )
+
+                # Rendered Markdown already starts on its own line. Any other
+                # body needs a break so clients that drop headings keep the
+                # title separate.
+                if title_html and (
+                    body_format != NotifyFormat.MARKDOWN or body_passthrough
+                ):
+                    title_html += "<br/>"
+
                 payload.update(
                     {
                         "format": "org.matrix.custom.html",
@@ -3060,6 +3091,15 @@ class NotifyMatrix(NotifyBase):
                     )
                 )
             )
+
+            # Rendered Markdown already starts on its own line. Any other
+            # body needs a break so clients that drop headings keep the
+            # title separate.
+            if title_html and (
+                body_format != NotifyFormat.MARKDOWN or body_passthrough
+            ):
+                title_html += "<br/>"
+
             msg_content.update(
                 {
                     "format": "org.matrix.custom.html",
