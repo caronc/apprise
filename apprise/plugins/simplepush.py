@@ -117,8 +117,8 @@ class NotifySimplePush(NotifyBase):
     # The services URL
     service_url = "https://simplepu.sh/"
 
-    # The default secure protocol
-    secure_protocol = "spush"
+    # The default secure protocol; simplepush:// is also accepted
+    secure_protocol = ("spush", "simplepush")
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/simplepush/"
@@ -987,7 +987,7 @@ class NotifySimplePush(NotifyBase):
 
         Targets or end points should never be identified here.
         """
-        return (self.secure_protocol, self.token, self.password)
+        return (self.secure_protocol[0], self.token, self.password)
 
     def url(self, privacy=False, *args, **kwargs):
         """Returns the URL built dynamically based on specified arguments."""
@@ -1027,7 +1027,7 @@ class NotifySimplePush(NotifyBase):
             )
 
         return "{schema}://{auth}{token}/{targets}?{params}".format(
-            schema=self.secure_protocol,
+            schema=self.secure_protocol[0],
             auth=auth,
             token=self.pprint(self.token, privacy, safe=""),
             targets="/".join(

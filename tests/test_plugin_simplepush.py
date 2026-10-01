@@ -77,6 +77,14 @@ apprise_url_tests = (
         },
     ),
     (
+        "simplepush://{}/alerts".format("A" * 14),
+        {
+            # The simplepush:// alias resolves to spush://
+            "instance": NotifySimplePush,
+            "privacy_url": "spush://A...A/alerts?",
+        },
+    ),
+    (
         "spush://{}/alerts/deploys".format("B" * 14),
         {
             # Send to two topics
@@ -340,6 +348,19 @@ def test_plugin_simplepush_encrypted_urls():
 
     # Run our encrypted tests
     EncryptedURLTester(tests=apprise_url_encrypted_tests).run_all()
+
+
+def test_plugin_simplepush_schema_alias():
+    """NotifySimplePush() simplepush:// is the same service as spush://."""
+
+    alias = Apprise.instantiate("simplepush://token123/alerts")
+    primary = Apprise.instantiate("spush://token123/alerts")
+    assert isinstance(alias, NotifySimplePush)
+
+    # Both forms identify the same connection and write the same URL
+    assert alias.url_identifier == primary.url_identifier
+    assert alias.url() == primary.url()
+    assert alias.url().startswith("spush://")
 
 
 def test_plugin_simplepush_edge_cases():
