@@ -25,10 +25,27 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# Nextcloud Talk supports two ways to post a message:
+#  1. As a user, with a username and an app password:
+#     nctalks://{user}:{password}@{host}/{room_token}
+#
+#  2. As a bot (Nextcloud Talk 17.1 / Nextcloud 27.1 or newer).  An admin
+#     installs the bot with a shared secret and the "response" feature:
+#       occ talk:bot:install --feature response \
+#           "Apprise" "{secret}" "https://localhost"
+#     then enables it in each conversation it should post to.  Use:
+#     nctalks://{host}/{room_token}?secret={secret}
+#
+# Resources:
+# - https://nextcloud-talk.readthedocs.io/en/latest/bots/
+
+from __future__ import annotations
+
 from hashlib import sha256
 import hmac
 from json import dumps
 import secrets
+from typing import Any, Optional
 
 import requests
 
@@ -36,7 +53,7 @@ from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import parse_list
+from ..utils.parse import parse_bool, parse_list
 from .base import NotifyBase
 
 
@@ -62,7 +79,12 @@ class NotifyNextcloudTalk(NotifyBase):
     title_maxlen = 255
 
     # Defines the maximum allowable characters per message.
-    body_maxlen = 4000
+    body_maxlen = 32000
+
+    # The 32000 characters above defined by the body_maxlen include that of
+    # the title.  Setting this to True ensures overflow options behave
+    # properly
+    overflow_amalgamate_title = True
 
     # Define object templates
     templates = (
@@ -122,6 +144,11 @@ class NotifyNextcloudTalk(NotifyBase):
         NotifyBase.template_args,
         **{
             "secret": {"alias_of": "secret"},
+            "silent": {
+                "name": _("Silent Notification"),
+                "type": "bool",
+                "default": False,
+            },
             "url_prefix": {
                 "name": _("URL Prefix"),
                 "type": "string",
@@ -139,15 +166,18 @@ class NotifyNextcloudTalk(NotifyBase):
 
     def __init__(
         self,
-        targets=None,
-        headers=None,
-        url_prefix=None,
-        secret=None,
-        **kwargs,
-    ):
+        targets: Optional[Any] = None,
+        headers: Optional[dict[str, str]] = None,
+        url_prefix: Optional[str] = None,
+        secret: Optional[str] = None,
+        silent: Optional[bool] = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize Nextcloud Talk Object."""
         super().__init__(**kwargs)
 
+        # A bot secret switches us to the bot API; otherwise a user and
+        # password are required
         self.secret = secret
         if not self.secret and (self.user is None or self.password is None):
             msg = "Specify a Nextcloud Talk user and password or bot secret."
@@ -156,6 +186,13 @@ class NotifyNextcloudTalk(NotifyBase):
 
         # Store our targets
         self.targets = parse_list(targets)
+
+        # Silent messages do not trigger chat notifications
+        self.silent = (
+            self.template_args["silent"]["default"]
+            if silent is None
+            else bool(silent)
+        )
 
         # Support URL Prefix
         self.url_prefix = "" if not url_prefix else url_prefix.strip("/")
@@ -167,7 +204,13 @@ class NotifyNextcloudTalk(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform Nextcloud Talk Notification."""
 
         if len(self.targets) == 0:
@@ -215,6 +258,10 @@ class NotifyNextcloudTalk(NotifyBase):
                     ),
                 }
 
+            # Only send the silent flag when it is used
+            if self.silent:
+                payload["silent"] = True
+
             # Nextcloud Talk URL
             notify_url = (
                 "{schema}://{host}{url_prefix}"
@@ -244,6 +291,9 @@ class NotifyNextcloudTalk(NotifyBase):
             self.logger.debug("Nextcloud Talk Payload: %s", payload)
 
             if self.secret:
+                # Bots sign each message with the shared secret.  The
+                # signature covers the random value followed by the
+                # message text (not the JSON payload).
                 random = secrets.token_hex(32)
                 headers["X-Nextcloud-Talk-Bot-Random"] = random
                 headers["X-Nextcloud-Talk-Bot-Signature"] = hmac.new(
@@ -260,6 +310,7 @@ class NotifyNextcloudTalk(NotifyBase):
                     notify_url,
                     data=dumps(payload),
                     headers=headers,
+                    # Bots authenticate with the signature headers
                     auth=None if self.secret else (self.user, self.password),
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
@@ -311,32 +362,38 @@ class NotifyNextcloudTalk(NotifyBase):
         return not has_error
 
     @property
-    def url_identifier(self):
+    def url_identifier(self) -> tuple[Any, ...]:
         """Returns all of the identifiers that make this URL unique from
         another simliar one.
 
         Targets or end points should never be identified here.
         """
+        # A bot connection is identified by its secret alone.  Any user
+        # and password are ignored in bot mode and dropped by url().
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.user,
-            self.password,
+            self.user if not self.secret else None,
+            self.password if not self.secret else None,
             self.host,
             self.port,
             self.secret,
         )
 
-    def url(self, privacy=False, *args, **kwargs):
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
 
         # Our default set of parameters
-        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+        params = {
+            "silent": "yes" if self.silent else "no",
+        }
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Append our headers into our parameters
         params.update({f"+{k}": v for k, v in self.headers.items()})
         if self.url_prefix:
             params["url_prefix"] = self.url_prefix
 
+        # Store our bot secret (urlencode() quotes it for us)
         if self.secret:
             params["secret"] = self.pprint(
                 self.secret, privacy, mode=PrivacyMode.Secret, quote=False
@@ -378,7 +435,7 @@ class NotifyNextcloudTalk(NotifyBase):
         return targets if targets else 1
 
     @staticmethod
-    def parse_url(url):
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
 
@@ -392,8 +449,12 @@ class NotifyNextcloudTalk(NotifyBase):
             results["fullpath"]
         )
 
+        # Support the bot secret; query values arrive already unquoted
         if "secret" in results["qsd"]:
             results["secret"] = results["qsd"]["secret"]
+
+        # Support silent notifications
+        results["silent"] = parse_bool(results["qsd"].get("silent", False))
 
         # Support URL Prefixes
         if "url_prefix" in results["qsd"] and len(
