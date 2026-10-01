@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apprise 2.0.0\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2026-09-29 22:17+0200\n"
+"POT-Creation-Date: 2026-09-26 14:24-0400\n"
 "PO-Revision-Date: 2026-09-25 12:00-0400\n"
 "Last-Translator: Chris Caron <lead2gold@gmail.com>\n"
 "Language: hi\n"
@@ -93,12 +93,12 @@ msgstr "ऐप का उपयोगकर्ता नाम"
 #: apprise/plugins/postmark.py:118 apprise/plugins/prowl.py:122
 #: apprise/plugins/resend.py:108 apprise/plugins/resend.py:146
 #: apprise/plugins/sendgrid.py:117 apprise/plugins/seven.py:76
-#: apprise/plugins/smsmanager.py:107 apprise/plugins/smtp2go.py:119
-#: apprise/plugins/sparkpost.py:170 apprise/plugins/splunk.py:166
-#: apprise/plugins/techuluspush.py:98 apprise/plugins/telnyx.py:88
-#: apprise/plugins/trigv.py:143 apprise/plugins/twilio.py:195
-#: apprise/plugins/vapid/__init__.py:162 apprise/plugins/vonage.py:81
-#: apprise/plugins/wpush.py:158
+#: apprise/plugins/simplepush.py:102 apprise/plugins/smsmanager.py:107
+#: apprise/plugins/smtp2go.py:119 apprise/plugins/sparkpost.py:170
+#: apprise/plugins/splunk.py:166 apprise/plugins/techuluspush.py:98
+#: apprise/plugins/telnyx.py:88 apprise/plugins/trigv.py:143
+#: apprise/plugins/twilio.py:195 apprise/plugins/vapid/__init__.py:162
+#: apprise/plugins/vonage.py:81 apprise/plugins/wpush.py:158
 msgid "API Key"
 msgstr "API कुंजी"
 
@@ -137,18 +137,18 @@ msgstr "लक्षित फ़ोन"
 #: apprise/plugins/rocketchat.py:168 apprise/plugins/sendgrid.py:134
 #: apprise/plugins/sendpulse.py:141 apprise/plugins/serwersms.py:162
 #: apprise/plugins/seven.py:89 apprise/plugins/sfr.py:114
-#: apprise/plugins/signal_api.py:139 apprise/plugins/simplepush.py:189
-#: apprise/plugins/sinch.py:141 apprise/plugins/slack.py:287
-#: apprise/plugins/smpp.py:129 apprise/plugins/smsc.py:157
-#: apprise/plugins/smseagle.py:173 apprise/plugins/smsmanager.py:120
-#: apprise/plugins/sns.py:171 apprise/plugins/telegram.py:379
-#: apprise/plugins/telnyx.py:108 apprise/plugins/threema.py:116
-#: apprise/plugins/trigv.py:156 apprise/plugins/twilio.py:175
-#: apprise/plugins/twist.py:124 apprise/plugins/twitter.py:194
-#: apprise/plugins/vapid/__init__.py:168 apprise/plugins/voipms.py:109
-#: apprise/plugins/vonage.py:109 apprise/plugins/wechat.py:219
-#: apprise/plugins/whatsapp.py:167 apprise/plugins/wxpusher.py:140
-#: apprise/plugins/xmpp/base.py:135 apprise/plugins/zulip.py:154
+#: apprise/plugins/signal_api.py:139 apprise/plugins/sinch.py:141
+#: apprise/plugins/slack.py:287 apprise/plugins/smpp.py:129
+#: apprise/plugins/smsc.py:157 apprise/plugins/smseagle.py:173
+#: apprise/plugins/smsmanager.py:120 apprise/plugins/sns.py:171
+#: apprise/plugins/telegram.py:379 apprise/plugins/telnyx.py:108
+#: apprise/plugins/threema.py:116 apprise/plugins/trigv.py:156
+#: apprise/plugins/twilio.py:175 apprise/plugins/twist.py:124
+#: apprise/plugins/twitter.py:194 apprise/plugins/vapid/__init__.py:168
+#: apprise/plugins/voipms.py:109 apprise/plugins/vonage.py:109
+#: apprise/plugins/wechat.py:219 apprise/plugins/whatsapp.py:167
+#: apprise/plugins/wxpusher.py:140 apprise/plugins/xmpp/base.py:135
+#: apprise/plugins/zulip.py:154
 msgid "Targets"
 msgstr "लक्ष्य"
 
@@ -253,7 +253,7 @@ msgstr "उपयोगकर्ता नाम"
 #: apprise/plugins/notifico.py:181 apprise/plugins/ntfy.py:226
 #: apprise/plugins/pushjet.py:93 apprise/plugins/reddit.py:146
 #: apprise/plugins/rocketchat.py:136 apprise/plugins/serwersms.py:137
-#: apprise/plugins/signal_api.py:113 apprise/plugins/simplepush.py:173
+#: apprise/plugins/signal_api.py:113 apprise/plugins/simplepush.py:109
 #: apprise/plugins/smpp.py:98 apprise/plugins/smsc.py:144
 #: apprise/plugins/synology.py:100 apprise/plugins/twist.py:102
 #: apprise/plugins/voipms.py:89 apprise/plugins/xmpp/base.py:118
@@ -335,7 +335,6 @@ msgid "Level"
 msgstr "स्तर"
 
 #: apprise/plugins/bark.py:202 apprise/plugins/pushward.py:183
-#: apprise/plugins/simplepush.py:215
 msgid "Volume"
 msgstr "ध्वनि स्तर"
 
@@ -567,7 +566,7 @@ msgid "Clickatell"
 msgstr "Clickatell"
 
 #: apprise/plugins/clickatell.py:73 apprise/plugins/eight00com.py:109
-#: apprise/plugins/rocketchat.py:141 apprise/plugins/simplepush.py:167
+#: apprise/plugins/rocketchat.py:141
 msgid "API Token"
 msgstr "API टोकन"
 
@@ -605,8 +604,7 @@ msgstr "मूल पता"
 #: apprise/plugins/ntfy.py:284 apprise/plugins/opsgenie.py:281
 #: apprise/plugins/pinglet.py:178 apprise/plugins/prowl.py:142
 #: apprise/plugins/pushover.py:272 apprise/plugins/pushsafer.py:388
-#: apprise/plugins/simplepush.py:210 apprise/plugins/smseagle.py:188
-#: apprise/plugins/youlmk.py:177
+#: apprise/plugins/smseagle.py:188 apprise/plugins/youlmk.py:177
 msgid "Priority"
 msgstr "प्राथमिकता"
 
@@ -729,8 +727,7 @@ msgstr "Base64 में आइकन (पाठ API)"
 msgid "Image Base64 (Image API)"
 msgstr "Base64 में छवि (छवि API)"
 
-#: apprise/plugins/dot.py:180 apprise/plugins/simplepush.py:225
-#: apprise/plugins/youlmk.py:210
+#: apprise/plugins/dot.py:180 apprise/plugins/youlmk.py:210
 msgid "Link"
 msgstr "लिंक"
 
@@ -1403,8 +1400,8 @@ msgstr "प्रेषक का ईमेल"
 msgid "Auth ID"
 msgstr "प्रमाणीकरण की आईडी"
 
-#: apprise/plugins/plivo.py:95 apprise/plugins/simplepush.py:229
-#: apprise/plugins/sinch.py:114 apprise/plugins/twilio.py:148
+#: apprise/plugins/plivo.py:95 apprise/plugins/sinch.py:114
+#: apprise/plugins/twilio.py:148
 msgid "Auth Token"
 msgstr "प्रमाणीकरण टोकन"
 
@@ -1502,8 +1499,7 @@ msgid "Secret API Key"
 msgstr "गुप्त API कुंजी"
 
 #: apprise/plugins/fcm/__init__.py:163 apprise/plugins/pushy.py:92
-#: apprise/plugins/simplepush.py:178 apprise/plugins/sns.py:164
-#: apprise/plugins/wxpusher.py:129
+#: apprise/plugins/sns.py:164 apprise/plugins/wxpusher.py:129
 msgid "Target Topic"
 msgstr "लक्षित विषय"
 

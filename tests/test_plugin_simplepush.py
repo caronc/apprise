@@ -40,7 +40,10 @@ import requests
 from apprise import Apprise, AppriseAttachment
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins import simplepush
-from apprise.plugins.simplepush import NotifySimplePush
+from apprise.plugins.simplepush import (
+    NOTIFY_SIMPLEPUSH_ENCRYPTION,
+    NotifySimplePush,
+)
 
 logging.disable(logging.CRITICAL)
 
@@ -327,6 +330,15 @@ def test_plugin_simplepush_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@pytest.mark.skipif(
+    not NOTIFY_SIMPLEPUSH_ENCRYPTION, reason="PyNaCl not installed"
+)
+def test_plugin_simplepush_encrypted_urls():
+    """NotifySimplePush() encrypted Apprise URLs."""
+
+    # Run our encrypted tests
     EncryptedURLTester(tests=apprise_url_encrypted_tests).run_all()
 
 
@@ -463,6 +475,9 @@ def test_plugin_simplepush_payload(mock_post):
     assert mock_post.call_count == 2
 
 
+@pytest.mark.skipif(
+    not NOTIFY_SIMPLEPUSH_ENCRYPTION, reason="PyNaCl not installed"
+)
 @mock.patch("requests.get")
 @mock.patch("requests.post")
 def test_plugin_simplepush_encryption(mock_post, mock_get):
@@ -660,17 +675,6 @@ def test_plugin_simplepush_attachments(mock_post, mock_put, tmpdir):
     assert "title" not in payload
     assert "contentFormat" not in payload
 
-    # Encrypted: the uploaded bytes are sealed with the topic key
-    mock_post.reset_mock()
-    upload_mocks(mock_post, mock_put, ["att_2"])
-    obj = Apprise.instantiate("spush://secret@token123/alerts")
-    assert obj.notify(body="Body", attach=attach) is True
-    key, _ = obj._derive_key("alerts")
-    blob = mock_put.call_args[1]["data"]
-    assert decrypt(base64.b64encode(blob), key) == "jpeg-bytes"
-    payload = json.loads(mock_post.call_args_list[0][1]["data"])
-    assert payload["files"][0]["size"] == len(blob)
-
     # The upload fails; the server is told so
     mock_post.reset_mock()
     upload_mocks(mock_post, mock_put, ["att_3"])
@@ -721,6 +725,29 @@ def test_plugin_simplepush_attachments(mock_post, mock_put, tmpdir):
     assert mock_post.call_count == 0
 
 
+@pytest.mark.skipif(
+    not NOTIFY_SIMPLEPUSH_ENCRYPTION, reason="PyNaCl not installed"
+)
+@mock.patch("requests.put")
+@mock.patch("requests.post")
+def test_plugin_simplepush_encrypted_attachments(mock_post, mock_put, tmpdir):
+    """NotifySimplePush() seals uploaded attachments with the topic key."""
+
+    path = tmpdir.join("photo.jpg")
+    path.write_binary(b"jpeg-bytes")
+    attach = AppriseAttachment(str(path))
+
+    # Encrypted: the uploaded bytes are sealed with the topic key
+    upload_mocks(mock_post, mock_put, ["att_2"])
+    obj = Apprise.instantiate("spush://secret@token123/alerts")
+    assert obj.notify(body="Body", attach=attach) is True
+    key, _ = obj._derive_key("alerts")
+    blob = mock_put.call_args[1]["data"]
+    assert decrypt(base64.b64encode(blob), key) == "jpeg-bytes"
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["files"][0]["size"] == len(blob)
+
+
 @mock.patch("requests.post")
 def test_plugin_simplepush_retry(mock_post):
     """NotifySimplePush() retries skip the topics that already have a task."""
@@ -740,6 +767,9 @@ def test_plugin_simplepush_retry(mock_post):
     assert topics == ["alerts", "deploys", "deploys"]
 
 
+@pytest.mark.skipif(
+    not NOTIFY_SIMPLEPUSH_ENCRYPTION, reason="PyNaCl not installed"
+)
 @mock.patch("requests.get")
 @mock.patch("requests.post")
 def test_plugin_simplepush_organization_encryption(mock_post, mock_get):
