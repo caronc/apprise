@@ -1707,13 +1707,21 @@ msgstr "외부 ID"
 msgid "Status"
 msgstr "상태"
 
-#: apprise/plugins/simplepush.py:114
-msgid "Salt"
-msgstr "솔트"
+#: apprise/plugins/simplepush.py:183
+msgid "Target Member"
+msgstr "대상 구성원"
 
-#: apprise/plugins/simplepush.py:127
-msgid "Event"
-msgstr "이벤트"
+#: apprise/plugins/simplepush.py:200
+msgid "Broadcast"
+msgstr "브로드캐스트"
+
+#: apprise/plugins/simplepush.py:205
+msgid "Shared"
+msgstr "공유"
+
+#: apprise/plugins/simplepush.py:221
+msgid "Tag"
+msgstr "태그"
 
 #: apprise/plugins/sinch.py:135 apprise/plugins/twilio.py:169
 msgid "Target Short Code"

@@ -743,7 +743,7 @@ def test_manager_known_plugin_runtime_deps():
     assert "gntp" in NotifyGrowl.runtime_deps()
     assert "smpplib" in NotifySMPP.runtime_deps()
     assert "slixmpp" in NotifyXMPP.runtime_deps()
-    assert "cryptography" in NotifySimplePush.runtime_deps()
+    assert "nacl" in NotifySimplePush.runtime_deps()
     assert "cryptography" in NotifyFCM.runtime_deps()
     assert "cryptography" in NotifyVapid.runtime_deps()
 

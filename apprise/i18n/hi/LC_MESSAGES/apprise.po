@@ -1707,13 +1707,21 @@ msgstr "बाहरी आईडी"
 msgid "Status"
 msgstr "स्थिति"
 
-#: apprise/plugins/simplepush.py:114
-msgid "Salt"
-msgstr "साल्ट"
+#: apprise/plugins/simplepush.py:183
+msgid "Target Member"
+msgstr "लक्ष्य सदस्य"
 
-#: apprise/plugins/simplepush.py:127
-msgid "Event"
-msgstr "घटना"
+#: apprise/plugins/simplepush.py:200
+msgid "Broadcast"
+msgstr "प्रसारण"
+
+#: apprise/plugins/simplepush.py:205
+msgid "Shared"
+msgstr "साझा"
+
+#: apprise/plugins/simplepush.py:221
+msgid "Tag"
+msgstr "टैग"
 
 #: apprise/plugins/sinch.py:135 apprise/plugins/twilio.py:169
 msgid "Target Short Code"

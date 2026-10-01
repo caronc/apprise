@@ -1708,13 +1708,21 @@ msgstr "معرّف خارجي"
 msgid "Status"
 msgstr "الحالة"
 
-#: apprise/plugins/simplepush.py:114
-msgid "Salt"
-msgstr "قيمة التمليح"
+#: apprise/plugins/simplepush.py:183
+msgid "Target Member"
+msgstr "العضو المستهدف"
 
-#: apprise/plugins/simplepush.py:127
-msgid "Event"
-msgstr "الحدث"
+#: apprise/plugins/simplepush.py:200
+msgid "Broadcast"
+msgstr "بث"
+
+#: apprise/plugins/simplepush.py:205
+msgid "Shared"
+msgstr "مشترك"
+
+#: apprise/plugins/simplepush.py:221
+msgid "Tag"
+msgstr "وسم"
 
 #: apprise/plugins/sinch.py:135 apprise/plugins/twilio.py:169
 msgid "Target Short Code"

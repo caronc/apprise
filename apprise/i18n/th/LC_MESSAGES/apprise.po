@@ -1707,13 +1707,21 @@ msgstr "รหัสภายนอก"
 msgid "Status"
 msgstr "สถานะ"
 
-#: apprise/plugins/simplepush.py:114
-msgid "Salt"
-msgstr "ค่าสุ่มผสม"
+#: apprise/plugins/simplepush.py:183
+msgid "Target Member"
+msgstr "สมาชิกเป้าหมาย"
 
-#: apprise/plugins/simplepush.py:127
-msgid "Event"
-msgstr "เหตุการณ์"
+#: apprise/plugins/simplepush.py:200
+msgid "Broadcast"
+msgstr "ออกอากาศ"
+
+#: apprise/plugins/simplepush.py:205
+msgid "Shared"
+msgstr "แชร์"
+
+#: apprise/plugins/simplepush.py:221
+msgid "Tag"
+msgstr "แท็ก"
 
 #: apprise/plugins/sinch.py:135 apprise/plugins/twilio.py:169
 msgid "Target Short Code"

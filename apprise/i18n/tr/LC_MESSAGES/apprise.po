@@ -1707,13 +1707,21 @@ msgstr "Dış kimlik"
 msgid "Status"
 msgstr "Durum"
 
-#: apprise/plugins/simplepush.py:114
-msgid "Salt"
-msgstr "Tuz"
+#: apprise/plugins/simplepush.py:183
+msgid "Target Member"
+msgstr "Hedef Üye"
 
-#: apprise/plugins/simplepush.py:127
-msgid "Event"
-msgstr "Olay"
+#: apprise/plugins/simplepush.py:200
+msgid "Broadcast"
+msgstr "Herkese Gönder"
+
+#: apprise/plugins/simplepush.py:205
+msgid "Shared"
+msgstr "Paylaşılan"
+
+#: apprise/plugins/simplepush.py:221
+msgid "Tag"
+msgstr "Etiket"
 
 #: apprise/plugins/sinch.py:135 apprise/plugins/twilio.py:169
 msgid "Target Short Code"

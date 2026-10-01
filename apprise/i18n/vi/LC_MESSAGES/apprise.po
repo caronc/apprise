@@ -1707,13 +1707,21 @@ msgstr "ID bên ngoài"
 msgid "Status"
 msgstr "Trạng thái"
 
-#: apprise/plugins/simplepush.py:114
-msgid "Salt"
-msgstr "Giá trị muối"
+#: apprise/plugins/simplepush.py:183
+msgid "Target Member"
+msgstr "Thành viên đích"
 
-#: apprise/plugins/simplepush.py:127
-msgid "Event"
-msgstr "Sự kiện"
+#: apprise/plugins/simplepush.py:200
+msgid "Broadcast"
+msgstr "Phát cho tất cả"
+
+#: apprise/plugins/simplepush.py:205
+msgid "Shared"
+msgstr "Chia sẻ"
+
+#: apprise/plugins/simplepush.py:221
+msgid "Tag"
+msgstr "Thẻ"
 
 #: apprise/plugins/sinch.py:135 apprise/plugins/twilio.py:169
 msgid "Target Short Code"

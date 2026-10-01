@@ -180,7 +180,7 @@ keywords = [
     "Signal",
     "Signalgrid",
     "SIGNL4",
-    "SimplePush",
+    "Simplepush",
     "Sinch",
     "Slack",
     "SMPP",
@@ -247,8 +247,11 @@ dev = [
 # all plugins
 all-plugins = [
     # Used in many applications requiring cryptography
-    # such as fcm://, splush:// and much more
+    # such as fcm:// and much more
     "cryptography",
+
+    # Provides encrypted spush:// sends
+    "PyNaCl",
 
     # provides growl:// support
     "gntp",

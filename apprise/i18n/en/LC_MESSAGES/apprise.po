@@ -1707,13 +1707,21 @@ msgstr "External ID"
 msgid "Status"
 msgstr "Status"
 
-#: apprise/plugins/simplepush.py:114
-msgid "Salt"
-msgstr "Salt"
+#: apprise/plugins/simplepush.py:183
+msgid "Target Member"
+msgstr "Target Member"
 
-#: apprise/plugins/simplepush.py:127
-msgid "Event"
-msgstr "Event"
+#: apprise/plugins/simplepush.py:200
+msgid "Broadcast"
+msgstr "Broadcast"
+
+#: apprise/plugins/simplepush.py:205
+msgid "Shared"
+msgstr "Shared"
+
+#: apprise/plugins/simplepush.py:221
+msgid "Tag"
+msgstr "Tag"
 
 #: apprise/plugins/sinch.py:135 apprise/plugins/twilio.py:169
 msgid "Target Short Code"
