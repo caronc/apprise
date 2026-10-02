@@ -1883,6 +1883,10 @@ msgstr "Tahimik na abiso"
 msgid "Web Page Preview"
 msgstr "Preview ng web page"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "Igrupo ang mga attachment na larawan/video"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "ID ng thread ng paksa"

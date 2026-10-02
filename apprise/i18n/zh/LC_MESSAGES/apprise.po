@@ -1883,6 +1883,10 @@ msgstr "静默通知"
 msgid "Web Page Preview"
 msgstr "网页预览"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "将照片/视频附件分组"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "主题话题标识"

@@ -1883,6 +1883,10 @@ msgstr "การแจ้งเตือนแบบไม่มีเสีย
 msgid "Web Page Preview"
 msgstr "ตัวอย่างหน้าเว็บ"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "จัดกลุ่มไฟล์แนบรูปภาพ/วิดีโอ"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "รหัสกระทู้ของหัวข้อ"

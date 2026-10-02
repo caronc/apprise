@@ -1883,6 +1883,10 @@ msgstr "Stille melding"
 msgid "Web Page Preview"
 msgstr "Voorbeeld van de webpagina"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "Foto-/videobijlagen groeperen"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "Draad-id van het onderwerp"
