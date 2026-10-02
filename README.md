@@ -113,7 +113,7 @@ The table below identifies the services this tool supports and some example serv
 | [Misskey](https://appriseit.com/services/misskey/) | misskey:// or misskeys://| (TCP) 80 or 443  | misskey://access_token@hostname
 | [MQTT](https://appriseit.com/services/mqtt/) | mqtt://  or mqtts:// | (TCP) 1883 or 8883   | mqtt://hostname/topic<br />mqtt://user@hostname/topic<br />mqtts://user:pass@hostname:9883/topic
 | [Nextcloud](https://appriseit.com/services/nextcloud/) | ncloud:// or nclouds:// | (TCP) 80 or 443 | ncloud://adminuser:pass@host/User<br/>nclouds://adminuser:pass@host/User1/User2/UserN
-| [NextcloudTalk](https://appriseit.com/services/nextcloudtalk/) | nctalk:// or nctalks:// | (TCP) 80 or 443 | nctalk://user:pass@host/RoomId<br/>nctalks://user:pass@host/RoomId1/RoomId2/RoomIdN
+| [NextcloudTalk](https://appriseit.com/services/nextcloudtalk/) | nctalk:// or nctalks:// | (TCP) 80 or 443 | nctalk://user:pass@host/RoomId<br/>nctalks://user:pass@host/RoomId1/RoomId2/RoomIdN<br/>nctalks://host/RoomId?secret=BotSecret
 | [Notica](https://appriseit.com/services/notica/) | notica://  | (TCP) 443   | notica://Token/
 | [Notifiarr](https://appriseit.com/services/notifiarr/) | notifiarr:// | (TCP) 443 | notifiarr://apikey/#channel<br />notifiarr://apikey/#channel1/#channel2/#channeln
 | [Notifico](https://appriseit.com/services/notifico/) | notifico:// or notificos://  | (TCP) 80 or 443   | notifico://ProjectID/MessageHook/<br />notifico://host/ProjectID/MessageHook/<br />notificos://host/ProjectID/MessageHook/
