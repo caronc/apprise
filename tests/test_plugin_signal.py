@@ -674,3 +674,46 @@ def test_plugin_signal_unpaired_tildes_are_fast():
     assert result.count("~") == 33333 + 25000 * 2
     assert "~" not in result.replace("\\~", "")
     assert elapsed < 5.0
+
+
+@pytest.mark.parametrize(
+    "markdown, expected",
+    [
+        # A backslash then digits before Signal markup stays literal text
+        ("\\2~", "\\2\\~"),
+        ("\\1~~", "\\1\\~\\~"),
+        ("\\0*", "\\0\\*"),
+        ("\\3_", "\\3_"),
+        ("a\\12~b~", "a\\12~b~"),
+        ("\\0~~a~~", "\\0~a~"),
+        # Private-use characters already in the message are left alone
+        ("\\2~", "\\2\\~"),
+        ("\\0*", "\\0\\*"),
+    ],
+)
+def test_plugin_signal_backslash_digits(markdown, expected):
+    """Backslash and digit sequences never break Signal conversion."""
+    assert NotifySignalAPI._commonmark_to_signal(markdown) == expected
+
+
+def test_plugin_signal_backslash_markers_stay_small():
+    """Many backslashes never make Signal conversion slow or large."""
+    # Every Private Use character is taken
+    every = "".join(
+        chr(c)
+        for start, end in (
+            (0xE000, 0xF8FF),
+            (0xF0000, 0xFFFFD),
+            (0x100000, 0x10FFFD),
+        )
+        for c in range(start, end + 1)
+    )
+
+    # Taken characters, a long run of the first one, and both together,
+    # each followed by many backslashes before markup
+    for prefix in (every, chr(0xE000) * 20000, every + chr(0xE000) * 20000):
+        body = prefix + "\\2~" * 20000
+        start = default_timer()
+        result = NotifySignalAPI._commonmark_to_signal(body)
+        assert default_timer() - start < 5.0
+        assert result == prefix + "\\2\\~" * 20000

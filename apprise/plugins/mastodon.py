@@ -68,10 +68,8 @@ HASHTAG_DETECTION_RE = re.compile(
 
 HASHTAG_VALUE_RE = re.compile(r"^[^\W_][\w]*$", re.I)
 
-# A leading CommonMark heading such as "# Title" (or "## Title ##").
-# The title takes the rest of the line; any closing "#" run and
-# trailing spaces are removed in code, which avoids slow backtracking
-# on long runs of spaces.
+# A leading CommonMark heading such as "# Title" or "## Title ##".
+# Closing markers and spaces are removed separately to keep matching fast.
 LEADING_HEADING_RE = re.compile(
     r"\A {0,3}#{1,6}(?:[ \t]+(?P<title>.*))?(?=\r?\n|\Z)"
 )

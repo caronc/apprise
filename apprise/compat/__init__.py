@@ -25,10 +25,8 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""Workarounds for older platforms and libraries.
+"""Compatibility helpers for supported older platforms and libraries.
 
-Each module here exists only for an older release that Apprise still
-supports (for example Rocky Linux 9, with Python 3.9 and Markdown 3.3).
-When that release is no longer supported, delete its module, its
-``tests/test_compat_*.py`` file and the one call that uses it.
+Modules can be removed with their tests once their target versions are no
+longer supported.
 """

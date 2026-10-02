@@ -1036,8 +1036,8 @@ class NotifySlack(NotifyBase):
                             "type": "header",
                             "text": {
                                 "type": "plain_text",
-                                # Titles are plain text; keep &, < and >
-                                # literal just like the legacy title
+                                # Escape Slack control characters so the
+                                # plain-text title stays literal.
                                 "text": escape(title, quote=False),
                                 "emoji": True,
                             },

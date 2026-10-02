@@ -498,10 +498,8 @@ class NotifyAfricasTalking(NotifyBase):
             # An exact match always identifies the right target
             matched = [t for t, d in digits.items() if d == number]
             if not matched:
-                # Replies may switch between local and international forms,
-                # so fall back to the ending digits.  This only counts when
-                # exactly one target could be meant; otherwise a number from
-                # another country could be marked as delivered.
+                # Replies may change local numbers to international form.
+                # Match ending digits only when they identify one target.
                 matched = [
                     t
                     for t, d in digits.items()

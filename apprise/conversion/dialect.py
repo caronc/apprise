@@ -342,9 +342,8 @@ def truncate_dialect_chunk(
 ) -> str:
     """Return the longest converted prefix within ``limit``.
 
-    Truncate mode discards all remaining content.  When ``body_format`` is
-    HTML, the prefix never ends inside a tag or entity; plain text is never
-    repaired as markup.
+    HTML cuts keep tags and entities whole. Plain text is not repaired as
+    markup, and all content after the cut is discarded.
     """
     if not body:
         return dialect_convert(body)

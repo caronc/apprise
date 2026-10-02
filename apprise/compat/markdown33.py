@@ -25,7 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# Added for Python-Markdown 3.3 (Rocky Linux 9) compatibility.
+# Support Python-Markdown 3.3 as shipped with Rocky Linux 9.
 
 from html import escape
 import re

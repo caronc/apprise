@@ -299,8 +299,10 @@ class NotifySignalAPI(NotifyBase):
         backtick_runs = commonmark_index_backtick_runs(body)
         # Use a temporary marker absent from the message.
         sentinel = commonmark_pick_emphasis_sentinel(body)
-        # Hold literal backslashes until adjacent markup is known.
-        backslash = f"{sentinel}\\{sentinel}"
+        # Mark literal backslashes with the sentinel plus a backslash.
+        # Numbered delimiter placeholders need a digit after the sentinel, so
+        # adjacent digits stay literal text and the marker stays small.
+        backslash = f"{sentinel}\\"
         # Escape Signal markup and temporarily mark literal backslashes.
         escape = str.maketrans(
             {"\\": backslash, **{c: "\\" + c for c in SIGNAL_STYLE_CHARS}}

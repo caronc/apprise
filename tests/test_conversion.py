@@ -3902,19 +3902,38 @@ def test_conversion_commonmark_pick_emphasis_sentinel():
     """conversion: Test commonmark_pick_emphasis_sentinel()"""
 
     # An ordinary body with no Private Use Area characters at all
-    # picks a single one, the narrowest candidate available.
+    # picks the first one.
     assert commonmark_pick_emphasis_sentinel("hello world") == chr(0xE000)
 
-    # Existing candidates make the sentinel double until it is unique.
-    assert commonmark_pick_emphasis_sentinel(chr(0xE000)) == chr(0xE000) * 2
-    assert commonmark_pick_emphasis_sentinel(chr(0xE000) * 3) == (
-        chr(0xE000) * 4
+    # A character already in the message is skipped for the next one, so
+    # the sentinel stays a single character even after a long run.
+    assert commonmark_pick_emphasis_sentinel(chr(0xE000)) == chr(0xE001)
+    assert commonmark_pick_emphasis_sentinel(chr(0xE000) * 100000) == (
+        chr(0xE001)
     )
 
-    # Doubling also handles long collision runs efficiently.
-    picked = commonmark_pick_emphasis_sentinel(chr(0xE000) * 100000)
-    assert picked not in chr(0xE000) * 100000
-    assert len(picked) == 131072
+    # Once the first area is used up, the next Private Use area is tried
+    bmp = "".join(chr(c) for c in range(0xE000, 0xF900))
+    assert commonmark_pick_emphasis_sentinel(bmp) == chr(0xF0000)
+
+    # With every Private Use character taken, an unused pair of two
+    # different ones is used, however long a run of one of them is
+    every = bmp + "".join(
+        chr(c)
+        for start, end in ((0xF0000, 0xFFFFD), (0x100000, 0x10FFFD))
+        for c in range(start, end + 1)
+    )
+    body = every + chr(0xE000) * 100000
+    picked = commonmark_pick_emphasis_sentinel(body)
+    assert picked == chr(0xE000) + chr(0xE002)
+    assert picked not in body
+
+    # When every character already follows the first one, the next first
+    # character is tried
+    body = every + "".join(chr(0xE000) + char for char in every[1:])
+    picked = commonmark_pick_emphasis_sentinel(body)
+    assert picked == chr(0xE001) + chr(0xE003)
+    assert picked not in body
 
     # Sentinel selection remains deterministic for the same input.
     assert commonmark_pick_emphasis_sentinel(
@@ -4511,3 +4530,30 @@ def test_conversion_html_tag_reducer_line_breaks():
     assert "\n" not in reducer.reduce(
         "<table>\n<tr>\n<td>a</td>\n<td>b</td>\n</tr>\n</table>"
     )
+
+
+def test_conversion_sentinel_exhausted_partners_is_fast():
+    """Many used-up first characters still pick a sentinel quickly."""
+    every = "".join(
+        chr(c)
+        for start, end in (
+            (0xE000, 0xF8FF),
+            (0xF0000, 0xFFFFD),
+            (0x100000, 0x10FFFD),
+        )
+        for c in range(start, end + 1)
+    )
+
+    # The first 10 characters are each followed by every other one
+    body = every + "".join(
+        every[i] + char
+        for i in range(10)
+        for char in every
+        if char != every[i]
+    )
+
+    start = default_timer()
+    picked = commonmark_pick_emphasis_sentinel(body)
+    assert default_timer() - start < 5.0
+    assert picked == chr(0xE00A) + chr(0xE00C)
+    assert picked not in body

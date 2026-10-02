@@ -80,13 +80,10 @@ def html_adjust(
     window_start: int,
     split_at: int,
 ) -> int:
-    """
-    Adjust the split point to avoid splitting inside an HTML entity such
-    as '&nbsp;'.
+    """Move a split before any HTML entity it would divide.
 
-    If the split falls inside '&...;' within a small window around the
-    boundary, move the split back to '&' so the entire entity is kept
-    in the next chunk.
+    For example, a split inside ``&nbsp;`` moves back to ``&`` so the next
+    chunk receives the complete entity.
     """
     if split_at <= window_start or split_at > len(text):
         return split_at
