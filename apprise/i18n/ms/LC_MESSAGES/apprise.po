@@ -1883,6 +1883,10 @@ msgstr "Pemberitahuan senyap"
 msgid "Web Page Preview"
 msgstr "Pratonton halaman web"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "Kumpulkan lampiran foto/video"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "ID bebenang topik"

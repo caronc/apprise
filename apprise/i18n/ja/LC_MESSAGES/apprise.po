@@ -1884,6 +1884,10 @@ msgstr "サイレント通知"
 msgid "Web Page Preview"
 msgstr "ウェブページのプレビュー"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "写真/動画の添付ファイルをまとめる"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "トピックのスレッド ID"

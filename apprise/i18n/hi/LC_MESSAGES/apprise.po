@@ -1883,6 +1883,10 @@ msgstr "मौन अधिसूचना"
 msgid "Web Page Preview"
 msgstr "वेब पृष्ठ की झलक"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "फ़ोटो/वीडियो अटैचमेंट को समूहित करें"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "विषय के सूत्र की आईडी"

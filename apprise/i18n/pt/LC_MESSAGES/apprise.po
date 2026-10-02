@@ -1883,6 +1883,10 @@ msgstr "Notificação silenciosa"
 msgid "Web Page Preview"
 msgstr "Pré-visualização da página web"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "Agrupar anexos de foto/vídeo"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "Identificador do tópico do assunto"

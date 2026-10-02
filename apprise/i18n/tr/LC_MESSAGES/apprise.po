@@ -1883,6 +1883,10 @@ msgstr "Sessiz bildirim"
 msgid "Web Page Preview"
 msgstr "Web sayfası ön izlemesi"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "Fotoğraf/video eklerini grupla"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "Konu başlığı kimliği"

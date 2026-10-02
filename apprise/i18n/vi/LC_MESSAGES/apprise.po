@@ -1883,6 +1883,10 @@ msgstr "Thông báo im lặng"
 msgid "Web Page Preview"
 msgstr "Xem trước trang web"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "Nhóm tệp đính kèm ảnh/video"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "ID luồng của chủ đề"

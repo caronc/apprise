@@ -1884,6 +1884,10 @@ msgstr "إشعار صامت"
 msgid "Web Page Preview"
 msgstr "معاينة صفحة الويب"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "تجميع مرفقات الصور/الفيديو"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "معرّف محادثة الموضوع"

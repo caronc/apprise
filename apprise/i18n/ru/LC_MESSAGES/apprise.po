@@ -1884,6 +1884,10 @@ msgstr "Тихое уведомление"
 msgid "Web Page Preview"
 msgstr "Предварительный просмотр страницы"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "Группировать вложения фото/видео"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "Идентификатор обсуждения темы"

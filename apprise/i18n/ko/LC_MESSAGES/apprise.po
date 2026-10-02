@@ -1883,6 +1883,10 @@ msgstr "무음 알림"
 msgid "Web Page Preview"
 msgstr "웹 페이지 미리 보기"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "사진/동영상 첨부 파일 묶기"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "주제 스레드 ID"

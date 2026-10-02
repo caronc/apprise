@@ -1884,6 +1884,10 @@ msgstr "Ciche powiadomienie"
 msgid "Web Page Preview"
 msgstr "Podgląd strony internetowej"
 
+#: apprise/plugins/telegram.py:449
+msgid "Group Photo/Video Attachments"
+msgstr "Grupuj załączniki zdjęć/filmów"
+
 #: apprise/plugins/telegram.py:412
 msgid "Topic Thread ID"
 msgstr "Identyfikator wątku tematu"
