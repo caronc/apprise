@@ -43,8 +43,12 @@
 # or consider purchasing a short-code from here:
 #    https://www.twilio.com/docs/glossary/what-is-a-short-code
 #
+from __future__ import annotations
+
 from json import loads
 import re
+from typing import Any
+from xml.sax.saxutils import escape
 
 import requests
 
@@ -123,9 +127,7 @@ class NotifyTwilio(NotifyBase):
     # The maximum length of the call body in xml format
     body_call_maxlen = 4000
 
-    # A title can not be used for SMS Messages.  Setting this to zero will
-    # cause any title (if defined) to get placed into the message body.
-    title_maxlen = 0
+    # SMS folds titles into the body; calls keep TwiML separate.
 
     # Define object templates
     templates = (
@@ -373,7 +375,13 @@ class NotifyTwilio(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform Twilio Notification."""
 
         if not self.targets and len(self.source) in (5, 6):
@@ -401,7 +409,26 @@ class NotifyTwilio(NotifyBase):
             payload["Body"] = body
         else:
             url = self.notify_call_url.format(sid=self.account_sid)
-            payload["Twiml"] = body
+
+            if body.lstrip().startswith("<"):
+                # The body is already a TwiML document; send it untouched
+                # so it stays well formed (a title has no place in it)
+                if title:
+                    self.logger.debug(
+                        "Twilio call body is TwiML; the title is not used."
+                    )
+
+                payload["Twiml"] = body
+
+            else:
+                # Plain text is spoken aloud; the title is read out first
+                payload["Twiml"] = "<Response>{}</Response>".format(
+                    "".join(
+                        f"<Say>{escape(text)}</Say>"
+                        for text in (title, body)
+                        if text
+                    )
+                )
 
         # Create a copy of the targets list
         targets = list(self.targets)
@@ -522,6 +549,16 @@ class NotifyTwilio(NotifyBase):
             self.mark_delivered(delivery_key)
 
         return not has_error
+
+    @property
+    def title_maxlen(self) -> int:
+        """Maximum title length: 0 for SMS, 250 for phone calls."""
+        # Keep call titles separate so they cannot break a TwiML document.
+        return (
+            0
+            if self.method == TwilioNotificationMethod.SMS
+            else NotifyBase.title_maxlen
+        )
 
     @property
     def body_maxlen(self):

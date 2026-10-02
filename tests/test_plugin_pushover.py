@@ -30,6 +30,7 @@ from json import dumps
 # Disable logging for a cleaner testing output
 import logging
 import os
+from timeit import default_timer
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -38,7 +39,11 @@ import requests
 
 import apprise
 from apprise.exception import AppriseImproperlyConfigured
-from apprise.plugins.pushover import NotifyPushover, PushoverPriority
+from apprise.plugins.pushover import (
+    NotifyPushover,
+    PushoverHTMLReducer,
+    PushoverPriority,
+)
 
 logging.disable(logging.CRITICAL)
 
@@ -642,7 +647,7 @@ def test_plugin_pushover_multi_format(mock_post):
     assert obj.notify(body="*hi*", body_format=apprise.NotifyFormat.MARKDOWN)
     sent = mock_post.call_args[1]["data"]
     assert sent["html"] == 1
-    assert sent["message"] != "*hi*"
+    assert sent["message"] == "<i>hi</i>"
 
     # Undeclared input stays unconverted, even with a Markdown override.
     mock_post.reset_mock()
@@ -653,6 +658,151 @@ def test_plugin_pushover_multi_format(mock_post):
     sent = mock_post.call_args[1]["data"]
     assert "html" not in sent
     assert sent["message"] == "*hi*"
+
+
+@mock.patch("requests.post")
+def test_plugin_pushover_markdown_uses_supported_html(mock_post):
+    """Markdown becomes HTML built only from Pushover's tags."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    aobj = apprise.Apprise()
+    assert aobj.add("pover://{}@{}".format("u" * 30, "a" * 30))
+
+    body = (
+        "# Head\n\n"
+        "para *one*\n\n"
+        "- a & b\n"
+        "- **bold**\n\n"
+        "> quote\n\n"
+        "[link](https://example.com/?a=1&b=2)"
+    )
+    assert aobj.notify(
+        body=body, title="T & <t>", body_format=apprise.NotifyFormat.MARKDOWN
+    )
+    sent = mock_post.call_args[1]["data"]
+    assert sent["html"] == 1
+    assert sent["message"] == (
+        "<b>Head</b><br>"
+        "para <i>one</i><br><br>"
+        "- a &amp; b<br>"
+        "- <b>bold</b><br><br>"
+        "quote<br><br>"
+        '<a href="https://example.com/?a=1&amp;b=2">link</a>'
+    )
+
+    # The title is plain text and sent as-is
+    assert sent["title"] == "T & <t>"
+
+
+@mock.patch("requests.post")
+def test_plugin_pushover_markdown_split_limit(mock_post):
+    """Split Markdown is sized after it becomes HTML."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    aobj = apprise.Apprise()
+    assert aobj.add("pover://{}@{}?overflow=split".format("u" * 30, "a" * 30))
+    assert aobj.notify(
+        body="**bold** word " * 100,
+        body_format=apprise.NotifyFormat.MARKDOWN,
+    )
+
+    messages = [call[1]["data"] for call in mock_post.call_args_list]
+    assert len(messages) > 1
+    for sent in messages:
+        assert sent["html"] == 1
+        assert len(sent["message"]) <= NotifyPushover.body_maxlen
+
+        # Every piece keeps its bold tags balanced
+        assert sent["message"].count("<b>") == sent["message"].count("</b>")
+
+
+def test_plugin_pushover_html_reduced_to_supported_tags():
+    """HTML is rewritten to the tags Pushover can show."""
+
+    def reduce(html):
+        return PushoverHTMLReducer().reduce(html)
+
+    # Supported tags are kept; their aliases are mapped
+    assert (
+        reduce("<strong>a</strong><em>b</em><ins>c</ins><u>d</u>")
+        == "<b>a</b><i>b</i><u>c</u><u>d</u>"
+    )
+
+    # Colour and link tags only survive with their attribute
+    assert (
+        reduce('<font color="#ff0000">red</font> <font>plain</font>')
+        == '<font color="#ff0000">red</font> plain'
+    )
+    assert (
+        reduce('<a href="http://e.com?a=1&amp;b=2">l</a> <a name="x">n</a>')
+        == '<a href="http://e.com?a=1&amp;b=2">l</a> n'
+    )
+
+    # Unknown tags keep their text; hidden ones lose it
+    assert (
+        reduce("<script>bad()</script><style>x</style>hi <span>you</span>")
+        == "hi you"
+    )
+
+    # Images keep their description only
+    assert reduce('<img alt="pic" src="x.png" /><img src="y.png">') == "pic"
+
+    # Line breaks and dividers
+    assert reduce("a<br/>b<hr/>c") == "a<br>b<br><br>c"
+
+    # Code keeps its own line breaks
+    assert (
+        reduce("<pre><code>x &lt; 1\r\ny\n</code></pre>after")
+        == "x &lt; 1<br>y<br><br>after"
+    )
+
+    # Tables become one line per row
+    assert (
+        reduce(
+            "<table><tr><th>a</th><th>b</th></tr>"
+            "<tr><td>1</td><td>2</td></tr></table>"
+        )
+        == "a | b<br>1 | 2"
+    )
+
+    # Nested and numbered lists
+    assert (
+        reduce(
+            "<ul><li>a<ul><li>b</li></ul></li><li>c</li></ul>"
+            "<ol><li>one</li><li>two</li></ol>end"
+        )
+        == "- a<br>  - b<br>- c<br><br>1. one<br>2. two<br><br>end"
+    )
+    assert reduce("<li>orphan</li>") == "- orphan"
+
+    # Stray, crossed and unclosed tags still give balanced output
+    assert reduce("</b>stray <b>open <i>both") == (
+        "stray <b>open <i>both</i></b>"
+    )
+    assert reduce("<b>x <i>y</b> z</i>") == "<b>x <i>y</i></b> z"
+
+    # Self-closed tags other than br, hr and img are ignored
+    assert reduce("a<b/>c") == "ac"
+
+    # A list closed without being opened still ends its block
+    assert reduce("a</ul>b") == "a<br><br>b"
+
+    # Blank input stays blank
+    assert reduce("   \n  ") == ""
+
+
+def test_plugin_pushover_text_skips_dialect():
+    """Plain text is not changed by the Pushover dialect."""
+
+    obj = NotifyPushover(user_key="u" * 30, token="a" * 30)
+    assert (
+        obj.dialect_convert("a < b & c", apprise.NotifyFormat.TEXT)
+        == "a < b & c"
+    )
 
 
 @mock.patch("requests.post")
@@ -1080,3 +1230,13 @@ def test_plugin_pushover_e2ee_field_encrypt():
         pytest.raises(OSError, match="rng failure"),
     ):
         obj._encrypt_field("boom", key_bytes)
+
+
+def test_plugin_pushover_html_reducer_stray_closers_are_fast():
+    """Many closing tags that were never opened are ignored quickly."""
+
+    start = default_timer()
+    result = PushoverHTMLReducer().reduce("<b>" * 28571 + "</i>" * 28571)
+    elapsed = default_timer() - start
+    assert result == "<b>" * 28571 + "</b>" * 28571
+    assert elapsed < 5.0

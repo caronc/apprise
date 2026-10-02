@@ -1040,9 +1040,9 @@ class URLBase:
         response_mask that contains a dictionary of integer -> string mapped
         variables
         """
-        if isinstance(response_mask, dict):
-            # Apply any/all header over-rides defined
-            HTML_LOOKUP.update(response_mask)
+        if isinstance(response_mask, dict) and code in response_mask:
+            # A plugin override wins without changing the shared table.
+            return response_mask[code]
 
         # Look up our response
         try:

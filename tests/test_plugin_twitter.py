@@ -1505,3 +1505,100 @@ def test_plugin_twitter_tweet_attachments_jpeg_before_gif(
     assert (
         mock_post.call_args_list[4][0][0] == "https://api.twitter.com/2/tweets"
     )
+
+
+@patch("apprise.plugins.base.time.sleep")
+@patch("requests.post")
+def test_plugin_twitter_tweet_retry(
+    mock_post,
+    mock_sleep,
+    twitter_url,
+    good_message_response,
+    bad_message_response,
+    good_media_response,
+):
+    """A retry only re-posts the tweet that failed."""
+
+    # Tweet 1 posts, tweet 2 fails, then the retry posts tweet 2 alone
+    tweets = [
+        good_message_response,
+        bad_message_response,
+        good_message_response,
+    ]
+
+    def _post(url, *args, **kwargs):
+        return (
+            good_media_response
+            if url == "https://api.x.com/2/media/upload"
+            else tweets.pop(0)
+        )
+
+    mock_post.side_effect = _post
+
+    aobj = Apprise()
+    assert aobj.add(twitter_url + "?mode=tweet&batch=no&retry=2&wait=0")
+
+    # Each gif is its own tweet
+    attach = [
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif"),
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif"),
+    ]
+    assert bool(aobj.notify(body="body", attach=attach)) is True
+
+    texts = [
+        json.loads(call[1]["data"])["text"]
+        for call in mock_post.call_args_list
+        if call[0][0] == "https://api.twitter.com/2/tweets"
+    ]
+
+    # The first tweet was never repeated
+    assert texts == ["body", "02/02", "02/02"]
+    assert not tweets
+
+
+@patch("apprise.plugins.base.time.sleep")
+@patch("requests.post")
+def test_plugin_twitter_dm_retry(
+    mock_post,
+    mock_sleep,
+    twitter_url,
+    good_message_response,
+    bad_message_response,
+    good_media_response,
+):
+    """A retry only re-sends the direct message that failed."""
+
+    # DM 1 is sent, DM 2 fails, then the retry sends DM 2 alone
+    messages = [
+        good_message_response,
+        bad_message_response,
+        good_message_response,
+    ]
+
+    def _post(url, *args, **kwargs):
+        return (
+            good_media_response
+            if url == "https://api.x.com/2/media/upload"
+            else messages.pop(0)
+        )
+
+    mock_post.side_effect = _post
+
+    aobj = Apprise()
+    assert aobj.add(twitter_url + "?mode=dm&retry=2&wait=0")
+
+    attach = [
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif"),
+        os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+    ]
+    assert bool(aobj.notify(body="body", attach=attach)) is True
+
+    texts = [
+        json.loads(call[1]["data"])["text"]
+        for call in mock_post.call_args_list
+        if call[0][0].endswith("/messages")
+    ]
+
+    # The first message was never repeated
+    assert texts == ["body", "02/02", "02/02"]
+    assert not messages

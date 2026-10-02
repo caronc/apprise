@@ -40,9 +40,9 @@ from json import dumps, loads
 import re
 import threading
 from time import monotonic, time
+from typing import Any, Optional
 import uuid
 
-from markdown import markdown
 import requests
 
 from ...common import (
@@ -51,7 +51,7 @@ from ...common import (
     NotifyType,
     PersistentStoreMode,
 )
-from ...conversion import html_to_text
+from ...conversion import html_to_text, markdown_to_html
 from ...exception import AppriseImproperlyConfigured, ApprisePluginException
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
@@ -695,21 +695,48 @@ class NotifyMatrix(NotifyBase):
             **kwargs,
         )
 
-    def dialect_convert(self, body, body_format=None, *args, **kwargs):
+    def dialect_convert(
+        self,
+        body: str,
+        body_format: Optional[NotifyFormat] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> str:
         """Render CommonMark as HTML for Matrix's rich-text fields.
 
-        Slack webhooks keep CommonMark for Slack to render.
+        Slack webhooks keep CommonMark and receive HTML as plain text.
         """
+        # Slack-style text is escaped before it is sent, so HTML tags would
+        # show up literally. Send HTML as plain text instead.
+        if self.mode == MatrixWebhookMode.SLACK:
+            return (
+                html_to_text(body)
+                if body_format == NotifyFormat.HTML
+                else body
+            )
+
         # Non-Markdown bodies need no dialect conversion.
         if body_format != NotifyFormat.MARKDOWN:
             return body
 
-        # Slack expects the original CommonMark source.
-        if self.mode == MatrixWebhookMode.SLACK:
-            return body
+        # Other Matrix paths receive rendered HTML.  Matrix keeps plain
+        # Python-Markdown line handling, so no extensions are enabled.
+        return markdown_to_html(body, extensions=())
 
-        # Other Matrix paths receive rendered HTML.
-        return markdown(body)
+    def _matrix_html_body(
+        self,
+        body: str,
+        body_format: Optional[NotifyFormat],
+        body_passthrough: Optional[bool],
+    ) -> str:
+        """Return the HTML sent in Matrix's formatted body."""
+        # The framework skips dialect_convert() for passthrough content,
+        # so Markdown steered here by ?format=markdown is rendered now.
+        if body_passthrough and body_format == NotifyFormat.MARKDOWN:
+            return markdown_to_html(body, extensions=())
+
+        # HTML and already rendered Markdown are used as they are.
+        return body
 
     def _matrix_plain_fallback(self, body, body_format, body_passthrough):
         """Build Matrix's plain-text fallback.
@@ -916,15 +943,13 @@ class NotifyMatrix(NotifyBase):
             "text": "",
         }
 
-        # Declared Markdown is already HTML; passthrough content is unchanged.
+        # Markdown is rendered to HTML here; HTML is used as it is.
         if body_format in (NotifyFormat.HTML, NotifyFormat.MARKDOWN):
             # Rendered Markdown already starts on its own line. Any other
             # body needs a break so clients that drop headings keep the
             # title separate.
             title_break = (
-                "<br/>"
-                if body_format != NotifyFormat.MARKDOWN or body_passthrough
-                else ""
+                "<br/>" if body_format != NotifyFormat.MARKDOWN else ""
             )
             payload["text"] = "{title}{body}".format(
                 title=(
@@ -934,7 +959,9 @@ class NotifyMatrix(NotifyBase):
                         NotifyMatrix.escape_html(title), title_break
                     )
                 ),
-                body=body,
+                body=self._matrix_html_body(
+                    body, body_format, body_passthrough
+                ),
             )
 
         else:  # NotifyFormat.TEXT
@@ -980,7 +1007,7 @@ class NotifyMatrix(NotifyBase):
             "text": "",
         }
 
-        # Declared Markdown is already HTML; passthrough content is unchanged.
+        # Markdown is rendered to HTML here; HTML is used as it is.
         if body_format in (NotifyFormat.HTML, NotifyFormat.MARKDOWN):
             # Keep confirmed markup out of the plain-text fallback.
             plain_body = self._matrix_plain_fallback(
@@ -994,9 +1021,7 @@ class NotifyMatrix(NotifyBase):
             # body needs a break so clients that drop headings keep the
             # title separate.
             title_break = (
-                "<br/>"
-                if body_format != NotifyFormat.MARKDOWN or body_passthrough
-                else ""
+                "<br/>" if body_format != NotifyFormat.MARKDOWN else ""
             )
             payload["html"] = "{title}{body}".format(
                 title=(
@@ -1006,7 +1031,9 @@ class NotifyMatrix(NotifyBase):
                         NotifyMatrix.escape_html(title), title_break
                     )
                 ),
-                body=body,
+                body=self._matrix_html_body(
+                    body, body_format, body_passthrough
+                ),
             )
 
         else:  # NotifyFormat.TEXT
@@ -1296,33 +1323,32 @@ class NotifyMatrix(NotifyBase):
                 ),
             }
 
-            # HTML and rendered Markdown share a formatted body. HTML titles
-            # remain trusted, while Markdown titles are escaped.
+            # HTML and rendered Markdown share a formatted body. Titles
+            # always arrive as plain text, so they are escaped.
             if body_format in (NotifyFormat.HTML, NotifyFormat.MARKDOWN):
                 title_html = (
                     ""
                     if not title
-                    else (
-                        f"<h1>{title}</h1>"
-                        if body_format == NotifyFormat.HTML
-                        else "<h1>{}</h1>".format(
-                            NotifyMatrix.escape_html(title, whitespace=False)
-                        )
+                    else "<h1>{}</h1>".format(
+                        NotifyMatrix.escape_html(title, whitespace=False)
                     )
                 )
 
                 # Rendered Markdown already starts on its own line. Any other
                 # body needs a break so clients that drop headings keep the
                 # title separate.
-                if title_html and (
-                    body_format != NotifyFormat.MARKDOWN or body_passthrough
-                ):
+                if title_html and body_format != NotifyFormat.MARKDOWN:
                     title_html += "<br/>"
 
                 payload.update(
                     {
                         "format": "org.matrix.custom.html",
-                        "formatted_body": f"{title_html}{body}",
+                        "formatted_body": "{}{}".format(
+                            title_html,
+                            self._matrix_html_body(
+                                body, body_format, body_passthrough
+                            ),
+                        ),
                     }
                 )
 
@@ -3077,33 +3103,32 @@ class NotifyMatrix(NotifyBase):
             ),
         }
 
-        # HTML and rendered Markdown share a formatted body. HTML titles
-        # remain trusted, while Markdown titles are escaped.
+        # HTML and rendered Markdown share a formatted body. Titles
+        # always arrive as plain text, so they are escaped.
         if body_format in (NotifyFormat.HTML, NotifyFormat.MARKDOWN):
             title_html = (
                 ""
                 if not title
-                else (
-                    "<h1>{}</h1>".format(title)
-                    if body_format == NotifyFormat.HTML
-                    else "<h1>{}</h1>".format(
-                        NotifyMatrix.escape_html(title, whitespace=False)
-                    )
+                else "<h1>{}</h1>".format(
+                    NotifyMatrix.escape_html(title, whitespace=False)
                 )
             )
 
             # Rendered Markdown already starts on its own line. Any other
             # body needs a break so clients that drop headings keep the
             # title separate.
-            if title_html and (
-                body_format != NotifyFormat.MARKDOWN or body_passthrough
-            ):
+            if title_html and body_format != NotifyFormat.MARKDOWN:
                 title_html += "<br/>"
 
             msg_content.update(
                 {
                     "format": "org.matrix.custom.html",
-                    "formatted_body": f"{title_html}{body}",
+                    "formatted_body": "{}{}".format(
+                        title_html,
+                        self._matrix_html_body(
+                            body, body_format, body_passthrough
+                        ),
+                    ),
                 }
             )
 

@@ -270,6 +270,9 @@ class NotifyGoogleChat(NotifyBase):
                 elif nxt == ">":
                     # ">" closes a Chat anchor; escape it symmetrically.
                     out.append("&gt;")
+                elif nxt == "&":
+                    # An escaped ampersand is still escaped for Chat.
+                    out.append("&amp;")
                 elif nxt in ("*", "_", "~", "`"):
                     # Preserve escapes for Chat formatting characters.
                     out.append("\\" + nxt)

@@ -72,10 +72,12 @@
 #        - Your bot will join your channel.
 
 import contextlib
+from html import escape
 from json import dumps, loads
 from json.decoder import JSONDecodeError
 import re
 from time import time
+from typing import Any, Optional
 
 import requests
 
@@ -396,12 +398,27 @@ class NotifySlack(NotifyBase):
         re.IGNORECASE,
     )
 
-    def dialect_convert(self, body, body_format=None, *args, **kwargs):
-        """Translate declared CommonMark to Slack ``mrkdwn``."""
+    def dialect_convert(
+        self,
+        body: str,
+        body_format: Optional[NotifyFormat] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> str:
+        """Adapt a declared body to Slack's own text rules.
+
+        - Markdown becomes Slack ``mrkdwn``.
+        - Plain text escapes ``&``, ``<`` and ``>`` so they stay literal.
+        """
+        if body_format == NotifyFormat.TEXT:
+            # Slack uses these characters for links and mentions. See:
+            # https://docs.slack.dev/messaging/formatting-message-text
+            return escape(body, quote=False)
+
         if body_format != NotifyFormat.MARKDOWN:
-            # Slack's other declared format (TEXT) needs no dialect
-            # completion of its own -- only Markdown does.
+            # Nothing else needs a Slack specific conversion
             return body
+
         return self._commonmark_to_slack(body)
 
     @classmethod
@@ -1019,7 +1036,9 @@ class NotifySlack(NotifyBase):
                             "type": "header",
                             "text": {
                                 "type": "plain_text",
-                                "text": title,
+                                # Escape Slack control characters so the
+                                # plain-text title stays literal.
+                                "text": escape(title, quote=False),
                                 "emoji": True,
                             },
                         },
@@ -1188,13 +1207,16 @@ class NotifySlack(NotifyBase):
             message_key = ("message", channel)
 
             if self.is_delivered(message_key):
-                # Never repost a visible message. Without retained API state,
-                # an unfinished attachment remains a failure.
-                if track_attachments and not all(
-                    self.is_delivered(("attachment", no, message_key))
-                    for no, _ in enumerate(attach, start=1)
-                ):
+                # Keep the visible message and retry missing attachments.
+                channel_id = self.recall(message_key)
+                if channel_id:
+                    attach_channel_list.append((message_key, channel_id))
+
+                elif track_attachments:
+                    # The channel was never identified, so attachments
+                    # have nowhere to go.
                     has_error = True
+
                 continue
 
             if channel is not None:
@@ -1269,6 +1291,9 @@ class NotifySlack(NotifyBase):
             channel_id = response.get("channel")
             if channel_id:
                 attach_channel_list.append((message_key, channel_id))
+
+                # A retry needs this ID to finish a failed attachment
+                self.remember(message_key, channel_id)
 
             # The message is visible now, even if a later upload fails
             self.mark_delivered(message_key)

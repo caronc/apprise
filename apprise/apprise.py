@@ -1431,25 +1431,11 @@ class Apprise:
 
                 if key not in conversion_title_map:
                     # Prepare our title
-                    conversion_title_map[key] = (
-                        capped_title if capped_title else ""
-                    )
+                    source_title = capped_title if capped_title else ""
+                    source_body = capped_body
 
-                    # Conversion of title only occurs for services
-                    # where the title is blended with the body
-                    # (title_maxlen <= 0)
-                    if conversion_title_map[key] and service.title_maxlen <= 0:
-                        conversion_title_map[key] = convert_between(
-                            body_format,
-                            target_format,
-                            content=conversion_title_map[key],
-                        )
-
-                    # Our body is always converted no matter what
-                    conversion_body_map[key] = convert_between(
-                        body_format, target_format, content=capped_body
-                    )
-
+                    # Apply escapes and emojis before format conversion so
+                    # their source markers are still recognizable.
                     if interpret_escapes:
                         #
                         # Escape our content
@@ -1459,17 +1445,13 @@ class Apprise:
                             # Added overhead required due to Python 3
                             # Encoding Bug identified here:
                             # https://bugs.python.org/issue21331
-                            conversion_body_map[key] = (
-                                conversion_body_map[key]
-                                .encode("ascii", "backslashreplace")
-                                .decode("unicode-escape")
-                            )
+                            source_body = source_body.encode(
+                                "ascii", "backslashreplace"
+                            ).decode("unicode-escape")
 
-                            conversion_title_map[key] = (
-                                conversion_title_map[key]
-                                .encode("ascii", "backslashreplace")
-                                .decode("unicode-escape")
-                            )
+                            source_title = source_title.encode(
+                                "ascii", "backslashreplace"
+                            ).decode("unicode-escape")
 
                         except AttributeError:
                             # Must be of string type
@@ -1482,12 +1464,26 @@ class Apprise:
                         # Convert our :emoji: definitions
                         #
 
-                        conversion_body_map[key] = apply_emojis(
-                            conversion_body_map[key]
+                        source_body = apply_emojis(source_body)
+                        source_title = apply_emojis(source_title)
+
+                    # Conversion of title only occurs for services
+                    # where the title is blended with the body
+                    # (title_maxlen <= 0)
+                    conversion_title_map[key] = (
+                        convert_between(
+                            body_format,
+                            target_format,
+                            content=source_title,
                         )
-                        conversion_title_map[key] = apply_emojis(
-                            conversion_title_map[key]
-                        )
+                        if source_title and service.title_maxlen <= 0
+                        else source_title
+                    )
+
+                    # Our body is always converted no matter what
+                    conversion_body_map[key] = convert_between(
+                        body_format, target_format, content=source_body
+                    )
 
             except AppriseImproperlyConfigured:
                 # Bad input from the caller is not this service's

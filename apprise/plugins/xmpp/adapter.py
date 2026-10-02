@@ -42,7 +42,7 @@ from typing import Any, Callable, Optional
 
 import certifi
 
-from ...compat import dataclass_compat as dataclass
+from ...compat.py39 import dataclass_compat as dataclass
 from ...exception import AppriseException, AppriseImproperlyConfigured
 from .common import SECURE_MODES, SecureXMPPMode
 

@@ -4218,3 +4218,153 @@ def test_notify_emoji_general(mock_request):
     assert dataset["message"] == body
 
     mock_request.reset_mock()
+
+
+def _format_recorder(fmt, title_maxlen=250, body_maxlen=2000, **kwargs):
+    """Build a plugin of format ``fmt`` that records every send()."""
+
+    class RecordingNotification(NotifyBase):
+        notify_format = fmt
+
+        def __init__(self, **kw):
+            super().__init__(**kw)
+            self.sent = []
+
+        def url(self, *args, **kw):
+            return "recorder://"
+
+        def send(self, body, title="", notify_type=None, **kw):
+            self.sent.append(
+                {
+                    "title": title,
+                    "body": body,
+                    "body_format": kw.get("body_format"),
+                }
+            )
+            return True
+
+    RecordingNotification.title_maxlen = title_maxlen
+    RecordingNotification.body_maxlen = body_maxlen
+    return RecordingNotification(**kwargs)
+
+
+def test_emojis_and_escapes_apply_before_format_conversion():
+    """Emoji shortcodes and escapes survive TEXT -> MARKDOWN escaping."""
+
+    md = _format_recorder(NotifyFormat.MARKDOWN, emojis=True)
+    md_notitle = _format_recorder(
+        NotifyFormat.MARKDOWN, title_maxlen=0, emojis=True
+    )
+    html = _format_recorder(NotifyFormat.HTML, emojis=True)
+
+    ap_obj = Apprise()
+    ap_obj.add(md)
+    ap_obj.add(md_notitle)
+    ap_obj.add(html)
+
+    assert ap_obj.notify(
+        title="Hi :+1:",
+        body="ok :+1: :white_check_mark: a\\nb. AT&T",
+        body_format=NotifyFormat.TEXT,
+        interpret_escapes=True,
+    )
+
+    # Emojis and a real newline arrive; remaining punctuation is escaped.
+    assert md.sent[0]["title"] == "Hi \U0001f44d"
+    assert md.sent[0]["body"] == "ok \U0001f44d ✅ a\nb\\. AT&T"
+
+    # A title blended into the body is converted the same way.
+    assert md_notitle.sent[0]["body"] == (
+        "# Hi \U0001f44d\nok \U0001f44d ✅ a\nb\\. AT&T"
+    )
+
+    # HTML targets now see the real newline and turn it into a break.
+    assert html.sent[0]["body"] == (
+        "ok&nbsp;\U0001f44d&nbsp;✅&nbsp;a<br/>b.&nbsp;AT&amp;T"
+    )
+
+
+def test_markdown_overflow_keeps_escape_with_its_character():
+    """Split and truncate never strand an escaping backslash."""
+
+    body = "x" * 19 + ">quoted"
+
+    # SPLIT moves the backslash into the next chunk with its character.
+    obj = _format_recorder(
+        NotifyFormat.MARKDOWN, body_maxlen=20, overflow=OverflowMode.SPLIT
+    )
+    ap_obj = Apprise()
+    ap_obj.add(obj)
+    assert ap_obj.notify(body=body, body_format=NotifyFormat.TEXT)
+    assert [s["body"] for s in obj.sent] == ["x" * 19, "\\>quoted"]
+
+    # TRUNCATE drops the backslash that lost its character.
+    obj = _format_recorder(
+        NotifyFormat.MARKDOWN, body_maxlen=20, overflow=OverflowMode.TRUNCATE
+    )
+    ap_obj = Apprise()
+    ap_obj.add(obj)
+    assert ap_obj.notify(body=body, body_format=NotifyFormat.TEXT)
+    assert [s["body"] for s in obj.sent] == ["x" * 19]
+
+    # A complete escaped backslash pair is kept when truncating.
+    ap_obj.notify(body="x" * 18 + "\\" + "y" * 5, body_format="text")
+    assert obj.sent[-1]["body"] == "x" * 18 + "\\\\"
+
+
+def test_direct_notify_converts_declared_source_format():
+    """A direct plugin call converts its declared source format."""
+
+    # The title field is separate, so only the body is converted.
+    obj = _format_recorder(NotifyFormat.HTML)
+    assert obj.notify(
+        body="x < y", title="A & B", body_format=NotifyFormat.TEXT
+    )
+    assert obj.sent[-1]["title"] == "A & B"
+    assert obj.sent[-1]["body"] == "x&nbsp;&lt;&nbsp;y"
+    assert obj.sent[-1]["body_format"] == NotifyFormat.HTML
+
+    # A plain string works too, and a blended title is converted as well.
+    obj = _format_recorder(NotifyFormat.MARKDOWN, title_maxlen=0)
+    assert obj.notify(body="a*b", title="1. Go", body_format="text")
+    assert obj.sent[-1]["body"] == "# 1\\. Go\na\\*b"
+
+    # Without a declared source format nothing is converted.
+    obj = _format_recorder(NotifyFormat.HTML)
+    assert obj.notify(body="x < y")
+    assert obj.sent[-1]["body"] == "x < y"
+
+    # The payload cap is applied to the source before conversion.
+    obj = _format_recorder(
+        NotifyFormat.HTML, asset=AppriseAsset(payload_max_size=5)
+    )
+    assert obj.notify(body="<<<<<<<<<<", body_format=NotifyFormat.TEXT)
+    assert obj.sent[-1]["body"] == "&lt;" * 5
+
+
+def test_direct_notify_accepts_plain_string_format():
+    """send() dispatch accepts a string, NotifyFormat, or None format."""
+
+    obj = _format_recorder(NotifyFormat.HTML)
+
+    # A plain string with passthrough disabled reaches send() untouched.
+    assert (
+        obj.notify(body="<b>x</b>", body_format="html", body_passthrough=False)
+        is True
+    )
+    assert obj.sent[-1]["body"] == "<b>x</b>"
+
+    # A plugin's result is returned as-is.
+    obj.send = mock.Mock(return_value=False)
+    assert (
+        obj.notify(body="x", body_format="html", body_passthrough=False)
+        is False
+    )
+
+    # A format-specific sender is found from a plain string.
+    obj.send_html = mock.Mock(return_value=True)
+    assert obj.notify(body="x", body_format="html", body_passthrough=False)
+    assert obj.send_html.call_count == 1
+
+    # No format at all falls back to send().
+    assert obj._timed_send(body="x", title="", body_format=None) is False

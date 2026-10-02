@@ -25,6 +25,8 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from json import loads
+
 # Disable logging for a cleaner testing output
 import logging
 import os
@@ -34,6 +36,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise import Apprise, NotifyFormat
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.guilded import NotifyGuilded
 
@@ -235,3 +238,23 @@ def test_plugin_guilded_general(mock_post):
 
     # Test that we get a string response
     assert isinstance(obj.url(), str)
+
+
+@mock.patch("requests.post")
+def test_plugin_guilded_markdown_content(mock_post):
+    """Markdown input uses embeds only when markdown was requested."""
+
+    mock_post.return_value = mock.Mock(
+        status_code=requests.codes.ok, content=b"", headers={}
+    )
+
+    body = "## Summary\nAll **good**"
+    for extra, embeds in (("", False), ("?format=markdown", True)):
+        mock_post.reset_mock()
+        aobj = Apprise()
+        aobj.add(f"guilded://{'i' * 24}/{'t' * 64}/{extra}")
+        assert aobj.notify(body=body, body_format=NotifyFormat.MARKDOWN)
+
+        payload = loads(mock_post.call_args_list[0][1]["data"])
+        assert ("embeds" in payload) is embeds
+        assert ("content" in payload) is not embeds

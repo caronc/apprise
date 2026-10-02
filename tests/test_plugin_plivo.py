@@ -26,10 +26,14 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+from json import loads
 import logging
+from unittest import mock
 
 from helpers import AppriseURLTester
+import requests
 
+from apprise import Apprise
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.plivo import NotifyPlivo
 
@@ -153,3 +157,89 @@ def test_plugin_plivo_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch("requests.post")
+def test_plugin_plivo_dst_single(mock_post):
+    """Plivo sends one message per recipient in dst."""
+
+    # Plivo answers a queued message with 202 Accepted
+    response = mock.Mock()
+    response.status_code = requests.codes.accepted
+    response.content = b"{}"
+    mock_post.return_value = response
+
+    aobj = Apprise()
+    assert aobj.add(
+        "plivo://{}@{}/15551230000/15551231111/15551232222".format(
+            "a" * 25, "b" * 40
+        )
+    )
+    assert aobj.notify(body="body", title="title")
+
+    # One post per recipient
+    assert mock_post.call_count == 2
+    first = loads(mock_post.call_args_list[0][1]["data"])
+    second = loads(mock_post.call_args_list[1][1]["data"])
+    assert first["src"] == "+15551230000"
+    assert first["dst"] == "+15551231111"
+    assert second["dst"] == "+15551232222"
+
+    # No undocumented keys are sent
+    assert "recipients" not in first
+
+
+@mock.patch("requests.post")
+def test_plugin_plivo_dst_batch(mock_post):
+    """Plivo batches recipients into dst separated by <."""
+
+    # Plivo also documents 201 Created as a success
+    response = mock.Mock()
+    response.status_code = requests.codes.created
+    response.content = b"{}"
+    mock_post.return_value = response
+
+    aobj = Apprise()
+    assert aobj.add(
+        "plivo://{}@{}/15551230000/15551231111/15551232222?batch=yes".format(
+            "a" * 25, "b" * 40
+        )
+    )
+    assert aobj.notify(body="body", title="title")
+
+    # A single post carries every recipient
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["dst"] == "+15551231111<+15551232222"
+    assert "recipients" not in payload
+
+
+@mock.patch("requests.post")
+def test_plugin_plivo_retry_skips_delivered(mock_post):
+    """A Plivo retry only re-sends to the recipient that failed."""
+
+    good = mock.Mock()
+    good.status_code = requests.codes.accepted
+    good.content = b"{}"
+
+    bad = mock.Mock()
+    bad.status_code = requests.codes.internal_server_error
+    bad.content = b"{}"
+
+    def respond(url, data=None, **kwargs):
+        # Only the second recipient is refused
+        return bad if loads(data)["dst"] == "+15551232222" else good
+
+    mock_post.side_effect = respond
+
+    aobj = Apprise()
+    assert aobj.add(
+        "plivo://{}@{}/15551230000/15551231111/15551232222"
+        "?retry=1&wait=0".format("a" * 25, "b" * 40)
+    )
+    assert not aobj.notify(body="body")
+
+    # The healthy recipient is contacted exactly once
+    dsts = [loads(c[1]["data"])["dst"] for c in mock_post.call_args_list]
+    assert dsts.count("+15551231111") == 1
+    assert dsts.count("+15551232222") == 2

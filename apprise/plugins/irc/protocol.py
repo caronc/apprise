@@ -49,7 +49,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ...compat import dataclass_compat as dataclass
+from ...compat.py39 import dataclass_compat as dataclass
 
 
 class IRCAuthMode:

@@ -40,6 +40,7 @@ from apprise.conversion import (
     LIST_DEPTH_MAX,
     MAX_FRAME_DEPTH,
     HTMLMarkdownConverter,
+    HTMLTagReducer,
     commonmark as commonmark_module,
     commonmark_can_close_emphasis,
     commonmark_can_open_emphasis,
@@ -59,6 +60,7 @@ from apprise.conversion import (
     commonmark_scan_delimiter_run,
     commonmark_scan_paren_dest,
     commonmark_scan_repair_region,
+    commonmark_sections,
     convert_between,
     html_to_markdown,
     markdown_to_html,
@@ -66,7 +68,9 @@ from apprise.conversion import (
     truncate_dialect_chunk,
 )
 from apprise.plugins.google_chat import NotifyGoogleChat
+from apprise.plugins.pushover import PushoverHTMLReducer
 from apprise.plugins.slack import NotifySlack
+from apprise.plugins.telegram import TelegramHTMLReducer
 
 logging.disable(logging.CRITICAL)
 
@@ -1774,9 +1778,16 @@ def test_conversion_headings_type7_regex_performance():
     times = []
     for spaces in (1600, 6400):
         body = "<x " + (" " * spaces) + "<\n# real"
-        start = default_timer()
-        commonmark_headings_to_bold(body)
-        times.append(default_timer() - start)
+
+        # Keep the fastest of 3 runs so a pause on a busy test runner
+        # cannot look like slow code.
+        best = None
+        for _ in range(3):
+            start = default_timer()
+            commonmark_headings_to_bold(body)
+            elapsed = default_timer() - start
+            best = elapsed if best is None else min(best, elapsed)
+        times.append(best)
 
     # A 4x input must stay well below the roughly 16x cost of quadratic work.
     assert times[1] < times[0] * 8 + 0.2
@@ -2817,7 +2828,20 @@ def test_conversion_text_to_markdown():
 
     # Every Markdown-significant punctuation character gets escaped.
     response = to_markdown("_*[]()~`>#+=|{}.!-")
-    assert response == "\\_\\*\\[\\]\\(\\)\\~\\`\\>\\#\\+\\=\\|\\{\\}\\.\\!\\-"
+    assert response == (
+        "\\_\\*\\[\\]\\(\\)\\~\\`\\>\\#\\+\\=\\|\\{\\}\\.\\!\\-"
+    )
+
+    # An ampersand is only escaped when the text looks like an HTML
+    # entity, so a CommonMark renderer does not turn it into one.
+    response = to_markdown("AT&amp;T &copy; &#169; a & b")
+    assert response == "AT\\&amp;T \\&copy; \\&\\#169; a & b"
+
+    # Escapes Python-Markdown does not know by default still render
+    # without their backslash.
+    response = to_markdown("Tom & Jerry ~x~ a=b")
+    assert response == "Tom & Jerry \\~x\\~ a\\=b"
+    assert markdown_to_html(response) == "<p>Tom &amp; Jerry ~x~ a=b</p>"
 
     # Plain text has no escape state, so a literal backslash is escaped.
     response = to_markdown("already \\* escaped")
@@ -3878,19 +3902,38 @@ def test_conversion_commonmark_pick_emphasis_sentinel():
     """conversion: Test commonmark_pick_emphasis_sentinel()"""
 
     # An ordinary body with no Private Use Area characters at all
-    # picks a single one, the narrowest candidate available.
+    # picks the first one.
     assert commonmark_pick_emphasis_sentinel("hello world") == chr(0xE000)
 
-    # Existing candidates make the sentinel double until it is unique.
-    assert commonmark_pick_emphasis_sentinel(chr(0xE000)) == chr(0xE000) * 2
-    assert commonmark_pick_emphasis_sentinel(chr(0xE000) * 3) == (
-        chr(0xE000) * 4
+    # A character already in the message is skipped for the next one, so
+    # the sentinel stays a single character even after a long run.
+    assert commonmark_pick_emphasis_sentinel(chr(0xE000)) == chr(0xE001)
+    assert commonmark_pick_emphasis_sentinel(chr(0xE000) * 100000) == (
+        chr(0xE001)
     )
 
-    # Doubling also handles long collision runs efficiently.
-    picked = commonmark_pick_emphasis_sentinel(chr(0xE000) * 100000)
-    assert picked not in chr(0xE000) * 100000
-    assert len(picked) == 131072
+    # Once the first area is used up, the next Private Use area is tried
+    bmp = "".join(chr(c) for c in range(0xE000, 0xF900))
+    assert commonmark_pick_emphasis_sentinel(bmp) == chr(0xF0000)
+
+    # With every Private Use character taken, an unused pair of two
+    # different ones is used, however long a run of one of them is
+    every = bmp + "".join(
+        chr(c)
+        for start, end in ((0xF0000, 0xFFFFD), (0x100000, 0x10FFFD))
+        for c in range(start, end + 1)
+    )
+    body = every + chr(0xE000) * 100000
+    picked = commonmark_pick_emphasis_sentinel(body)
+    assert picked == chr(0xE000) + chr(0xE002)
+    assert picked not in body
+
+    # When every character already follows the first one, the next first
+    # character is tried
+    body = every + "".join(chr(0xE000) + char for char in every[1:])
+    picked = commonmark_pick_emphasis_sentinel(body)
+    assert picked == chr(0xE001) + chr(0xE003)
+    assert picked not in body
 
     # Sentinel selection remains deterministic for the same input.
     assert commonmark_pick_emphasis_sentinel(
@@ -4087,3 +4130,430 @@ def test_conversion_commonmark_render_emphasis_events():
     assert commonmark_render_emphasis_events(
         [("close", True), ("close", False)], strong, regular
     ) == ("</b></i>", "")
+
+
+def test_conversion_html_keeps_trailing_bare_ampersand_text():
+    """HTML ending in a bare "&word" keeps all of its text."""
+
+    for body in ("q&a", "x&y=1&z=2"):
+        assert convert_between(NotifyFormat.HTML, NotifyFormat.TEXT, body) == (
+            body
+        )
+        assert (
+            convert_between(NotifyFormat.HTML, NotifyFormat.MARKDOWN, body)
+            == body
+        )
+
+    # Held-back text lands inside a tag that is still open at the end.
+    assert html_to_markdown("<b>q&a") == "**q&a**"
+
+
+def test_split_dialect_chunk_never_cuts_inside_html_tag():
+    """HTML dialect splitting keeps every tag and entity whole."""
+
+    def identity(body):
+        return body
+
+    body = "x" * 15 + ' <a href="u" title="t t">link</a> &amp; tail'
+    pieces = split_dialect_chunk(
+        body, 20, identity, body_format=NotifyFormat.HTML
+    )
+
+    # The 24 character tag cannot fit, so it becomes its own piece.
+    assert pieces == [
+        "x" * 15 + " ",
+        '<a href="u" title="t t">',
+        "link</a> &amp; tail",
+    ]
+
+    # No piece ends or starts inside a tag or an entity.
+    for piece in pieces:
+        assert piece.count("<") == piece.count(">")
+        assert piece.count("&") == piece.count(";")
+
+    # CommonMark repair is not applied to HTML (no stray escapes).
+    assert "\\" not in "".join(pieces)
+
+    # A tag longer than the limit still makes progress.
+    body = '<a href="' + "u" * 30 + '">x</a>'
+    pieces = split_dialect_chunk(
+        body, 10, identity, body_format=NotifyFormat.HTML
+    )
+    assert "".join(pieces) == body
+    assert pieces[0] == '<a href="' + "u" * 30 + '">'
+
+    # Converting to fewer characters than the limit returns a single piece.
+    assert split_dialect_chunk(
+        "<b>a</b>", 10, identity, body_format=NotifyFormat.HTML
+    ) == ["<b>a</b>"]
+
+    # A bare "&" that is not an entity may be split anywhere.
+    pieces = split_dialect_chunk(
+        "a & b c d e f g h", 6, identity, body_format=NotifyFormat.HTML
+    )
+    assert "".join(pieces) == "a & b c d e f g h"
+
+    # Pieces that convert to nothing are skipped after the first one.
+    def drop_tags(body):
+        return "" if body.startswith("<") else body
+
+    pieces = split_dialect_chunk(
+        "abcdef<i>", 3, drop_tags, body_format=NotifyFormat.HTML
+    )
+    assert pieces == ["abc", "def"]
+
+    # Truncation keeps the longest prefix without a partial tag.
+    body = "x" * 15 + '<a href="u">link</a>'
+    assert (
+        truncate_dialect_chunk(
+            body, 20, identity, body_format=NotifyFormat.HTML
+        )
+        == "x" * 15
+    )
+
+
+def test_conversion_markdown_to_html_extensions():
+    """Callers can replace the default Python-Markdown extensions."""
+
+    # The defaults turn a single newline into a line break
+    assert markdown_to_html("a\nb") == "<p>a<br />\nb</p>"
+
+    # No extensions keeps plain Python-Markdown line handling
+    assert markdown_to_html("a\nb", extensions=()) == "<p>a\nb</p>"
+
+    # Every CommonMark escape still loses its backslash
+    assert markdown_to_html("a \\& b", extensions=()) == "<p>a &amp; b</p>"
+
+
+def test_conversion_html_tag_reducer():
+    """HTMLTagReducer keeps only the generic structure it knows."""
+
+    # The defaults keep headings, lists, tables and alt text, hide
+    # scripts and drop every other tag.  A line break written inside
+    # text is kept.
+    expected = "<b>Head</b>\n- one\n- two\n  1. x\na | b\nA &amp; Bkept?\nend"
+    assert (
+        HTMLTagReducer().reduce(
+            "<h2>Head</h2><ul><li>one</li><li>two<ol><li>x</li></ol></li>"
+            "</ul><table><tr><th>a</th><th>b</th></tr></table>"
+            "<script>hidden()</script><img alt='A &amp; B'/><b>kept?</b>"
+            "\n  end<br>"
+        )
+        == expected
+    )
+
+    class Reducer(HTMLTagReducer):
+        INLINE_MAP = {"strong": "b"}
+        LINE_BREAK = "<br>"
+        TEXT_MAP = str.maketrans({"\xa0": " "})
+
+    # Mapped tags are renamed, stray closing tags are ignored, text
+    # characters are swapped and open tags are closed at the end
+    assert (
+        Reducer().reduce(
+            "<strong>x\xa0y</strong></em><ul><li>i</li></ul><strong>open"
+        )
+        == "<b>x y</b><br>- i<br><b>open</b>"
+    )
+
+
+@pytest.mark.parametrize(
+    "reducer", (HTMLTagReducer, TelegramHTMLReducer, PushoverHTMLReducer)
+)
+def test_conversion_html_tag_reducer_reuse(reducer):
+    """One reducer gives the same results as a fresh one per call."""
+
+    first = "<b>open <i>never <pre>closed\n<ul><li>x"
+    second = "<p>second</p><b>two</b>"
+
+    # Leftover output and open tags must not leak into the next call
+    shared = reducer()
+    assert shared.reduce(first) == reducer().reduce(first)
+    assert shared.reduce(second) == reducer().reduce(second)
+    assert shared.reduce(first) == reducer().reduce(first)
+
+
+def test_conversion_html_tag_reducer_long_space_run_is_fast():
+    """A long run of spaces with no line break is kept quickly."""
+
+    start = default_timer()
+    result = HTMLTagReducer().reduce("<p>a" + " \t" * 50000 + "b")
+    elapsed = default_timer() - start
+    assert result == "a" + " \t" * 50000 + "b"
+    assert elapsed < 5.0
+
+
+def test_conversion_html_tag_reducer_list_indent_is_capped():
+    """List indentation stops growing past LIST_DEPTH_MAX levels."""
+
+    # Nesting up to the cap keeps its full indentation
+    body = "".join(f"<ul><li>{n}" for n in range(1, LIST_DEPTH_MAX + 3))
+    lines = HTMLTagReducer().reduce(body).split("\n")
+    assert lines[:LIST_DEPTH_MAX] == [
+        "  " * n + f"- {n + 1}" for n in range(LIST_DEPTH_MAX)
+    ]
+
+    # Deeper levels reuse the deepest indentation
+    indent = "  " * (LIST_DEPTH_MAX - 1)
+    assert lines[LIST_DEPTH_MAX:] == [
+        f"{indent}- {LIST_DEPTH_MAX + 1}",
+        f"{indent}- {LIST_DEPTH_MAX + 2}",
+    ]
+
+    # Absurd nesting no longer makes the output grow out of control
+    start = default_timer()
+    result = HTMLTagReducer().reduce("<ul>" * 12500 + "<li>" * 12500)
+    elapsed = default_timer() - start
+    assert len(result) < 12500 * 16
+    assert elapsed < 5.0
+
+
+def test_conversion_headings_to_bold_long_space_run_is_fast():
+    """A heading holding a long run of spaces is converted quickly."""
+
+    start = default_timer()
+    result = commonmark_headings_to_bold("# a" + " " * 100000 + "b")
+    elapsed = default_timer() - start
+    assert result == "**a" + " " * 100000 + "b**"
+    assert elapsed < 5.0
+
+    # A closing "#" run is still removed after a long run of spaces
+    assert commonmark_headings_to_bold("# a" + " " * 1000 + "#") == "**a**"
+
+
+def test_split_dialect_chunk_long_html_is_fast():
+    """Splitting a long HTML body only converts text near each cut."""
+
+    def expand(body):
+        return body.replace("&", "&amp;")
+
+    start = default_timer()
+    pieces = split_dialect_chunk(
+        "&" * 200000, 100, expand, body_format=NotifyFormat.HTML
+    )
+    elapsed = default_timer() - start
+    assert "".join(pieces) == "&amp;" * 200000
+    assert all(len(piece) <= 100 for piece in pieces)
+    assert elapsed < 5.0
+
+    # Truncation finds the same longest fitting prefix
+    assert (
+        truncate_dialect_chunk(
+            "&" * 200000, 100, expand, body_format=NotifyFormat.HTML
+        )
+        == "&amp;" * 20
+    )
+
+
+def test_conversion_split_dialect_html_ignores_quoted_gt():
+    """HTML pieces never end inside a tag with a quoted ">"."""
+
+    def identity(body):
+        return body
+
+    for tag in ('<a title="1 > 0">', "<a title='1 > 0'>"):
+        body = "hello " + tag + "link</a> world"
+        start = body.index(tag)
+        end = start + len(tag)
+        for limit in range(1, len(body)):
+            pieces = split_dialect_chunk(
+                body, limit, identity, NotifyFormat.HTML
+            )
+            assert "".join(pieces) == body
+
+            # No piece may end inside the tag
+            pos = 0
+            for piece in pieces:
+                pos += len(piece)
+                assert not start < pos < end
+
+            piece = truncate_dialect_chunk(
+                body, limit, identity, NotifyFormat.HTML
+            )
+            assert not start < len(piece) < end
+
+    # An unclosed tag is never cut
+    body = 'ab <a title="x > y'
+    assert split_dialect_chunk(body, 4, identity, NotifyFormat.HTML) == [
+        "ab ",
+        '<a title="x > y',
+    ]
+
+
+def test_conversion_split_dialect_html_unbalanced_quotes_are_fast():
+    """Unbalanced attribute quotes keep HTML splitting linear."""
+
+    def identity(body):
+        return body
+
+    for body in ('<a title="' * 20000, "<a title='" * 20000):
+        start = default_timer()
+        pieces = split_dialect_chunk(body, 100, identity, NotifyFormat.HTML)
+        truncate_dialect_chunk(body, 100, identity, NotifyFormat.HTML)
+        elapsed = default_timer() - start
+        assert "".join(pieces) == body
+        assert elapsed < 5.0
+
+
+def test_conversion_commonmark_sections():
+    """commonmark_sections() splits markdown into named sections."""
+
+    # Nothing to split
+    assert commonmark_sections("", 10, 10) == ("", [])
+
+    # Intro text, a cut heading, an empty heading and a long section
+    desc, sections = commonmark_sections(
+        "intro\n# Heading Name\nshort\n## Empty\n# Long\n" + "word " * 10,
+        7,
+        20,
+    )
+    assert desc == "intro"
+    assert sections[:3] == [
+        ("Heading", "short"),
+        ("Empty", ""),
+        ("Long", "word word word word "),
+    ]
+
+    # The long section continues under the same name
+    assert all(name == "Long" for name, _ in sections[2:])
+    assert (
+        "".join(value for _, value in sections[2:]) == ("word " * 10).strip()
+    )
+
+
+def test_conversion_commonmark_sections_quirks():
+    """commonmark_sections() keeps its long-standing parsing rules."""
+
+    # A lone "#" is skipped, so a later "#" mid-line opens a heading
+    assert commonmark_sections("#\nfoo # bar", 10, 10) == (
+        "",
+        [("bar", "")],
+    )
+
+    # A heading made only of "#" keeps an empty name
+    assert commonmark_sections("##\nvalue", 10, 10) == ("", [("", "value")])
+
+    # Section text needs at least two characters
+    assert commonmark_sections("# H\nx", 10, 10) == ("", [("H", "")])
+
+    # A "#" mid-line does not end the intro; CRLF and tabs are handled
+    assert commonmark_sections("a #b\n\n# c\r\nd e f\n", 10, 10) == (
+        "a #b",
+        [("c", "d e f")],
+    )
+    assert commonmark_sections("\t\v# H\r\nval  ", 10, 10) == (
+        "",
+        [("H", "val")],
+    )
+
+
+def test_conversion_commonmark_sections_is_fast():
+    """Newline-heavy input keeps commonmark_sections() linear."""
+
+    start = default_timer()
+    assert commonmark_sections("\n" * 200000, 10, 10) == ("", [])
+    elapsed = default_timer() - start
+    assert elapsed < 5.0
+
+    # Headings, values and long blank runs mixed together
+    body = "x\n" + "\n" * 100000 + ("# h\n" + "\n" * 50 + "vv\n") * 2000
+    start = default_timer()
+    desc, sections = commonmark_sections(body, 10, 10)
+    elapsed = default_timer() - start
+    assert desc == "x"
+    assert sections == [("h", "vv")] * 2000
+    assert elapsed < 5.0
+
+
+def test_split_dialect_text_not_repaired():
+    """Plain text is cut as it is, without CommonMark repair."""
+
+    def convert(body):
+        # Escaping that makes the text longer forces another split
+        return body.replace("&", "&amp;")
+
+    body = "aaaaaaaa*bbbb_cc" + "&" * 40
+    pieces = split_dialect_chunk(body, 30, convert, NotifyFormat.TEXT)
+    assert len(pieces) > 1
+    assert all(len(piece) <= 30 for piece in pieces)
+
+    # Every character arrives exactly once, with no added backslashes
+    assert "".join(pieces) == convert(body)
+
+    # Truncation keeps the text as it was too
+    assert truncate_dialect_chunk(body, 30, convert, NotifyFormat.TEXT) == (
+        "aaaaaaaa*bbbb_cc&amp;&amp;"
+    )
+
+    # Markdown is still repaired around the cut
+    assert split_dialect_chunk(body, 30, convert, NotifyFormat.MARKDOWN)[
+        0
+    ].startswith("aaaaaaaa\\*")
+
+
+def test_split_dialect_html_long_entity():
+    """The longest HTML5 named entity is never split."""
+
+    entity = "&CounterClockwiseContourIntegral;"
+    body = "a b " + entity + " c d"
+
+    def convert(text):
+        # Raw ">" text grows once escaped, forcing extra cuts
+        return text.replace(" ", "&gt;")
+
+    for limit in range(2, len(body) * 5):
+        pieces = split_dialect_chunk(body, limit, convert, NotifyFormat.HTML)
+
+        # The entity always arrives whole in a single piece
+        assert any(entity in piece for piece in pieces)
+        assert "".join(pieces) == convert(body)
+
+        # Truncation never ends partway through the entity
+        piece = truncate_dialect_chunk(body, limit, convert, NotifyFormat.HTML)
+        assert entity in piece or "&C" not in piece
+
+
+def test_conversion_html_tag_reducer_line_breaks():
+    """Line breaks written inside text survive; layout whitespace does not."""
+
+    reducer = HTMLTagReducer()
+
+    # A break inside text is kept, with "\r\n" counting once
+    assert reducer.reduce("one\ntwo\r\nthree\n\nfour") == (
+        "one\ntwo\nthree\n\nfour"
+    )
+
+    # A break right after a tag that already ended the line is not doubled
+    assert reducer.reduce("<h2>one</h2>\ntwo") == "<b>one</b>\ntwo"
+
+    # Whitespace that only lays out the HTML source adds no breaks
+    assert "\n" not in reducer.reduce(
+        "<table>\n<tr>\n<td>a</td>\n<td>b</td>\n</tr>\n</table>"
+    )
+
+
+def test_conversion_sentinel_exhausted_partners_is_fast():
+    """Many used-up first characters still pick a sentinel quickly."""
+    every = "".join(
+        chr(c)
+        for start, end in (
+            (0xE000, 0xF8FF),
+            (0xF0000, 0xFFFFD),
+            (0x100000, 0x10FFFD),
+        )
+        for c in range(start, end + 1)
+    )
+
+    # The first 10 characters are each followed by every other one
+    body = every + "".join(
+        every[i] + char
+        for i in range(10)
+        for char in every
+        if char != every[i]
+    )
+
+    start = default_timer()
+    picked = commonmark_pick_emphasis_sentinel(body)
+    assert default_timer() - start < 5.0
+    assert picked == chr(0xE00A) + chr(0xE00C)
+    assert picked not in body

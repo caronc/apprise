@@ -470,3 +470,57 @@ def test_plugin_rocket_chat_html_to_markdown_format(mock_post):
     # The body must arrive as Markdown, not as stripped plain text
     payload = loads(mock_post.call_args_list[0][1]["data"])
     assert payload["text"] == "**hello** *world*"
+
+
+@mock.patch("apprise.plugins.base.time.sleep")
+@mock.patch("requests.post")
+def test_plugin_rocket_chat_retry(mock_post, mock_sleep):
+    """A retry only re-posts to the targets that failed."""
+
+    good = mock.Mock()
+    good.status_code = requests.codes.ok
+    good.content = b"{}"
+
+    bad = mock.Mock()
+    bad.status_code = requests.codes.internal_server_error
+    bad.content = b"{}"
+
+    # #ops fails on every attempt; every other target accepts
+    mock_post.side_effect = lambda *args, **kwargs: (
+        bad if loads(kwargs["data"]).get("channel") == "#ops" else good
+    )
+
+    def _sent() -> list:
+        """Return the target of every post made."""
+        return [
+            loads(call[1]["data"]).get(
+                "channel", loads(call[1]["data"]).get("roomId")
+            )
+            for call in mock_post.call_args_list
+        ]
+
+    # Webhook mode
+    aobj = apprise.Apprise()
+    assert aobj.add(
+        "rockets://web/token@localhost/@alice/%23ops"
+        "?mode=webhook&retry=2&wait=0"
+    )
+    assert bool(aobj.notify(body="body")) is False
+
+    # @alice was notified once; #ops was tried on every attempt
+    assert _sent().count("@alice") == 1
+    assert _sent().count("#ops") == 3
+
+    # Token mode posts channels and rooms separately
+    mock_post.reset_mock()
+    aobj = apprise.Apprise()
+    assert aobj.add(
+        "rockets://user:token@localhost/@alice/%23ops/roomid"
+        "?mode=token&retry=2&wait=0"
+    )
+    assert bool(aobj.notify(body="body")) is False
+
+    # Only #ops was retried
+    assert _sent().count("@alice") == 1
+    assert _sent().count("roomid") == 1
+    assert _sent().count("#ops") == 3

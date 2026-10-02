@@ -51,6 +51,7 @@ from ..common import (
 )
 from ..conversion import (
     commonmark_repair_chunk,
+    convert_between,
     split_dialect_chunk,
     truncate_dialect_chunk,
 )
@@ -899,8 +900,12 @@ class NotifyBase(URLBase):
 
         Prefer a format-specific sender when available, otherwise use send().
         """
+        # The format may arrive as a NotifyFormat, a plain string such as
+        # "html", or None when a caller skipped it entirely.
         resolved = kwargs.get("body_format")
-        fn = getattr(self, f"send_{resolved.value}", None)
+        fn = getattr(
+            self, f"send_{getattr(resolved, 'value', resolved)}", None
+        )
         send_fn = fn if callable(fn) else self.send
 
         # Track each piece of a split message separately.
@@ -1032,8 +1037,11 @@ class NotifyBase(URLBase):
 
         # Direct plugin calls bypass Apprise's per-server resolution, so
         # resolve here and remember whether a source format was declared.
+        # Keep the source format for conversion after size checks.
+        source_format = None
         if body_passthrough is None:
             body_passthrough = body_format is None
+            source_format = body_format
             body_format = self.resolve_format(body_format)
 
         if not self.enabled:
@@ -1077,6 +1085,19 @@ class NotifyBase(URLBase):
 
         # Handle situations where the title is None
         title = title if title else ""
+
+        if source_format is not None:
+            # Cap direct-call source content before converting it to the
+            # resolved format, matching Apprise.notify().
+            title, body = self._enforce_payload_cap(title, body)
+            _payload_precapped = _PAYLOAD_PRECAPPED
+
+            # Convert our body
+            body = convert_between(source_format, body_format, body)
+
+            # A title is only converted when it is blended into the body
+            if title and self.title_maxlen <= 0:
+                title = convert_between(source_format, body_format, title)
 
         # Truncate mode keeps only the first of multiple attachments.
         # Prepare it once for all calls made by this service.
@@ -1129,6 +1150,24 @@ class NotifyBase(URLBase):
                 }
                 index += 1
 
+    def _enforce_payload_cap(self, title: str, body: str) -> tuple[str, str]:
+        """Apply the asset's payload_max_size to a title and body.
+
+        Returns the (possibly trimmed) title and body, logging a warning
+        when anything was removed.
+        """
+        original_len = len(title) + len(body)
+        title, body = self.asset.enforce_payload_max_size(title, body)
+        if len(title) + len(body) < original_len:
+            self.logger.warning(
+                "%s payload trimmed to stay within the configured "
+                "payload_max_size of %d characters.",
+                self.service_name,
+                self.asset._payload_max_size,
+            )
+
+        return title, body
+
     def _attachment_send_index(self, total: int) -> int:
         """Return the flat call index that should carry an attachment.
 
@@ -1173,15 +1212,7 @@ class NotifyBase(URLBase):
         # Direct plugin calls still need the source-size cap. Only Apprise's
         # private token confirms it was already applied before conversion.
         if _payload_precapped is not _PAYLOAD_PRECAPPED:
-            original_len = len(title) + len(body)
-            title, body = self.asset.enforce_payload_max_size(title, body)
-            if len(title) + len(body) < original_len:
-                self.logger.warning(
-                    "%s payload trimmed to stay within the configured "
-                    "payload_max_size of %d characters.",
-                    self.service_name,
-                    self.asset._payload_max_size,
-                )
+            title, body = self._enforce_payload_cap(title, body)
 
         # Default overflow mode
         if overflow is None:
@@ -1276,6 +1307,12 @@ class NotifyBase(URLBase):
         if overflow == OverflowMode.TRUNCATE:
             truncated = body[:body_maxlen].lstrip("\r\n\x0b\x0c").rstrip()
             if body_format == NotifyFormat.MARKDOWN and not body_passthrough:
+                # An odd run of trailing backslashes means the last one
+                # lost the character it escaped; drop it so it does not
+                # dangle at the end of the message.
+                if (len(truncated) - len(truncated.rstrip("\\"))) % 2:
+                    truncated = truncated[:-1].rstrip()
+
                 # Repair truncated constructs before dialect conversion.
                 # Bounded discarded text can identify a possible closer.
                 lookahead_end = body_maxlen + body_maxlen * 8
@@ -1476,12 +1513,12 @@ class NotifyBase(URLBase):
 
         if overflow == OverflowMode.SPLIT:
             bodies = split_dialect_chunk(
-                chunk["body"], self.body_maxlen, convert_fn
+                chunk["body"], self.body_maxlen, convert_fn, body_format
             )
         elif overflow == OverflowMode.TRUNCATE:
             bodies = [
                 truncate_dialect_chunk(
-                    chunk["body"], self.body_maxlen, convert_fn
+                    chunk["body"], self.body_maxlen, convert_fn, body_format
                 )
             ]
         else:

@@ -35,6 +35,7 @@ from unittest import mock
 from helpers import AppriseURLTester
 import requests
 
+from apprise import Apprise, NotifyFormat
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.reddit import NotifyReddit
 
@@ -515,3 +516,50 @@ def test_plugin_reddit_general(mock_post):
     ]
     obj = NotifyReddit(**kwargs)
     assert obj.send(body="test") is False
+
+
+@mock.patch("requests.post")
+def test_plugin_reddit_link_escapes(mock_post):
+    """Link posts carry a plain URL; self posts keep their Markdown."""
+    NotifyReddit.clock_skew = timedelta(seconds=0)
+
+    response = mock.Mock()
+    response.content = dumps(
+        {
+            "access_token": "abc123",
+            "expires_in": 100000,
+            "json": {"errors": []},
+        }
+    )
+    response.status_code = requests.codes.ok
+    response.headers = {}
+    mock_post.return_value = response
+
+    url = "https://example.com/my_page?a=1&b=2"
+    for reddit_url in (
+        "reddit://user:pass@app_id/secret/apprise",
+        "reddit://user:pass@app_id/secret/apprise?kind=link",
+    ):
+        obj = Apprise.instantiate(reddit_url)
+
+        # Plain text is still detected (and sent) as an unescaped link
+        mock_post.reset_mock()
+        assert obj.notify(body=url, body_format=NotifyFormat.TEXT)
+        payload = mock_post.call_args_list[-1][1]["data"]
+        assert payload["kind"] == "link"
+        assert payload["url"] == url
+
+    # A self post keeps the escapes so the text renders literally
+    obj = Apprise.instantiate("reddit://user:pass@app_id/secret/apprise")
+    assert obj.notify(body="my_var 2*3", body_format=NotifyFormat.TEXT)
+    payload = mock_post.call_args_list[-1][1]["data"]
+    assert payload["kind"] == "self"
+    assert payload["text"] == "my\\_var 2\\*3"
+
+    # Content with no declared format is passed through untouched
+    obj = Apprise.instantiate(
+        "reddit://user:pass@app_id/secret/apprise?kind=link"
+    )
+    assert obj.notify(body="https://example.com/a\\_b")
+    payload = mock_post.call_args_list[-1][1]["data"]
+    assert payload["url"] == "https://example.com/a\\_b"

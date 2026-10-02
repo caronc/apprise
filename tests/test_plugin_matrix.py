@@ -43,6 +43,7 @@ from apprise import (
     Apprise,
     AppriseAsset,
     AppriseAttachment,
+    NotifyFormat,
     NotifyType,
     PersistentStoreMode,
 )
@@ -8156,7 +8157,7 @@ def test_plugin_matrix_html_passthrough_untouched(
 @mock.patch("requests.get")
 @mock.patch("requests.post")
 def test_plugin_matrix_markdown_title_break(mock_post, mock_get, mock_put):
-    """Only a Markdown body that was not rendered gets a title break."""
+    """Rendered Markdown needs no extra break after the title."""
     from apprise.common import NotifyFormat
 
     response_obj = {
@@ -8179,10 +8180,11 @@ def test_plugin_matrix_markdown_title_break(mock_post, mock_get, mock_put):
     )
     obj = NotifyMatrix(**kwargs)
 
-    # No body_format declared: the body is sent as-is, so it needs a break
+    # No body_format declared: ?format=markdown still renders the body into
+    # a paragraph, which already starts on its own line
     assert bool(obj.notify(title="Title", body="Body text")) is True
     payload = loads(mock_put.call_args.kwargs["data"])
-    assert payload["formatted_body"] == "<h1>Title</h1><br/>Body text"
+    assert payload["formatted_body"] == "<h1>Title</h1><p>Body text</p>"
 
     # Declared Markdown is rendered into a paragraph, which already starts
     # on its own line, so no extra blank line is added
@@ -8260,6 +8262,233 @@ def test_plugin_matrix_e2ee_html_plain_fallback(mock_post, mock_get, mock_put):
     )
     assert "<b>" not in msg_content["body"]
     assert "Bold text" in msg_content["body"]
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_passthrough_markdown(mock_post, mock_get, mock_put):
+    """Undeclared content sent with format=markdown is rendered to HTML."""
+
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    request = _Response()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    obj = Apprise.instantiate(
+        "matrix://user:passwd@hostname/#abcd?format=markdown"
+    )
+    assert obj is not None
+
+    # No body_format declared: a passthrough source.
+    assert bool(obj.notify(title="T", body="**bold** & [l](http://x)")) is True
+
+    payload = loads(mock_put.call_args.kwargs["data"])
+    assert payload["format"] == "org.matrix.custom.html"
+    assert payload["formatted_body"] == (
+        '<h1>T</h1><p><strong>bold</strong> &amp; <a href="http://x">l</a></p>'
+    )
+    # The plain fallback keeps the Markdown source.
+    assert payload["body"] == "# T\r\n**bold** & [l](http://x)"
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_escapes_html_title(mock_post, mock_get, mock_put):
+    """HTML output escapes the plain-text title."""
+    from apprise.common import NotifyFormat
+
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    request = _Response()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    obj = Apprise.instantiate(
+        "matrix://user:passwd@hostname/#abcd?format=html"
+    )
+    assert obj is not None
+
+    assert (
+        bool(
+            obj.notify(
+                title="Disk <sda1> & full",
+                body="body",
+                body_format=NotifyFormat.TEXT,
+            )
+        )
+        is True
+    )
+
+    payload = loads(mock_put.call_args.kwargs["data"])
+    assert payload["formatted_body"].startswith(
+        "<h1>Disk &lt;sda1&gt; &amp; full</h1>"
+    )
+    assert payload["body"].startswith("# Disk <sda1> & full\r\n")
+
+    # Passthrough HTML bodies stay untouched while the title is escaped.
+    assert bool(obj.notify(title="A <b>", body="<i>x</i>")) is True
+    payload = loads(mock_put.call_args.kwargs["data"])
+    assert payload["formatted_body"] == "<h1>A &lt;b&gt;</h1><br/><i>x</i>"
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_e2ee_markdown_passthrough():
+    """Encrypted sends render passthrough Markdown and escape the title."""
+    from apprise.common import NotifyFormat
+    from apprise.plugins.matrix.e2ee import (
+        MatrixMegOlmSession,
+        MatrixOlmAccount,
+    )
+
+    obj = NotifyMatrix(
+        host="h", user="u", password="pass", targets=["#r"], e2ee=True
+    )
+    obj.access_token = "tok"
+    obj.home_server = "h"
+    obj.user_id = "@u:h"
+    obj.device_id = "DEV"
+    obj._e2ee_account = MatrixOlmAccount()
+
+    session = MatrixMegOlmSession()
+    obj.store.set("e2ee_megolm_!r:h", session.to_dict())
+    obj.store.set("e2ee_key_shared_!r:h", session.session_id)
+
+    # Capture the event before encryption.
+    captured = {}
+    original_encrypt = MatrixMegOlmSession.encrypt
+
+    def _spy_encrypt(self, event):
+        captured["event"] = event
+        return original_encrypt(self, event)
+
+    ok = _Response()
+    ok.status_code = requests.codes.ok
+    ok.content = b"{}"
+
+    with (
+        mock.patch.object(MatrixMegOlmSession, "encrypt", _spy_encrypt),
+        mock.patch("requests.put", return_value=ok),
+    ):
+        assert (
+            obj._e2ee_send_to_room(
+                "!r:h",
+                "**bold** & x",
+                "A <b>",
+                NotifyType.INFO,
+                body_format=NotifyFormat.MARKDOWN,
+                body_passthrough=True,
+            )
+            is True
+        )
+
+    msg_content = captured["event"]["content"]
+    assert msg_content["formatted_body"] == (
+        "<h1>A &lt;b&gt;</h1><p><strong>bold</strong> &amp; x</p>"
+    )
+    # The plain fallback keeps the Markdown source.
+    assert msg_content["body"] == "# A <b>\r\n**bold** & x"
+
+
+@mock.patch("requests.post")
+def test_plugin_matrix_webhook_markdown_passthrough(mock_post):
+    """Webhooks render passthrough Markdown sent with format=markdown."""
+
+    response = _Response()
+    response.status_code = requests.codes.ok
+    response.content = b"{}"
+    mock_post.return_value = response
+
+    # Matrix (and t2bot) style webhook.
+    obj = Apprise.instantiate(
+        "matrixs://apprise:secret@hook.example?mode=matrix&format=markdown"
+    )
+    assert obj is not None
+    assert bool(obj.notify(title="T", body="**Body** & x")) is True
+
+    payload = loads(mock_post.call_args.kwargs["data"])
+    assert payload["format"] == "html"
+    assert payload["text"] == (
+        "<h1>T</h1><p><strong>Body</strong> &amp; x</p>"
+    )
+
+    # Hookshot webhook.
+    obj = Apprise.instantiate(
+        "matrixs://apprise:secret@hook.example?mode=hookshot&format=markdown"
+    )
+    assert obj is not None
+    assert bool(obj.notify(title="T", body="**Body** & x")) is True
+
+    payload = loads(mock_post.call_args.kwargs["data"])
+    assert payload["html"] == (
+        "<h1>T</h1><p><strong>Body</strong> &amp; x</p>"
+    )
+    # The plain fallback keeps the Markdown source.
+    assert payload["text"] == "T\r\n**Body** & x"
+
+
+@mock.patch("requests.post")
+def test_plugin_matrix_slack_webhook_html(mock_post):
+    """Slack webhooks send HTML as escaped plain text."""
+    from apprise.common import NotifyFormat
+
+    response = _Response()
+    response.status_code = requests.codes.ok
+    response.content = b"{}"
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        "matrixs://apprise:supersecret@slack.example?mode=slack"
+    )
+    assert obj is not None
+
+    assert (
+        bool(
+            obj.notify(
+                title="T",
+                body="<p>Hi <b>there</b> &amp; you</p>",
+                body_format=NotifyFormat.HTML,
+            )
+        )
+        is True
+    )
+
+    payload = loads(mock_post.call_args.kwargs["data"])
+    assert payload["mrkdwn"] is False
+    # Tags are dropped and the ampersand is escaped exactly once.
+    assert payload["attachments"][0]["text"] == "Hi there &amp; you"
+
+    # Plain text keeps Slack's usual escaping.
+    assert (
+        bool(
+            obj.notify(
+                title="T", body="a & <b>", body_format=NotifyFormat.TEXT
+            )
+        )
+        is True
+    )
+    payload = loads(mock_post.call_args.kwargs["data"])
+    assert payload["attachments"][0]["text"] == "a &amp; &lt;b&gt;"
 
 
 def test_plugin_matrix_e2ee_body_limit():
@@ -9322,3 +9551,14 @@ def test_plugin_matrix_discovery_is_unauthenticated(
 
     del obj
     _force_del_cleanup()
+
+
+def test_plugin_matrix_markdown_escapes():
+    """Markdown escapes render without a backslash in Matrix HTML."""
+
+    obj = Apprise.instantiate("matrix://user:pass@localhost/#room")
+
+    # Escaped text is shown literally and newlines keep Matrix's handling
+    assert obj.dialect_convert("a \\& b\nnext", NotifyFormat.MARKDOWN) == (
+        "<p>a &amp; b\nnext</p>"
+    )

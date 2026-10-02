@@ -30,11 +30,28 @@ from __future__ import annotations
 from json import dumps
 import logging
 import re
+from string import punctuation
+from typing import Any, Optional
 
 import requests
 
 from .. import exception
 from ..common import NotifyType
+from ..conversion import (
+    commonmark_can_close_emphasis,
+    commonmark_can_open_emphasis,
+    commonmark_decode_backslash_escapes,
+    commonmark_emphasis_run,
+    commonmark_find_backtick_run,
+    commonmark_headings_to_bold,
+    commonmark_index_backtick_runs,
+    commonmark_match_emphasis,
+    commonmark_new_scan_budget,
+    commonmark_pick_emphasis_sentinel,
+    commonmark_scan_angle_dest,
+    commonmark_scan_autolink_dest,
+    commonmark_scan_paren_dest,
+)
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
@@ -45,6 +62,14 @@ from .base import NotifyBase, NotifyFormat
 GROUP_REGEX = re.compile(
     r"^\s*((\@|\%40)?(group\.)|\@|\%40)(?P<group>[a-z0-9_=-]+)", re.I
 )
+
+# Signal markup characters that require escaping when used literally:
+#   https://github.com/bbernhard/signal-cli-rest-api/blob/master/\
+#       src/utils/textstyleparser.go
+SIGNAL_STYLE_CHARS = "*`~|"
+
+# A zero-width space separates literal escapes from adjacent markup.
+SIGNAL_ZWSP = "\u200b"
 
 
 class NotifySignalAPI(NotifyBase):
@@ -224,6 +249,297 @@ class NotifySignalAPI(NotifyBase):
             self.targets.append(self.source)
 
         return
+
+    def dialect_convert(
+        self,
+        body: str,
+        body_format: Optional[NotifyFormat] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> str:
+        """Translate repaired CommonMark to Signal styled text."""
+        if body_format != NotifyFormat.MARKDOWN:
+            return body
+        return self._commonmark_to_signal(body)
+
+    @classmethod
+    def _commonmark_to_signal(cls, body: str) -> str:
+        """Translate CommonMark to signal-cli-rest-api styled text.
+
+        CommonMark          Signal
+        ------------------  ---------------------------
+        # heading           **heading** (Signal has no headings)
+        **bold**            **bold**
+        *italic*            *italic*
+        ~~strike~~          ~strike~
+        `code`              `code`
+        [label](<url>)      label (url)
+        \\_                 _
+
+        Unescaped ``||spoiler||`` is Signal's own syntax and is kept. Other
+        backslash escapes are dropped unless Signal needs them to keep a
+        ``*``, backtick, ``~`` or ``|`` literal.
+        """
+        # Signal represents headings as bold while preserving code.
+        body = commonmark_headings_to_bold(body)
+
+        # Build translated output while recording markup for later matching.
+        out = []
+        delimiters = []
+        # Tilde runs use (length, can_open, can_close).
+        tildes: list[tuple[int, bool, bool]] = []
+        # Link labels are nested in stack order.
+        link_stack = []
+
+        # Scan once from left to right.
+        i = 0
+        n = len(body)
+
+        # Index backticks for quick code-span matching.
+        backtick_runs = commonmark_index_backtick_runs(body)
+        # Use a temporary marker absent from the message.
+        sentinel = commonmark_pick_emphasis_sentinel(body)
+        # Mark literal backslashes with the sentinel plus a backslash.
+        # Numbered delimiter placeholders need a digit after the sentinel, so
+        # adjacent digits stay literal text and the marker stays small.
+        backslash = f"{sentinel}\\"
+        # Escape Signal markup and temporarily mark literal backslashes.
+        escape = str.maketrans(
+            {"\\": backslash, **{c: "\\" + c for c in SIGNAL_STYLE_CHARS}}
+        )
+        # Bound the total work spent scanning labeled-link destinations.
+        scan_budget = commonmark_new_scan_budget(body)
+
+        while i < n:
+            ch = body[i]
+
+            # Decode CommonMark escapes, keeping Signal's own where needed.
+            if ch == "\\" and i + 1 < n and body[i + 1] in punctuation:
+                out.append(body[i + 1].translate(escape))
+                i += 2
+                continue
+
+            # A backslash before a line break is a CommonMark hard break.
+            if ch == "\\" and i + 1 < n and body[i + 1] == "\n":
+                i += 1
+                continue
+
+            # Keep any other backslash as literal text.
+            if ch == "\\":
+                out.append(backslash)
+                i += 1
+                continue
+
+            # Signal uses a single backtick for monospace text.
+            if ch == "`":
+                j = i
+                # Measure this backtick run.
+                while j < n and body[j] == "`":
+                    j += 1
+                run = j - i
+                # Find the next closing run of the same size.
+                close = commonmark_find_backtick_run(backtick_runs, j, run)
+
+                if close is not None:
+                    content = body[j:close]
+                    if run >= 3 and "\n" in content:
+                        # Drop the language line of a fenced code block.
+                        content = content.split("\n", 1)[1].rstrip("\n")
+
+                    out.append("`" + content.translate(escape) + "`")
+                    # Continue after the closing run.
+                    i = close + run
+                    continue
+
+                # Preserve unmatched backticks as literal text.
+                out.append(body[i:j].translate(escape))
+                i = j
+                continue
+
+            # Record a possible CommonMark link-label opening.
+            if ch == "[":
+                link_stack.append(len(out))
+                out.append("[")
+                i += 1
+                continue
+
+            # Convert a complete CommonMark link to ``label (url)``.
+            if body.startswith("](<", i) and link_stack:
+                # Scan forward with escape awareness for the ">)" terminator.
+                close = commonmark_scan_angle_dest(
+                    body, i, n, budget=scan_budget
+                )
+
+                if close is not None:
+                    cls._append_signal_link(
+                        out, link_stack.pop(), body[i + 3 : close], escape
+                    )
+                    # Skip past the closing ">)" of the destination.
+                    i = close + 2
+                    continue
+
+                # Fall through to the bare-link check.
+
+            # Convert bare destinations without scanning their URL as markup.
+            if body.startswith("](", i) and link_stack:
+                close = commonmark_scan_paren_dest(
+                    body, i + 1, n, budget=scan_budget
+                )
+
+                if close is not None:
+                    cls._append_signal_link(
+                        out, link_stack.pop(), body[i + 2 : close], escape
+                    )
+                    # Skip past the closing ")" of the destination.
+                    i = close + 1
+                    continue
+
+                # Prevent this label from matching an unrelated link.
+                link_stack.pop()
+
+            # Retire labels that do not form a link.
+            if ch == "]" and link_stack and not body.startswith("](", i):
+                link_stack.pop()
+
+            # Drop autolink brackets; Signal recognizes the remaining URL.
+            if ch == "<":
+                close, still_valid = commonmark_scan_autolink_dest(body, i, n)
+                if close is not None:
+                    out.append(body[i + 1 : close].translate(escape))
+                    i = close + 1
+                    continue
+
+                if not still_valid:
+                    # Keep a non-autolink "<" literal.
+                    out.append(ch)
+                    i += 1
+                    continue
+
+                # Keep an unfinished autolink as literal text.
+                out.append(body[i:].translate(escape))
+                i = n
+                continue
+
+            # Record CommonMark emphasis for Signal's ``**``/``*`` syntax.
+            if ch in "*_":
+                i = commonmark_emphasis_run(
+                    body, i, n, delimiters, out, sentinel
+                )
+                continue
+
+            # Record a possible strikethrough opener or closer.
+            if ch == "~":
+                j = i
+                while j < n and body[j] == "~":
+                    j += 1
+
+                prev_ch = body[i - 1] if i > 0 else None
+                next_ch = body[j] if j < n else None
+                tildes.append(
+                    (
+                        j - i,
+                        commonmark_can_open_emphasis(ch, prev_ch, next_ch),
+                        commonmark_can_close_emphasis(ch, prev_ch, next_ch),
+                    )
+                )
+                out.append(f"{sentinel}~{len(tildes) - 1}{sentinel}")
+                i = j
+                continue
+
+            # Preserve ordinary characters (including a raw ``||``).
+            out.append(ch)
+            i += 1
+
+        # Pair tilde runs with the nearest opener of the same size.
+        openers: dict[int, list[int]] = {1: [], 2: []}
+        # Indices of the ``~`` runs that were paired.
+        matched: set[int] = set()
+        for index, (length, can_open, can_close) in enumerate(tildes):
+            if length > 2:
+                continue
+
+            if can_close and openers[length]:
+                # Pair with the nearest opener of the same size
+                opener = openers[length].pop()
+                matched.update((opener, index))
+
+                # Discard crossed openers of the other size.
+                other = openers[3 - length]
+                while other and other[-1] > opener:
+                    other.pop()
+
+            if index not in matched and can_open:
+                openers[length].append(index)
+
+        # Pair ``*`` and ``_`` runs using CommonMark's emphasis rules.
+        commonmark_match_emphasis(delimiters)
+
+        def _render(match: re.Match) -> str:
+            # Strikethrough uses a single ``~`` on either side in Signal.
+            if match.group(1):
+                index = int(match.group(2))
+                return "~" if index in matched else "\\~" * tildes[index][0]
+
+            # Render closers, unmatched text, then openers in nesting order.
+            descriptor = delimiters[int(match.group(2))]
+            events = descriptor["events"]
+            pieces = [
+                "**" if is_strong else "*"
+                for kind, is_strong in events
+                if kind == "close"
+            ]
+            # Unmatched stars are literal and must be escaped for Signal.
+            pieces.append(
+                (descriptor["char"] * descriptor["numdelims"]).translate(
+                    escape
+                )
+            )
+            pieces.extend(
+                "**" if is_strong else "*"
+                for kind, is_strong in reversed(events)
+                if kind == "open"
+            )
+
+            # Separate adjacent star tokens so Signal does not merge them.
+            after_star = match.string.endswith("\\*", 0, match.start())
+            result = []
+            for piece in pieces:
+                if piece and piece[0] == "*" and after_star:
+                    result.append(SIGNAL_ZWSP)
+
+                if piece:
+                    result.append(piece)
+                    after_star = piece[-1] == "*"
+
+            return "".join(result)
+
+        escaped = re.escape(sentinel)
+        body = re.sub(escaped + r"(~?)(\d+)" + escaped, _render, "".join(out))
+
+        # Separate a literal backslash from following markup.
+        before_markup = re.compile(
+            re.escape(backslash)
+            + "(?=["
+            + re.escape(SIGNAL_STYLE_CHARS)
+            + "])"
+        )
+        return before_markup.sub(lambda _: "\\" + SIGNAL_ZWSP, body).replace(
+            backslash, "\\"
+        )
+
+    @staticmethod
+    def _append_signal_link(
+        out: list[str], open_index: int, raw_url: str, escape: dict[int, str]
+    ) -> None:
+        """Replace a buffered link with Signal's ``label (url)`` form."""
+        url = commonmark_decode_backslash_escapes(raw_url).translate(escape)
+
+        # Recover the buffered label and remove its opening ``[``.
+        text = "".join(out[open_index + 1 :])
+        del out[open_index:]
+
+        # Omit the label when only a bare URL is available.
+        out.append(f"{text} ({url})" if text else url)
 
     def send(
         self,

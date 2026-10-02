@@ -27,9 +27,12 @@
 
 # Disable logging for a cleaner testing output
 import logging
+from unittest import mock
 
 from helpers import AppriseURLTester
+import requests
 
+import apprise
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.streamlabs import NotifyStreamlabs
 
@@ -180,3 +183,58 @@ def test_plugin_streamlabs_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch("requests.post")
+def test_plugin_streamlabs_alert_payload(mock_post):
+    """NotifyStreamlabs() alert places title and body correctly."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    obj = apprise.Apprise.instantiate(
+        "strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=alerts"
+    )
+    assert isinstance(obj, NotifyStreamlabs)
+
+    # Title is the heading and the body is the second line
+    assert obj.notify(body="the body", title="the title") is True
+    data = mock_post.call_args[1]["data"]
+    assert data["message"] == "the title"
+    assert data["user_message"] == "the body"
+    assert "user_massage" not in data
+
+    # Without a title, the body is the heading so it is still shown
+    mock_post.reset_mock()
+    assert obj.notify(body="the body") is True
+    data = mock_post.call_args[1]["data"]
+    assert data["message"] == "the body"
+    assert data["user_message"] == ""
+
+
+@mock.patch("requests.post")
+def test_plugin_streamlabs_donation_payload(mock_post):
+    """NotifyStreamlabs() donation keeps the title in its message."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    obj = apprise.Apprise.instantiate(
+        "strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=donations"
+    )
+    assert isinstance(obj, NotifyStreamlabs)
+
+    # The title leads the message
+    assert obj.notify(body="the body", title="the title") is True
+    data = mock_post.call_args[1]["data"]
+    assert data["message"] == "the title\r\nthe body"
+
+    # Without a title, only the body is sent
+    mock_post.reset_mock()
+    assert obj.notify(body="the body") is True
+    assert mock_post.call_args[1]["data"]["message"] == "the body"
+
+    # The message always stays under 255 characters
+    mock_post.reset_mock()
+    assert obj.notify(body="b" * 255, title="t" * 20) is True
+    assert len(mock_post.call_args[1]["data"]["message"]) == 254

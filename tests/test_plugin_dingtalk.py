@@ -208,7 +208,7 @@ def test_plugin_dingtalk_msgtype(mock_post):
     payload = loads(mock_post.call_args_list[0][1]["data"])
     assert payload["msgtype"] == "markdown"
     assert payload["markdown"]["title"] == "title"
-    assert payload["markdown"]["text"] == "body"
+    assert payload["markdown"]["text"] == "# title\nbody"
     assert "text" not in payload
 
 
@@ -228,6 +228,9 @@ def test_plugin_dingtalk_markdown_no_title(mock_post):
 
     payload = loads(mock_post.call_args_list[0][1]["data"])
     assert payload["markdown"]["title"] == obj.app_desc
+
+    # No heading is added to the text when there is no title
+    assert payload["markdown"]["text"] == "body"
 
 
 @mock.patch("requests.post")
@@ -293,15 +296,65 @@ def test_plugin_dingtalk_multi_format(mock_post):
 
 
 def test_plugin_dingtalk_title_maxlen():
-    """NotifyDingTalk(): a title field only exists in markdown mode."""
+    """NotifyDingTalk(): the title reaches send() in every format."""
 
-    # Text is our default, so the framework folds the title into the body
+    # The framework never folds the title in, send() places it instead
     obj = Apprise.instantiate("dingtalk://{}".format("a" * 8))
-    assert obj.title_maxlen == 0
+    assert obj.title_maxlen > 0
 
-    # Markdown carries its own title field
     obj = Apprise.instantiate("dingtalk://{}?format=markdown".format("a" * 8))
     assert obj.title_maxlen > 0
+
+
+@mock.patch("requests.post")
+def test_plugin_dingtalk_markdown_title_placement(mock_post):
+    """NotifyDingTalk(): markdown shows the title in the preview and text."""
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Markdown picked by the body format (no ?format= override)
+    aobj = Apprise()
+    assert aobj.add("dingtalk://{}".format("a" * 8))
+    assert aobj.notify(
+        title="My Title",
+        body="**hello**",
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    by_body = loads(mock_post.call_args_list[0][1]["data"])
+
+    # Markdown picked by ?format=markdown
+    mock_post.reset_mock()
+    aobj = Apprise()
+    assert aobj.add("dingtalk://{}?format=markdown".format("a" * 8))
+    assert aobj.notify(
+        title="My Title",
+        body="**hello**",
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    by_override = loads(mock_post.call_args_list[0][1]["data"])
+
+    # Both routes produce the exact same message
+    assert by_body == by_override
+    assert by_body["msgtype"] == "markdown"
+    assert by_body["markdown"] == {
+        "title": "My Title",
+        "text": "# My Title\n**hello**",
+    }
+
+    # A multi-line title is kept on a single heading line
+    mock_post.reset_mock()
+    assert aobj.notify(
+        title="## Build\nfailed",
+        body="body",
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["markdown"] == {
+        "title": "Build failed",
+        "text": "# Build failed\nbody",
+    }
 
 
 def test_plugin_dingtalk_url_format_round_trip():

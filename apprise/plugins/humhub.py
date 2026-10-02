@@ -242,47 +242,43 @@ class NotifyHumHub(NotifyBase):
         # Post to each container in turn
         for container_id in self.targets:
             message_key = ("message", container_id)
-            post_id = None
 
-            if self.is_delivered(message_key):
-                # Never recreate a visible post. Missing uploads cannot be
-                # retried because only the creation response has its post ID.
-                if attach and not all(
-                    self.is_delivered(("attachment", container_id, no))
-                    for no in range(1, len(attach) + 1)
-                ):
+            # A post made by an earlier attempt keeps its ID so a retry can
+            # still upload attachments to it without posting again.
+            post_id = self.recall(message_key)
+
+            if not self.is_delivered(message_key):
+                # Build the post URL for this container
+                url = "{}://{}{}/api/v1/post/container/{}".format(
+                    self.schema, self.host, port, container_id
+                )
+
+                # Create the post
+                ok, content = self._send(url, dumps(payload), headers, auth)
+                if not ok:
+                    # Mark our failure
                     has_error = True
+                    continue
 
-                continue
+                self.logger.info(
+                    "Sent HumHub notification to container %s.",
+                    container_id,
+                )
 
-            # Build the post URL for this container
-            url = "{}://{}{}/api/v1/post/container/{}".format(
-                self.schema, self.host, port, container_id
-            )
+                if attach:
+                    # Read the post ID needed for attachment uploads
+                    try:
+                        response = loads(content)
+                        post_id = response.get("id")
 
-            # Create the post
-            ok, content = self._send(url, dumps(payload), headers, auth)
-            if not ok:
-                # Mark our failure
-                has_error = True
-                continue
+                    except (AttributeError, TypeError, ValueError):
+                        post_id = None
 
-            self.logger.info(
-                "Sent HumHub notification to container %s.",
-                container_id,
-            )
+                    # Keep the ID in case an upload fails and is retried
+                    self.remember(message_key, post_id)
 
-            if attach:
-                # Read the post ID needed for attachment uploads
-                try:
-                    response = loads(content)
-                    post_id = response.get("id")
-
-                except (AttributeError, TypeError, ValueError):
-                    post_id = None
-
-            # The post is visible now, even if an upload later fails
-            self.mark_delivered(message_key)
+                # The post is visible now, even if an upload later fails
+                self.mark_delivered(message_key)
 
             # Skip attachment handling when there is nothing to upload
             if not attach:

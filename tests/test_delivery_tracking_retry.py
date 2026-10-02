@@ -43,7 +43,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
-from apprise.plugins.base import _delivery_tracker
+from apprise.plugins.base import _delivery_memo, _delivery_tracker
 
 logging.disable(logging.CRITICAL)
 
@@ -104,6 +104,7 @@ TRACKED = {
     "clicksend": "clicksend://user:pass@33333333333333?batch=no",
     "d7networks": "d7sms://token1@33333333333333?batch=no",
     "dapnet": "dapnet://user:pass@localhost/DL0001/DL9999",
+    "discord": "discord://1234567890/abcdefghijklmnop",
     "eight00com": "eight00com://tttttttttt@8888888888/55555555555",
     "email": "mailto://user:pass@localhost/one@example.ca/two@example.ca",
     "emby": "emby://user:pass@localhost",
@@ -116,9 +117,11 @@ TRACKED = {
         "12125550001/12125559999"
     ),
     "fcm": "fcm://apikey/#topic1/device/",
+    "fluxer": "fluxer://1234567890/abcdefghijklmnop",
     "flock": "flock://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/u:0001/u:9999",
     "fortysixelks": "46elks://user:pass@sender/12125550001/12125559999",
     "google_chat": "gchat://workspace/key/token",
+    "guilded": "guilded://1234567890/abcdefghijklmnop",
     "home_assistant": "hassio://localhost/prefix/path/long.lived.token",
     "httpsms": (
         "httpsms://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@12125550000/"
@@ -443,7 +446,9 @@ def test_retry_does_not_repeat_delivery(name):
         pytest.skip(f"{name}: {NEEDS_ITS_OWN_SERVICE[name]}")
 
     work = _Work(RESPONSES.get(name))
+    # Retries turn on delivery marks and remembered values together.
     token = _delivery_tracker.set(set())
+    memo_token = _delivery_memo.set({})
     try:
         with _watched(work):
             # Built inside the patches; a service that opens its own
@@ -463,6 +468,7 @@ def test_retry_does_not_repeat_delivery(name):
 
     finally:
         _delivery_tracker.reset(token)
+        _delivery_memo.reset(memo_token)
 
     # The first pass has to actually deliver something, otherwise this
     # case proves nothing at all.

@@ -66,11 +66,14 @@
 # http://www.aprs.org/doc/APRS101.PDF
 #
 
+from __future__ import annotations
+
 import contextlib
 from itertools import chain
 import re
 import socket
 import sys
+from typing import Any
 
 from .. import __version__
 from ..common import NotifyType
@@ -562,7 +565,13 @@ class NotifyAprs(NotifyBase):
 
         return rx_buf.rstrip()
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform APRS Notification."""
 
         if not self.targets:
@@ -610,6 +619,15 @@ class NotifyAprs(NotifyBase):
 
         payload = APRS_COMPILED_MAP.sub(  # pragma: no branch
             lambda x: APRS_BAD_CHARMAP[x.group()], payload
+        )
+
+        # APRS-IS ends packets at line breaks, so join the message into one
+        # line. The pattern starts at the first space to scan long runs once.
+        # See https://www.aprs-is.net/Connecting.aspx
+        payload = re.sub(
+            r"(?:(?<![ \t])[ \t]+)?[\r\n]+[ \t]*",
+            " ",
+            payload.strip("\r\n"),
         )
 
         # Finally, constrain output string to 67 characters as

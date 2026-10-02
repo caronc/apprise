@@ -30,6 +30,11 @@
 #  From here... acquire your APIKey
 #
 # API Details: https://developers.africastalking.com/docs/sms/sending/bulk
+from __future__ import annotations
+
+from json import loads
+from typing import Any
+
 import requests
 
 from ..common import NotifyType
@@ -65,7 +70,8 @@ AFRICAS_TALKING_SMS_MODES = (
 )
 
 
-# Extend HTTP Error Messages
+# Recipient ``statusCode`` values returned inside ``SMSMessageData``.
+# These are not HTTP status codes.
 AFRICAS_TALKING_HTTP_ERROR_MAP = {
     100: "Processed",
     101: "Sent",
@@ -82,6 +88,9 @@ AFRICAS_TALKING_HTTP_ERROR_MAP = {
     501: "Gateway Error",
     502: "Rejected By Gateway",
 }
+
+# Recipient statusCode values meaning the message was accepted
+AFRICAS_TALKING_RECIPIENT_OK = (100, 101, 102)
 
 
 class NotifyAfricasTalking(NotifyBase):
@@ -275,7 +284,13 @@ class NotifyAfricasTalking(NotifyBase):
                 else result["full"]
             )
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform Africas Talking Notification."""
 
         if not self.targets:
@@ -298,17 +313,17 @@ class NotifyAfricasTalking(NotifyBase):
         # Send in batches if identified to do so
         batch_size = 1 if not self.batch else self.default_batch_size
 
-        # Create a copy of the target list
-        for index in range(0, len(self.targets), batch_size):
-            # Skip a batch that already went out so a retry does
-            # not deliver it to those recipients twice.
-            if self.is_delivered(index):
-                continue
+        # Retry only recipients that have not accepted the message.
+        pending = [t for t in self.targets if not self.is_delivered(t)]
+
+        for index in range(0, len(pending), batch_size):
+            # Our batch of phone numbers
+            _batch = pending[index : index + batch_size]
 
             # Prepare our payload
             payload = {
                 "username": self.appuser,
-                "to": ",".join(self.targets[index : index + batch_size]),
+                "to": ",".join(_batch),
                 "from": self.sender,
                 "message": body,
             }
@@ -323,11 +338,8 @@ class NotifyAfricasTalking(NotifyBase):
             self.logger.debug(f"Africas Talking Payload: {payload!s}")
 
             # Printable target detail
-            _batch = self.targets[index : index + batch_size]
             p_target = (
-                self.targets[index]
-                if batch_size == 1
-                else f"{len(_batch)} target(s)"
+                _batch[0] if batch_size == 1 else f"{len(_batch)} target(s)"
             )
 
             # Always call throttle before any remote server i/o is made
@@ -355,11 +367,12 @@ class NotifyAfricasTalking(NotifyBase):
                 #     }
                 # }
 
-                if r.status_code not in (100, 101, 102, requests.codes.ok):
+                # The service answers with 201 Created; accept any 2xx
+                if not (200 <= r.status_code < 300):
                     # We had a problem
                     status_str = (
                         NotifyAfricasTalking.http_response_code_lookup(
-                            r.status_code, AFRICAS_TALKING_HTTP_ERROR_MAP
+                            r.status_code
                         )
                     )
 
@@ -381,11 +394,6 @@ class NotifyAfricasTalking(NotifyBase):
                     has_error = True
                     continue
 
-                else:
-                    self.logger.info(
-                        f"Sent Africas Talking notification to {p_target}."
-                    )
-
             except requests.RequestException as e:
                 self.logger.warning(
                     "A Connection error occurred sending Africas Talking "
@@ -397,10 +405,114 @@ class NotifyAfricasTalking(NotifyBase):
                 has_error = True
                 continue
 
-            # Delivered; a retry can safely skip this batch.
-            self.mark_delivered(index)
+            # Work out which numbers in this batch accepted the message
+            delivered = self._accepted(r, _batch)
+
+            for target in _batch:
+                if target not in delivered:
+                    # Mark our failure; a retry sends to it again
+                    has_error = True
+                    continue
+
+                # Delivered; a retry can safely skip this recipient.
+                self.mark_delivered(target)
+
+            if delivered:
+                self.logger.info(
+                    "Sent Africas Talking notification to {}/{}"
+                    " recipient(s).".format(len(delivered), len(_batch))
+                )
 
         return not has_error
+
+    def _accepted(self, r: Any, batch: list[str]) -> list[str]:
+        """Return the numbers in batch the service accepted.
+
+        - An unreadable body trusts the 2xx reply for the whole batch.
+        - Otherwise a number counts only when its Recipients entry has a
+          success statusCode (Processed, Sent or Queued).
+        """
+
+        try:
+            content = loads(r.content)
+
+        except (TypeError, ValueError):
+            # ValueError  -- r.content is not valid JSON
+            # TypeError   -- r.content is None (e.g. empty body)
+            content = {}
+
+        # Dig out our list of recipients
+        data = (
+            content.get("SMSMessageData")
+            if isinstance(content, dict)
+            else None
+        )
+        recipients = data.get("Recipients") if isinstance(data, dict) else None
+
+        if not isinstance(recipients, list):
+            # Nothing to inspect; the 2xx reply is all we have to go on
+            return list(batch)
+
+        # Collect the digits of every number in the reply, and of the ones
+        # that were accepted
+        numbers = set()
+        accepted = []
+        for entry in recipients:
+            if not isinstance(entry, dict):
+                continue
+
+            number = "".join(
+                c for c in str(entry.get("number", "")) if c.isdigit()
+            ).lstrip("0")
+            numbers.add(number)
+
+            try:
+                code = int(entry.get("statusCode"))
+
+            except (TypeError, ValueError):
+                code = None
+
+            if code in AFRICAS_TALKING_RECIPIENT_OK:
+                accepted.append(number)
+                continue
+
+            # Use the recipient map without changing shared HTTP messages.
+            status_str = AFRICAS_TALKING_HTTP_ERROR_MAP.get(code, "")
+            self.logger.warning(
+                "Africas Talking rejected {}: {}{}statusCode={}.".format(
+                    entry.get("number"),
+                    status_str,
+                    ", " if status_str else "",
+                    entry.get("statusCode"),
+                )
+            )
+
+        # Targets are stored as digits with an optional leading "+"
+        digits = {target: target.lstrip("+0") for target in batch}
+
+        # Targets whose own number appears in the reply, accepted or not
+        exact = {t for t, d in digits.items() if d in numbers}
+
+        result = set()
+        for number in accepted:
+            # An exact match always identifies the right target
+            matched = [t for t, d in digits.items() if d == number]
+            if not matched:
+                # Replies may change local numbers to international form.
+                # Match ending digits only when they identify one target.
+                matched = [
+                    t
+                    for t, d in digits.items()
+                    if t not in exact
+                    and (number.endswith(d) or d.endswith(number))
+                ]
+                if len(matched) != 1:
+                    continue
+
+            result.update(matched)
+
+        # Keep the batch order
+        return [target for target in batch if target in result]
 
     @property
     def url_identifier(self):

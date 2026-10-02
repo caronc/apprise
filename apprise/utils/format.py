@@ -27,7 +27,9 @@
 
 from __future__ import annotations
 
+from html.entities import html5
 import re
+from typing import Optional
 
 from apprise.common import NotifyFormat
 
@@ -37,9 +39,40 @@ PUNCT_SPLIT_PATTERN = re.compile(
     f"[{re.escape(PUNCTUATION_CHARS)}][ \t\r\n\x0b\x0c]+"
 )
 
-# Support HTML entities (&...;)
-HTML_ENTITY_LOOKBACK = 16
-HTML_ENTITY_LOOKAHEAD = 16
+# The longest an HTML entity can be, "&" and ";" included.  The longest
+# named one is &CounterClockwiseContourIntegral;
+HTML_ENTITY_MAXLEN = 1 + max(len(name) for name in html5)
+
+# Characters that end a tag or open a quoted attribute value
+HTML_TAG_STOP_RE = re.compile("[>\"']")
+
+
+def html_tag_end(text: str, start: int, end: Optional[int] = None) -> int:
+    """Return where the tag opened at ``start`` ends, or -1 if unclosed.
+
+    A ``>`` inside a quoted attribute value does not end the tag.
+    """
+    # Scan no further than the requested end
+    end = len(text) if end is None else end
+    idx = start + 1
+    while True:
+        # Jump to the next closing ">" or opening quote
+        match = HTML_TAG_STOP_RE.search(text, idx, end)
+        if not match:
+            return -1
+
+        idx = match.start()
+        if text[idx] == ">":
+            # The tag ends here
+            return idx
+
+        # Skip past the matching quote so a ">" inside it is ignored
+        idx = text.find(text[idx], idx + 1, end)
+        if idx == -1:
+            # The quoted value never closes, so neither does the tag
+            return -1
+
+        idx += 1
 
 
 def html_adjust(
@@ -47,25 +80,22 @@ def html_adjust(
     window_start: int,
     split_at: int,
 ) -> int:
-    """
-    Adjust the split point to avoid splitting inside short HTML entities
-    such as '&nbsp;'.
+    """Move a split before any HTML entity it would divide.
 
-    If the split falls inside '&...;' within a small window around the
-    boundary, move the split back to '&' so the entire entity is kept
-    in the next chunk.
+    For example, a split inside ``&nbsp;`` moves back to ``&`` so the next
+    chunk receives the complete entity.
     """
     if split_at <= window_start or split_at > len(text):
         return split_at
 
-    search_start = max(window_start, split_at - HTML_ENTITY_LOOKBACK)
+    search_start = max(window_start, split_at - HTML_ENTITY_MAXLEN)
     search_end = split_at
 
     amp_index = text.rfind("&", search_start, search_end)
     if amp_index == -1:
         return split_at
 
-    forward_end = min(len(text), split_at + HTML_ENTITY_LOOKAHEAD)
+    forward_end = min(len(text), split_at + HTML_ENTITY_MAXLEN)
     semi_index = text.find(";", amp_index, forward_end)
 
     if (
@@ -76,6 +106,48 @@ def html_adjust(
         return amp_index
 
     return split_at
+
+
+def html_tag_adjust(
+    text: str,
+    window_start: int,
+    split_at: int,
+    window_end: Optional[int] = None,
+) -> int:
+    """Move a split out of an HTML tag.
+
+    A tag may contain spaces, so a soft split can land inside it:
+      - Move before ``<`` so the tag goes to the next chunk.
+      - If the tag opens the chunk, move after ``>`` when it still fits.
+
+    Returns the adjusted split, or the original one when neither fits.
+    """
+    if split_at <= window_start or split_at > len(text):
+        return split_at
+
+    # Walk the tags before the split to find one the split lands inside.
+    # Scanning forward keeps a "<" or ">" inside quotes from misleading us.
+    lt_index = text.find("<", window_start, split_at)
+    while lt_index != -1:
+        # Find where this tag ends, honouring quoted attribute values
+        gt_index = html_tag_end(text, lt_index, window_end)
+        if gt_index == -1 or gt_index >= split_at:
+            # The split is inside this tag
+            break
+
+        # This tag ended before the split; check the next one
+        lt_index = text.find("<", gt_index + 1, split_at)
+
+    if lt_index == -1:
+        # No tag opener; nothing to protect
+        return split_at
+
+    if lt_index > window_start:
+        # The split is inside the tag; keep the tag whole
+        return lt_index
+
+    # The tag opens the chunk, so try to end the chunk right after it
+    return gt_index + 1 if gt_index != -1 else split_at
 
 
 def markdown_adjust(
@@ -217,10 +289,21 @@ def smart_split(
         if body_format is NotifyFormat.HTML:
             split_at = html_adjust(text, start, split_at)
 
+            # Never cut a tag such as <a href="..."> in two
+            split_at = html_tag_adjust(text, start, split_at, window_end)
+
         elif body_format is NotifyFormat.MARKDOWN:
             # Markdown may also contain HTML entities.
             split_at = html_adjust(text, start, split_at)
             split_at = markdown_adjust(text, start, split_at)
+
+            # Never separate an escaping backslash from the character it
+            # escapes. An odd run of backslashes right before the split
+            # means the last one still needs its partner, so keep them
+            # together in the next chunk.
+            chunk = text[start:split_at]
+            if (len(chunk) - len(chunk.rstrip("\\"))) % 2:
+                split_at -= 1
 
         if split_at <= start:
             split_at = orig_split

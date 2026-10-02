@@ -25,7 +25,10 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from __future__ import annotations
+
 from itertools import chain
+from typing import Any
 
 try:
     import smpplib
@@ -220,7 +223,13 @@ class NotifySMPP(NotifyBase):
         """
         return len(self.targets) if self.targets else 1
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform SMPP Notification."""
 
         if not self.targets:
@@ -257,7 +266,14 @@ class NotifySMPP(NotifyBase):
             if self.is_delivered(target):
                 continue
 
-            parts, encoding, msg_type = smpplib.gsm.make_parts(body)
+            # Reuse multipart data on retries so every part keeps the same
+            # reference number and can be reassembled by the handset.
+            built = self.recall(("parts", target))
+            if built is None:
+                built = smpplib.gsm.make_parts(body)
+                self.remember(("parts", target), built)
+
+            parts, encoding, msg_type = built
 
             # Always call throttle before any remote server i/o is made
             self.throttle()

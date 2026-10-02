@@ -1218,3 +1218,59 @@ def test_plugin_bluesky_oversized_lookup(mock_get):
 
     # We stopped reading rather than holding on to all of it
     flood.close.assert_called_once()
+
+
+@patch("apprise.plugins.base.time.sleep")
+@patch("requests.post")
+@patch("requests.get")
+def test_plugin_bluesky_multi_post_retry(
+    mock_get,
+    mock_post,
+    mock_sleep,
+    good_message_response,
+    good_media_response,
+):
+    """A retry only re-creates the post that failed."""
+
+    mock_get.return_value = good_message_response
+
+    # Post 1 is created, post 2 fails, then the retry creates post 2 alone
+    records = [good_response(), bad_response(), good_response()]
+
+    def _post(url, *args, **kwargs):
+        if url.endswith("uploadBlob"):
+            return good_media_response
+
+        if url.endswith("createRecord"):
+            return records.pop(0)
+
+        # Session creation
+        return good_response()
+
+    mock_post.side_effect = _post
+
+    aobj = Apprise()
+    assert aobj.add("bluesky://user@app-key?retry=2&wait=0")
+
+    attach = [
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif"),
+        os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+    ]
+    assert bool(aobj.notify(body="body", attach=attach)) is True
+
+    posts = [
+        json.loads(call[1]["data"])["record"]
+        for call in mock_post.call_args_list
+        if call[0][0].endswith("createRecord")
+    ]
+
+    # The first post was never repeated
+    assert [p["text"] for p in posts] == ["body", "02/02", "02/02"]
+    assert not records
+
+    # Each post carries its own image
+    assert [p["embed"]["images"][0]["alt"] for p in posts] == [
+        "apprise-test.gif",
+        "apprise-test.png",
+        "apprise-test.png",
+    ]

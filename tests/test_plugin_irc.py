@@ -1234,3 +1234,23 @@ def test_plugin_irc_client_join_non_send_actions() -> None:
 
         # Not joined, so debug path executes
         m_dbg.assert_called_once()
+
+
+def test_plugin_irc_privmsg_lines() -> None:
+    """Each line of a message is its own PRIVMSG command."""
+    c = IRCClient(host="h", nickname="n", fullname="f")
+    c.transport = mock.Mock()
+
+    with (
+        mock.patch.object(c, "_flush"),
+        mock.patch.object(c, "_handshake"),
+        mock.patch("time.monotonic", return_value=0.0),
+    ):
+        # A raw line break must never reach the server inside one command
+        c.privmsg(target="#c", message="Title\r\nline 1\n\nQUIT", timeout=0.1)
+
+    assert list(c._out_queue) == [
+        b"PRIVMSG #c :Title\r\n",
+        b"PRIVMSG #c :line 1\r\n",
+        b"PRIVMSG #c :QUIT\r\n",
+    ]

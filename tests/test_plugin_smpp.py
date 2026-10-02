@@ -215,3 +215,39 @@ def test_plugin_smpp_edge_case():
             )
             is False
         )
+
+
+@pytest.mark.skipif("smpplib" not in sys.modules, reason="Requires smpplib")
+def test_plugin_smpp_retry_keeps_part_reference():
+    """A retry re-sends missing parts with the original reference."""
+
+    sent = []
+    calls = {"count": 0}
+
+    def send_message(**kwargs):
+        # The link drops while the second part is being sent
+        calls["count"] += 1
+        if calls["count"] == 2:
+            raise smpplib.exceptions.ConnectionError()
+        sent.append(kwargs["short_message"])
+
+    with mock.patch("smpplib.client.Client") as mock_client_class:
+        mock_client_class.return_value.send_message.side_effect = send_message
+
+        aobj = Apprise()
+        assert aobj.add(
+            "smpp://user:pass@host/{}/{}?retry=1&wait=0".format(
+                "1" * 10, "2" * 10
+            )
+        )
+        assert aobj.notify(body="x" * 400)
+
+    # The first attempt failed, so a retry had to finish the job
+    assert calls["count"] == len(sent) + 1
+
+    # Each part went out exactly once (UDH byte 5 is the part number)
+    assert sorted(p[5] for p in sent) == list(range(1, len(sent) + 1))
+
+    # Every part shares the one reference (UDH byte 3) so the handset
+    # can join them back together
+    assert len({p[3] for p in sent}) == 1

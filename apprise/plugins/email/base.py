@@ -1153,6 +1153,11 @@ class NotifyEmail(NotifyBase):
             # use server time
             tzinfo = datetime.now().astimezone().tzinfo
 
+        if subject:
+            # Email subjects must be one header line, so collapse whitespace
+            # as described by RFC 5322 section 2.2.3.
+            subject = " ".join(subject.split())
+
         logger.debug(f"SMTP Host: {smtp_host}")
 
         # Create a copy of the targets list

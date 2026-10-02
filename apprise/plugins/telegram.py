@@ -52,11 +52,12 @@
 # Development API Reference::
 #  - https://core.telegram.org/bots/api
 from contextlib import ExitStack
+from html import escape
 from json import dumps, loads
 from json.decoder import JSONDecodeError
 import os
 import re
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import requests
 
@@ -69,6 +70,7 @@ from ..common import (
     PersistentStoreMode,
 )
 from ..conversion import (
+    HTMLTagReducer,
     commonmark_emphasis_run,
     commonmark_find_backtick_run,
     commonmark_headings_to_bold,
@@ -151,6 +153,208 @@ TELEGRAM_CONTENT_PLACEMENT = (
     TelegramContentPlacement.BEFORE,
     TelegramContentPlacement.AFTER,
 )
+
+
+# The line break used in Telegram HTML messages; Telegram has no <br> tag
+TELEGRAM_HTML_BR = "\r\n"
+
+# Formatting tags Telegram accepts, and the tag written for each one.
+# See: https://core.telegram.org/bots/api#formatting-options
+TELEGRAM_HTML_INLINE_MAP = {
+    "b": "b",
+    "strong": "b",
+    "i": "i",
+    "em": "i",
+    "u": "u",
+    "ins": "u",
+    "s": "s",
+    "strike": "s",
+    "del": "s",
+    "tg-spoiler": "tg-spoiler",
+}
+
+# Heading tags; they become bold text on a line of their own
+TELEGRAM_HTML_HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6", "title")
+
+# Block tags that start and end their own line (lists are handled by
+# HTMLTagReducer)
+TELEGRAM_HTML_BLOCKS = ("p", "div", "table", "hr")
+
+# Tags whose content is never shown
+TELEGRAM_HTML_SKIP = ("script", "style")
+
+# Common entities often written without their closing semicolon
+TELEGRAM_HTML_LOOSE_ENTITY_RE = re.compile(
+    r"&(apos|quot|nbsp|emsp)(?!;)", re.I
+)
+
+# Telegram does not know &nbsp; or &emsp;, so use plain spaces instead
+TELEGRAM_HTML_SPACES = str.maketrans({"\xa0": " ", "\u2003": "   "})
+
+
+class TelegramHTMLReducer(HTMLTagReducer):
+    """Rewrite HTML so it only uses the markup Telegram accepts.
+
+    - b, i, u, s, spoilers, a href, code, pre, blockquote and tg-emoji
+      are kept; strong, em, ins, strike and del become b, i, u and s.
+    - Headings become bold text on their own line.
+    - List items become "- " (or "1. ") lines and table rows become
+      lines with cells split by " | ".
+    - <br> and block tags become new lines.
+    - Formatting is dropped inside code, and quotes are never nested,
+      because Telegram rejects both.
+    - Any other tag is dropped and only its text is kept.
+    - Every opened tag is closed, so the result is always balanced.
+    """
+
+    INLINE_MAP = TELEGRAM_HTML_INLINE_MAP
+    HEADINGS = TELEGRAM_HTML_HEADINGS
+    SKIP_TAGS = TELEGRAM_HTML_SKIP
+    LINE_BREAK = TELEGRAM_HTML_BR
+    TEXT_MAP = TELEGRAM_HTML_SPACES
+
+    def reset(self) -> None:
+        """Clear the reducer state, including the line tracking."""
+        super().reset()
+
+        # True once the current line holds text (anything but tags)
+        self.has_text = False
+
+        # How many pieces of self.out were already checked for text
+        self.checked = 0
+
+    def _is_open(self, tag: str) -> bool:
+        """Return True when Telegram tag ``tag`` is currently open."""
+        # These Telegram tags keep their source names in the output.
+        return bool(self.open_count[tag])
+
+    def _line(self) -> None:
+        """Start a new line unless the current one has no text yet."""
+        # Check only newly written pieces.
+        for piece in self.out[self.checked :]:
+            if piece == TELEGRAM_HTML_BR:
+                # Already on a fresh line
+                self.has_text = False
+
+            elif not piece.startswith("<"):
+                # The current line holds text
+                self.has_text = True
+
+        self.checked = len(self.out)
+
+        if not self.has_text:
+            # Nothing written on this line yet
+            return
+
+        # The current line holds text; end it
+        self._break()
+
+    def _break(self) -> None:
+        """End the current line, dropping spaces left at its end."""
+        if (
+            self.out
+            and not self.out[-1].startswith("<")
+            and not (self._is_open("pre") or self._is_open("code"))
+        ):
+            self.out[-1] = self.out[-1].rstrip()
+
+        self.out.append(TELEGRAM_HTML_BR)
+
+    def _start(self, tag: str, values: dict[str, Optional[str]]) -> None:
+        """Map an opening tag to Telegram markup."""
+        if tag == "br":
+            # Line breaks are always kept
+            self._break()
+            return
+
+        if self._is_open("code") or (self._is_open("pre") and tag != "code"):
+            # Telegram allows no formatting inside code, except the code
+            # tag that names the language of a code block
+            return
+
+        if tag == "span" and "tg-spoiler" in (values.get("class") or "").split(
+            " "
+        ):
+            # The span form of a spoiler
+            self._open(tag, "tg-spoiler")
+
+        elif tag == "a" and values.get("href") and not self._is_open("a"):
+            # Links keep only their destination and are never nested
+            href = escape(values["href"], quote=True)
+            self._open(tag, "a", f' href="{href}"')
+
+        elif tag == "tg-emoji" and values.get("emoji-id"):
+            # Custom emoji keep their identifier
+            emoji = escape(values["emoji-id"], quote=True)
+            self._open(tag, "tg-emoji", f' emoji-id="{emoji}"')
+
+        elif tag in ("pre", "code"):
+            # Code keeps only a "language-" class, and only inside pre
+            language = values.get("class") or ""
+            attr = (
+                f' class="{escape(language, quote=True)}"'
+                if tag == "code"
+                and self._is_open("pre")
+                and language.startswith("language-")
+                else ""
+            )
+            if tag == "pre":
+                self._line()
+
+            self._open(tag, tag, attr)
+
+        elif tag == "blockquote":
+            # Quotes start a new line and cannot be nested
+            self._line()
+            if not self._is_open("blockquote"):
+                self._open(
+                    tag,
+                    "blockquote",
+                    " expandable" if "expandable" in values else "",
+                )
+
+        elif tag in TELEGRAM_HTML_BLOCKS:
+            # Other blocks (and dividers) begin on a new line too
+            self._line()
+
+        else:
+            # Bold, italic, underline, strikethrough, spoilers, headings,
+            # lists, tables and images
+            super()._start(tag, values)
+
+    def _end(self, tag: str) -> None:
+        """Close a tag and add any line break it implies."""
+        if tag == "br":
+            # A closing </br> is treated as a line break too
+            self._break()
+            return
+
+        super()._end(tag)
+
+        if tag in TELEGRAM_HTML_BLOCKS or tag in ("pre", "blockquote"):
+            # These end their line too
+            self._line()
+
+    def _text(self, data: str) -> None:
+        """Write text with its special characters escaped."""
+        if not (self._is_open("pre") or self._is_open("code")):
+            # Outside code, HTML source spacing rules apply
+            super()._text(data)
+
+        elif data:
+            # Code keeps its spaces and line breaks as they are
+            self.out.append(
+                escape(data.translate(TELEGRAM_HTML_SPACES), quote=False)
+            )
+
+    def reduce(self, html: str) -> str:
+        """Return ``html`` rewritten for Telegram."""
+        # Accept entities that are missing their semicolon
+        return super().reduce(
+            TELEGRAM_HTML_LOOSE_ENTITY_RE.sub(
+                lambda m: f"&{m.group(1).lower()};", html
+            )
+        )
 
 
 class TelegramMediaKind:
@@ -288,7 +492,7 @@ class NotifyTelegram(NotifyBase):
     # output the user expected
     __telegram_escape_html_entries = (
         # Comments
-        (re.compile(r"\s*<!.+?-->\s*", (re.I | re.M | re.S)), "", {}),
+        (re.compile(r"\s*<!.+?-->\s*", (re.I | re.M | re.S)), ""),
         # the following tags are not supported
         (
             re.compile(
@@ -298,7 +502,6 @@ class NotifyTelegram(NotifyBase):
                 (re.I | re.M | re.S),
             ),
             "",
-            {},
         ),
         # All closing tags to be removed are put here
         (
@@ -309,7 +512,6 @@ class NotifyTelegram(NotifyBase):
                 (re.I | re.M | re.S),
             ),
             "",
-            {},
         ),
         # Bold
         (
@@ -317,30 +519,26 @@ class NotifyTelegram(NotifyBase):
                 r"<\s*(strong)([^a-z0-9>][^>]*)?>", (re.I | re.M | re.S)
             ),
             "<b>",
-            {},
         ),
         (
             re.compile(
                 r"<\s*/\s*(strong)([^a-z0-9>][^>]*)?>", (re.I | re.M | re.S)
             ),
             "</b>",
-            {},
         ),
         (
             re.compile(
                 r"\s*<\s*(h[1-6]|title)([^a-z0-9>][^>]*)?>\s*",
                 (re.I | re.M | re.S),
             ),
-            "{}<b>",
-            {"html": "\r\n"},
+            "<b>",
         ),
         (
             re.compile(
                 r"\s*<\s*/\s*(h[1-6]|title)([^a-z0-9>][^>]*)?>\s*",
                 (re.I | re.M | re.S),
             ),
-            "</b>{}",
-            {"html": "<br/>"},
+            "</b>",
         ),
         # Italic
         (
@@ -348,7 +546,6 @@ class NotifyTelegram(NotifyBase):
                 r"<\s*(caption|em)([^a-z0-9>][^>]*)?>", (re.I | re.M | re.S)
             ),
             "<i>",
-            {},
         ),
         (
             re.compile(
@@ -356,13 +553,11 @@ class NotifyTelegram(NotifyBase):
                 (re.I | re.M | re.S),
             ),
             "</i>",
-            {},
         ),
         # Bullet Lists
         (
             re.compile(r"<\s*li([^a-z0-9>][^>]*)?>\s*", (re.I | re.M | re.S)),
             " -",
-            {},
         ),
         # New Lines
         (
@@ -370,7 +565,6 @@ class NotifyTelegram(NotifyBase):
                 r"\s*<\s*/?\s*(ol|ul|br|hr)\s*/?>\s*", (re.I | re.M | re.S)
             ),
             "\r\n",
-            {},
         ),
         (
             re.compile(
@@ -378,19 +572,18 @@ class NotifyTelegram(NotifyBase):
                 (re.I | re.M | re.S),
             ),
             "\r\n",
-            {},
         ),
         # HTML Spaces (&nbsp;) and tabs (&emsp;) aren't supported
         # See https://core.telegram.org/bots/api#html-style
-        (re.compile(r"\&nbsp;?", re.I), " ", {}),
+        (re.compile(r"\&nbsp;?", re.I), " "),
         # Tabs become 3 spaces
-        (re.compile(r"\&emsp;?", re.I), "   ", {}),
+        (re.compile(r"\&emsp;?", re.I), "   "),
         # Some characters get re-escaped by the Telegram upstream
         # service so we need to convert these back,
-        (re.compile(r"\&apos;?", re.I), "'", {}),
-        (re.compile(r"\&quot;?", re.I), '"', {}),
+        (re.compile(r"\&apos;?", re.I), "'"),
+        (re.compile(r"\&quot;?", re.I), '"'),
         # New line cleanup
-        (re.compile(r"\r*\n[\r\n]+", re.I), "\r\n", {}),
+        (re.compile(r"\r*\n[\r\n]+", re.I), "\r\n"),
     )
 
     # Define our template tokens
@@ -937,12 +1130,26 @@ class NotifyTelegram(NotifyBase):
     # Escape the full reserved set in literal text not handled as markup.
     _TELEGRAM_RESERVED_FULL = _TELEGRAM_STRICT_CHARS + "_*[]()`"
 
-    def dialect_convert(self, body, body_format=None, *args, **kwargs):
-        """Translate CommonMark to the configured Telegram Markdown."""
+    def dialect_convert(
+        self,
+        body: str,
+        body_format: Optional[NotifyFormat] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> str:
+        """Adapt a declared body to Telegram's own markup.
+
+        - HTML is reduced to the tags Telegram accepts.
+        - CommonMark becomes the configured Telegram Markdown.
+        """
+        if body_format == NotifyFormat.HTML:
+            # Telegram rejects messages holding tags it does not support
+            return TelegramHTMLReducer().reduce(body)
+
         if body_format != NotifyFormat.MARKDOWN:
-            # Telegram's other declared format (HTML) needs no dialect
-            # completion of its own -- only Markdown does.
+            # Nothing else needs a Telegram specific conversion
             return body
+
         strict = self.markdown_ver == TelegramMarkdownVersion.TWO
         return self._commonmark_to_telegram(body, strict=strict)
 
@@ -1319,12 +1526,12 @@ class NotifyTelegram(NotifyBase):
         else:  # HTML
             # Use Telegram's HTML mode
             payload_["parse_mode"] = "HTML"
-            for r, v, m in self.__telegram_escape_html_entries:
-                if "html" in m:
-                    # Add heading padding only for declared HTML sources.
-                    v = v.format(m["html"] if not body_passthrough else "")
 
-                body = r.sub(v, body)
+            # Declared HTML was already reduced by dialect_convert(); only
+            # undeclared HTML still needs the unsupported tags removed.
+            if body_passthrough:
+                for r, v in self.__telegram_escape_html_entries:
+                    body = r.sub(v, body)
 
             # Prepare our payload based on HTML or TEXT
             bodies = [body]

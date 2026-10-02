@@ -28,8 +28,13 @@
 # Fit plugin dialect conversions to service limits after CommonMark repair.
 # Plugins may also reuse these helpers for custom dialect output.
 
+from bisect import bisect_right
+from collections.abc import Sequence
 import re
+from typing import Callable, Optional
 
+from ..common import NotifyFormat
+from ..utils.format import HTML_ENTITY_MAXLEN, html_tag_end
 from .commonmark import (
     commonmark_materialize_repair,
     commonmark_repair_chunk,
@@ -187,12 +192,112 @@ def _longest_fitting_prefix(body, offset, limit, dialect_convert, pending):
     return best_converted, best_len, best_pending
 
 
-def split_dialect_chunk(body, limit, dialect_convert):
-    """Split repaired CommonMark into converted pieces within ``limit``.
+def _html_safe_cuts(body: str) -> list[int]:
+    """Return cut positions outside HTML tags and entities.
 
-    The converter must return the same result for the same input. Longer input
-    should usually stay the same length or grow after conversion. Local markup
-    repairs may make it shorter.
+    The end of ``body`` is always included.
+    """
+    cuts = []
+
+    # Track where the current entity ends
+    entity_end = -1
+
+    idx = 0
+    n = len(body)
+    while idx < n:
+        # A cut here would fall just before this character
+        if idx > entity_end:
+            cuts.append(idx)
+
+        ch = body[idx]
+        if ch == "<":
+            # Jump over the whole tag, quoted attribute values included
+            idx = html_tag_end(body, idx)
+            if idx == -1:
+                # An unclosed tag runs to the end, so no later cut is safe
+                break
+
+        elif ch == "&":
+            # Protect an entity up to and including its ``;``
+            semi = body.find(";", idx, idx + HTML_ENTITY_MAXLEN)
+            if semi != -1 and not any(c.isspace() for c in body[idx:semi]):
+                entity_end = semi
+
+        idx += 1
+
+    # The whole body is always a valid cut
+    cuts.append(len(body))
+    return cuts
+
+
+def _longest_fitting_cut(
+    body: str,
+    offset: int,
+    limit: int,
+    dialect_convert: Callable[[str], str],
+    cuts: Sequence[int],
+) -> tuple[str, int, Sequence[int]]:
+    """Return the longest converted prefix ending at one of ``cuts``.
+
+    Nothing is repaired. The shortest prefix is returned when none fit,
+    ensuring the caller always makes progress.
+    """
+    # Only cuts past the current offset are candidates
+    first = bisect_right(cuts, offset)
+    lo, hi = first, len(cuts) - 1
+    best = None
+
+    # Grow quickly to find the range that may contain the best cut.
+    span = max(1, limit)
+    while lo <= hi:
+        # Use the last cut within the probed length (at least one cut)
+        probe = max(lo, bisect_right(cuts, offset + span, lo) - 1)
+        candidate = dialect_convert(body[offset : cuts[probe]])
+        if len(candidate) > limit:
+            # Too long; the answer lies below this cut
+            hi = probe - 1
+            break
+
+        # This prefix fits; keep growing
+        best = (candidate, cuts[probe] - offset, cuts)
+        lo = probe + 1
+        span *= 2
+
+    # Find the longest safe prefix in the remaining range.
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        candidate = dialect_convert(body[offset : cuts[mid]])
+        if len(candidate) <= limit:
+            # This prefix fits. Try a longer one.
+            best = (candidate, cuts[mid] - offset, cuts)
+            lo = mid + 1
+
+        else:
+            # Too long. Try a shorter prefix.
+            hi = mid - 1
+
+    if best is None:
+        # Not even the shortest safe prefix fits. Force progress anyway.
+        best = (
+            dialect_convert(body[offset : cuts[first]]),
+            cuts[first] - offset,
+            cuts,
+        )
+
+    return best
+
+
+def split_dialect_chunk(
+    body: str,
+    limit: int,
+    dialect_convert: Callable[[str], str],
+    body_format: Optional[NotifyFormat] = None,
+) -> list[str]:
+    """Split converted content into pieces within ``limit``.
+
+    The converter must be deterministic and generally preserve input order.
+    CommonMark is repaired around cuts; HTML keeps tags and entities whole;
+    plain text is cut as it is.
     """
     if not body:
         return [dialect_convert(body)]
@@ -201,15 +306,25 @@ def split_dialect_chunk(body, limit, dialect_convert):
     if len(converted) <= limit:
         return [converted]
 
+    if body_format == NotifyFormat.HTML:
+        # Split HTML only at positions that keep tags and entities whole
+        fit, state = _longest_fitting_cut, _html_safe_cuts(body)
+
+    elif body_format == NotifyFormat.TEXT:
+        # Plain text may be cut anywhere and is never repaired as markup
+        fit, state = _longest_fitting_cut, range(len(body) + 1)
+
+    else:
+        # Carry repair state so later pieces consume real closing markers.
+        fit, state = _longest_fitting_prefix, {}
+
     pieces = []
     # Advance a cursor to avoid copying the full remaining body per piece.
     n = len(body)
     offset = 0
-    # Carry repair state so later pieces consume real closing markers.
-    pending = {}
     while offset < n:
-        piece, consumed, pending = _longest_fitting_prefix(
-            body, offset, limit, dialect_convert, pending
+        piece, consumed, state = fit(
+            body, offset, limit, dialect_convert, state
         )
         # Skip redundant empty closers, but always return at least one piece.
         if piece or not pieces:
@@ -219,10 +334,16 @@ def split_dialect_chunk(body, limit, dialect_convert):
     return pieces
 
 
-def truncate_dialect_chunk(body, limit, dialect_convert):
+def truncate_dialect_chunk(
+    body: str,
+    limit: int,
+    dialect_convert: Callable[[str], str],
+    body_format: Optional[NotifyFormat] = None,
+) -> str:
     """Return the longest converted prefix within ``limit``.
 
-    Truncate mode discards all remaining content.
+    HTML cuts keep tags and entities whole. Plain text is not repaired as
+    markup, and all content after the cut is discarded.
     """
     if not body:
         return dialect_convert(body)
@@ -230,6 +351,20 @@ def truncate_dialect_chunk(body, limit, dialect_convert):
     converted = dialect_convert(body)
     if len(converted) <= limit:
         return converted
+
+    if body_format == NotifyFormat.HTML:
+        # Keep tags and entities whole; no CommonMark repair for HTML
+        piece, _, _ = _longest_fitting_cut(
+            body, 0, limit, dialect_convert, _html_safe_cuts(body)
+        )
+        return piece
+
+    if body_format == NotifyFormat.TEXT:
+        # Plain text is cut as it is, with no markup repair
+        piece, _, _ = _longest_fitting_cut(
+            body, 0, limit, dialect_convert, range(len(body) + 1)
+        )
+        return piece
 
     # Truncate mode has no prior or subsequent repair state.
     piece, _, _ = _longest_fitting_prefix(body, 0, limit, dialect_convert, {})

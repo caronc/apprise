@@ -32,6 +32,9 @@ from functools import lru_cache
 import re
 import unicodedata
 
+from ..common import NotifyFormat
+from ..utils.format import smart_split
+
 # Keep related constants together and define dependent patterns afterward.
 
 # CommonMark ASCII punctuation; Unicode categories cover other characters.
@@ -134,7 +137,8 @@ def _match_html_block_start(line):
 _ATX_HEADING_SHAPE_RE = re.compile(r"#{1,6}(?:[ \t]+(?P<content>.*))?[ \t]*$")
 
 # Match closing hashes preceded by whitespace at the end of a heading.
-_ATX_CLOSING_SEQUENCE_RE = re.compile(r"[ \t]+#+[ \t]*$")
+# Start at the first space so long runs are scanned only once.
+_ATX_CLOSING_SEQUENCE_RE = re.compile(r"(?<![ \t])[ \t]+#+[ \t]*$")
 
 # Allow several full-body destination scans while keeping total work linear.
 SCAN_BUDGET_MULTIPLIER = 4
@@ -152,9 +156,14 @@ _COMMONMARK_LITERAL_CHARS = "\\`*_[]()<>"
 
 
 def commonmark_index_backtick_runs(text):
-    """Index unescaped backtick positions by run length in one pass.
+    r"""List where every run of backticks starts, grouped by its length.
 
-    For example, ``"a`b``c"`` produces ``{1: [1], 2: [3]}``.
+    - Lets code-span lookups jump straight to a matching run of the same
+      length instead of rescanning the text.
+    - Escaped backticks (``\```) are skipped because they are plain text.
+
+    Example: ``"a`b``c"`` returns ``{1: [1], 2: [3]}`` (one single
+    backtick at index 1, one double at index 3).
     """
 
     # Group positions by delimiter width.
@@ -185,9 +194,13 @@ def commonmark_index_backtick_runs(text):
 
 
 def commonmark_find_backtick_run(index, start, run):
-    """Find the next code fence of ``run`` backticks at or after ``start``.
+    """Find the next backtick run of an exact length at or after a position.
 
-    For example, ``commonmark_find_backtick_run({1: [0, 4]}, 1, 1)`` returns 4.
+    - ``index`` comes from ``commonmark_index_backtick_runs()``.
+    - Returns the run's start index, or ``None`` if there is no such run.
+
+    Example: ``commonmark_find_backtick_run({1: [0, 4]}, 1, 1)`` returns
+    ``4``.
     """
 
     # Return early when no run has the requested width.
@@ -949,10 +962,13 @@ def _commonmark_html_block_spans(text):
 
 
 def commonmark_headings_to_bold(body):
-    """Convert ATX headings to bold while leaving code regions unchanged.
+    """Turn ``# Heading`` lines into bold text.
 
-    For example, ``"# Alert"`` becomes ``"**Alert**"``. Code and HTML remain
-    unchanged, while list and quote prefixes are preserved.
+    - For services that have bold but no headings.
+    - Code blocks, code spans, and HTML are left alone.
+    - List and quote prefixes such as ``> `` are kept.
+
+    Example: ``"# Alert"`` becomes ``"**Alert**"``.
     """
     # Find fenced code and HTML blocks together to avoid a duplicate scan.
     protected = sorted(
@@ -1036,11 +1052,14 @@ def commonmark_headings_to_bold(body):
 
 
 def commonmark_decode_backslash_escapes(text):
-    """Remove backslashes from escaped characters before dialect encoding.
+    r"""Remove the backslash from escaped punctuation.
 
-    For example, ``r"a\\_b"`` becomes ``"a_b"`` for a URL or link label.
-    Only CommonMark punctuation is unescaped, preserving paths such as
-    ``r"C:\\Users"``.
+    - Use it on text that is not Markdown, such as a link URL or label.
+    - Only punctuation that CommonMark allows to be escaped is changed,
+      so Windows paths keep their backslashes.
+
+    Example: ``r"a\_b"`` becomes ``"a_b"``, but ``r"C:\Users"`` stays
+    the same.
     """
     out = []
 
@@ -1061,9 +1080,13 @@ def commonmark_decode_backslash_escapes(text):
 
 
 def commonmark_escape_link_url(url):
-    """Prepare a CommonMark URL for a service's ``<url|label>`` syntax.
+    r"""Make a Markdown link URL safe inside a ``<url|label>`` style link.
 
-    For example, ``r"a\\|b&c"`` becomes ``"a%7Cb&amp;c"``.
+    - Removes Markdown backslash escapes.
+    - ``&``, ``<`` and ``>`` become HTML entities.
+    - ``|`` becomes ``%7C`` so it is not read as the label separator.
+
+    Example: ``r"a\|b&c"`` becomes ``"a%7Cb&amp;c"``.
     """
 
     # Step 1: strip CommonMark backslash escapes so we recover the raw URL
@@ -1081,18 +1104,28 @@ def commonmark_escape_link_url(url):
 
 
 def commonmark_new_scan_budget(body):
-    """Create a shared allowance for labeled-link destination scans.
+    """Create a work limit shared by the link scanners for one message.
 
-    Once spent, each later destination receives a short fixed scan.
+    - Pass the result as ``budget`` to ``commonmark_scan_angle_dest()``
+      and ``commonmark_scan_paren_dest()``.
+    - Each scan uses up some of it. Once it is gone, scans only look a
+      short distance ahead, so a message full of broken links cannot make
+      scanning slow.
+
+    Example: ``commonmark_new_scan_budget("abc")`` returns ``[12]``.
     """
     return [len(body) * SCAN_BUDGET_MULTIPLIER]
 
 
 def commonmark_scan_angle_dest(body, i, n, budget=None):
-    """Locate the closing ``>`` of ``](<url>)``, ignoring escaped pairs.
+    r"""Find where a ``](<url>)`` link ends.
 
-    For ``"[x](<https://a>)"``, index 2 returns 14. ``budget`` limits the
-    combined work across a message while still allowing nearby closing text.
+    - ``i`` is the index of the ``]``.
+    - Returns the index of the closing ``>``, or ``None`` if not found.
+    - Escaped characters such as ``\>`` are skipped.
+    - ``budget`` is optional (see ``commonmark_new_scan_budget()``).
+
+    Example: in ``"[x](<https://a>)"``, ``i=2`` returns ``14``.
     """
     # Start immediately after the opening ``](<`` sequence.
     start = i + 3
@@ -1124,10 +1157,15 @@ def commonmark_scan_angle_dest(body, i, n, budget=None):
 
 
 def commonmark_scan_paren_dest(text, i, n, budget=None):
-    """Locate the closing ``)`` of a bare ``](dest)`` link destination.
+    """Find where a ``](url)`` link ends.
 
-    For ``"[x](a_(b))"``, index 3 returns 9. Invalid input returns ``None``.
-    ``budget`` limits combined work while still allowing nearby closing text.
+    - ``i`` is the index of the ``(``.
+    - Returns the index of the matching ``)``, or ``None`` if the URL is
+      not valid (for example, it contains a space or ``<``).
+    - Balanced brackets inside the URL are allowed.
+    - ``budget`` is optional (see ``commonmark_new_scan_budget()``).
+
+    Example: in ``"[x](a_(b))"``, ``i=3`` returns ``9``.
     """
     depth = 1
     start = i + 1
@@ -1167,10 +1205,20 @@ def commonmark_scan_paren_dest(text, i, n, budget=None):
 
 
 def commonmark_scan_autolink_dest(text, i, n):
-    """Classify a possible ``<scheme:destination>`` autolink at ``i``.
+    """Check whether ``<scheme:...>`` at ``i`` is an autolink.
 
-    ``"<https://a*b>"`` returns ``(12, True)``. An incomplete destination
-    remains viable until a disallowed character makes the second value false.
+    - ``i`` is the index of the ``<``.
+    - Returns ``(end, still_valid)``:
+
+      - ``end`` is the index of the closing ``>``, or ``None``.
+      - ``still_valid`` is ``False`` once a space or other character that
+        is not allowed is seen. It stays ``True`` if the text simply ends
+        first.
+
+    Examples:
+
+    - ``"<https://a*b>"`` returns ``(12, True)``.
+    - ``"<https://a b>"`` returns ``(None, False)``.
     """
     match = _AUTOLINK_SCHEME_RE.match(text, i + 1)
     if not match:
@@ -1193,20 +1241,83 @@ def commonmark_scan_autolink_dest(text, i, n):
     return None, True
 
 
-def commonmark_pick_emphasis_sentinel(body):
-    """Return a deterministic Private Use placeholder absent from ``body``.
+# Unicode's Private Use areas, where placeholder characters are taken from
+_PRIVATE_USE_RANGES = (
+    (0xE000, 0xF8FF),
+    (0xF0000, 0xFFFFD),
+    (0x100000, 0x10FFFD),
+)
 
-    For example, a body containing ``chr(0xE000)`` receives that character
-    twice, keeping internal markers distinct from user text.
+# The total number of Private Use characters
+_PRIVATE_USE_TOTAL = sum(end - start + 1 for start, end in _PRIVATE_USE_RANGES)
+
+# One Private Use character, in any of the areas above
+_PRIVATE_USE_CLASS = "".join(
+    f"{chr(start)}-{chr(end)}" for start, end in _PRIVATE_USE_RANGES
+)
+_PRIVATE_USE_RE = re.compile(f"[{_PRIVATE_USE_CLASS}]")
+
+# A run of anything that is not a Private Use character
+_NON_PRIVATE_USE_RE = re.compile(f"[^{_PRIVATE_USE_CLASS}]+")
+
+
+def _private_use_chars():
+    """Yield every Private Use character, in slot order."""
+    for start, end in _PRIVATE_USE_RANGES:
+        yield from map(chr, range(start, end + 1))
+
+
+def commonmark_pick_emphasis_sentinel(body):
+    r"""Pick a marker character that does not appear anywhere in ``body``.
+
+    - Converters temporarily swap ``*`` and ``_`` runs for numbered
+      placeholders like ``S0S``, ``S1S`` (``S`` is the marker). Once they
+      know which runs pair up, the placeholders are replaced with the
+      service's bold or italic syntax.
+    - The marker must not already be in the message, or user text could
+      be mistaken for a placeholder.
+    - It is taken from Unicode's Private Use area, which normal text
+      almost never uses. Usually this is ``"\ue000"``.
+    - If the message already uses every Private Use character, a
+      two-character marker is returned instead.
+
+    Examples:
+
+    - ``commonmark_pick_emphasis_sentinel("hi *there*")`` returns
+      ``"\ue000"``.
+    - ``commonmark_pick_emphasis_sentinel("x\ue000")`` returns
+      ``"\ue001"``.
     """
-    width = 1
-    while True:
-        # Use an uncommon Private Use character as the placeholder and grow
-        # its width until it cannot collide with the message.
-        candidate = chr(0xE000) * width
-        if candidate not in body:
-            return candidate
-        width *= 2
+    if not _PRIVATE_USE_RE.search(body):
+        # Most messages use no Private Use characters at all
+        return chr(_PRIVATE_USE_RANGES[0][0])
+
+    # Keep only the Private Use characters; a bounded set of them is all
+    # that is needed to see which are in use
+    private = _NON_PRIVATE_USE_RE.sub("", body)
+    present = set(private)
+    for char in _private_use_chars():
+        if char not in present:
+            # The first Private Use character the message does not use
+            return char
+
+    # Every one is taken, so pair one with a character that never follows
+    # it.  A character used k times has at most k different followers, so
+    # one used fewer times than there are Private Use characters always
+    # has a free partner; only a few need counting to find one.
+    first = next(
+        char
+        for char in _private_use_chars()
+        if private.count(char) < _PRIVATE_USE_TOTAL - 1
+    )
+    follows = re.compile(re.escape(first) + f"(?=([{_PRIVATE_USE_CLASS}]))")
+    taken = {match.group(1) for match in follows.finditer(body)}
+
+    # A pair is always two different characters
+    taken.add(first)
+    return first + next(
+        char for char in _private_use_chars() if char not in taken
+    )
 
 
 def _commonmark_emphasis_marker_pattern(sentinel):
@@ -1216,10 +1327,16 @@ def _commonmark_emphasis_marker_pattern(sentinel):
 
 
 def commonmark_emphasis_run(body, i, n, delimiters, out, sentinel):
-    """Record the ``*`` or ``_`` run at ``i`` for later emphasis matching.
+    """Swap the ``*`` or ``_`` run at ``i`` for a numbered placeholder.
 
-    Scanning ``"**bold**"`` at index 0 records a bold opener, appends its
-    placeholder to ``out``, and returns index 2.
+    - Adds a description of the run to ``delimiters`` (its character,
+      length, and whether it can open or close emphasis).
+    - Appends ``sentinel + index + sentinel`` to ``out``.
+    - Returns the index just past the run.
+    - Call ``commonmark_render_emphasis_markers()`` when done.
+
+    Example: for ``"**bold**"`` at ``i=0`` with ``sentinel="S"``, ``out``
+    gets ``"S0S"`` and ``2`` is returned.
     """
     ch = body[i]
 
@@ -1250,9 +1367,13 @@ def commonmark_emphasis_run(body, i, n, delimiters, out, sentinel):
 
 
 def commonmark_render_emphasis_events(events, strong_markers, regular_markers):
-    """Translate one delimiter run's events into close/open target markers.
+    """Build the markers to output for one ``*`` or ``_`` run.
 
-    A strong open with markers ``("<b>", "</b>")`` returns ``("", "<b>")``.
+    - ``events`` is the run's list of ``("open" | "close", is_strong)``.
+    - Returns ``(close_part, open_part)``. Closing markers come first.
+
+    Example: ``[("open", True)]`` with strong markers ``("<b>", "</b>")``
+    returns ``("", "<b>")``.
     """
     close_part = "".join(
         (strong_markers[1] if is_strong else regular_markers[1])
@@ -1272,10 +1393,17 @@ def commonmark_render_emphasis_events(events, strong_markers, regular_markers):
 def commonmark_render_emphasis_markers(
     text, delimiters, strong_markers, regular_markers, sentinel
 ):
-    """Replace recorded CommonMark runs with a service's emphasis markers.
+    """Replace the placeholders with the service's bold and italic markers.
 
-    Adapters can pass ``("<b>", "</b>")`` and ``("<i>", "</i>")`` to
-    render matched strong and regular emphasis as HTML-style tags.
+    - ``text`` and ``delimiters`` come from
+      ``commonmark_emphasis_run()``.
+    - ``strong_markers`` and ``regular_markers`` are ``(open, close)``
+      pairs.
+    - A run with no partner is put back as its original ``*`` or ``_``.
+
+    Example: ``"**hi** and *x*"`` becomes ``"S0ShiS1S and S2SxS3S"``, and
+    with ``("<b>", "</b>")`` and ``("<i>", "</i>")`` this returns
+    ``"<b>hi</b> and <i>x</i>"``.
     """
     commonmark_match_emphasis(delimiters)
 
@@ -1360,9 +1488,13 @@ def _cm_flanking(prev_ch, next_ch):
 
 @lru_cache(maxsize=8192)
 def commonmark_can_open_emphasis(delim_char, prev_ch, next_ch):
-    """Return whether ``*`` or ``_`` can open emphasis between two characters.
+    """Return whether a ``*`` or ``_`` run can start emphasis.
 
-    For example, ``commonmark_can_open_emphasis("*", " ", "x")`` is true.
+    - ``prev_ch`` and ``next_ch`` are the characters around the run
+      (``None`` at the start or end of the text).
+    - Follows the CommonMark rules: a run followed by a space cannot open.
+
+    Example: ``commonmark_can_open_emphasis("*", " ", "x")`` is ``True``.
     """
     left_flanking, right_flanking = _cm_flanking(prev_ch, next_ch)
     if not left_flanking:
@@ -1377,9 +1509,13 @@ def commonmark_can_open_emphasis(delim_char, prev_ch, next_ch):
 
 @lru_cache(maxsize=8192)
 def commonmark_can_close_emphasis(delim_char, prev_ch, next_ch):
-    """Return whether ``*`` or ``_`` can close emphasis between two characters.
+    """Return whether a ``*`` or ``_`` run can end emphasis.
 
-    For example, ``commonmark_can_close_emphasis("*", "x", " ")`` is true.
+    - ``prev_ch`` and ``next_ch`` are the characters around the run
+      (``None`` at the start or end of the text).
+    - Follows the CommonMark rules: a run after a space cannot close.
+
+    Example: ``commonmark_can_close_emphasis("*", "x", " ")`` is ``True``.
     """
     left_flanking, right_flanking = _cm_flanking(prev_ch, next_ch)
     if not right_flanking:
@@ -1395,10 +1531,15 @@ def commonmark_can_close_emphasis(delim_char, prev_ch, next_ch):
 def commonmark_scan_delimiter_run(
     text, i, boundary_prev_ch=None, boundary_next_ch=None
 ):
-    """Return a ``*``/``_`` run's end and the characters surrounding it.
+    """Measure the ``*`` or ``_`` run at ``i``.
 
-    ``commonmark_scan_delimiter_run("**word", 0)`` returns ``(2, None, "w")``;
-    boundary arguments supply neighbors outside the provided slice.
+    - Returns ``(end, prev_ch, next_ch)``: the index after the run and
+      the characters on either side (``None`` at an edge).
+    - ``boundary_prev_ch`` and ``boundary_next_ch`` give the neighbours
+      when ``text`` is only part of a longer message.
+
+    Example: ``commonmark_scan_delimiter_run("**word", 0)`` returns
+    ``(2, None, "w")``.
     """
     ch = text[i]
     n = len(text)
@@ -1413,10 +1554,17 @@ def commonmark_scan_delimiter_run(
 def commonmark_lookahead_closer_widths(
     next_chunk, boundary_prev_ch=None, boundary_next_ch=None
 ):
-    """Find usable emphasis closers in the next bounded message slice.
+    """Find which emphasis runs could be closed by text that follows.
 
-    ``commonmark_lookahead_closer_widths("tail** end")`` returns ``{"*": 2}``.
-    Markers inside code or links are ignored because they are literal text.
+    - ``next_chunk`` is the start of the next piece of the message.
+    - Returns ``{char: width}`` for each ``*`` or ``_`` closer found.
+    - Markers inside code or links do not count.
+
+    Examples:
+
+    - ``commonmark_lookahead_closer_widths("tail** end")`` returns
+      ``{"*": 2}``.
+    - ``commonmark_lookahead_closer_widths("`**` x")`` returns ``{}``.
     """
     if not next_chunk:
         return {}
@@ -1496,10 +1644,15 @@ def commonmark_lookahead_closer_widths(
 
 
 def commonmark_match_emphasis(delimiters):
-    """Pair recorded opener/closer runs using CommonMark emphasis rules.
+    """Pair up opening and closing ``*`` and ``_`` runs.
 
-    For runs from ``"*text*"``, this records an open on the first run and a
-    close on the second for later rendering.
+    - ``delimiters`` comes from ``commonmark_emphasis_run()``.
+    - Follows the CommonMark pairing rules.
+    - Adds ``("open" | "close", is_strong)`` entries to each run's
+      ``"events"`` list. Returns the same list.
+
+    Example: for ``"*text*"`` the first run gets ``[("open", False)]``
+    and the second gets ``[("close", False)]``.
     """
     total = len(delimiters)
 
@@ -1607,19 +1760,27 @@ def commonmark_repair_chunk(
     next_chunk_boundary_ch=None,
     record_atoms=None,
 ):
-    """Make one split CommonMark chunk safe to render on its own.
+    """Fix one piece of a split Markdown message so it displays correctly.
 
-    Pass the returned state to the next chunk. For example, ``"**hello"`` with
-    ``next_chunk=" world**"`` returns ``"**hello**"`` and ``{"**": 1}``.
+    - When a long message is split, bold or italic text can be cut in
+      half. This closes it at the end of the piece.
+    - ``pending`` tracks styles still open from earlier pieces. Start
+      with ``{}`` and pass the returned state to the next call.
+    - ``next_chunk`` is the text that comes next, used to check that a
+      style really does close later.
+    - Returns ``(fixed_text, pending)``.
 
-    When supplied, ``record_atoms`` collects reusable parsed sections as
-    ``(start, end, kind, payload)``. Available section kinds are:
+    Example: ``commonmark_repair_chunk("**hello", {}, " world**")``
+    returns ``("**hello**", {"**": 1})``.
 
-    - ``"plain"`` contains ordinary text and may be safely cut shorter.
-    - ``"literal"`` contains one complete escape, code span, or link.
-    - ``"delimiter"`` describes a reusable ``*`` or ``_`` markup run.
-    - ``"consumed"`` records markup already closed by a previous chunk.
-    - ``"resume"`` contains text plus the updated cross-chunk state.
+    ``record_atoms`` (optional) is a list that collects
+    ``(start, end, kind, payload)`` entries. Each ``kind`` is one of:
+
+    - ``"plain"``: ordinary text, safe to cut anywhere.
+    - ``"literal"``: one escape, code span, or link that must stay whole.
+    - ``"delimiter"``: a ``*`` or ``_`` run.
+    - ``"consumed"``: markup already closed by an earlier piece.
+    - ``"resume"``: text plus the updated ``pending`` state.
     """
 
     def _record(start, end, kind, payload):
@@ -2226,15 +2387,18 @@ class _CmCloserRunIndex:
 
 
 def commonmark_scan_closer_runs(text, boundary_next_ch=None):
-    """Index closing ``*`` and ``_`` runs for repeated checks.
+    """Index the ``*`` and ``_`` runs in ``text`` that could close emphasis.
 
-    Scanning stops where an escape, code span, or link could change how a
-    later range is interpreted.
+    - Built once so the same text can be checked many times quickly.
+    - Stops at the first escape, code span, or link, because those can
+      change the meaning of text after them.
+    - Returns ``(index_by_char, covered_end)``:
 
-    Returns ``(index_by_char, covered_end)``:
+      - ``index_by_char`` has one index for ``*`` and one for ``_``.
+      - ``covered_end`` is how far into ``text`` the index can be used.
 
-    - ``index_by_char`` contains an index for both ``*`` and ``_``.
-    - ``covered_end`` marks how far the shared result can be safely used.
+    Example: ``commonmark_scan_closer_runs("a** b_ `c*`")`` gives a
+    ``covered_end`` of ``7``, where the code span starts.
     """
     starts = {"*": [], "_": []}
     ends = {"*": [], "_": []}
@@ -2273,15 +2437,21 @@ def commonmark_scan_closer_runs(text, boundary_next_ch=None):
 
 
 def commonmark_scan_repair_region(text, pending, lookahead_span):
-    """Record reusable sections for repairing several prefixes of one text.
+    """Scan text once so many shorter cuts of it can be repaired quickly.
 
-    Use the same ``pending`` state and ``lookahead_span`` when materializing.
+    - Used when searching for the longest piece that fits a length limit.
+    - Pass the results to ``commonmark_materialize_repair()``, with the
+      same ``pending`` and ``lookahead_span``.
+    - Returns ``(recorded_sections, covered_end, sentinel)``:
 
-    Returns ``(recorded_sections, covered_end, sentinel)``:
+      - ``recorded_sections``: ``(start, end, kind, payload)`` entries
+        (see ``commonmark_repair_chunk()``).
+      - ``covered_end``: how far the sections can be reused.
+      - ``sentinel``: the marker from
+        ``commonmark_pick_emphasis_sentinel()``.
 
-    - ``recorded_sections`` contains ``(start, end, kind, payload)`` entries.
-    - ``covered_end`` marks the last safe reusable position.
-    - ``sentinel`` is the unique placeholder used while rebuilding markup.
+    Example: ``"**hello world**"`` records a ``"delimiter"``, a
+    ``"plain"`` section ``"hello world"``, and another ``"delimiter"``.
     """
     bracket_pos = text.find("[")
     covered_end = len(text) if bracket_pos == -1 else bracket_pos
@@ -2329,20 +2499,18 @@ def commonmark_materialize_repair(
     closer_index=None,
     closer_covered_end=None,
 ):
-    """Repair one prefix using a region scanned earlier.
+    """Repair the first ``cut`` characters of ``body`` from ``offset``,
+    reusing a scan from ``commonmark_scan_repair_region()``.
 
-    Equivalent to calling::
+    - Gives the same result as ``commonmark_repair_chunk()`` with
+      ``next_chunk`` set to the next ``lookahead_span`` characters.
+    - Pass the values from ``commonmark_scan_repair_region()`` with the
+      same ``pending`` state.
+    - ``closer_index`` and ``closer_covered_end`` (from
+      ``commonmark_scan_closer_runs()``) are optional but save a rescan.
 
-        commonmark_repair_chunk(
-            body[offset : offset + cut],
-            pending,
-            next_chunk=body[offset + cut : offset + cut + lookahead_span],
-            next_chunk_boundary_ch=body[offset + cut + lookahead_span]
-            if that position exists else None,
-        )
-
-    Supply the values returned by ``commonmark_scan_repair_region()`` with the
-    same ``pending`` state. Closer data is optional but avoids another scan.
+    Example: after scanning ``"**hello world**"``, a ``cut`` of ``7``
+    returns ``("**hello**", {"**": 1})``.
     """
 
     def _fallback():
@@ -2469,3 +2637,123 @@ def commonmark_materialize_repair(
         next_chunk=(lookahead or None),
         next_chunk_boundary_ch=boundary_next_ch,
     )
+
+
+def _section_text_end(text: str, start: int, tail: int) -> int:
+    """Return the end of intro or section text starting near ``start``.
+
+    Text ends at trailing whitespace or before the next heading line.
+    """
+    # Check each "#" before the trailing whitespace
+    hash_idx = text.find("#", start, tail)
+    while hash_idx != -1:
+        # Walk back over the whitespace just before this "#"
+        ws_idx = hash_idx
+        while ws_idx > start and text[ws_idx - 1].isspace():
+            ws_idx -= 1
+
+        # The text ends at the first line break in that whitespace
+        for idx in range(ws_idx, hash_idx):
+            if text[idx] in "\r\n":
+                return idx
+
+        # This "#" is not at the start of a line; try the next one
+        hash_idx = text.find("#", hash_idx + 1, tail)
+
+    # Otherwise the text runs up to the trailing whitespace
+    return max(start, tail)
+
+
+def commonmark_sections(
+    markdown: str, name_maxlen: int, value_maxlen: int
+) -> tuple[str, list[tuple[str, str]]]:
+    r"""Split Markdown into intro text and ``(heading, text)`` sections.
+
+    - Used for services that show messages as titled fields.
+    - Headings are cut to ``name_maxlen``.
+    - Section text longer than ``value_maxlen`` continues in extra
+      sections with the same heading.
+    - A heading with no text under it gets ``""``.
+
+    Example: ``"Intro\n# A\nsome text\n# B"`` returns
+    ``("Intro", [("A", "some text"), ("B", "")])``.
+    """
+    # Text before the first heading becomes the description
+    description = ""
+
+    # Skip the leading whitespace
+    n = len(markdown)
+    idx = 0
+    while idx < n and markdown[idx].isspace():
+        idx += 1
+
+    if idx < n and markdown[idx] != "#":
+        # The description runs until the first heading line
+        tail = len(markdown.rstrip())
+        end = _section_text_end(markdown, idx + 1, tail)
+        description = markdown[idx:end].strip()
+
+    if description:
+        # Strip description from our string since it has been handled
+        # now.
+        markdown = markdown.replace(description, "", 1)
+
+    # Where the trailing whitespace begins
+    n = len(markdown)
+    tail = len(markdown.rstrip())
+
+    # Find each heading and the text written below it.
+    sections: list[tuple[str, str]] = []
+    pos = 0
+    while True:
+        # Every "#" may open a heading
+        hash_idx = markdown.find("#", pos)
+        if hash_idx == -1:
+            break
+
+        # The heading runs to the end of its line
+        line_end = markdown.find("\n", hash_idx)
+        if line_end == -1:
+            line_end = n
+
+        # Skip the "#", space, tab and vertical tab characters after it
+        idx = hash_idx + 1
+        while idx < line_end and markdown[idx] in "# \t\v":
+            idx += 1
+
+        if idx == line_end:
+            if idx == hash_idx + 1:
+                # A lone "#" at the end of a line is not a heading
+                pos = hash_idx + 1
+                continue
+
+            # Keep at least the last character as the heading name
+            idx -= 1
+
+        # Section names have a length limit of their own
+        name = markdown[idx:line_end].strip("#`* \r\n\t\v")[:name_maxlen]
+
+        # Skip the line break and any whitespace after the heading
+        idx = min(line_end + 1, n)
+        while idx < n and markdown[idx].isspace():
+            idx += 1
+
+        # Section text needs two or more characters and no leading "#"
+        text = ""
+        pos = idx
+        if idx + 1 < n and markdown[idx] != "#":
+            pos = _section_text_end(markdown, idx + 2, tail)
+            text = markdown[idx:pos].strip()
+
+        if not text:
+            # A heading with nothing written below it
+            sections.append((name, ""))
+            continue
+
+        # Continue long sections in sections with the same name.
+        sections.extend(
+            (name, part)
+            for part in smart_split(text, value_maxlen, NotifyFormat.TEXT)
+        )
+
+    return description, sections

@@ -24,8 +24,15 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
+from timeit import default_timer
+
 from apprise import NotifyFormat
-from apprise.utils.format import html_adjust, markdown_adjust, smart_split
+from apprise.utils.format import (
+    html_adjust,
+    html_tag_adjust,
+    markdown_adjust,
+    smart_split,
+)
 
 
 def test_smart_split_prefers_newlines_over_spaces_and_punctuation():
@@ -490,3 +497,104 @@ def test_smart_split_uses_punctuation_branch_on_rare_whitespace() -> None:
     # We expect the first chunk to end after the rare whitespace
     assert chunks[0] == f"Hello.{vt}"
     assert chunks[1] == "World"
+
+
+def test_smart_split_keeps_markdown_escape() -> None:
+    """A hard split never strands an escaping backslash."""
+
+    # The hard split would land between "\" and ">"; it moves back one.
+    text = "x" * 19 + "\\>quoted"
+    chunks = smart_split(text, 20, body_format=NotifyFormat.MARKDOWN)
+    assert chunks == ["x" * 19, "\\>quoted"]
+
+    # An escaped backslash ("\\") is a complete pair, so it may end a chunk.
+    text = "x" * 18 + "\\\\" + "y" * 5
+    chunks = smart_split(text, 20, body_format=NotifyFormat.MARKDOWN)
+    assert chunks == ["x" * 18 + "\\\\", "y" * 5]
+
+    # Three backslashes leave the last one unpaired, so it moves on.
+    text = "x" * 17 + "\\\\\\" + ">yy"
+    chunks = smart_split(text, 20, body_format=NotifyFormat.MARKDOWN)
+    assert chunks == ["x" * 17 + "\\\\", "\\>yy"]
+
+    # When the pair cannot fit at all, splitting still makes progress.
+    chunks = smart_split("\\>\\>", 1, body_format=NotifyFormat.MARKDOWN)
+    assert "".join(chunks) == "\\>\\>"
+
+    # Plain text has no escapes, so the hard split is left alone.
+    text = "x" * 19 + "\\>quoted"
+    chunks = smart_split(text, 20, body_format=NotifyFormat.TEXT)
+    assert chunks[0] == "x" * 19 + "\\"
+
+
+def test_smart_split_never_cuts_inside_html_tag() -> None:
+    """A split landing inside an HTML tag moves before its "<"."""
+
+    text = "x" * 10 + ' <a href="u" title="t t">link</a>'
+    chunks = smart_split(text, 25, body_format=NotifyFormat.HTML)
+    assert "".join(chunks) == text
+    assert chunks[0] == "x" * 10 + " "
+    assert chunks[1].startswith('<a href="u" title="t t">')
+
+    # A closed tag before the split is left alone.
+    assert html_tag_adjust("<b>x</b> yy", 0, 9) == 9
+
+    # A tag opening the chunk ends the chunk right after its ">".
+    assert html_tag_adjust('<a title="t t">x', 0, 10, 16) == 15
+
+    # When that tag does not fit, the split is left where it was.
+    assert html_tag_adjust('<a title="t t">x', 0, 10, 12) == 10
+    assert html_tag_adjust('<a title="t t', 0, 10) == 10
+
+    # Guard paths return the split unchanged.
+    assert html_tag_adjust("abc", 2, 2) == 2
+    assert html_tag_adjust("abc", 0, 10) == 10
+
+
+def test_smart_split_ignores_quoted_gt_in_html_tag() -> None:
+    """A ">" inside a quoted attribute value does not end the tag."""
+
+    for tag in ('<a title="1 > 0">', "<a title='1 > 0'>"):
+        text = "hello " + tag + "link</a> world"
+        start = text.index(tag)
+        end = start + len(tag)
+        for limit in range(len(tag), len(text) + 1):
+            chunks = smart_split(text, limit, body_format=NotifyFormat.HTML)
+            assert "".join(chunks) == text
+
+            # No piece may end inside the tag
+            pos = 0
+            for chunk in chunks:
+                pos += len(chunk)
+                assert not start < pos < end
+
+    # A split inside the tag moves before it, even past a quoted ">"
+    assert html_tag_adjust('ab <a title="1 > 0">x', 0, 16) == 3
+
+    # A tag opening the chunk ends after its real ">"
+    assert html_tag_adjust('<a title="1 > 0">x', 0, 12) == 17
+
+    # An unclosed quote or tag never ends
+    assert html_tag_adjust('<a title="1 > 0', 0, 12) == 12
+    assert html_tag_adjust("ab <b", 0, 5) == 3
+
+
+def test_smart_split_unbalanced_html_quotes_are_fast() -> None:
+    """Unbalanced attribute quotes keep HTML splitting linear."""
+
+    for body in ('<a title="' * 20000, "<a title='" * 20000):
+        start = default_timer()
+        chunks = smart_split(body, 100, body_format=NotifyFormat.HTML)
+        elapsed = default_timer() - start
+        assert "".join(chunks) == body
+        assert elapsed < 5.0
+
+
+def test_smart_split_keeps_long_html_entity() -> None:
+    """smart_split never cuts inside the longest HTML5 named entity."""
+    entity = "&CounterClockwiseContourIntegral;"
+    text = "x" * 20 + entity + "y" * 20
+    for limit in range(len(entity) + 1, len(text)):
+        chunks = smart_split(text, limit, NotifyFormat.HTML)
+        assert any(entity in chunk for chunk in chunks)
+        assert "".join(chunks) == text

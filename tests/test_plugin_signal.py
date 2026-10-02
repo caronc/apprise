@@ -31,6 +31,7 @@ from json import loads
 # Disable logging for a cleaner testing output
 import logging
 import os
+from timeit import default_timer
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -554,3 +555,165 @@ def test_plugin_signal_text_mode_markdown_from_library(request_mock):
     payload = loads(details[1]["data"])
     # Core behaviour we are validating
     assert payload.get("text_mode") == "styled"
+
+
+@pytest.mark.parametrize(
+    "markdown,expected",
+    [
+        # Headings have no Signal syntax, so they become bold
+        ("# Alert", "**Alert**"),
+        # Emphasis maps onto Signal's star syntax
+        ("**bold** *it* _it_ __bold__", "**bold** *it* *it* **bold**"),
+        # Strikethrough uses a single tilde in Signal
+        ("~~gone~~ ~also~", "~gone~ ~also~"),
+        # Tildes that do not pair up stay literal
+        ("~~~x~~~ a ~~b~ c~", "\\~\\~\\~x\\~\\~\\~ a \\~\\~b\\~ c\\~"),
+        # A pair drops any opener of the other size found inside it
+        ("~a ~~b a~ b~~", "~a \\~\\~b a~ b\\~\\~"),
+        # CommonMark escapes are dropped unless Signal needs them
+        ("a\\_b \\# 2\\*3 \\~ \\| \\&", "a_b # 2\\*3 \\~ \\| &"),
+        # Unmatched stars are literal
+        ("2*3", "2\\*3"),
+        # A backslash before a line break is a hard break
+        ("a\\\nb", "a\nb"),
+        # Other backslashes are kept as-is
+        ("C:\\temp x\\", "C:\\temp x\\"),
+        # A literal backslash never escapes the markup after it
+        ("\\\\**b**", "\\\u200b**b**"),
+        # An escaped star is kept apart from the markup after it
+        ("**\\*T\\***", "**\\*T\\*\u200b**"),
+        # Nested emphasis closers are kept apart from each other
+        ("***bi***", "*\u200b**bi**\u200b*"),
+        # A literal star is kept apart from an opener in the same run
+        ("**a*", "\\*\u200b*a*"),
+        # Code spans keep their content literal
+        ("`a*b` ``x`y``", "`a\\*b` `x\\`y`"),
+        # Fenced code drops its language line
+        ("```python\nx*y\n```", "`x\\*y`"),
+        # An unmatched backtick stays literal
+        ("a ` b", "a \\` b"),
+        # Links become "label (url)"
+        ("[lbl](<https://x.com/~u>)", "lbl (https://x.com/\\~u)"),
+        ("[lbl](https://x.com/a\\_b)", "lbl (https://x.com/a_b)"),
+        ("[](<https://x.com>)", "https://x.com"),
+        # Broken link forms stay literal
+        ("[a](<b", "[a](<b"),
+        ("[a](b c", "[a](b c"),
+        ("[a] (b)", "[a] (b)"),
+        # Autolinks lose their brackets
+        ("<https://a.b/c~d>", "https://a.b/c\\~d"),
+        ("a < b", "a < b"),
+        ("<https://a.b/~c", "<https://a.b/\\~c"),
+        # A raw spoiler is Signal's own syntax and is kept
+        ("||spoiler||", "||spoiler||"),
+    ],
+)
+def test_plugin_signal_markdown_dialect(markdown, expected):
+    """CommonMark is translated to Signal styled text."""
+    assert NotifySignalAPI._commonmark_to_signal(markdown) == expected
+
+
+def test_plugin_signal_styled_text(request_mock):
+    """Declared content reaches Signal as styled text."""
+    obj = Apprise.instantiate(
+        "signal://localhost/+15551234567/+15557654321?format=markdown"
+    )
+
+    # Plain text stays literal in styled mode
+    assert obj.notify(
+        title="Build *failed*",
+        body="my_app 2*3 ~user",
+        body_format=NotifyFormat.TEXT,
+    )
+    payload = loads(request_mock.call_args_list[-1][1]["data"])
+    assert payload["text_mode"] == "styled"
+    assert payload["message"] == (
+        "**Build \\*failed\\*\u200b**\nmy_app 2\\*3 \\~user"
+    )
+
+    # HTML is rendered with Signal's own markup
+    assert obj.notify(
+        body="<b>bold</b> <i>it</i> a_b",
+        body_format=NotifyFormat.HTML,
+    )
+    payload = loads(request_mock.call_args_list[-1][1]["data"])
+    assert payload["message"] == "**bold** *it* a_b"
+
+    # Content with no declared format is passed through untouched
+    assert obj.notify(body="**bold** a\\_b")
+    payload = loads(request_mock.call_args_list[-1][1]["data"])
+    assert payload["message"] == "**bold** a\\_b"
+
+    # Plain text mode never sees Signal markup
+    obj = Apprise.instantiate("signal://localhost/+15551234567/+15557654321")
+    assert obj.notify(body="**bold**", body_format=NotifyFormat.MARKDOWN)
+    payload = loads(request_mock.call_args_list[-1][1]["data"])
+    assert payload["text_mode"] == "normal"
+    assert payload["message"] == "**bold**"
+
+
+def test_plugin_signal_unpaired_tildes_are_fast():
+    """Many tildes that never pair up are handled quickly."""
+
+    # Double tilde openers followed by single tilde closers
+    start = default_timer()
+    result = NotifySignalAPI._commonmark_to_signal(
+        "~~a " * 25000 + "a~ " * 33333
+    )
+    elapsed = default_timer() - start
+    assert result.count("~") == 25000 * 2 + 33333
+    assert "~" not in result.replace("\\~", "")
+    assert elapsed < 5.0
+
+    # Single tilde openers followed by double tilde closers
+    start = default_timer()
+    result = NotifySignalAPI._commonmark_to_signal(
+        "~a " * 33333 + "a~~ " * 25000
+    )
+    elapsed = default_timer() - start
+    assert result.count("~") == 33333 + 25000 * 2
+    assert "~" not in result.replace("\\~", "")
+    assert elapsed < 5.0
+
+
+@pytest.mark.parametrize(
+    "markdown, expected",
+    [
+        # A backslash then digits before Signal markup stays literal text
+        ("\\2~", "\\2\\~"),
+        ("\\1~~", "\\1\\~\\~"),
+        ("\\0*", "\\0\\*"),
+        ("\\3_", "\\3_"),
+        ("a\\12~b~", "a\\12~b~"),
+        ("\\0~~a~~", "\\0~a~"),
+        # Private-use characters already in the message are left alone
+        ("\\2~", "\\2\\~"),
+        ("\\0*", "\\0\\*"),
+    ],
+)
+def test_plugin_signal_backslash_digits(markdown, expected):
+    """Backslash and digit sequences never break Signal conversion."""
+    assert NotifySignalAPI._commonmark_to_signal(markdown) == expected
+
+
+def test_plugin_signal_backslash_markers_stay_small():
+    """Many backslashes never make Signal conversion slow or large."""
+    # Every Private Use character is taken
+    every = "".join(
+        chr(c)
+        for start, end in (
+            (0xE000, 0xF8FF),
+            (0xF0000, 0xFFFFD),
+            (0x100000, 0x10FFFD),
+        )
+        for c in range(start, end + 1)
+    )
+
+    # Taken characters, a long run of the first one, and both together,
+    # each followed by many backslashes before markup
+    for prefix in (every, chr(0xE000) * 20000, every + chr(0xE000) * 20000):
+        body = prefix + "\\2~" * 20000
+        start = default_timer()
+        result = NotifySignalAPI._commonmark_to_signal(body)
+        assert default_timer() - start < 5.0
+        assert result == prefix + "\\2\\~" * 20000

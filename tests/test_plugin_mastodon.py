@@ -31,6 +31,7 @@ from json import dumps, loads
 # Disable logging for a cleaner testing output
 import logging
 import os
+from timeit import default_timer
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -1208,3 +1209,112 @@ def test_plugin_mastodon_apprise_tags(mock_post):
     # A tag-filtered notify() follows the same code path
     assert bool(a.notify(body="test", tag="prod")) is True
     assert mock_post.call_count == 1
+
+
+@mock.patch("requests.post")
+def test_plugin_mastodon_markdown_dialect(mock_post):
+    """Mastodon statuses never carry Markdown escapes or headings."""
+
+    response = mock.Mock()
+    response.content = dumps({"id": "1"})
+    response.status_code = requests.codes.ok
+    response.headers = {}
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        "mastodon://access_key@nuxref.com?format=markdown"
+    )
+
+    # Plain text is shown as written and its hashtag stays whole
+    assert obj.notify(
+        title="Deploy & #1",
+        body="my_app 2*3 done @bob #my_tag",
+        body_format=NotifyFormat.TEXT,
+    )
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["status"] == (
+        "Deploy & #1\nmy_app 2*3 done @bob #my_tag @bob #my_tag"
+    )
+
+    # A body that looks like a heading stays literal
+    assert obj.notify(body="# not a heading", body_format=NotifyFormat.TEXT)
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["status"] == "# not a heading"
+
+    # Content with no declared format is passed through untouched
+    assert obj.notify(body="a\\_b")
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["status"] == "a\\_b"
+
+    # An empty or closed heading becomes a plain line
+    assert obj.dialect_convert("#\nbody", NotifyFormat.MARKDOWN) == "\nbody"
+    assert (
+        obj.dialect_convert("## Title ##\r\nbody", NotifyFormat.MARKDOWN)
+        == "Title\r\nbody"
+    )
+
+    # Other formats are left alone
+    assert obj.dialect_convert("# a\\_b", NotifyFormat.TEXT) == "# a\\_b"
+
+
+@mock.patch("requests.post")
+def test_plugin_mastodon_retry_posts(mock_post):
+    """A retry only reposts the statuses that failed."""
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.content = dumps(d)
+        r.status_code = code
+        r.headers = {}
+        return r
+
+    media = _mk_resp({"id": "1", "file_mime": "image/gif"})
+    ok = _mk_resp({"id": "2"})
+    bad = _mk_resp({}, requests.codes.internal_server_error)
+
+    # Two GIFs are never grouped, so two statuses are posted; the second
+    # one fails the first time around
+    mock_post.side_effect = [media, media, ok, bad, media, media, ok]
+
+    aobj = Apprise()
+    assert aobj.add("mastodon://access_key@nuxref.com?retry=1&wait=0")
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    assert aobj.notify(body="body", attach=[path, path])
+
+    statuses = [
+        loads(c[1]["data"])["status"]
+        for c in mock_post.call_args_list
+        if c[0][0].endswith("/statuses")
+    ]
+    assert statuses == ["body", "02/02", "02/02"]
+
+
+def test_plugin_mastodon_heading_title():
+    """A leading heading keeps its title and loses its closing hashes."""
+
+    obj = Apprise.instantiate("mastodon://access_key@example.com")
+    assert isinstance(obj, NotifyMastodon)
+
+    def convert(body):
+        return obj.dialect_convert(body, NotifyFormat.MARKDOWN)
+
+    # A closing "#" run needs a space before it to be removed
+    assert convert("# C#\nx") == "C#\nx"
+    assert convert("# C #\nx") == "C\nx"
+    assert convert("# #") == "#"
+    assert convert("#\t#\t") == "#"
+
+    # A carriage return only stays when a new line follows it
+    assert convert("# a \r") == "a \r"
+    assert convert("# a #\r\nb") == "a\r\nb"
+
+    # Text that is not a heading is left alone
+    assert convert("#a") == "#a"
+    assert convert("####### a") == "####### a"
+
+    # A long run of spaces inside the title is handled quickly
+    start = default_timer()
+    result = convert("# a" + " " * 100000 + "b")
+    elapsed = default_timer() - start
+    assert result == "a" + " " * 100000 + "b"
+    assert elapsed < 5.0

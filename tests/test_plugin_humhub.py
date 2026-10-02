@@ -35,7 +35,7 @@ import requests
 
 from apprise import Apprise
 from apprise.exception import AppriseImproperlyConfigured
-from apprise.plugins.base import _delivery_tracker
+from apprise.plugins.base import _delivery_memo, _delivery_tracker
 from apprise.plugins.humhub import NotifyHumHub
 
 logging.disable(logging.CRITICAL)
@@ -612,7 +612,7 @@ def test_plugin_humhub_attachment_upload_failure(mock_post):
 
 @mock.patch("requests.post")
 def test_plugin_humhub_attachment_failure_does_not_repeat_post(mock_post):
-    """An attachment failure does not create a duplicate post."""
+    """A retry uploads the attachment to the existing post."""
     from io import BytesIO
 
     create_resp = requests.Request()
@@ -623,20 +623,39 @@ def test_plugin_humhub_attachment_failure_does_not_repeat_post(mock_post):
     failed_upload.status_code = requests.codes.internal_server_error
     failed_upload.content = b"error"
 
-    mock_post.side_effect = [create_resp, failed_upload]
+    good_upload = requests.Request()
+    good_upload.status_code = requests.codes.ok
+    good_upload.content = b"{}"
+
+    mock_post.side_effect = [create_resp, failed_upload, good_upload]
 
     attachment = mock.MagicMock()
     attachment.__bool__ = mock.MagicMock(return_value=True)
     attachment.name = "report.pdf"
-    attachment.open = mock.MagicMock(return_value=BytesIO(b"pdf data"))
+    attachment.open = mock.MagicMock(side_effect=lambda: BytesIO(b"pdf data"))
 
     obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
+
+    # Retries turn on delivery marks and remembered values together
     tracker_token = _delivery_tracker.set(set())
+    memo_token = _delivery_memo.set({})
     try:
+        # The post is created but its upload fails
         assert obj.send(body="msg", attach=[attachment]) is False
-        assert obj.send(body="msg", attach=[attachment]) is False
+
+        # The retry uploads to the same post instead of making a new one
+        assert obj.send(body="msg", attach=[attachment]) is True
+
     finally:
         _delivery_tracker.reset(tracker_token)
+        _delivery_memo.reset(memo_token)
+
+    upload_calls = [
+        call
+        for call in mock_post.call_args_list
+        if call.args[0].endswith("/api/v1/post/3/upload-files")
+    ]
+    assert len(upload_calls) == 2
 
     create_calls = [
         call

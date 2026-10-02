@@ -48,11 +48,13 @@
 #   - https://github.com/reddit-archive/reddit/wiki/API
 from datetime import datetime, timedelta, timezone
 from json import loads
+from typing import Any, Optional
 
 import requests
 
 from .. import __title__, __version__
 from ..common import NotifyFormat, NotifyType
+from ..conversion import commonmark_decode_backslash_escapes
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
@@ -462,7 +464,15 @@ class NotifyReddit(NotifyBase):
         # Mark our failure
         return False
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        body_format: Optional[NotifyFormat] = None,
+        body_passthrough: bool = False,
+        **kwargs: Any,
+    ) -> bool:
         """Perform Reddit Notification."""
 
         # error tracking (used for function return)
@@ -477,9 +487,17 @@ class NotifyReddit(NotifyBase):
             self.logger.warning("There are no Reddit targets to notify")
             return False
 
+        # A link post's url field is not Markdown, so any CommonMark
+        # escapes Apprise added (e.g. "my\\_page") are removed from it
+        link = (
+            commonmark_decode_backslash_escapes(body)
+            if body_format == NotifyFormat.MARKDOWN and not body_passthrough
+            else body
+        )
+
         # Prepare our Message Type/Kind
         if self.kind == RedditMessageKind.AUTO:
-            parsed = NotifyBase.parse_url(body)
+            parsed = NotifyBase.parse_url(link)
             # Detect a link
             if (
                 parsed
@@ -527,7 +545,7 @@ class NotifyReddit(NotifyBase):
             if kind == RedditMessageKind.LINK:
                 payload.update(
                     {
-                        "url": body,
+                        "url": link,
                     }
                 )
             else:

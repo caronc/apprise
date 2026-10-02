@@ -31,6 +31,7 @@ from hashlib import sha256
 import hmac
 from itertools import chain
 import re
+from typing import Any
 
 import requests
 
@@ -112,7 +113,7 @@ class NotifySNS(NotifyBase):
     # characters and has no title field (title_maxlen = 0 causes the
     # framework to fold the title into the body automatically); Topic
     # mode allows up to 256 KB and passes the title as the SNS Subject
-    # field (title_maxlen = 100).
+    # field (title_maxlen = 99).
     # Source: https://docs.aws.amazon.com/sns/latest/api/API_Publish.html
 
     # Define object templates
@@ -311,7 +312,13 @@ class NotifySNS(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Wrapper to send_notification since we can alert more then one
         channel."""
 
@@ -401,7 +408,14 @@ class NotifySNS(NotifyBase):
             # when a title was provided; email subscribers will see
             # it as the message subject line
             if self.mode == SNSMode.TOPIC and title:
-                payload["Subject"] = title
+                # AWS subjects must be printable, single-line, and shorter
+                # than 100 characters.
+                # See: https://docs.aws.amazon.com/sns/latest/api/
+                #      API_Publish.html
+                subject = "".join(c if c.isprintable() else " " for c in title)
+                payload["Subject"] = " ".join(subject.split())[
+                    : self.title_maxlen
+                ]
 
             # Send our payload to AWS
             (result, _) = self._post(payload=payload, to=topic)
@@ -669,12 +683,10 @@ class NotifySNS(NotifyBase):
         )
 
     @property
-    def title_maxlen(self):
-        """Maximum title length: 100 for topic mode, 0 for SMS."""
-        # Return 100 in topic mode so the framework passes the title
-        # to send() separately; return 0 for SMS so the framework
-        # folds the title into the body automatically before send()
-        return 100 if self.mode == SNSMode.TOPIC else 0
+    def title_maxlen(self) -> int:
+        """Maximum title length: 99 for topic mode, 0 for SMS."""
+        # Topic mode keeps a valid AWS subject; SMS folds it into the body.
+        return 99 if self.mode == SNSMode.TOPIC else 0
 
     @property
     def body_maxlen(self):

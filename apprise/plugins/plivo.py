@@ -31,7 +31,10 @@
 #   - https://console.plivo.com/dashboard/
 #
 
+from __future__ import annotations
+
 from json import dumps
+from typing import Any
 
 import requests
 
@@ -205,7 +208,13 @@ class NotifyPlivo(NotifyBase):
             else self.template_args["batch"]["default"]
         )
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform Plivo Notification."""
 
         if not self.targets:
@@ -225,7 +234,7 @@ class NotifyPlivo(NotifyBase):
         # Prepare our authentication
         auth = (self.auth_id, self.token)
 
-        # Prepare our payload
+        # Prepare our payload; dst is filled in per batch below
         payload = {
             "src": self.source,
             "dst": None,
@@ -242,9 +251,7 @@ class NotifyPlivo(NotifyBase):
                 continue
 
             # Prepare our phone no (< delimits more then one)
-            payload["recipients"] = ",".join(
-                self.targets[index : index + batch_size]
-            )
+            payload["dst"] = "<".join(self.targets[index : index + batch_size])
 
             # Some Debug Logging
             self.logger.debug(
@@ -266,8 +273,10 @@ class NotifyPlivo(NotifyBase):
                     allow_redirects=self.redirects,
                 )
 
+                # Plivo answers a queued message with 200, 201 or 202
                 if r.status_code not in (
                     requests.codes.ok,
+                    requests.codes.created,
                     requests.codes.accepted,
                 ):
                     # We had a problem

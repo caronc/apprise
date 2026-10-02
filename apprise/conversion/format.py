@@ -28,17 +28,24 @@
 # Convert Apprise's TEXT, HTML, and MARKDOWN formats. Service dialects are
 # handled separately by ``conversion/dialect.py`` and plugin hooks.
 
+from collections.abc import Sequence
 import re
+from string import punctuation
+from typing import Optional
 
-from markdown import markdown
+from markdown import Markdown
 
 from ..common import NotifyFormat
+from ..compat.markdown33 import escape_placeholders_as_html
 from ..url import URLBase
 from .html import HTMLConverter, HTMLMarkdownConverter
 
 # CommonMark syntax characters, including backslash itself.
-# Plain text has no escape state, so escape every occurrence.
-_COMMONMARK_ESCAPABLE_RE = re.compile(r"([\\_*\[\]()~`>#+=|{}.!-])")
+# Plain text has no escape state, so escape every occurrence.  An "&" is
+# only escaped when it would otherwise read as an entity such as "&amp;".
+_COMMONMARK_ESCAPABLE_RE = re.compile(
+    r"([\\_*\[\]()~`>#+=|{}.!-]|&(?=#?[0-9A-Za-z]{1,32};))"
+)
 
 
 def convert_between(from_format, to_format, content):
@@ -54,14 +61,34 @@ def convert_between(from_format, to_format, content):
     return convert(content) if convert else content
 
 
-def markdown_to_html(content):
-    """Convert Markdown content to HTML."""
+# Notification-friendly line-break and table extensions.
+_MARKDOWN_EXTENSIONS = (
+    "markdown.extensions.nl2br",
+    "markdown.extensions.tables",
+)
 
-    # Enable notification-friendly line-break and table extensions.
-    return markdown(
-        content,
-        extensions=["markdown.extensions.nl2br", "markdown.extensions.tables"],
+
+def markdown_to_html(
+    content: str, extensions: Optional[Sequence[str]] = None
+) -> str:
+    """Convert Markdown content to HTML.
+
+    ``extensions`` replaces the default Python-Markdown extensions.
+    """
+
+    # Use the notification defaults unless the caller picks its own.
+    md = Markdown(
+        extensions=list(
+            _MARKDOWN_EXTENSIONS if extensions is None else extensions
+        ),
     )
+
+    # Match CommonMark by allowing all ASCII punctuation to be escaped.
+    md.ESCAPED_CHARS = sorted(set(md.ESCAPED_CHARS) | set(punctuation))
+
+    # Keep escaped characters valid HTML on every Python-Markdown release.
+    escape_placeholders_as_html(md)
+    return md.convert(content)
 
 
 def text_to_html(content):

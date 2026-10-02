@@ -50,6 +50,7 @@ from .commonmark import (
     commonmark_scan_delimiter_run,
     commonmark_scan_paren_dest,
     commonmark_scan_repair_region,
+    commonmark_sections,
 )
 from .dialect import split_dialect_chunk, truncate_dialect_chunk
 from .format import (
@@ -66,6 +67,7 @@ from .html import (
     MAX_FRAME_DEPTH,
     HTMLConverter,
     HTMLMarkdownConverter,
+    HTMLTagReducer,
 )
 
 __all__ = [
@@ -74,6 +76,7 @@ __all__ = [
     "MAX_FRAME_DEPTH",
     "HTMLConverter",
     "HTMLMarkdownConverter",
+    "HTMLTagReducer",
     "commonmark_can_close_emphasis",
     "commonmark_can_open_emphasis",
     "commonmark_decode_backslash_escapes",
@@ -96,6 +99,7 @@ __all__ = [
     "commonmark_scan_delimiter_run",
     "commonmark_scan_paren_dest",
     "commonmark_scan_repair_region",
+    "commonmark_sections",
     "convert_between",
     "html_to_markdown",
     "html_to_text",
