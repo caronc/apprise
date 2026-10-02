@@ -51,10 +51,12 @@
 #
 # Development API Reference::
 #  - https://core.telegram.org/bots/api
+from contextlib import ExitStack
 from json import dumps, loads
 from json.decoder import JSONDecodeError
 import os
 import re
+from typing import Optional, Union
 
 import requests
 
@@ -85,6 +87,17 @@ from ..utils.templates import TemplateType, apply_template
 from .base import NotifyBase
 
 TELEGRAM_IMAGE_XY = NotifyImageSize.XY_256
+
+# A Telegram album carries between 2 and 10 photos and/or videos.
+# Source: https://core.telegram.org/bots/api#sendmediagroup
+TELEGRAM_MEDIA_GROUP_MIN = 2
+TELEGRAM_MEDIA_GROUP_MAX = 10
+
+# Telegram's upload limits.  Photos can be up to 10 MB and every other
+# file up to 50 MB.
+# Source: https://core.telegram.org/bots/api#sending-files
+TELEGRAM_PHOTO_MAX_BYTES = 10000000
+TELEGRAM_FILE_MAX_BYTES = 50000000
 
 # Chat ID is required
 # If the Chat ID is positive, then it's addressed to a single person
@@ -138,6 +151,30 @@ TELEGRAM_CONTENT_PLACEMENT = (
     TelegramContentPlacement.BEFORE,
     TelegramContentPlacement.AFTER,
 )
+
+
+class TelegramMediaKind:
+    """How an attachment is sent when album mode is enabled."""
+
+    # Apprise only groups photos and videos into albums
+    PHOTO = "photo"
+    VIDEO = "video"
+
+    # Send every other attachment in its own message
+    SINGLE = "single"
+
+
+class TelegramGroupResult:
+    """Possible results from an album upload."""
+
+    # Telegram accepted the album
+    OK = "ok"
+
+    # Telegram refused the album; the items may still be fine alone
+    RETRY = "retry"
+
+    # The album could not be delivered at all
+    FAIL = "fail"
 
 
 class NotifyTelegram(NotifyBase):
@@ -408,6 +445,11 @@ class NotifyTelegram(NotifyBase):
                 "type": "bool",
                 "default": False,
             },
+            "album": {
+                "name": _("Group Photo/Video Attachments"),
+                "type": "bool",
+                "default": False,
+            },
             "topic": {
                 "name": _("Topic Thread ID"),
                 "type": "int",
@@ -454,6 +496,7 @@ class NotifyTelegram(NotifyBase):
         include_image=False,
         silent=None,
         preview=None,
+        album=False,
         topic=None,
         content=None,
         mdv=None,
@@ -503,6 +546,9 @@ class NotifyTelegram(NotifyBase):
             if preview is None
             else bool(preview)
         )
+
+        # Define whether eligible photo/video attachments should be grouped
+        self.album = bool(album)
 
         # Setup our content placement
         self.content = (
@@ -606,8 +652,15 @@ class NotifyTelegram(NotifyBase):
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
 
-    def send_media(self, target, notify_type, payload=None, attach=None):
-        """Sends a sticker based on the specified notify type."""
+    def send_media(
+        self,
+        target: tuple,
+        notify_type: NotifyType,
+        payload: Optional[dict] = None,
+        attach: Optional[Union[AttachBase, str]] = None,
+        document: bool = False,
+    ) -> bool:
+        """Upload an attachment, or the notify type image, to Telegram."""
 
         # Prepare our Headers
         if payload is None:
@@ -633,6 +686,16 @@ class NotifyTelegram(NotifyBase):
                 f"Posting Telegram attachment {attach.url(privacy=True)}"
             )
 
+            # Stop before uploading files Telegram will reject.
+            size = len(attach)
+            if size > TELEGRAM_FILE_MAX_BYTES:
+                self.logger.warning(
+                    "Telegram attachment %s is larger than the 50 MB"
+                    " upload limit.",
+                    attach.url(privacy=True),
+                )
+                return False
+
             # Store our path to our file
             path = attach.path
             file_name = attach.name
@@ -644,6 +707,13 @@ class NotifyTelegram(NotifyBase):
                 for x in self.mime_lookup
                 if x["regex"].match(mimetype)
             )  # pragma: no cover
+
+            if document or (
+                function_name == "sendPhoto"
+                and size > TELEGRAM_PHOTO_MAX_BYTES
+            ):
+                # Documents support larger photos and other file types.
+                function_name, key = "sendDocument", "document"
 
         else:
             attach = self.image_path(notify_type) if attach is None else attach
@@ -1448,8 +1518,300 @@ class NotifyTelegram(NotifyBase):
 
         return not has_error
 
-    def _send_attachments(self, target, notify_type, attach, payload=None):
+    def _album_kind(self, attachment: AttachBase) -> str:
+        """Choose album or single-message delivery for an attachment."""
+
+        if not isinstance(attachment, AttachBase) or not attachment:
+            # Let the regular path report unreadable attachments.
+            return TelegramMediaKind.SINGLE
+
+        mimetype = (attachment.mimetype or "").lower()
+
+        # GIF and raw H.264 files use Telegram's animation endpoint,
+        # which is not supported in albums
+        if (
+            mimetype.startswith("image/")
+            and mimetype != "image/gif"
+            and len(attachment) <= TELEGRAM_PHOTO_MAX_BYTES
+        ):
+            return TelegramMediaKind.PHOTO
+
+        if mimetype == "video/mp4" and (
+            len(attachment) <= TELEGRAM_FILE_MAX_BYTES
+        ):
+            return TelegramMediaKind.VIDEO
+
+        # Send audio, documents, animations, oversized media, and unknown
+        # types separately
+        return TelegramMediaKind.SINGLE
+
+    def _send_media_group(
+        self,
+        target: tuple,
+        batch: list,
+        kinds: list,
+        payload: Optional[dict] = None,
+    ) -> str:
+        """Upload a batch of attachments as one Telegram album."""
+
+        # Extract our target
+        chat_id, topic = target
+
+        # Prepare our payload
+        data = {
+            "chat_id": chat_id,
+            "disable_notification": self.silent,
+        }
+        if topic:
+            data["message_thread_id"] = topic
+
+        url = f"{self.notify_url}{self.bot_token}/sendMediaGroup"
+
+        # Link each album item to its uploaded file.
+        media = []
+        files = {}
+
+        try:
+            # Close every opened file, even when the upload fails
+            with ExitStack() as stack:
+                for no, (attachment, kind) in enumerate(zip(batch, kinds)):
+                    if not attachment:
+                        # We could not access the attachment
+                        self.logger.error(
+                            "Could not access attachment %s.",
+                            (
+                                attachment.url(privacy=True)
+                                if isinstance(attachment, AttachBase)
+                                else attachment
+                            ),
+                        )
+                        return TelegramGroupResult.FAIL
+
+                    field_name = f"file{no}"
+                    files[field_name] = (
+                        attachment.name or f"file{no:03}.dat",
+                        stack.enter_context(attachment.open()),
+                        attachment.mimetype,
+                    )
+
+                    item = {
+                        "type": kind,
+                        "media": f"attach://{field_name}",
+                    }
+
+                    # Telegram displays the caption on the first item only.
+                    if not no:
+                        item.update(payload or {})
+
+                    media.append(item)
+
+                data["media"] = dumps(media)
+
+                self.logger.debug(
+                    f"Telegram media group POST URL: {url} "
+                    f"(cert_verify={self.verify_certificate!r})"
+                )
+
+                # Always call throttle before any remote server i/o is made
+                self.throttle()
+
+                r = requests.post(
+                    url,
+                    headers={"User-Agent": self.app_id},
+                    files=files,
+                    data=data,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
+                )
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                "A connection error occurred posting Telegram media group."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
+            return TelegramGroupResult.FAIL
+
+        except OSError as e:
+            # OSError also covers the legacy IOError name
+            self.logger.warning(
+                "An I/O error occurred reading a Telegram media group"
+                " attachment."
+            )
+            self.logger.debug(f"I/O Exception: {e!s}")
+            return TelegramGroupResult.FAIL
+
+        if r.status_code == requests.codes.ok:
+            # Content was sent successfully if we got here
+            return TelegramGroupResult.OK
+
+        # We had a problem
+        status_str = NotifyTelegram.http_response_code_lookup(r.status_code)
+
+        self.logger.warning(
+            "Failed to send Telegram media group: {}{}error={}.".format(
+                status_str,
+                ", " if status_str else "",
+                r.status_code,
+            )
+        )
+
+        self.logger.debug("Response Details:\r\n%r", (r.content or b"")[:2000])
+
+        # A rejected album may still work as separate messages
+        return (
+            TelegramGroupResult.RETRY
+            if r.status_code == requests.codes.bad_request
+            else TelegramGroupResult.FAIL
+        )
+
+    def _send_album_item(
+        self,
+        target: tuple,
+        notify_type: NotifyType,
+        attachment: AttachBase,
+        kind: str,
+        payload: dict,
+    ) -> bool:
+        """Send one attachment on its own while album mode is enabled."""
+
+        # Try the attachment's usual endpoint first so media shows inline
+        if self.send_media(
+            target, notify_type, payload=dict(payload), attach=attachment
+        ):
+            return True
+
+        if kind == TelegramMediaKind.SINGLE:
+            # There is nothing else to try
+            return False
+
+        # Telegram refused the photo or video, so send it as a plain file
+        self.logger.info(
+            "Sending Telegram attachment %s as a document.",
+            attachment.url(privacy=True),
+        )
+        return self.send_media(
+            target,
+            notify_type,
+            payload=dict(payload),
+            attach=attachment,
+            document=True,
+        )
+
+    def _send_album_attachments(
+        self,
+        target: tuple,
+        notify_type: NotifyType,
+        attach: AppriseAttachment,
+        payload: Optional[dict] = None,
+    ) -> bool:
+        """Send supported attachments in Telegram albums."""
+
+        # Work out up front how each attachment wants to travel
+        attachments = list(attach)
+        kinds = [self._album_kind(x) for x in attachments]
+
+        # Track each item so retries skip attachments already delivered.
+        keys = [
+            ("attachment", target, no) for no in range(1, len(attachments) + 1)
+        ]
+
+        # Only photos and videos can be grouped into an album
+        grouped = (TelegramMediaKind.PHOTO, TelegramMediaKind.VIDEO)
+
+        # Only the first thing we send carries the caption
+        caption = payload if payload else {}
+
+        no = 0
+        while no < len(attachments):
+            if self.is_delivered(keys[no]):
+                # This one arrived on an earlier attempt, and took the
+                # caption with it if it was first
+                caption = {}
+                no += 1
+                continue
+
+            # Group adjacent media without changing attachment order.
+            end = no
+
+            # Album uploads use memory, so cap each batch at 50 MB.
+            total = 0
+            while (
+                end < len(attachments)
+                and kinds[end] in grouped
+                and end - no < TELEGRAM_MEDIA_GROUP_MAX
+                and total + len(attachments[end]) <= TELEGRAM_FILE_MAX_BYTES
+                and not self.is_delivered(keys[end])
+            ):
+                total += len(attachments[end])
+                end += 1
+
+            # Too few media for an album are sent one at a time
+            result = (
+                self._send_media_group(
+                    target,
+                    attachments[no:end],
+                    kinds[no:end],
+                    payload=caption,
+                )
+                if end - no >= TELEGRAM_MEDIA_GROUP_MIN
+                else TelegramGroupResult.RETRY
+            )
+
+            if result == TelegramGroupResult.FAIL:
+                # We failed; don't continue
+                return False
+
+            if result == TelegramGroupResult.RETRY:
+                # Retry rejected or ungrouped items separately.
+                end = max(end, no + 1)
+                for idx in range(no, end):
+                    if not self._send_album_item(
+                        target,
+                        notify_type,
+                        attachments[idx],
+                        kinds[idx],
+                        caption if idx == no else {},
+                    ):
+                        # We failed; don't continue
+                        return False
+
+                    # Delivered; a retry can safely skip it
+                    self.logger.info(
+                        f"Sent Telegram attachment: {attachments[idx]}."
+                    )
+                    self.mark_delivered(keys[idx])
+
+            else:
+                # The whole album arrived together
+                for idx in range(no, end):
+                    self.logger.info(
+                        f"Sent Telegram attachment: {attachments[idx]}."
+                    )
+                    self.mark_delivered(keys[idx])
+
+            # The caption has been spent
+            caption = {}
+            no = end
+
+        return True
+
+    def _send_attachments(
+        self,
+        target: tuple,
+        notify_type: NotifyType,
+        attach: AppriseAttachment,
+        payload: Optional[dict] = None,
+    ) -> bool:
         """Sends our attachments."""
+
+        if self.album:
+            # Album mode groups eligible media instead of sending one
+            # message per attachment
+            return self._send_album_attachments(
+                target, notify_type, attach, payload=payload
+            )
+
         if payload is None:
             payload = {}
         has_error = False
@@ -1708,6 +2070,7 @@ class NotifyTelegram(NotifyBase):
             "detect": "yes" if self.detect_owner else "no",
             "silent": "yes" if self.silent else "no",
             "preview": "yes" if self.preview else "no",
+            "album": "yes" if self.album else "no",
             "content": self.content,
             "mdv": TELEGRAM_MARKDOWN_VERSIONS[self.markdown_ver],
         }
@@ -1855,6 +2218,9 @@ class NotifyTelegram(NotifyBase):
 
         # Show Web Page Preview
         results["preview"] = parse_bool(results["qsd"].get("preview", False))
+
+        # Group eligible photo/video attachments into Telegram media groups
+        results["album"] = parse_bool(results["qsd"].get("album", False))
 
         # Include images with our message
         results["include_image"] = parse_bool(

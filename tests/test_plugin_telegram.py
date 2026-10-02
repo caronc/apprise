@@ -33,6 +33,7 @@ import logging
 import os
 import re
 from unittest import mock
+from urllib.parse import urlparse
 
 from helpers import AppriseURLTester
 import pytest
@@ -46,7 +47,12 @@ from apprise import (
     NotifyType,
 )
 from apprise.exception import AppriseImproperlyConfigured
-from apprise.plugins.telegram import NotifyTelegram
+from apprise.plugins.base import _delivery_tracker
+from apprise.plugins.telegram import (
+    NotifyTelegram,
+    TelegramGroupResult,
+    TelegramMediaKind,
+)
 
 logging.disable(logging.CRITICAL)
 
@@ -3107,3 +3113,629 @@ def test_plugin_telegram_template_request_exception(mock_post, tmpdir):
     assert (
         obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
     )
+
+
+def telegram_album_obj(targets=None):
+    """Build an album-enabled Telegram object without throttling."""
+    obj = NotifyTelegram(
+        bot_token="123456789:abcdefg_hijklmnop",
+        targets=targets if targets else ["12345"],
+        album=True,
+    )
+    obj.throttle = mock.Mock()
+    return obj
+
+
+def telegram_album_calls(mock_post):
+    """Return the Telegram endpoint used by each recorded POST."""
+    return [
+        urlparse(call[0][0]).path.rsplit("/", 1)[-1]
+        for call in mock_post.call_args_list
+    ]
+
+
+def test_plugin_telegram_album_url():
+    """Verify album= parsing and URL round trips."""
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/12345/?album=yes"
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert obj.album is True
+    assert "album=yes" in obj.url()
+
+    # Our default is off
+    obj = Apprise.instantiate("tgram://123456789:abcdefg_hijklmnop/12345/")
+    assert obj.album is False
+    assert "album=no" in obj.url()
+
+    # The flag survives a full round trip
+    obj = Apprise.instantiate(
+        Apprise.instantiate(
+            "tgram://123456789:abcdefg_hijklmnop/12345/?album=yes"
+        ).url()
+    )
+    assert obj.album is True
+
+
+def test_plugin_telegram_album_kind():
+    """Verify MIME types select album or separate delivery."""
+
+    obj = telegram_album_obj()
+
+    photo = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"))
+    video = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.mp4"))
+    animation = AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+    archive = AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, "apprise-archive.zip")
+    )
+
+    assert obj._album_kind(photo[0]) == TelegramMediaKind.PHOTO
+    assert obj._album_kind(video[0]) == TelegramMediaKind.VIDEO
+
+    # Animations go out on their own; sendAnimation has no album form
+    assert obj._album_kind(animation[0]) == TelegramMediaKind.SINGLE
+    assert obj._album_kind(archive[0]) == TelegramMediaKind.SINGLE
+
+    # An attachment we can't reach has no mime type to go on
+    missing = AppriseAttachment("file:///path/does/not/exist.png")
+    assert obj._album_kind(missing[0]) == TelegramMediaKind.SINGLE
+
+    # Anything that isn't an attachment object is left alone
+    assert obj._album_kind(None) == TelegramMediaKind.SINGLE
+
+
+def test_plugin_telegram_album_kind_size():
+    """Verify files over Telegram's size limits leave the album."""
+
+    obj = telegram_album_obj()
+
+    photo = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"))
+    video = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.mp4"))
+
+    # Telegram's limits are 10 MB for photos and 50 MB for videos
+    with mock.patch("os.path.getsize", return_value=10000000):
+        assert obj._album_kind(photo[0]) == TelegramMediaKind.PHOTO
+
+    with mock.patch("os.path.getsize", return_value=10000001):
+        assert obj._album_kind(photo[0]) == TelegramMediaKind.SINGLE
+
+    with mock.patch("os.path.getsize", return_value=50000000):
+        assert obj._album_kind(video[0]) == TelegramMediaKind.VIDEO
+
+    with mock.patch("os.path.getsize", return_value=50000001):
+        assert obj._album_kind(video[0]) == TelegramMediaKind.SINGLE
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_groups_media(mock_post):
+    """Verify eligible attachments are posted as one album."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"ok":true}'
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.mp4"),
+        ]
+    )
+
+    assert obj.notify(body="hello", attach=attach) is True
+
+    # One album, not three separate messages
+    assert telegram_album_calls(mock_post) == ["sendMediaGroup"]
+
+    details = mock_post.call_args_list[0]
+    assert urlparse(details[0][0]).hostname == "api.telegram.org"
+
+    media = loads(details[1]["data"]["media"])
+    assert [entry["type"] for entry in media] == ["photo", "photo", "video"]
+    assert [entry["media"] for entry in media] == [
+        "attach://file0",
+        "attach://file1",
+        "attach://file2",
+    ]
+    assert sorted(details[1]["files"]) == ["file0", "file1", "file2"]
+
+    # The caption rides on the first album entry only
+    assert media[0]["caption"] == "hello"
+    assert "caption" not in media[1]
+    assert "caption" not in media[2]
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_preserves_order(mock_post):
+    """Verify separate attachments keep their original position."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"ok":true}'
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-archive.zip"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+        ]
+    )
+
+    assert obj.notify(body="hello", attach=attach) is True
+
+    # A lone photo can't form an album, the zip never could, and the
+    # trailing pair does
+    assert telegram_album_calls(mock_post) == [
+        "sendPhoto",
+        "sendDocument",
+        "sendMediaGroup",
+    ]
+
+    # Only the very first message carries the caption
+    assert mock_post.call_args_list[0][1]["data"].get("caption") == "hello"
+    assert "caption" not in mock_post.call_args_list[1][1]["data"]
+    media = loads(mock_post.call_args_list[2][1]["data"]["media"])
+    assert "caption" not in media[0]
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_batches(mock_post):
+    """Verify more than ten media are split across albums."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"ok":true}'
+
+    obj = telegram_album_obj()
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.jpeg")
+
+    # Eleven photos: a full album of ten, then a single leftover
+    assert obj.notify(body="hello", attach=AppriseAttachment([path] * 11))
+    assert telegram_album_calls(mock_post) == ["sendMediaGroup", "sendPhoto"]
+    assert len(loads(mock_post.call_args_list[0][1]["data"]["media"])) == 10
+
+    # Twelve photos: two albums, since two is enough to form one
+    mock_post.reset_mock()
+    assert obj.notify(body="hello", attach=AppriseAttachment([path] * 12))
+    assert telegram_album_calls(mock_post) == [
+        "sendMediaGroup",
+        "sendMediaGroup",
+    ]
+    assert len(loads(mock_post.call_args_list[1][1]["data"]["media"])) == 2
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_topic(mock_post):
+    """Verify album requests include the topic thread."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"ok":true}'
+
+    obj = telegram_album_obj(targets=["12345:9"])
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ]
+    )
+
+    assert obj.notify(body="hello", attach=attach) is True
+    assert mock_post.call_args_list[0][1]["data"]["message_thread_id"] == 9
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_unnamed_attachment(mock_post):
+    """Verify unnamed attachments receive a filename."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"ok":true}'
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ]
+    )
+
+    # Use the instance's class because other tests may reload Apprise.
+    with mock.patch.object(
+        type(attach[0]),
+        "name",
+        new_callable=mock.PropertyMock,
+        return_value=None,
+    ):
+        assert (
+            obj._send_media_group(
+                (12345, None),
+                list(attach),
+                [TelegramMediaKind.PHOTO] * 2,
+            )
+            == TelegramGroupResult.OK
+        )
+
+    files = mock_post.call_args_list[0][1]["files"]
+    assert files["file0"][0] == "file000.dat"
+    assert files["file1"][0] == "file001.dat"
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_retry(mock_post):
+    """Verify a refused album is retried as separate messages."""
+
+    refused = mock.Mock()
+    refused.status_code = requests.codes.bad_request
+    refused.content = b'{"ok":false,"description":"group is invalid"}'
+
+    accepted = mock.Mock()
+    accepted.status_code = requests.codes.ok
+    accepted.content = b'{"ok":true}'
+
+    mock_post.side_effect = [refused, accepted, accepted]
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ]
+    )
+
+    assert obj.notify(body="hello", attach=attach) is True
+    assert telegram_album_calls(mock_post) == [
+        "sendMediaGroup",
+        "sendPhoto",
+        "sendPhoto",
+    ]
+
+    # The caption moves to the first of the retried messages
+    assert mock_post.call_args_list[1][1]["data"].get("caption") == "hello"
+    assert "caption" not in mock_post.call_args_list[2][1]["data"]
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_retry_failure(mock_post):
+    """Verify delivery stops when an album retry fails."""
+
+    refused = mock.Mock()
+    refused.status_code = requests.codes.bad_request
+    refused.content = b'{"ok":false}'
+
+    rejected = mock.Mock()
+    rejected.status_code = requests.codes.internal_server_error
+    rejected.content = b'{"ok":false}'
+
+    # The photo endpoint fails and so does the document fallback
+    mock_post.side_effect = [refused, rejected, rejected]
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ]
+    )
+
+    assert obj.notify(body="hello", attach=attach) is False
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_document_fallback(mock_post):
+    """Verify refused media is resent as a document."""
+
+    refused = mock.Mock()
+    refused.status_code = requests.codes.bad_request
+    refused.content = b'{"ok":false,"description":"bad photo"}'
+
+    accepted = mock.Mock()
+    accepted.status_code = requests.codes.ok
+    accepted.content = b'{"ok":true}'
+
+    # The album and the first photo are refused, the rest go through
+    mock_post.side_effect = [refused, refused, accepted, accepted]
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ]
+    )
+
+    assert obj.notify(body="hello", attach=attach) is True
+    assert telegram_album_calls(mock_post) == [
+        "sendMediaGroup",
+        "sendPhoto",
+        "sendDocument",
+        "sendPhoto",
+    ]
+
+    # The document keeps the caption the refused photo would have had
+    assert mock_post.call_args_list[2][1]["data"].get("caption") == "hello"
+    assert "document" in mock_post.call_args_list[2][1]["files"]
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_oversized_photo(mock_post):
+    """Verify oversized photos are sent straight as documents."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"ok":true}'
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ]
+    )
+
+    with mock.patch("os.path.getsize", return_value=10000001):
+        assert obj.notify(body="hello", attach=attach) is True
+
+    assert telegram_album_calls(mock_post) == ["sendDocument", "sendDocument"]
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_size_budget(mock_post):
+    """Verify an album is split before it grows past 50 MB."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"ok":true}'
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        [os.path.join(TEST_VAR_DIR, "apprise-test.mp4")] * 3
+    )
+
+    # Two 20 MB videos fit in one album; the third does not
+    with mock.patch("os.path.getsize", return_value=20000000):
+        assert obj.notify(body="hello", attach=attach) is True
+
+    assert telegram_album_calls(mock_post) == ["sendMediaGroup", "sendVideo"]
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_attach_size_limits(mock_post):
+    """Verify Telegram's upload limits are enforced before sending."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"ok":true}'
+
+    obj = NotifyTelegram(
+        bot_token="123456789:abcdefg_hijklmnop", targets=["12345"]
+    )
+    obj.throttle = mock.Mock()
+
+    photo = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"))
+    video = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.mp4"))
+
+    # A photo over 10 MB is sent as a document instead
+    with mock.patch("os.path.getsize", return_value=10000001):
+        assert obj.notify(body="hello", attach=photo) is True
+
+    assert telegram_album_calls(mock_post) == ["sendDocument"]
+
+    # Anything over 50 MB is never uploaded
+    mock_post.reset_mock()
+    with mock.patch("os.path.getsize", return_value=50000001):
+        assert obj.notify(body="hello", attach=video) is False
+
+    assert not mock_post.called
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_single_failure(mock_post):
+    """Verify a failed separate attachment stops delivery."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.internal_server_error
+    mock_post.return_value.content = b'{"ok":false}'
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, "apprise-archive.zip")
+    )
+
+    assert obj.notify(body="hello", attach=attach) is False
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_server_error(mock_post):
+    """Verify only HTTP 400 responses retry an album."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.internal_server_error
+    mock_post.return_value.content = b'{"ok":false}'
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ]
+    )
+
+    assert obj.notify(body="hello", attach=attach) is False
+    assert telegram_album_calls(mock_post) == ["sendMediaGroup"]
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_inaccessible(mock_post):
+    """Verify unreadable attachments stop before upload."""
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ]
+    )
+
+    with mock.patch("os.path.isfile", return_value=False):
+        assert (
+            obj._send_media_group(
+                (12345, None),
+                list(attach),
+                [TelegramMediaKind.PHOTO] * 2,
+            )
+            == TelegramGroupResult.FAIL
+        )
+
+    # Reporting a missing attachment must not raise
+    assert (
+        obj._send_media_group(
+            (12345, None), [None, None], [TelegramMediaKind.PHOTO] * 2
+        )
+        == TelegramGroupResult.FAIL
+    )
+
+    assert not mock_post.called
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_open_error(mock_post):
+    """Verify file read errors are handled."""
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ]
+    )
+
+    with mock.patch("builtins.open", side_effect=OSError):
+        assert (
+            obj._send_media_group(
+                (12345, None),
+                list(attach),
+                [TelegramMediaKind.PHOTO] * 2,
+            )
+            == TelegramGroupResult.FAIL
+        )
+
+    assert not mock_post.called
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_request_exception(mock_post):
+    """Verify album connection errors are handled."""
+
+    mock_post.side_effect = requests.ConnectionError(
+        0, "requests.ConnectionError() not handled"
+    )
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ]
+    )
+
+    assert obj.notify(body="hello", attach=attach) is False
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_disabled(mock_post):
+    """Verify attachments remain separate by default."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"ok":true}'
+
+    obj = NotifyTelegram(
+        bot_token="123456789:abcdefg_hijklmnop", targets=["12345"]
+    )
+    obj.throttle = mock.Mock()
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        ]
+    )
+
+    assert obj.notify(body="hello", attach=attach) is True
+    assert telegram_album_calls(mock_post) == ["sendPhoto", "sendPhoto"]
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_album_delivery_tracking(mock_post):
+    """Verify a retry only resends album items that never arrived."""
+
+    refused = mock.Mock()
+    refused.status_code = requests.codes.bad_request
+    refused.content = b'{"ok":false}'
+
+    rejected = mock.Mock()
+    rejected.status_code = requests.codes.internal_server_error
+    rejected.content = b'{"ok":false}'
+
+    accepted = mock.Mock()
+    accepted.status_code = requests.codes.ok
+    accepted.content = b'{"ok":true}'
+
+    obj = telegram_album_obj()
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+        ]
+    )
+
+    token = _delivery_tracker.set(set())
+    try:
+        # The album is refused, the first photo arrives on its own, and
+        # the second photo fails along with its document fallback
+        mock_post.side_effect = [refused, accepted, rejected, rejected]
+        assert (
+            obj._send_attachments(
+                (12345, None),
+                NotifyType.INFO,
+                attach,
+                payload={"caption": "hello"},
+            )
+            is False
+        )
+
+        # The retry skips the delivered photo and its caption, and the
+        # two remaining photos still form an album
+        mock_post.reset_mock()
+        mock_post.side_effect = [accepted]
+        assert (
+            obj._send_attachments(
+                (12345, None),
+                NotifyType.INFO,
+                attach,
+                payload={"caption": "hello"},
+            )
+            is True
+        )
+        assert telegram_album_calls(mock_post) == ["sendMediaGroup"]
+        media = loads(mock_post.call_args_list[0][1]["data"]["media"])
+        assert len(media) == 2
+        assert "caption" not in media[0]
+
+        # Nothing is left to send on a further retry
+        mock_post.reset_mock()
+        assert (
+            obj._send_attachments((12345, None), NotifyType.INFO, attach)
+            is True
+        )
+        assert not mock_post.called
+
+    finally:
+        _delivery_tracker.reset(token)
