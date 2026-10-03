@@ -29,6 +29,14 @@
 # You will need credits (new accounts start with a few)
 #     https://www.bulksms.com/account/
 #
+# BulkSMS signs you in with an API Token.  Create one under
+# Settings > Developers > API Tokens; it gives you a Token ID and a
+# Token Secret, used to build your Apprise URL:
+#     bulksms://{token_id}:{token_secret}@{phone_no}
+#
+# The Token Secret can contain characters such as # that must be
+# URL encoded (# becomes %23).
+#
 # API is documented here:
 #   - https://www.bulksms.com/developer/json/v1/#tag/Message
 from itertools import chain
@@ -103,22 +111,24 @@ class NotifyBulkSMS(NotifyBase):
     title_maxlen = 0
 
     # Define object templates
-    templates = ("{schema}://{user}:{password}@{targets}",)
+    templates = ("{schema}://{token_id}:{token_secret}@{targets}",)
 
     # Define our template tokens
     template_tokens = dict(
         NotifyBase.template_tokens,
         **{
-            "user": {
-                "name": _("User Name"),
+            "token_id": {
+                "name": _("Token"),
                 "type": "string",
                 "required": True,
+                "map_to": "user",
             },
-            "password": {
-                "name": _("Password"),
+            "token_secret": {
+                "name": _("Secret"),
                 "type": "string",
                 "private": True,
                 "required": True,
+                "map_to": "password",
             },
             "target_phone": {
                 "name": _("Target Phone No"),

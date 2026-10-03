@@ -262,3 +262,43 @@ def test_plugin_bulksms_edge_cases(mock_post):
     )
     # 2 groups and 2 phones are lumped together
     assert len(obj) == 3
+
+
+@mock.patch("requests.post")
+def test_plugin_bulksms_api_token(mock_post):
+    """NotifyBulkSMS() API Token ID and Secret as credentials."""
+
+    # A Token ID and Token Secret shaped like the ones BulkSMS issues
+    token_id = "BBDE1B476E03498AA768F66A286AABDC-01-B"
+    token_secret = "9jSbVDK20!MXdfRGiIIFu#ffUE8*S"
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.created
+    mock_post.return_value = response
+
+    # The secret must be URL encoded since it contains a #
+    obj = Apprise.instantiate(
+        "bulksms://{}:{}@15551231234".format(
+            token_id, NotifyBulkSMS.quote(token_secret, safe="")
+        )
+    )
+    assert isinstance(obj, NotifyBulkSMS)
+    assert obj.notify(body="body") is True
+
+    # The token is sent as basic authentication
+    assert mock_post.call_count == 1
+    assert mock_post.call_args[1]["auth"] == (token_id, token_secret)
+
+    # The secret survives a round trip through url()
+    obj2 = Apprise.instantiate(obj.url())
+    assert obj2.url_identifier == obj.url_identifier
+
+    # The same token can be supplied through ?user= and ?password=
+    obj = Apprise.instantiate(
+        "bulksms://15551231234?user={}&password={}".format(
+            token_id, NotifyBulkSMS.quote(token_secret, safe="")
+        )
+    )
+    assert isinstance(obj, NotifyBulkSMS)
+    assert obj.url_identifier == obj2.url_identifier
