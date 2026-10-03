@@ -33,6 +33,7 @@ Unit Tests for the XMPP plugin.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
 import contextlib
 import gc
 import logging
@@ -167,6 +168,20 @@ class FakeClientXMPP:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def join_xmpp_threads() -> Iterator[None]:
+    """Wait for any XMPP worker thread a test started to finish."""
+    # Threads already running belong to someone else.
+    before = set(threading.enumerate())
+
+    yield
+
+    # A worker left running would call into the next test's patches.
+    for thread in set(threading.enumerate()) - before:
+        if thread.name.startswith("apprise-xmpp"):
+            thread.join(timeout=10.0)
 
 
 def install_fake_slixmpp(monkeypatch: pytest.MonkeyPatch) -> None:
