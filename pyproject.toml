@@ -238,6 +238,7 @@ dev = [
     "pytest",
     "pytest-cov",
     "pytest-mock",
+    "pytest-xdist",
     "ruff==0.15.8",
     "babel",
     "validate-pyproject",

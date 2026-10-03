@@ -61,12 +61,17 @@ if [ ! -x $PYTEST ]; then
    exit 1
 fi
 
+# Use up to 8 CPU cores when pytest-xdist is installed
+XDIST=""
+$PYTEST --help 2>/dev/null | grep -q -- "--numprocesses" && \
+   XDIST="-n auto --maxprocesses=8"
+
 pushd $PYTHONPATH &>/dev/null
 if [ ! -z "$@" ]; then
-   LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH $PYTEST -k "$@"
+   LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH $PYTEST $XDIST -k "$@"
    exit $?
 
 else
-   LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH $PYTEST
+   LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH $PYTEST $XDIST
    exit $?
 fi

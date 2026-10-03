@@ -42,7 +42,7 @@ from apprise.plugins.gnome import GnomeUrgency, NotifyGnome
 logging.disable(logging.CRITICAL)
 
 
-def setup_glib_environment():
+def setup_glib_environment(monkeypatch):
     """Setup a heavily mocked Glib environment."""
 
     # Our module base
@@ -55,7 +55,7 @@ def setup_glib_environment():
         # Test cases where the gi library exists; we want to remove it
         # for the purpose of testing and capture the handling of the
         # library when it is missing
-        del sys.modules[gi_name]
+        monkeypatch.delitem(sys.modules, gi_name)
         reload_plugin("gnome")
 
     # We need to fake our gnome environment for testing purposes since
@@ -78,10 +78,12 @@ def setup_glib_environment():
     # Emulate require_version function:
     gi.require_version = mock.Mock(name=gi_name + ".require_version")
 
-    # Force the fake module to exist
-    sys.modules[gi_name] = gi
-    sys.modules[gi_name + ".repository"] = gi.repository
-    sys.modules[gi_name + ".repository.Notify"] = gi.repository.Notify
+    # Force the fake module to exist until the test finishes
+    monkeypatch.setitem(sys.modules, gi_name, gi)
+    monkeypatch.setitem(sys.modules, gi_name + ".repository", gi.repository)
+    monkeypatch.setitem(
+        sys.modules, gi_name + ".repository.Notify", gi.repository.Notify
+    )
 
     # Notify Object
     notify_obj = mock.Mock()
@@ -98,9 +100,9 @@ def setup_glib_environment():
 
 
 @pytest.fixture
-def glib_environment():
+def glib_environment(monkeypatch):
     """Fixture to provide a mocked Glib environment to test case functions."""
-    setup_glib_environment()
+    setup_glib_environment(monkeypatch)
 
 
 @pytest.fixture
@@ -393,8 +395,7 @@ def test_plugin_gnome_set_urgency():
     NotifyGnome(priority=0)
 
 
-@pytest.mark.skipif("gi" not in sys.modules, reason="Requires gi library")
-def test_plugin_gnome_gi_croaks():
+def test_plugin_gnome_gi_croaks(glib_environment):
     """Verify notification fails when `gi.require_version()` croaks."""
 
     # Make `require_version` function raise an error.
@@ -412,7 +413,6 @@ def test_plugin_gnome_gi_croaks():
     assert obj is None
 
 
-@pytest.mark.skipif("gi" not in sys.modules, reason="Requires gi library")
 def test_plugin_gnome_notify_croaks(mocker, obj):
     """Fail gracefully if underlying object croaks for whatever reason."""
 

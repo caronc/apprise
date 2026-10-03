@@ -43,6 +43,9 @@
 
 %global pypi_name apprise
 
+# Use up to 8 test workers; builders can lower this with _smp_ncpus_max
+%global pytest_workers %{lua: print(math.min(8, tonumber(rpm.expand("%{_smp_build_ncpus}")) or 1))}
+
 # Handle rpmlint false positives
 # - Prevent warnings:
 #    en_US ntfy -> notify
@@ -152,6 +155,7 @@ BuildRequires: python3dist(tox)
 %if %{with tests}
 BuildRequires: python3dist(pytest)
 BuildRequires: python3dist(pytest-mock)
+BuildRequires: python3dist(pytest-xdist)
 %endif
 
 Requires: python3dist(requests)
@@ -222,9 +226,9 @@ popd
 %check
 %if %{legacy_python_build}
 # backwards compatible
-LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{version} py.test-%{python3_version}
+LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{version} py.test-%{python3_version} -n %{pytest_workers}
 %else
-%pytest
+%pytest -n %{pytest_workers}
 %endif
 %endif
 

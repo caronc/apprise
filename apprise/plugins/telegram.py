@@ -1596,7 +1596,7 @@ class NotifyTelegram(NotifyBase):
                     # We failed to send the image associated with our
                     # notify_type
                     self.logger.warning(
-                        "Failed to send Telegram attachment to {}.", pchat_id
+                        "Failed to send Telegram attachment to %s.", pchat_id
                     )
 
             if (

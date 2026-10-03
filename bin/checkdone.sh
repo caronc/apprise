@@ -81,12 +81,20 @@ echo
 # Run our unit test coverage check
 echo "Running test coverage check..."
 pushd $PYTHONPATH &>/dev/null
+
+# Use up to 8 xdist workers; pytest-cov combines their coverage.
+XDIST=""
+python3 -m pytest --help 2>/dev/null | grep -q -- "--numprocesses" && \
+   XDIST="-n auto --maxprocesses=8"
+
 if [ ! -z "$@" ]; then
-   LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH coverage run -m pytest -vv -k "$@"
+   LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH python3 -m pytest -vv $XDIST \
+      --cov=apprise --cov-report= -k "$@"
    RET=$?
 
 else
-   LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH coverage run -m pytest -vv
+   LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH python3 -m pytest -vv $XDIST \
+      --cov=apprise --cov-report=
    RET=$?
 fi
 
@@ -94,9 +102,6 @@ if [ $RET -ne 0 ]; then
    echo "Tests failed."
    exit 1
 fi
-
-# Build our report
-LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH coverage combine
 
 # Prepare XML Reference
 LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH coverage xml

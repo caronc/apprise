@@ -71,8 +71,8 @@ def enabled_glib_environment(monkeypatch):
     )
 
     # Step 2: Inject into sys.modules
-    sys.modules["gi"] = gi
-    sys.modules["gi.repository"] = gi.repository
+    monkeypatch.setitem(sys.modules, "gi", gi)
+    monkeypatch.setitem(sys.modules, "gi.repository", gi.repository)
 
     # Step 3: Reload plugin with all mocks in place
     reload_plugin("glib")
@@ -102,8 +102,8 @@ def test_plugin_glib_gdkpixbuf_attribute_error(monkeypatch):
     gi.require_version = Mock(side_effect=fake_require_version)
 
     # Inject into sys.modules
-    sys.modules["gi"] = gi
-    sys.modules["gi.repository"] = gi.repository
+    monkeypatch.setitem(sys.modules, "gi", gi)
+    monkeypatch.setitem(sys.modules, "gi.repository", gi.repository)
 
     # Trigger the plugin reload with our patched environment
     reload_plugin("glib")
@@ -316,7 +316,7 @@ def test_plugin_glib_require_version_importerror(monkeypatch):
     """Simulate gi.require_version() raising ImportError"""
     gi = types.ModuleType("gi")
     gi.require_version = Mock(side_effect=ImportError("no gio"))
-    sys.modules["gi"] = gi
+    monkeypatch.setitem(sys.modules, "gi", gi)
     reload_plugin("glib")
     obj = apprise.Apprise.instantiate("glib://", suppress_exceptions=False)
     assert not isinstance(obj, NotifyGLib)
@@ -326,22 +326,21 @@ def test_plugin_glib_require_version_valueerror(monkeypatch):
     """Simulate gi.require_version() raising ValueError without reload
     crash."""
 
-    import gi
+    # Provide a gi module whose require_version() fails
+    gi = types.ModuleType("gi")
+    gi.require_version = Mock(side_effect=ValueError("fail"))
+    monkeypatch.setitem(sys.modules, "gi", gi)
 
     import apprise.plugins.glib as plugin_glib
-
-    # Patch require_version after import
-    monkeypatch.setattr(
-        gi, "require_version", Mock(side_effect=ValueError("fail"))
-    )
 
     # Re-evaluate plugin support logic manually
     try:
         gi.require_version("Gio", "2.0")
 
     except Exception:
-        plugin_glib.NOTIFY_GLIB_SUPPORT_ENABLED = False
-        plugin_glib.NotifyGLib.enabled = False
+        # Restored after the test so later glib tests are not disabled
+        monkeypatch.setattr(plugin_glib, "NOTIFY_GLIB_SUPPORT_ENABLED", False)
+        monkeypatch.setattr(plugin_glib.NotifyGLib, "enabled", False)
 
     # Confirm plugin is now marked disabled
     assert not plugin_glib.NotifyGLib.enabled
@@ -365,8 +364,8 @@ def test_plugin_glib_gdkpixbuf_require_version_valueerror(monkeypatch):
     gi.require_version = Mock(side_effect=fake_require_version)
 
     # Step 2: Patch into sys.modules
-    sys.modules["gi"] = gi
-    sys.modules["gi.repository"] = gi.repository
+    monkeypatch.setitem(sys.modules, "gi", gi)
+    monkeypatch.setitem(sys.modules, "gi.repository", gi.repository)
 
     # Step 3: Reload plugin to trigger branch
     reload_plugin("glib")
