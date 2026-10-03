@@ -30,6 +30,7 @@ from inspect import cleandoc
 
 # Disable logging for a cleaner testing output
 import logging
+import sys
 from typing import Any
 from unittest.mock import Mock
 
@@ -1902,6 +1903,20 @@ urls:
     assert tzinfo.utcoffset(dt) is not None
     # also stable tzname resolution
     assert isinstance(tzinfo.tzname(dt), str)
+
+
+def test_config_base_yaml_missing(monkeypatch):
+    """YAML config loads nothing when PyYAML is not installed."""
+
+    # A None entry in sys.modules makes import yaml raise ImportError.
+    monkeypatch.setitem(sys.modules, "yaml", None)
+    assert ConfigBase.config_parse_yaml("urls:\n  - json://localhost\n") == (
+        [],
+        [],
+    )
+
+    # URLs and text configuration still work.
+    assert ConfigBase.config_parse_text("json://localhost")[0]
 
 
 def test_config_base_yaml_tag_alias_dict(tmpdir):

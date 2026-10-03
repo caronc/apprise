@@ -31,8 +31,6 @@ import os
 import re
 import time
 
-import yaml
-
 from .. import common, plugins
 from ..asset import AppriseAsset
 from ..exception import AppriseImproperlyConfigured, AppriseTemplateError
@@ -882,6 +880,17 @@ class ConfigBase(URLBase):
 
         You may optionally associate an asset with the notification.
         """
+
+        try:
+            # PyYAML is only loaded once a YAML configuration is parsed.
+            import yaml
+
+        except ImportError:
+            # Only possible when PyYAML was removed from the install.
+            ConfigBase.logger.error(
+                "YAML configuration requires the PyYAML package."
+            )
+            return ([], [])
 
         # A list of loaded Notification Services
         services = []
