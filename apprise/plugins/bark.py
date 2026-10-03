@@ -309,7 +309,7 @@ class NotifyBark(NotifyBase):
         except ValueError:
             self.badge = None
             self.logger.warning(
-                "The specified Bark badge ({}) is not valid ", badge
+                "The specified Bark badge (%s) is not valid", badge
             )
 
         # Sound (easy-lookup)
@@ -322,7 +322,7 @@ class NotifyBark(NotifyBase):
         )
         if sound and not self.sound:
             self.logger.warning(
-                "The specified Bark sound ({}) was not found ", sound
+                "The specified Bark sound (%s) was not found", sound
             )
 
         # Volume
@@ -335,7 +335,7 @@ class NotifyBark(NotifyBase):
 
             except (TypeError, ValueError):
                 self.logger.warning(
-                    "The specified Bark volume ({}) is not valid. "
+                    "The specified Bark volume (%s) is not valid. "
                     "Must be between 0 and 10",
                     volume,
                 )
@@ -394,7 +394,7 @@ class NotifyBark(NotifyBase):
         )
         if level and not self.level:
             self.logger.warning(
-                "The specified Bark level ({}) is not valid ", level
+                "The specified Bark level (%s) is not valid", level
             )
 
         return

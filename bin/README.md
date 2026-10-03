@@ -147,7 +147,7 @@ Once you've entered one of these environments, you can leverage the following co
 1. `bin/apprise`: launches the Apprise CLI using the local build (same as `tox -e apprise`)
 1. `ruff check . --fix`: auto-formats the codebase (same as `tox -e format`)
 1. `ruff check .`: performs lint-only validation (same as `tox -e lint`)
-1. `coverage run --source=apprise -m pytest tests`: manual test execution with coverage
+1. `pytest tests -n auto --maxprocesses=8 --cov=apprise`: runs coverage tests across up to 8 CPU cores
 
 The only advantage of this route is the overhead associated with each `tox` call is gone (faster responses).  Otherwise just utilizing the `tox` commands can sometimes be easier.
 

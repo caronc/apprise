@@ -895,7 +895,7 @@ class NotifyOffice365(NotifyBase):
                 postokay, response = self._fetch(url=attach_url)
                 if not postokay:
                     self.logger.warning(
-                        "Could not send drafted email id: {} ", message_id
+                        "Could not send drafted email id: %s", message_id
                     )
                     has_error = True
                     continue

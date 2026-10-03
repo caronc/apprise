@@ -70,6 +70,14 @@ def apprise_logs_enabled(level=logging.TRACE):
         apprise_logger.setLevel(restore_level)
 
 
+def wait_until(condition, timeout=5.0):
+    """Check ``condition`` until it is true or ``timeout`` seconds pass."""
+    # Poll because background work finishes asynchronously.
+    deadline = time.monotonic() + timeout
+    while not condition() and time.monotonic() < deadline:
+        time.sleep(0.02)
+
+
 class _TestNotify(NotifyBase):
     """Test notification plugin -- controlled pass/fail via side_effect."""
 
@@ -4685,7 +4693,9 @@ class TestServiceTimeout:
             assert apprise_module.any_abandoned_calls_still_running() is True
 
             # Give it a generous window to actually finish.
-            time.sleep(0.7)
+            wait_until(
+                lambda: not apprise_module.any_abandoned_calls_still_running()
+            )
             assert apprise_module.any_abandoned_calls_still_running() is False
         finally:
             N_MGR.unload_modules()
@@ -4712,7 +4722,9 @@ class TestServiceTimeout:
             assert "slow://descriptionhost" in descriptions[0]
 
             # Once the service finishes, its abandoned-call description clears.
-            time.sleep(0.7)
+            wait_until(
+                lambda: not apprise_module.abandoned_call_descriptions()
+            )
             assert apprise_module.abandoned_call_descriptions() == []
         finally:
             N_MGR.unload_modules()
@@ -4736,7 +4748,9 @@ class TestServiceTimeout:
 
             # Queued futures are cancelled before they ever touch the tracked
             # abandoned-call list; any running work should settle quickly.
-            time.sleep(0.5)
+            wait_until(
+                lambda: not apprise_module.any_abandoned_calls_still_running()
+            )
             assert apprise_module.any_abandoned_calls_still_running() is False
         finally:
             N_MGR.unload_modules()
@@ -4952,12 +4966,10 @@ class TestAsyncAbandonedCallTracking:
             assert any("x" in d or "slowthreaded" in d for d in descriptions)
 
             # Once the real delay elapses, it drops out of the list.
-            deadline = time.monotonic() + 2.0
-            while (
-                apprise_module.any_abandoned_calls_still_running()
-                and time.monotonic() < deadline
-            ):
-                time.sleep(0.02)
+            wait_until(
+                lambda: not apprise_module.any_abandoned_calls_still_running(),
+                timeout=2.0,
+            )
             assert apprise_module.any_abandoned_calls_still_running() is False
             assert service.calls == 1
         finally:

@@ -9,6 +9,7 @@ mock
 pytest
 pytest-cov
 pytest-mock
+pytest-xdist
 ruff
 babel
 validate-pyproject

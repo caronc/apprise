@@ -174,7 +174,7 @@ class NotifyPushy(NotifyBase):
         except ValueError:
             self.badge = None
             self.logger.warning(
-                "The specified Pushy badge ({}) is not valid ", badge
+                "The specified Pushy badge (%s) is not valid", badge
             )
 
         return

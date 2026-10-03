@@ -77,6 +77,7 @@ uvx --with tox-uv tox -e qa
 
 ```bash
 pytest               # Run all tests
+pytest -n auto --maxprocesses=8  # Run tests across up to 8 CPU cores
 pytest tests/foo.py  # Run a specific test file
 ```
 
