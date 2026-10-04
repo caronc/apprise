@@ -344,6 +344,13 @@ FLEET = (
         {},
     ),
     (
+        "onebot",
+        "onebot://localhost/@1001/#9009",
+        "1001",
+        "9009",
+        {},
+    ),
+    (
         "notifiarr",
         f"notifiarr://{TOKEN}/#1001/#9009",
         "1001",
