@@ -181,7 +181,7 @@ No `.venv` is required unless you choose to use one.
 1. **Fork the repository** and create a new branch.
 2. Make your changes.
 3. Run the checks listed above.
-4. Submit a pull request (PR) to the `main` branch.
+4. Submit a pull request (PR) to the `master` branch.
 
 GitHub Actions will run tests and lint checks on your PR automatically.
 
