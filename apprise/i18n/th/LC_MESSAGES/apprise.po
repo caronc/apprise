@@ -1336,6 +1336,14 @@ msgstr "ข้อมูลตอบกลับ"
 msgid "Integration Key"
 msgstr "คีย์การเชื่อมต่อ"
 
+#: apprise/plugins/goalert.py:169
+msgid "Integration Keys"
+msgstr "คีย์การเชื่อมต่อหลายรายการ"
+
+#: apprise/plugins/goalert.py:194
+msgid "Deduplication Key"
+msgstr "คีย์ตัดรายการซ้ำ"
+
 #: apprise/plugins/pagerduty.py:152
 msgid "Component"
 msgstr "ส่วนประกอบ"

@@ -1336,6 +1336,14 @@ msgstr "Datos ng postback"
 msgid "Integration Key"
 msgstr "Susi ng integrasyon"
 
+#: apprise/plugins/goalert.py:169
+msgid "Integration Keys"
+msgstr "Mga susi ng integrasyon"
+
+#: apprise/plugins/goalert.py:194
+msgid "Deduplication Key"
+msgstr "Susi ng deduplikasyon"
+
 #: apprise/plugins/pagerduty.py:152
 msgid "Component"
 msgstr "Bahagi"

@@ -68,8 +68,9 @@ notification services. It supports sending alerts to platforms such as: \
 `Chanify`, `Clickatell`, `ClickSend`, `DAPNET`, `Delta Chat`, \
 `DingTalk`, `Discord`, \
 `Dot. (Quote/0)`, `E-Mail`, `Emby`, `Evolution API`, `Exotel`, \
-`FCM`, `Feishu`, `Flock`, `Flowtriq`, `Fluxer`, `Free Mobile`, `Google Chat`, \
-`Gotify`, `GroupMe`, `Growl`, `Guilded`, `Home Assistant`, `httpSMS`, \
+`FCM`, `Feishu`, `Flock`, `Flowtriq`, `Fluxer`, `Free Mobile`, `GoAlert`, \
+`Google Chat`, `Gotify`, `GroupMe`, `Growl`, `Guilded`, `Home Assistant`, \
+`httpSMS`, \
 `HumHub`, \
 `IFTTT`, `IRC`, `Jellyfin`, `Jira`, `Join`, `Kavenegar`, `KODI`, `Kook`, \
 `Kumulos`, `LaMetric`, `Lark`, `Lauther`, `Line`, `MacOSX`, `Mailgun`, \

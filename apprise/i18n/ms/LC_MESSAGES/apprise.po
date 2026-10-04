@@ -1336,6 +1336,14 @@ msgstr "Data maklum balas"
 msgid "Integration Key"
 msgstr "Kunci penyatuan"
 
+#: apprise/plugins/goalert.py:169
+msgid "Integration Keys"
+msgstr "Kunci-kunci penyatuan"
+
+#: apprise/plugins/goalert.py:194
+msgid "Deduplication Key"
+msgstr "Kunci nyahduplikasi"
+
 #: apprise/plugins/pagerduty.py:152
 msgid "Component"
 msgstr "Komponen"

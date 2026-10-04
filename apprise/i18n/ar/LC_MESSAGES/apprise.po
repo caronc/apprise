@@ -1337,6 +1337,14 @@ msgstr "بيانات الاستجابة"
 msgid "Integration Key"
 msgstr "مفتاح التكامل"
 
+#: apprise/plugins/goalert.py:169
+msgid "Integration Keys"
+msgstr "مفاتيح التكامل"
+
+#: apprise/plugins/goalert.py:194
+msgid "Deduplication Key"
+msgstr "مفتاح إزالة التكرار"
+
 #: apprise/plugins/pagerduty.py:152
 msgid "Component"
 msgstr "المكوّن"

@@ -1336,6 +1336,14 @@ msgstr "Geri bildirim verileri"
 msgid "Integration Key"
 msgstr "Tümleştirme anahtarı"
 
+#: apprise/plugins/goalert.py:169
+msgid "Integration Keys"
+msgstr "Tümleştirme anahtarları"
+
+#: apprise/plugins/goalert.py:194
+msgid "Deduplication Key"
+msgstr "Yinelenenleri kaldırma anahtarı"
+
 #: apprise/plugins/pagerduty.py:152
 msgid "Component"
 msgstr "Bileşen"

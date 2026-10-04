@@ -1336,6 +1336,14 @@ msgstr "回传数据"
 msgid "Integration Key"
 msgstr "集成密钥"
 
+#: apprise/plugins/goalert.py:169
+msgid "Integration Keys"
+msgstr "集成密钥列表"
+
+#: apprise/plugins/goalert.py:194
+msgid "Deduplication Key"
+msgstr "去重密钥"
+
 #: apprise/plugins/pagerduty.py:152
 msgid "Component"
 msgstr "组件"

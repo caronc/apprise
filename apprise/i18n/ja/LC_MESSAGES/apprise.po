@@ -1337,6 +1337,14 @@ msgstr "ポストバックデータ"
 msgid "Integration Key"
 msgstr "連携キー"
 
+#: apprise/plugins/goalert.py:169
+msgid "Integration Keys"
+msgstr "連携キー一覧"
+
+#: apprise/plugins/goalert.py:194
+msgid "Deduplication Key"
+msgstr "重複排除キー"
+
 #: apprise/plugins/pagerduty.py:152
 msgid "Component"
 msgstr "コンポーネント"

@@ -1336,6 +1336,14 @@ msgstr "Dados de retorno"
 msgid "Integration Key"
 msgstr "Chave de integração"
 
+#: apprise/plugins/goalert.py:169
+msgid "Integration Keys"
+msgstr "Chaves de integração"
+
+#: apprise/plugins/goalert.py:194
+msgid "Deduplication Key"
+msgstr "Chave de desduplicação"
+
 #: apprise/plugins/pagerduty.py:152
 msgid "Component"
 msgstr "Componente"
