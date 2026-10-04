@@ -1336,6 +1336,14 @@ msgstr "Terugkoppelingsgegevens"
 msgid "Integration Key"
 msgstr "Integratiesleutel"
 
+#: apprise/plugins/goalert.py:169
+msgid "Integration Keys"
+msgstr "Integratiesleutels"
+
+#: apprise/plugins/goalert.py:194
+msgid "Deduplication Key"
+msgstr "Ontdubbelingssleutel"
+
 #: apprise/plugins/pagerduty.py:152
 msgid "Component"
 msgstr "Onderdeel"

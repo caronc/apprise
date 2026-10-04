@@ -1336,6 +1336,14 @@ msgstr "Postback Data"
 msgid "Integration Key"
 msgstr "Integration Key"
 
+#: apprise/plugins/goalert.py:169
+msgid "Integration Keys"
+msgstr "Integration Keys"
+
+#: apprise/plugins/goalert.py:194
+msgid "Deduplication Key"
+msgstr "Deduplication Key"
+
 #: apprise/plugins/pagerduty.py:152
 msgid "Component"
 msgstr "Component"

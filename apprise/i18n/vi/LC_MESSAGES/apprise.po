@@ -1336,6 +1336,14 @@ msgstr "Dữ liệu phản hồi"
 msgid "Integration Key"
 msgstr "Khóa tích hợp"
 
+#: apprise/plugins/goalert.py:169
+msgid "Integration Keys"
+msgstr "Các khóa tích hợp"
+
+#: apprise/plugins/goalert.py:194
+msgid "Deduplication Key"
+msgstr "Khóa chống trùng lặp"
+
 #: apprise/plugins/pagerduty.py:152
 msgid "Component"
 msgstr "Thành phần"

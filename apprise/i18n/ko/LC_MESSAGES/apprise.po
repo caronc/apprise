@@ -1336,6 +1336,14 @@ msgstr "포스트백 데이터"
 msgid "Integration Key"
 msgstr "연동 키"
 
+#: apprise/plugins/goalert.py:169
+msgid "Integration Keys"
+msgstr "연동 키 목록"
+
+#: apprise/plugins/goalert.py:194
+msgid "Deduplication Key"
+msgstr "중복 제거 키"
+
 #: apprise/plugins/pagerduty.py:152
 msgid "Component"
 msgstr "구성 요소"

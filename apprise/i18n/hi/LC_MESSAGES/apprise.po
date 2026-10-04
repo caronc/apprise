@@ -1336,6 +1336,14 @@ msgstr "पोस्टबैक डेटा"
 msgid "Integration Key"
 msgstr "एकीकरण कुंजी"
 
+#: apprise/plugins/goalert.py:169
+msgid "Integration Keys"
+msgstr "एकीकरण कुंजियाँ"
+
+#: apprise/plugins/goalert.py:194
+msgid "Deduplication Key"
+msgstr "डुप्लिकेट-रोधी कुंजी"
+
 #: apprise/plugins/pagerduty.py:152
 msgid "Component"
 msgstr "घटक"

@@ -279,6 +279,14 @@ FLEET = (
         {},
     ),
     (
+        "goalert",
+        "goalert://localhost/ab12cd34-ab12-4c5d-8e9f-000000000001"
+        "/ab12cd34-ab12-4c5d-8e9f-000000009999",
+        "000000000001",
+        "000000009999",
+        {"__http__": 204},
+    ),
+    (
         "ntfy",
         "ntfy://localhost/topic0001/topic9999",
         "topic0001",
