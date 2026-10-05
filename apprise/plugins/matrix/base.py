@@ -250,16 +250,6 @@ class NotifyMatrix(NotifyBase):
     # Keep our cache for 20 days
     default_cache_expiry_sec = 60 * 60 * 24 * 20
 
-    # Number of signed_curve25519 one-time keys to generate and upload
-    # per batch (both on initial device registration and replenishment).
-    default_e2ee_otk_count = 10
-
-    # Replenish the server-side OTK pool when the estimated remaining
-    # count drops below this value.  /keys/claim consumes one OTK per
-    # device; without replenishment the pool runs dry and subsequent
-    # key-shares skip devices that have no OTK available.
-    default_e2ee_otk_replenish_threshold = 5
-
     # Maximum time an opt-in verification bootstrap waits for SAS events.
     default_autoverify_timeout_sec = 120
 
@@ -2447,7 +2437,12 @@ class NotifyMatrix(NotifyBase):
         return True
 
     def _e2ee_upload_keys(self):
-        """POST device keys to ``/_matrix/client/v3/keys/upload``."""
+        """POST device keys to ``/_matrix/client/v3/keys/upload``.
+
+        No one-time keys are published.  Apprise only sends, and a key
+        share consumes the recipient's one-time keys, never ours, so any
+        we upload would sit unused on the server.
+        """
         if not self.user_id or not self.device_id:
             self.logger.warning(
                 "Matrix E2EE: cannot upload keys without user_id "
@@ -2459,24 +2454,16 @@ class NotifyMatrix(NotifyBase):
             "device_keys": self._e2ee_account.device_keys_payload(
                 self.user_id, self.device_id
             ),
-            "one_time_keys": self._e2ee_account.one_time_keys_payload(
-                self.user_id,
-                self.device_id,
-                count=self.default_e2ee_otk_count,
-            ),
             "fallback_keys": self._e2ee_account.fallback_keys_payload(
                 self.user_id, self.device_id
             ),
         }
-        postokay, response, _ = self._fetch("/keys/upload", payload=payload)
+        postokay, _, _ = self._fetch("/keys/upload", payload=payload)
         if not postokay:
             self.logger.warning("Matrix E2EE: device key upload failed.")
             return False
 
-        # Mirror stable python-olm account behaviour: once uploaded, the
-        # current one-time key batch is considered published and a future
-        # upload should generate a fresh set.
-        self._e2ee_account.mark_keys_as_published()
+        # Persist the fallback key generated for this upload.
         self.store.set(
             "e2ee_account",
             self._e2ee_account.to_dict(),
@@ -2494,140 +2481,10 @@ class NotifyMatrix(NotifyBase):
             expires=self.default_cache_expiry_sec,
         )
 
-        # Track the server-side OTK count so _e2ee_replenish_otks can
-        # decide whether a top-up is needed after the next /keys/claim.
-        counts = (
-            response.get("one_time_key_counts", {})
-            if isinstance(response, dict)
-            else {}
-        )
-        self.store.set(
-            "e2ee_otk_server_count",
-            counts.get("signed_curve25519", 0),
-            expires=self.default_cache_expiry_sec,
-        )
-
         self.logger.debug(
-            "Matrix E2EE: device keys uploaded for %s / %s "
-            "(server OTK count: %d).",
+            "Matrix E2EE: device keys uploaded for %s / %s.",
             self.user_id,
             self.device_id,
-            counts.get("signed_curve25519", 0),
-        )
-        return True
-
-    def _e2ee_replenish_otks(self, claimed_count=0, skipped_no_otk=0):
-        """Top up the server-side OTK pool after a ``/keys/claim`` event.
-
-        Parameters:
-          claimed_count   -- number of OTKs successfully consumed by the
-                             preceding ``/keys/claim`` (= ``built_count``
-                             from :meth:`_e2ee_share_room_key`)
-          skipped_no_otk  -- devices that were skipped because the server
-                             returned no OTK for them (pool already dry)
-
-        A replenishment upload is issued when any of the following is true:
-
-        - ``skipped_no_otk > 0``: the pool was already depleted during
-          the current claim -- top up immediately so the next key share
-          can reach those devices.
-        - estimated remaining OTKs after claim <
-          ``default_e2ee_otk_replenish_threshold``: pool is running low.
-        - server count was never recorded (unknown state): replenish as a
-          precaution.
-
-        Only ``one_time_keys`` is uploaded so the server does not treat
-        this as a device re-registration.
-
-        Returns ``True`` on success (or when no top-up was needed),
-        ``False`` on network failure (non-fatal -- the preceding send
-        already succeeded).
-        """
-        if not self.user_id or not self.device_id:
-            return False
-
-        server_count = self.store.get("e2ee_otk_server_count")
-        unknown_count = server_count is None
-
-        if unknown_count:
-            remaining = 0
-        else:
-            remaining = max(0, server_count - claimed_count)
-
-        need_replenish = (
-            skipped_no_otk > 0
-            or unknown_count
-            or remaining < self.default_e2ee_otk_replenish_threshold
-        )
-
-        if not need_replenish:
-            self.logger.trace(
-                "Matrix E2EE: OTK pool sufficient "
-                "(~%d remaining after claim); skipping replenishment.",
-                remaining,
-            )
-            return True
-
-        if skipped_no_otk > 0:
-            self.logger.warning(
-                "Matrix E2EE: %d device(s) had no OTK available during "
-                "key share (server pool was depleted). Those device(s) "
-                "will not decrypt the current message. Replenishing OTK "
-                "pool now so the next session rotation can reach them.",
-                skipped_no_otk,
-            )
-        elif unknown_count:
-            self.logger.debug(
-                "Matrix E2EE: server OTK count unknown; "
-                "replenishing as a precaution.",
-            )
-        else:
-            self.logger.debug(
-                "Matrix E2EE: OTK pool low (~%d remaining after claim, "
-                "threshold=%d); replenishing.",
-                remaining,
-                self.default_e2ee_otk_replenish_threshold,
-            )
-
-        payload = {
-            "one_time_keys": self._e2ee_account.one_time_keys_payload(
-                self.user_id,
-                self.device_id,
-                count=self.default_e2ee_otk_count,
-            ),
-        }
-        postokay, response, _ = self._fetch("/keys/upload", payload=payload)
-        if not postokay:
-            self.logger.warning(
-                "Matrix E2EE: OTK replenishment upload failed "
-                "(estimated ~%d remaining); pool may be depleted "
-                "on the next key share.",
-                remaining,
-            )
-            return False
-
-        self._e2ee_account.mark_keys_as_published()
-        self.store.set(
-            "e2ee_account",
-            self._e2ee_account.to_dict(),
-            expires=self.default_cache_expiry_sec,
-        )
-
-        counts = (
-            response.get("one_time_key_counts", {})
-            if isinstance(response, dict)
-            else {}
-        )
-        new_count = counts.get("signed_curve25519", 0)
-        self.store.set(
-            "e2ee_otk_server_count",
-            new_count,
-            expires=self.default_cache_expiry_sec,
-        )
-        self.logger.debug(
-            "Matrix E2EE: OTK pool replenished; "
-            "server now reports %d signed_curve25519 key(s).",
-            new_count,
         )
         return True
 
@@ -2985,6 +2842,17 @@ class NotifyMatrix(NotifyBase):
             skipped_olm_fail,
         )
 
+        if skipped_no_otk:
+            # The recipient owns its key pool; it is only replenished
+            # when one of its own clients next comes online.
+            self.logger.warning(
+                "Matrix E2EE: %d device(s) in %s had no one-time key "
+                "available; those device(s) will not be able to decrypt "
+                "this message.",
+                skipped_no_otk,
+                room_id,
+            )
+
         # Only send if at least one device message was built
         if not any(v for v in to_device_msgs.values()):
             self.logger.trace(
@@ -3021,19 +2889,6 @@ class NotifyMatrix(NotifyBase):
             room_id,
             self.transaction_id,
         )
-
-        # Check whether the OTK pool needs topping up.  Pass the number of
-        # OTKs consumed (built_count) and any devices skipped because the
-        # server had no OTK for them so _e2ee_replenish_otks can log the
-        # right diagnostic and decide whether an upload is needed.
-        # We always reach here with built_count >= 1 (the any() guard above
-        # returns early when no messages were built), so the call is never
-        # redundant -- _e2ee_replenish_otks itself decides whether to upload.
-        self._e2ee_replenish_otks(
-            claimed_count=built_count,
-            skipped_no_otk=skipped_no_otk,
-        )
-
         return True
 
     def _e2ee_send_to_room(

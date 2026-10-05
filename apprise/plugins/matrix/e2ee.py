@@ -698,7 +698,6 @@ class MatrixOlmAccount:
         self,
         ik_priv_b64=None,
         sk_priv_b64=None,
-        otks=None,
         fallback_otk=None,
     ):
         """Initialise from saved keys or generate a fresh key pair.
@@ -725,7 +724,6 @@ class MatrixOlmAccount:
         self._sk_pub = self._sk.public_key().public_bytes(
             Encoding.Raw, PublicFormat.Raw
         )
-        self._otks = dict(otks or {})
         self._fallback_otk = fallback_otk
 
     # --- Public-key properties -------------------------------------------
@@ -763,7 +761,6 @@ class MatrixOlmAccount:
                     Encoding.Raw, PrivateFormat.Raw, NoEncryption()
                 )
             ),
-            "otks": self._otks,
             "fallback_otk": self._fallback_otk,
         }
 
@@ -773,7 +770,6 @@ class MatrixOlmAccount:
         return MatrixOlmAccount(
             ik_priv_b64=data["ik"],
             sk_priv_b64=data["sk"],
-            otks=data.get("otks"),
             fallback_otk=data.get("fallback_otk"),
         )
 
@@ -816,31 +812,6 @@ class MatrixOlmAccount:
         }
         return payload
 
-    def _ensure_otks(self, count=10):
-        """Ensure at least *count* signed_curve25519 one-time keys exist."""
-        while len(self._otks) < count:
-            key_id = uuid.uuid4().hex[:10]
-            priv = X25519PrivateKey.generate()
-            self._otks[key_id] = _b64enc(
-                priv.private_bytes(
-                    Encoding.Raw, PrivateFormat.Raw, NoEncryption()
-                )
-            )
-
-    def one_time_keys_payload(self, user_id, device_id, count=10):
-        """Build signed ``one_time_keys`` for ``POST /keys/upload``."""
-        self._ensure_otks(count=count)
-        payload = {}
-        for key_id, priv_b64 in self._otks.items():
-            priv = X25519PrivateKey.from_private_bytes(_b64dec(priv_b64))
-            pub = priv.public_key().public_bytes(
-                Encoding.Raw, PublicFormat.Raw
-            )
-            payload["signed_curve25519:{}".format(key_id)] = (
-                self._signed_curve25519_key(user_id, device_id, _b64enc(pub))
-            )
-        return payload
-
     def fallback_keys_payload(self, user_id, device_id):
         """Build signed ``fallback_keys`` for ``POST /keys/upload``."""
         if not self._fallback_otk:
@@ -865,15 +836,6 @@ class MatrixOlmAccount:
                 user_id, device_id, _b64enc(pub)
             )
         }
-
-    def mark_keys_as_published(self):
-        """Mark the current OTK batch as published.
-
-        This mirrors stable python-olm's ``Account.mark_keys_as_published()``:
-        the uploaded one-time keys are no longer treated as the next
-        unpublished batch, so a subsequent upload can generate a fresh set.
-        """
-        self._otks.clear()
 
     # --- Outbound session ------------------------------------------------
 
