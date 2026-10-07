@@ -309,8 +309,8 @@ class NotifySeven(NotifyBase):
         if self.label:
             params["label"] = self.label
 
-        # Our URL parameters
-        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         return "{schema}://{apikey}/{targets}/?{params}".format(
             schema=self.secure_protocol,
