@@ -32,6 +32,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise import Apprise
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.seven import NotifySeven
 
@@ -145,6 +146,31 @@ def test_plugin_seven_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+def test_plugin_seven_url_round_trip():
+    """NotifySeven() url() keeps the optional parameters."""
+
+    obj = Apprise.instantiate(
+        "seven://{}/15551232000?source=AR&flash=yes&label=123"
+        "&verify=no".format("3" * 14)
+    )
+    assert isinstance(obj, NotifySeven)
+
+    url = obj.url()
+    assert "from=AR" in url
+    assert "flash=yes" in url
+    assert "label=123" in url
+    assert "verify=no" in url
+
+    # Reloading our URL produces the same configuration
+    obj2 = Apprise.instantiate(url)
+    assert isinstance(obj2, NotifySeven)
+    assert obj2.source == "AR"
+    assert obj2.flash is True
+    assert obj2.label == "123"
+    assert obj2.verify_certificate is False
+    assert obj2.url() == url
 
 
 @mock.patch("requests.post")
