@@ -466,12 +466,12 @@ class NotifyStreamlabs(NotifyBase):
         # donation - name
         if "name" in results["qsd"] and results["qsd"]["name"]:
             results["name"] = NotifyStreamlabs.unquote(
-                results["qsd"]["name"].strip().upper()
+                results["qsd"]["name"].strip()
             )
         # donation - identifier
         if "identifier" in results["qsd"] and results["qsd"]["identifier"]:
             results["identifier"] = NotifyStreamlabs.unquote(
-                results["qsd"]["identifier"].strip().upper()
+                results["qsd"]["identifier"].strip()
             )
         # alert - alert_type
         if "alert_type" in results["qsd"] and results["qsd"]["alert_type"]:
@@ -486,7 +486,7 @@ class NotifyStreamlabs(NotifyBase):
         # alert - sound_href
         if "sound_href" in results["qsd"] and results["qsd"]["sound_href"]:
             results["sound_href"] = NotifyStreamlabs.unquote(
-                results["qsd"]["sound_href"].strip().upper()
+                results["qsd"]["sound_href"].strip()
             )
         # alert - duration
         if "duration" in results["qsd"] and results["qsd"]["duration"]:
