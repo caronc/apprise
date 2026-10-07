@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import gc
 import logging
 import re
 import ssl
@@ -155,6 +156,59 @@ def test_plugin_mqtt_multiple_topics_success(mqtt_client_mock):
         ),
         call.publish().is_published(),
     ]
+
+
+def test_plugin_mqtt_disconnect_on_cleanup(mqtt_client_mock):
+    """Verify the broker connection is closed once the notifier is freed."""
+
+    apobj = apprise.Apprise()
+    assert apobj.add("mqtt://localhost/my/topic") is True
+    assert bool(apobj.notify(body="test=test")) is True
+
+    # The connection stays open while the notifier is still around
+    assert call.disconnect() not in mqtt_client_mock.mock_calls
+    assert call.loop_stop() not in mqtt_client_mock.mock_calls
+
+    # Freeing the notifier closes the connection and stops the network
+    # thread started by loop_start()
+    del apobj
+    gc.collect()
+
+    assert mqtt_client_mock.mock_calls[-2:] == [
+        call.disconnect(),
+        call.loop_stop(),
+    ]
+
+
+def test_plugin_mqtt_cleanup_without_connection(mqtt_client_mock):
+    """Verify cleanup is skipped when no connection was ever made."""
+
+    obj = apprise.Apprise.instantiate(
+        "mqtt://localhost/my/topic", suppress_exceptions=False
+    )
+    assert isinstance(obj, NotifyMQTT)
+
+    del obj
+    gc.collect()
+
+    assert mqtt_client_mock.mock_calls == [
+        call.max_inflight_messages_set(200),
+    ]
+
+
+def test_plugin_mqtt_cleanup_exception(mqtt_client_mock):
+    """Verify an error while disconnecting is never raised on cleanup."""
+
+    obj = apprise.Apprise.instantiate(
+        "mqtt://localhost/my/topic", suppress_exceptions=False
+    )
+    assert isinstance(obj, NotifyMQTT)
+    assert bool(obj.notify(body="test=test")) is True
+
+    mqtt_client_mock.disconnect.side_effect = OSError("Connection lost")
+
+    # Does not raise
+    obj.__del__()
 
 
 def test_plugin_mqtt_to_success(mqtt_client_mock):

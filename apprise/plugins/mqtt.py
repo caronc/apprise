@@ -607,6 +607,17 @@ class NotifyMQTT(NotifyBase):
         """Returns the number of targets associated with this notification."""
         return len(self.topics)
 
+    def __del__(self):
+        """Close our broker connection and stop the network thread."""
+        try:
+            if not self.__initial_connect:
+                self.client.disconnect()
+                self.client.loop_stop()
+
+        except Exception:
+            # Never raise from __del__
+            pass
+
     @staticmethod
     def parse_url(url):
         """There are no parameters nessisary for this protocol; simply having
