@@ -587,6 +587,70 @@ def test_plugin_mailgun_header_check(mock_post):
     assert payload["to"] == "luke@rebels.com"
 
 
+@mock.patch("requests.post")
+def test_plugin_mailgun_url_from_round_trip(mock_post):
+    """NotifyMailgun() url() keeps the from= address on reload."""
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+    mock_post.return_value = okay_response
+
+    apikey = "abc123"
+
+    # Address only
+    obj = Apprise.instantiate(
+        f"mailgun://user@localhost.localdomain/{apikey}?from=luke@rebels.com"
+    )
+    assert isinstance(obj, NotifyMailgun)
+    assert "from=luke%40rebels.com" in obj.url()
+
+    reloaded = Apprise.instantiate(obj.url())
+    assert isinstance(reloaded, NotifyMailgun)
+    assert reloaded.from_addr == obj.from_addr
+
+    assert (
+        bool(
+            reloaded.notify(
+                body="body", title="title", notify_type=NotifyType.INFO
+            )
+        )
+        is True
+    )
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][1]["data"]["from"] == "luke@rebels.com"
+
+    mock_post.reset_mock()
+
+    # Name and address
+    obj = Apprise.instantiate(
+        f"mailgun://user@localhost.localdomain/{apikey}"
+        "?from=Chris<luke@rebels.com>"
+    )
+    assert isinstance(obj, NotifyMailgun)
+
+    reloaded = Apprise.instantiate(obj.url())
+    assert isinstance(reloaded, NotifyMailgun)
+    assert reloaded.from_addr[0] == "Chris"
+    assert reloaded.from_addr[1] == "luke@rebels.com"
+    assert reloaded.from_addr == obj.from_addr
+
+    # Default sender is not written as from=
+    obj = Apprise.instantiate(f"mailgun://user@localhost.localdomain/{apikey}")
+    assert isinstance(obj, NotifyMailgun)
+    assert "from=" not in obj.url()
+    assert Apprise.instantiate(obj.url()).from_addr == obj.from_addr
+
+    # The default sender address given on its own adds nothing to the url
+    obj = Apprise.instantiate(
+        f"mailgun://user@localhost.localdomain/{apikey}"
+        "?from=user@localhost.localdomain"
+    )
+    assert isinstance(obj, NotifyMailgun)
+    assert "from=" not in obj.url()
+    assert "name=" not in obj.url()
+
+
 def test_plugin_mailgun_cc_bcc_invalid_branch():
     """NotifyMailgun() CC/BCC validation: invalid entries are dropped."""
 
