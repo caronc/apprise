@@ -386,6 +386,40 @@ def test_plugin_pingram_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
+def test_plugin_pingram_url_from_round_trip():
+    """NotifyPingram() url() keeps the from= sender address."""
+
+    # No from= given; nothing is written
+    obj = Apprise.instantiate("pingram://pingram_sk_abc123/id5/")
+    assert isinstance(obj, NotifyPingram)
+    assert obj.from_addr is None
+    assert "from=" not in obj.url()
+
+    # A bare address (no name) is written back as the address
+    obj = Apprise.instantiate(
+        "pingram://pingram_sk_abc123/id5/?from=joe@example.ca"
+    )
+    assert isinstance(obj, NotifyPingram)
+    assert obj.from_addr == "joe@example.ca"
+    assert "from=joe%40example.ca" in obj.url()
+    reloaded = Apprise.instantiate(obj.url())
+    assert isinstance(reloaded, NotifyPingram)
+    assert reloaded.from_addr == obj.from_addr
+    assert reloaded.names[reloaded.from_addr] == obj.names[obj.from_addr]
+
+    # A named address keeps both the name and the address
+    for sender in ("Chris<chris@example.eu>", "Chris Caron<chris@example.eu>"):
+        obj = Apprise.instantiate(
+            f"pingram://pingram_sk_abc123/id5/?from={sender}"
+        )
+        assert isinstance(obj, NotifyPingram)
+        assert obj.from_addr == "chris@example.eu"
+        reloaded = Apprise.instantiate(obj.url())
+        assert isinstance(reloaded, NotifyPingram)
+        assert reloaded.from_addr == obj.from_addr
+        assert reloaded.names[reloaded.from_addr] == (obj.names[obj.from_addr])
+
+
 @mock.patch("requests.post")
 def test_plugin_pingram_template_sms_payloads(mock_post):
     """NotifyPingram() Testing Template SMS Payloads."""
