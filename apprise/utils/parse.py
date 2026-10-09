@@ -148,7 +148,7 @@ CALL_SIGN_DETECTION_RE = re.compile(
 
 # Regular expression used to destinguish between multiple URLs.
 URL_DETECTION_RE = re.compile(
-    r"([a-z0-9]+?:\/\/.*?)(?=$|[\s,]{1,32}[a-z0-9]{1,32}?:\/\/)", re.I
+    r"([a-z0-9]+?:\/\/.*?)(?=$|[\s,;]{1,32}[a-z0-9]{1,32}?:\/\/)", re.I
 )
 
 # No leading separator; first-char anchors make separator positions O(1)-fail
