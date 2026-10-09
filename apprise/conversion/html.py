@@ -162,6 +162,9 @@ class HTMLConverter(HTMLParser):
         # Should we store the text content or not?
         self._do_store = True
 
+        # Count the open <pre> elements; text inside keeps its line breaks.
+        self._pre_depth = 0
+
         # Initialize internal result list
         self._result = []
 
@@ -219,8 +222,14 @@ class HTMLConverter(HTMLParser):
 
         # Ignore data while an ignored container is active.
         if self._do_store:
-            # Collapse whitespace before buffering visible text.
-            content = self.WS_TRIM.sub(" ", data)
+            if self._pre_depth:
+                # Keep the line breaks and indentation inside <pre>; only
+                # the line break style is normalized.
+                content = data.replace("\r\n", "\n").replace("\r", "\n")
+
+            else:
+                # Collapse whitespace before buffering visible text.
+                content = self.WS_TRIM.sub(" ", data)
 
             # Preserve the normalized fragment for final assembly.
             self._result.append(content)
@@ -230,6 +239,10 @@ class HTMLConverter(HTMLParser):
 
         # Toggle storage according to the newly opened container.
         self._do_store = tag not in self.IGNORE_TAGS
+
+        # Track entry into preformatted text.
+        if tag == "pre":
+            self._pre_depth += 1
 
         # Start block elements on a fresh output line.
         if tag in self.BLOCK_TAGS:
@@ -260,6 +273,10 @@ class HTMLConverter(HTMLParser):
 
         # Resume storage after leaving an ignored container.
         self._do_store = True
+
+        # Track the exit from preformatted text.
+        if tag == "pre" and self._pre_depth:
+            self._pre_depth -= 1
 
         # Close block elements with a line boundary.
         if tag in self.BLOCK_TAGS:
