@@ -101,6 +101,10 @@ _delivery_index: contextvars.ContextVar[int] = contextvars.ContextVar(
     "apprise_delivery_index", default=0
 )
 
+# Marks a whole message piece as accepted. The name cannot collide with the
+# keys that plugins track their own targets under.
+_PIECE_DELIVERED = "__piece__"
+
 
 class NotifyBase(URLBase):
     """This is the base class for all notification services."""
@@ -913,7 +917,17 @@ class NotifyBase(URLBase):
 
         send_start = time.monotonic()
         try:
+            # A retry does not send a piece that was already accepted.
+            if self.is_delivered(_PIECE_DELIVERED):
+                self.logger.debug(
+                    "%s already accepted this message piece; skipping.",
+                    self.service_name,
+                )
+                return True
+
             result = send_fn(**kwargs)
+            if result:
+                self.mark_delivered(_PIECE_DELIVERED)
 
         finally:
             # Always restore the previous piece, even if send() raised.
