@@ -634,3 +634,107 @@ def test_batch_positions_stay_distinct():
 
     finally:
         _delivery_tracker.reset(token)
+
+
+JSON_URL = "json://localhost/?overflow=split"
+PIECES = ("PIECE1", "PIECE2", "PIECE3")
+
+
+def _json_post(fail_times=1):
+    """Build a requests.request replacement that refuses the last piece.
+
+    - The service sends one request per piece; the piece holding ``PIECE3``
+      is refused.
+    - ``fail_times`` limits how many times it is refused; None means
+      always.
+    """
+    seen = []
+    state = {"n": 0}
+
+    def handler(method, url, *args, **kwargs):
+        body = loads(kwargs["data"])["message"]
+        r = requests.Request()
+        r.status_code = requests.codes.ok
+        r.content = "{}"
+        r.headers = {}
+
+        if "PIECE3" in body:
+            state["n"] += 1
+            if fail_times is None or state["n"] <= fail_times:
+                r.status_code = requests.codes.internal_server_error
+                seen.append("PIECE3 refused")
+                return r
+
+        seen.append(next(p for p in PIECES if p in body))
+        return r
+
+    return handler, seen
+
+
+def _three_pieces():
+    """Return a body that the json service splits into three pieces."""
+
+    maxlen = Apprise.instantiate(JSON_URL).body_maxlen
+    pieces = []
+    for tag in PIECES:
+        # Fill each piece to just under the limit, so that the next one has
+        # to start a new request.
+        rows = (maxlen - 3) // 100 - 1
+        head = tag.ljust(maxlen - 3 - rows * 100, "a")
+        pieces.append("\n".join([head] + ["a" * 99] * rows))
+
+    return "\n".join(pieces)
+
+
+def test_accepted_pieces_are_not_resent_on_retry():
+    """Only the piece that failed is sent again."""
+
+    handler, seen = _json_post(fail_times=1)
+    with mock.patch("requests.request", side_effect=handler):
+        aobj = Apprise()
+        assert aobj.add(JSON_URL + "&retry=1&wait=0")
+        result = aobj.notify(body=_three_pieces())
+
+    assert bool(result) is True
+    assert seen == ["PIECE1", "PIECE2", "PIECE3 refused", "PIECE3"]
+
+
+def test_accepted_pieces_are_sent_once_without_retry():
+    """With retry off every piece goes out once and a failure is final."""
+
+    handler, seen = _json_post(fail_times=1)
+    with mock.patch("requests.request", side_effect=handler):
+        aobj = Apprise()
+        assert aobj.add(JSON_URL + "&retry=0")
+        result = aobj.notify(body=_three_pieces())
+
+    assert bool(result) is False
+    assert seen == ["PIECE1", "PIECE2", "PIECE3 refused"]
+
+
+def test_failing_piece_exhausts_retries_without_resending_others():
+    """A piece that never succeeds fails the notification, but the pieces
+    before it are still only sent once."""
+
+    handler, seen = _json_post(fail_times=None)
+    with mock.patch("requests.request", side_effect=handler):
+        aobj = Apprise()
+        assert aobj.add(JSON_URL + "&retry=2&wait=0")
+        result = aobj.notify(body=_three_pieces())
+
+    assert bool(result) is False
+    assert seen == ["PIECE1", "PIECE2"] + ["PIECE3 refused"] * 3
+
+
+def test_async_accepted_pieces_are_not_resent_on_retry():
+    """The asynchronous path skips accepted pieces as well."""
+
+    handler, seen = _json_post(fail_times=1)
+    with mock.patch("requests.request", side_effect=handler):
+        aobj = Apprise()
+        assert aobj.add(JSON_URL + "&retry=1&wait=0")
+        result = asyncio.run(aobj.async_notify(body=_three_pieces()))
+
+    assert bool(result) is True
+    assert seen == ["PIECE1", "PIECE2", "PIECE3 refused", "PIECE3"]
+    assert _delivery_tracker.get() is None
