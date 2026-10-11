@@ -2033,6 +2033,75 @@ def test_config_base_yaml_tag_priority(tmpdir):
     assert sum(1 for _ in a.find("secondary")) == 0
 
 
+@pytest.mark.parametrize(
+    "url",
+    (
+        "apprise://localhost/mykey?tags=devops",
+        "opsgenie://apikey/?tags=devops",
+        "pagertree://int_abcdefghij?tags=devops",
+        "jira://apikey/?tags=devops",
+    ),
+)
+def test_config_base_yaml_plugin_tags_kept(url):
+    """
+    API: ConfigBase.config_parse_yaml
+
+    A plugin's own ?tags= reaches the plugin and never becomes a routing tag.
+    """
+    text_result, _ = ConfigBase.config_parse_text(url)
+    yaml_result, _ = ConfigBase.config_parse_yaml(f"urls:\n  - {url}\n")
+
+    assert len(text_result) == len(yaml_result) == 1
+    for result in (text_result[0], yaml_result[0]):
+        # No routing tag was derived from the URL
+        assert not result.tags
+        # The plugin kept its own tags
+        assert "tags=devops" in result.url()
+
+    # A `tag` key in the YAML sets the routing tag and leaves the plugin's
+    # ?tags= alone
+    yaml_result, _ = ConfigBase.config_parse_yaml(
+        f"urls:\n  - {url}:\n      tag: local\n"
+    )
+    assert len(yaml_result) == 1
+    assert yaml_result[0].tags == {"local"}
+    assert "tags=devops" in yaml_result[0].url()
+
+    # The list form behaves the same way for every expanded entry
+    yaml_result, _ = ConfigBase.config_parse_yaml(
+        f"urls:\n  - {url}:\n    - tag: one\n    - tag: two\n"
+    )
+    assert len(yaml_result) == 2
+    assert {frozenset(r.tags) for r in yaml_result} == {
+        frozenset({"one"}),
+        frozenset({"two"}),
+    }
+    assert all("tags=devops" in r.url() for r in yaml_result)
+
+    # Global tags are applied as routing tags only
+    yaml_result, _ = ConfigBase.config_parse_yaml(
+        f"tag: global\nurls:\n  - {url}\n"
+    )
+    assert len(yaml_result) == 1
+    assert yaml_result[0].tags == {"global"}
+    assert "tags=devops" in yaml_result[0].url()
+
+
+def test_config_base_yaml_tags_key_still_alias():
+    """
+    API: ConfigBase.config_parse_yaml
+
+    A `tags` key written in the YAML remains an alias of `tag`, even for a
+    plugin that has its own `tags` argument.
+    """
+    yaml_result, _ = ConfigBase.config_parse_yaml(
+        "urls:\n  - apprise://localhost/mykey:\n      tags: local\n"
+    )
+    assert len(yaml_result) == 1
+    assert yaml_result[0].tags == {"local"}
+    assert "tags=" not in yaml_result[0].url()
+
+
 def test_yaml_sibling_token_overrides_basic():
     """
     API: ConfigBase - YAML sibling-key token overrides (basic cases).
