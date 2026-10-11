@@ -35,7 +35,6 @@ does not require a custom loader or depend on PyYAML's internal constructors.
 from collections.abc import Collection
 from typing import Any, Optional
 
-from .parse import QSD_FULL_MODE_KEYS
 from .template import (
     TEMPLATE_VAR_RE,
     TemplatePlaceholderMap,
@@ -159,22 +158,13 @@ def templated_tag(
     """Return whether a parsed entry makes ``tag`` or ``tags`` variable.
 
     Tags control Apprise routing and therefore must be known before a pending
-    notification service is resolved. The check covers URL query modifiers,
-    YAML settings encoded as placeholders, and unencoded global YAML tags.
+    notification service is resolved. A tag or tags value on the URL itself
+    belongs to the plugin and is not checked.
     """
     if not placeholders or not isinstance(results, dict):
         return False
 
-    # URL parsing stores ordinary query arguments in qsd and the three custom
-    # forms in the shared QSD_FULL_MODE_KEYS definition. A static tag name with
-    # a templated value is invalid in every bucket.
-    for bucket in ("qsd", *QSD_FULL_MODE_KEYS):
-        values = results.get(bucket)
-        if isinstance(values, dict) and any(
-            placeholders.used(values.get(key)) for key in ("tag", "tags")
-        ):
-            return True
-
+    # The YAML tag and tags keys both end up here before this check runs.
     tags = results.get("tag", ())
     if placeholders.used(tags):
         # Per-service YAML tag values have already been encoded.

@@ -114,10 +114,12 @@ def test_yaml_dropped_template_reports_stable_missing_name():
 
 
 @pytest.mark.parametrize("bucket", ("qsd", *QSD_FULL_MODE_KEYS))
-def test_yaml_templated_tag_checks_every_query_bucket(bucket):
-    """Every query modifier uses the same fixed-routing rule."""
+def test_yaml_templated_tag_ignores_url_values(bucket):
+    """A tag in the URL query belongs to the plugin and is allowed."""
     mapping = placeholders("t")
-    assert templated_tag({bucket: {"tag": mapping.encode("${T}")}}, mapping)
+    assert not templated_tag(
+        {bucket: {"tag": mapping.encode("${T}")}}, mapping
+    )
 
 
 def test_yaml_templated_tag_handles_encoded_and_global_values():

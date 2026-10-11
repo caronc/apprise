@@ -32,6 +32,7 @@ covered separately in ``test_apprise_template_placement.py``.
 
 # Disable logging for a cleaner testing output
 from collections import UserDict
+from json import loads
 import logging
 import os
 from types import MappingProxyType
@@ -105,21 +106,62 @@ def test_apprise_template_text_config():
 @pytest.mark.parametrize(
     "entry",
     (
-        "json://localhost/?tag=${T}",
-        "json://localhost/?tags=${T}",
-        "json://localhost/?+tag=${T}",
-        "json://localhost/?-tag=${T}",
-        "json://localhost/?:tag=${T}",
         "json://localhost/:\n    - tag: ${T}",
         "json://localhost/:\n    - tags: ${T}",
     ),
 )
 def test_apprise_template_rejects_tag_variable(entry, logging_enabled, caplog):
-    """Query, singular, and plural tags all stay fixed."""
+    """Singular and plural YAML tag keys stay fixed."""
     with caplog.at_level(logging.ERROR):
         assert parse("template:\n  - t\nurls:\n  - {}\n".format(entry)) == []
 
     assert "not permitted in tag/tags" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "url, field",
+    (
+        ("apprise://localhost/key?method=json&tags=${T}", "body"),
+        ("json://localhost/?tag=${T}", None),
+        ("json://localhost/?tags=${T}", None),
+        ("json://localhost/?-tag=${T}", "params"),
+        ("json://localhost/?:tag=${T}", "body"),
+        ("json://localhost/?+tag=${T}", "headers"),
+    ),
+)
+def test_apprise_template_url_tag_passthrough(url, field):
+    """A templated tag on the URL is handed to the plugin, not routing."""
+    apobj = load("template:\n  - t\nurls:\n  - {}\n".format(url))
+
+    # The URL value never becomes an Apprise routing tag
+    service = next(apobj.find(template={"t": "devops"}))
+    assert not service.tags
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    response.headers = {}
+
+    with (
+        mock.patch("requests.post", return_value=response) as post,
+        mock.patch("requests.request", return_value=response) as request,
+    ):
+        assert apobj.notify(body="x", template={"t": "devops"})
+
+    # Only one of the two calls is used by each plugin
+    call = (post.call_args or request.call_args).kwargs
+
+    if field == "body":
+        # The value reaches the request payload
+        assert loads(call["data"])["tag"] in ("devops", ["devops"])
+
+    elif field == "params":
+        # The value reaches the request query string
+        assert call["params"]["tag"] == "devops"
+
+    elif field == "headers":
+        # The value reaches the request headers
+        assert call["headers"]["tag"] == "devops"
 
 
 @pytest.mark.parametrize(
