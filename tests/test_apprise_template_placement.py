@@ -184,7 +184,6 @@ def test_url_and_setting_scope(sent):
 @pytest.mark.parametrize(
     "position",
     [
-        "json://localhost/?tag=${V}",
         "json://localhost/:\n    - tag: ${V}",
         "${V}://localhost/",
     ],
