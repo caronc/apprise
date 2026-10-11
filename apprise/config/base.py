@@ -1576,10 +1576,8 @@ class ConfigBase(URLBase):
                 # tag is a special keyword that is managed by Apprise object.
                 # The below ensures our tags are set correctly.
                 #
-                # Only a `tags` key written in the YAML is an alias of `tag`.
-                # Plugins such as apprise://, opsgenie://, pagertree:// and
-                # jira:// parse their own ?tags= from the URL; that value
-                # belongs to the plugin and must be passed through untouched.
+                # Only a tags key written in the YAML is an alias of tag.  A
+                # ?tags= found on the URL belongs to the plugin that read it.
                 yaml_tags = "tags" in yaml_tokens_
                 if "tag" in results_:
                     # Tidy our list up

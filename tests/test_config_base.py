@@ -2046,10 +2046,7 @@ def test_config_base_yaml_plugin_tags_kept(url):
     """
     API: ConfigBase.config_parse_yaml
 
-    A ?tags= on the URL is parsed by the plugin itself (Apprise API,
-    Opsgenie, PagerTree, Jira). Only a `tags` key written in the YAML is an
-    alias of `tag`; the URL value must reach the plugin and must not become
-    an Apprise routing tag. YAML and TEXT must load the URL the same way.
+    A plugin's own ?tags= reaches the plugin and never becomes a routing tag.
     """
     text_result, _ = ConfigBase.config_parse_text(url)
     yaml_result, _ = ConfigBase.config_parse_yaml(f"urls:\n  - {url}\n")
