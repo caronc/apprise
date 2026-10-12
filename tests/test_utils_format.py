@@ -52,6 +52,26 @@ def test_smart_split_prefers_newlines_over_spaces_and_punctuation():
     assert "".join(chunks) == text
 
 
+def test_smart_split_never_returns_a_blank_chunk():
+    """A boundary in the whitespace that opens a window is skipped.
+
+    Splitting there left a chunk holding only a line break or a space,
+    which split mode then sent as an empty message.
+    """
+    # The first window ends between the CR and LF of a line break, so the
+    # second window opens with the LF
+    text = "a" * 9 + "\r\n" + "b" * 15
+    chunks = smart_split(text, 10, body_format=NotifyFormat.TEXT)
+    assert chunks == ["a" * 9 + "\r", "\n" + "b" * 9, "b" * 6]
+    assert "".join(chunks) == text
+
+    # A word that fills the window exactly, followed by a space
+    text = "a" * 10 + " " + "b" * 15
+    chunks = smart_split(text, 10, body_format=NotifyFormat.TEXT)
+    assert chunks == ["a" * 10, " " + "b" * 9, "b" * 6]
+    assert "".join(chunks) == text
+
+
 def test_smart_split_prefers_spaces_over_hard_split():
     """
     When there are no newlines, split on the last space/tab before falling back
