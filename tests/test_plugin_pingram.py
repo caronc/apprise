@@ -417,7 +417,7 @@ def test_plugin_pingram_url_from_round_trip():
         reloaded = Apprise.instantiate(obj.url())
         assert isinstance(reloaded, NotifyPingram)
         assert reloaded.from_addr == obj.from_addr
-        assert reloaded.names[reloaded.from_addr] == (obj.names[obj.from_addr])
+        assert reloaded.names[reloaded.from_addr] == obj.names[obj.from_addr]
 
 
 @mock.patch("requests.post")
