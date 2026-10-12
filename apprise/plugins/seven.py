@@ -305,7 +305,7 @@ class NotifySeven(NotifyBase):
             "flash": "yes" if self.flash else "no",
         }
         if self.source:
-            params["from"] = self.source
+            params["source"] = self.source
         if self.label:
             params["label"] = self.label
 
