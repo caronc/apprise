@@ -28,6 +28,7 @@
 from __future__ import annotations
 
 import asyncio
+import codecs
 from collections.abc import Iterator, Mapping
 import concurrent.futures as cf
 import contextvars
@@ -36,6 +37,7 @@ from itertools import chain
 import json
 import logging
 import os
+import re
 import threading
 import time
 from typing import Any, Callable, Optional, Union
@@ -93,6 +95,29 @@ N_MGR = NotificationManager()
 
 # Extra seconds of patience for notify() calls.
 _ABANDON_GRACE_SECONDS = 0.1
+
+# The backslash escapes interpret_escapes turns into characters. Anything
+# else after a backslash is kept as written, so a Windows path such as
+# C:\Users does not make the whole message fail.
+ESCAPE_SEQUENCE_RE = re.compile(
+    r"\\(?:U[0-9a-fA-F]{8}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|N\{[^{}\\]+\}"
+    r"|[0-7]{1,3}|[\\'\"abfnrtv\n])"
+)
+
+
+def decode_escapes(content: str) -> str:
+    """Return ``content`` with its backslash escapes interpreted."""
+
+    def _decode(match: re.Match) -> str:
+        try:
+            return codecs.decode(match.group(0), "unicode_escape")
+
+        except UnicodeDecodeError:
+            # A character name that does not exist, such as \N{NOPE}
+            return match.group(0)
+
+    return ESCAPE_SEQUENCE_RE.sub(_decode, content)
+
 
 # Shared pool for service calls. Coordinators use a separate pool so they
 # cannot occupy the workers needed by the service calls they await.
@@ -1442,18 +1467,10 @@ class Apprise:
                         #
 
                         try:
-                            # Added overhead required due to Python 3
-                            # Encoding Bug identified here:
-                            # https://bugs.python.org/issue21331
-                            source_body = source_body.encode(
-                                "ascii", "backslashreplace"
-                            ).decode("unicode-escape")
+                            source_body = decode_escapes(source_body)
+                            source_title = decode_escapes(source_title)
 
-                            source_title = source_title.encode(
-                                "ascii", "backslashreplace"
-                            ).decode("unicode-escape")
-
-                        except AttributeError:
+                        except TypeError:
                             # Must be of string type
                             msg = "Failed to escape message body"
                             logger.error(msg)
