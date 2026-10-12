@@ -28,6 +28,9 @@
 # Disable logging for a cleaner testing output
 import logging
 from os.path import dirname, join
+from unittest import mock
+
+import pytest
 
 from apprise import (
     Apprise,
@@ -40,6 +43,7 @@ from apprise import (
 )
 from apprise.decorators import notify
 from apprise.decorators.base import CustomNotifyPlugin
+from apprise.template import NotifyTemplate
 
 logging.disable(logging.CRITICAL)
 
@@ -130,7 +134,8 @@ def test_notify_simple_decoration():
     assert isinstance(verify_obj["kwargs"], dict)
     assert "meta" in verify_obj["kwargs"]
     assert isinstance(verify_obj["kwargs"]["meta"], dict)
-    assert len(verify_obj["kwargs"]["meta"]) == 4
+    assert len(verify_obj["kwargs"]["meta"]) == 5
+    assert verify_obj["kwargs"]["meta"]["verify"] is True
     assert "tag" in verify_obj["kwargs"]["meta"]
 
     assert "asset" in verify_obj["kwargs"]["meta"]
@@ -162,7 +167,8 @@ def test_notify_simple_decoration():
     assert isinstance(verify_obj["kwargs"], dict)
     assert "meta" in verify_obj["kwargs"]
     assert isinstance(verify_obj["kwargs"]["meta"], dict)
-    assert len(verify_obj["kwargs"]["meta"]) == 4
+    assert len(verify_obj["kwargs"]["meta"]) == 5
+    assert verify_obj["kwargs"]["meta"]["verify"] is True
     assert "tag" in verify_obj["kwargs"]["meta"]
 
     assert "asset" in verify_obj["kwargs"]["meta"]
@@ -194,7 +200,8 @@ def test_notify_simple_decoration():
     assert isinstance(verify_obj["kwargs"], dict)
     assert "meta" in verify_obj["kwargs"]
     assert isinstance(verify_obj["kwargs"]["meta"], dict)
-    assert len(verify_obj["kwargs"]["meta"]) == 4
+    assert len(verify_obj["kwargs"]["meta"]) == 5
+    assert verify_obj["kwargs"]["meta"]["verify"] is True
     assert "tag" in verify_obj["kwargs"]["meta"]
 
     assert "asset" in verify_obj["kwargs"]["meta"]
@@ -237,7 +244,8 @@ def test_notify_simple_decoration():
     assert isinstance(verify_obj["kwargs"], dict)
     assert "meta" in verify_obj["kwargs"]
     assert isinstance(verify_obj["kwargs"]["meta"], dict)
-    assert len(verify_obj["kwargs"]["meta"]) == 4
+    assert len(verify_obj["kwargs"]["meta"]) == 5
+    assert verify_obj["kwargs"]["meta"]["verify"] is True
     assert "tag" in verify_obj["kwargs"]["meta"]
 
     assert "asset" in verify_obj["kwargs"]["meta"]
@@ -279,7 +287,8 @@ def test_notify_simple_decoration():
     # specified
     assert "meta" in verify_obj["kwargs"]
     assert isinstance(verify_obj["kwargs"], dict)
-    assert len(verify_obj["kwargs"]["meta"]) == 4
+    assert len(verify_obj["kwargs"]["meta"]) == 5
+    assert verify_obj["kwargs"]["meta"]["verify"] is True
     assert "asset" in verify_obj["kwargs"]["meta"]
     assert isinstance(verify_obj["kwargs"]["meta"]["asset"], AppriseAsset)
     assert "tag" in verify_obj["kwargs"]["meta"]
@@ -475,7 +484,8 @@ def test_notify_complex_decoration():
     assert "tag" in verify_obj["kwargs"]["meta"]
     assert isinstance(verify_obj["kwargs"]["meta"]["tag"], set)
 
-    assert len(verify_obj["kwargs"]["meta"]) == 8
+    assert len(verify_obj["kwargs"]["meta"]) == 9
+    assert verify_obj["kwargs"]["meta"]["verify"] is True
     # We carry all of our default arguments from the @notify's initialization
     assert verify_obj["kwargs"]["meta"]["schema"] == "utiltest"
 
@@ -521,7 +531,8 @@ def test_notify_complex_decoration():
     # specified
     assert "meta" in verify_obj["kwargs"]
     assert isinstance(verify_obj["kwargs"], dict)
-    assert len(verify_obj["kwargs"]["meta"]) == 8
+    assert len(verify_obj["kwargs"]["meta"]) == 9
+    assert verify_obj["kwargs"]["meta"]["verify"] is True
 
     # We carry all of our default arguments from the @notify's initialization
     assert verify_obj["kwargs"]["meta"]["schema"] == "utiltest"
@@ -845,3 +856,385 @@ def test_custom_notify_plugin_decoration():
     """decorators: CustomNotifyPlugin testing"""
 
     CustomNotifyPlugin()
+
+    # A URL that cannot be parsed is handed back as-is
+    assert CustomNotifyPlugin.parse_url(None) is None
+
+    # A parsed URL picks up the same defaults as any other plugin
+    results = CustomNotifyPlugin.parse_url("custom://host?verify=no")
+    assert results["verify"] is False
+    assert results["secure"] is False
+
+
+@pytest.fixture
+def captured():
+    """Register a capturing ``capture://`` handler for the test."""
+    calls = []
+
+    @notify(on="capture", name="Capture @notify")
+    def _handler(body, title, notify_type, meta, *args, **kwargs):
+        # Keep each call so the test can inspect what arrived
+        calls.append(
+            {"body": body, "title": title, "meta": meta, "kwargs": kwargs}
+        )
+
+        # A ?fail=yes URL reports a failed delivery
+        return meta.get("qsd", {}).get("fail") != "yes"
+
+    assert "capture" in N_MGR
+    yield calls
+
+    # Tidy
+    N_MGR.remove("capture")
+
+
+def _yaml(content, **kwargs):
+    """Load YAML into an Apprise object and send one notification."""
+    apobj = Apprise()
+    config = AppriseConfig()
+    assert config.add_config(content, format="yaml")
+    assert apobj.add(config)
+    return apobj, apobj.notify("body", title="title", **kwargs)
+
+
+def _plain(meta):
+    """Return ``meta`` without the shared asset and tag objects."""
+    # The asset and tag set are compared separately
+    return {k: v for k, v in meta.items() if k not in ("asset", "tag")}
+
+
+@pytest.mark.parametrize(
+    "url",
+    (
+        "capture://",
+        "capture://host",
+        "capture://host?x=1",
+        "capture://host?verify=no&format=html",
+        "capture://bob@host?x=1",
+        "capture://host?user=bob&pass=pw",
+        "capture://secret@host?user=bob",
+        "capture://u:p@host:8080/a/b?x=1&-y=2&+z=3&:w=4",
+    ),
+)
+def test_notify_load_paths_agree(captured, url):
+    """Direct, TEXT and YAML loading all give the same meta."""
+    # Load the same URL each of the three ways
+    direct = Apprise()
+    assert direct.add(url)
+    assert direct.notify("body", title="title")
+
+    text = Apprise()
+    config = AppriseConfig()
+    assert config.add_config(url, format="text")
+    assert text.add(config)
+    assert text.notify("body", title="title")
+
+    _, result = _yaml("urls:\n  - {}\n".format(url))
+    assert result
+
+    # Every path delivered once, with identical details
+    assert len(captured) == 3
+    expected = _plain(captured[0]["meta"])
+    assert _plain(captured[1]["meta"]) == expected
+    assert _plain(captured[2]["meta"]) == expected
+
+
+def test_notify_yaml_query_without_password(captured):
+    """A YAML URL with a query and no password loads and sends."""
+    apobj, result = _yaml(
+        "urls:\n  - capture://host?x=1\n  - capture://other\n"
+    )
+
+    # Both entries load, so one URL cannot break the rest of the file
+    assert result
+    assert len(apobj) == 2
+    assert len(captured) == 2
+
+    meta = next(c["meta"] for c in captured if c["meta"]["host"] == "host")
+    assert meta["host"] == "host"
+    assert meta["qsd"] == {"x": "1"}
+    assert meta["verify"] is True
+    assert "password" not in meta
+
+
+def test_notify_query_overrides(captured):
+    """Query string verify, user and pass reach meta and the plugin."""
+    apobj = Apprise()
+    assert apobj.add("capture://host?verify=no&user=bob&pass=pw")
+
+    # The plugin itself honours verify=no like any other plugin
+    service = apobj[0]
+    assert service.verify_certificate is False
+
+    assert apobj.notify("body")
+    meta = captured[0]["meta"]
+    assert meta["verify"] is False
+    assert meta["user"] == "bob"
+    assert meta["password"] == "pw"
+
+    # The raw query string is still available untouched
+    assert meta["qsd"] == {"verify": "no", "user": "bob", "pass": "pw"}
+    assert meta["url"] == "capture://bob:pw@host?verify=no&user=bob&pass=pw"
+
+
+def test_notify_yaml_settings(captured):
+    """YAML settings under a URL reach meta like any other plugin."""
+    _, result = _yaml(
+        "urls:\n"
+        "  - capture://host?x=1:\n"
+        "      user: yamluser\n"
+        "      verify: no\n"
+        "      custom: value\n"
+        "      tag: mytag\n",
+        tag="mytag",
+    )
+    assert result
+    meta = captured[0]["meta"]
+
+    # Built-in and custom settings are both delivered
+    assert meta["user"] == "yamluser"
+    assert meta["verify"] is False
+    assert meta["custom"] == "value"
+    assert meta["qsd"] == {"x": "1"}
+    assert meta["tag"] == {"mytag"}
+
+    # The assembled URL reflects the YAML user
+    assert meta["url"] == "capture://yamluser@host?x=1"
+
+
+def test_notify_yaml_list_and_siblings(captured):
+    """List entries and sibling settings each build their own service."""
+    apobj, result = _yaml(
+        "urls:\n"
+        "  - capture://host?x=1:\n"
+        "    - custom: one\n"
+        "    - custom: two\n"
+        "  - capture://other?y=2:\n"
+        "    custom: three\n"
+    )
+    assert result
+    assert len(apobj) == 3
+
+    # Each entry carries its own value and the shared query string
+    found = sorted(
+        (c["meta"]["host"], c["meta"]["custom"], c["meta"]["qsd"].get("x"))
+        for c in captured
+    )
+    assert found == [
+        ("host", "one", "1"),
+        ("host", "two", "1"),
+        ("other", "three", None),
+    ]
+
+
+def test_notify_template_values(captured):
+    """Template values fill every part of a decorator URL."""
+    apobj, result = _yaml(
+        "template:\n"
+        "  - host\n"
+        "  - v\n"
+        "urls:\n"
+        "  - capture://${V}@${HOST}/p/${V}?x=${V}&-q=${V}:\n"
+        "      custom: ${V}\n",
+        template={"host": "example.com", "v": "val"},
+    )
+    assert result
+
+    # The pending entry became a real service only once values arrived
+    assert isinstance(next(iter(apobj)), NotifyTemplate)
+
+    meta = captured[0]["meta"]
+    assert meta["host"] == "example.com"
+    assert meta["user"] == "val"
+    assert meta["fullpath"] == "/p/val"
+    assert meta["qsd"] == {"x": "val", "-q": "val"}
+    assert meta["custom"] == "val"
+    assert meta["url"] == "capture://val@example.com/p/val?x=val&-q=val"
+
+
+def test_notify_template_kept_verbatim(captured):
+    """Template values with URL punctuation arrive unchanged."""
+    hostile = "a b&c=d?e/f@g"
+    _, result = _yaml(
+        "template:\n  - v\nurls:\n  - capture://host?x=${V}:\n"
+        "      custom: ${V}\n",
+        template={"v": hostile},
+    )
+    assert result
+
+    # The value stays one opaque string in both places
+    meta = captured[0]["meta"]
+    assert meta["qsd"] == {"x": hostile}
+    assert meta["custom"] == hostile
+
+
+def test_notify_template_defaults(captured):
+    """Defaults apply, and a missing value skips the entry."""
+    apobj, _ = _yaml(
+        "template:\n"
+        "  v: fallback\n"
+        "  required:\n"
+        "urls:\n"
+        "  - capture://host?x=${V}\n"
+        "  - capture://other?x=${REQUIRED}\n"
+    )
+
+    # Only the entry with a default could be sent
+    assert len(captured) == 1
+    assert captured[0]["meta"]["host"] == "host"
+    assert captured[0]["meta"]["qsd"] == {"x": "fallback"}
+
+    # Supplying the missing value sends both
+    del captured[:]
+    assert apobj.notify("body", template={"required": "given"})
+    assert sorted(c["meta"]["qsd"]["x"] for c in captured) == [
+        "fallback",
+        "given",
+    ]
+
+
+def test_notify_template_reuse(captured):
+    """Each distinct set of values builds its own service."""
+    apobj, _ = _yaml("template:\n  - v\nurls:\n  - capture://host?x=${V}\n")
+    del captured[:]
+
+    # Two different values are delivered separately
+    assert apobj.notify("body", template={"v": "one"})
+    assert apobj.notify("body", template={"v": "two"})
+    assert [c["meta"]["qsd"]["x"] for c in captured] == ["one", "two"]
+
+    # The same values hand back the same service
+    first = next(apobj.find(template={"v": "one"}))
+    assert next(apobj.find(template={"v": "one"})) is first
+    assert next(apobj.find(template={"v": "two"})) is not first
+
+
+# Each common URL option, a value for it, and how to read it back
+COMMON_OPTIONS = (
+    ("verify", "no", lambda p: p.verify_certificate),
+    ("redirect", "no", lambda p: p.redirects),
+    ("rto", "7", lambda p: p.socket_read_timeout),
+    ("cto", "3", lambda p: p.socket_connect_timeout),
+    ("format", "html", lambda p: p._format_override),
+    ("overflow", "truncate", lambda p: p.overflow_mode),
+    ("emojis", "yes", lambda p: p.interpret_emojis),
+    ("tz", "America/Toronto", lambda p: str(p.tzinfo)),
+    ("store", "no", lambda p: p.persistent_storage),
+    ("retry", "2", lambda p: p.retry),
+    ("wait", "1.5", lambda p: p.wait),
+    ("optional", "yes", lambda p: p.optional),
+)
+
+
+@pytest.mark.parametrize(
+    "key, value, read", COMMON_OPTIONS, ids=[o[0] for o in COMMON_OPTIONS]
+)
+@pytest.mark.parametrize("how", ("add", "text", "yaml"))
+def test_notify_common_options(captured, how, key, value, read):
+    """Every common URL option is applied the same as on json://."""
+    # json:// is the reference for how the option should land
+    reference = Apprise()
+    assert reference.add("json://localhost/?{}={}".format(key, value))
+    expected = read(reference[0])
+
+    # Load the decorator URL the requested way
+    url = "capture://host?{}={}".format(key, value)
+    apobj = Apprise()
+    if how == "add":
+        assert apobj.add(url)
+
+    else:
+        config = AppriseConfig()
+        assert config.add_config(
+            url if how == "text" else "urls:\n  - {}\n".format(url),
+            format=how,
+        )
+        assert apobj.add(config)
+
+    # The plugin applies the option exactly like json:// does
+    assert read(apobj[0]) == expected
+
+    # The parsed option is also shown to the decorated function
+    assert apobj.notify("body")
+    assert key in captured[0]["meta"]
+
+
+def test_notify_format_option(captured):
+    """A ?format= choice decides the format the function receives."""
+    apobj = Apprise()
+    assert apobj.add("capture://host?format=html")
+    assert apobj.notify("<b>body</b>", body_format=NotifyFormat.HTML)
+    assert captured[0]["kwargs"]["body_format"] == NotifyFormat.HTML
+
+    # Markdown input is converted to the chosen HTML
+    del captured[:]
+    assert apobj.notify("**body**", body_format=NotifyFormat.MARKDOWN)
+    assert captured[0]["kwargs"]["body_format"] == NotifyFormat.HTML
+    assert "<strong>body</strong>" in captured[0]["body"]
+
+
+def test_notify_emojis_option(captured):
+    """A ?emojis=yes URL converts emoji shortcodes before delivery."""
+    apobj = Apprise()
+    assert apobj.add("capture://host?emojis=yes")
+    assert apobj.notify(":smile:")
+    assert captured[0]["body"] == "\U0001f604"
+
+
+@pytest.mark.parametrize(
+    "url",
+    (
+        "capture://host?fail=yes&retry=2&wait=1.5",
+        "urls:\n  - capture://host?fail=yes:\n      retry: 2\n"
+        "      wait: 1.5\n",
+    ),
+    ids=("url", "yaml"),
+)
+def test_notify_retry_option(captured, url):
+    """A failing function is retried, from a URL or a YAML setting."""
+    apobj = Apprise()
+    if url.startswith("urls:"):
+        config = AppriseConfig()
+        assert config.add_config(url, format="yaml")
+        assert apobj.add(config)
+
+    else:
+        assert apobj.add(url)
+
+    with mock.patch("apprise.apprise.time.sleep") as sleep:
+        assert not apobj.notify("body")
+
+    # The first try plus two retries, with the wait between each
+    assert len(captured) == 3
+    assert sleep.call_count == 2
+    sleep.assert_called_with(pytest.approx(1.5))
+
+
+def test_notify_optional_option(captured):
+    """A failure on an optional URL does not fail the notification."""
+    apobj = Apprise()
+    assert apobj.add("capture://host?fail=yes&optional=yes")
+    assert apobj.add("capture://other")
+    assert apobj.notify("body")
+
+    # Both functions still ran
+    assert len(captured) == 2
+
+    # Without optional the same failure is reported
+    apobj = Apprise()
+    assert apobj.add("capture://host?fail=yes")
+    assert not apobj.notify("body")
+
+
+def test_notify_unsupported_options(captured):
+    """Unknown format and overflow values fall back to the defaults."""
+    apobj = Apprise()
+    assert apobj.add("capture://host?format=bogus&overflow=bogus")
+    plugin = apobj[0]
+    assert plugin._format_override is None
+    assert plugin.overflow_mode == common.OverflowMode.UPSTREAM
+
+    # The function still runs, and sees the raw values in the query string
+    assert apobj.notify("body")
+    assert "format" not in captured[0]["meta"]
+    assert captured[0]["meta"]["qsd"]["format"] == "bogus"

@@ -648,3 +648,34 @@ def test_notify_base_async_notify_preserves_send_order():
     )
     assert result is True
     assert call_order == [0, 1, 2, 3, 4]
+
+
+def test_notify_base_parse_url_options():
+    """Common query options are read only when a query string exists."""
+    # Nothing to read, so the results come back unchanged
+    results = {"schema": "json"}
+    assert NotifyBase.parse_url_options(results) == {"schema": "json"}
+
+    # Each supported option is lifted out of the query string
+    results = NotifyBase.parse_url_options(
+        {
+            "qsd": {
+                "format": "HTML",
+                "overflow": "split",
+                "emojis": "yes",
+                "tz": "UTC",
+                "store": "no",
+                "retry": "2",
+                "wait": "1.5",
+                "optional": "yes",
+            }
+        }
+    )
+    assert results["format"] == "html"
+    assert results["overflow"] == "split"
+    assert results["emojis"] is True
+    assert results["tz"] == "UTC"
+    assert results["store"] == "no"
+    assert results["retry"] == "2"
+    assert results["wait"] == "1.5"
+    assert results["optional"] is True
