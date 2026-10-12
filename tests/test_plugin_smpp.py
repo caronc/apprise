@@ -120,6 +120,10 @@ apprise_url_tests = (
         "smpp://user:pass@host/{}/{}".format("1" * 10, "1" * 10),
         {
             "instance": NotifySMPP,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "smpp://user:****@host/{}/{}".format(
+                "1" * 10, "1" * 10
+            ),
         },
     ),
     (
@@ -165,6 +169,31 @@ def test_plugin_smpp_urls():
 
         # Run our general tests
         AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@pytest.mark.skipif("smpplib" not in sys.modules, reason="Requires smpplib")
+def test_plugin_smpp_url_credentials():
+    """NotifySMPP() credentials are escaped and hidden in url()."""
+
+    obj = Apprise.instantiate(
+        "smpp://us%2Fer:p%40ss%2Fword@host/{}/{}".format("1" * 10, "2" * 10)
+    )
+    assert isinstance(obj, NotifySMPP)
+    assert obj.user == "us/er"
+    assert obj.password == "p@ss/word"
+
+    # The password is never shown in a privacy url
+    assert "p@ss" not in obj.url(privacy=True)
+    assert "p%40ss" not in obj.url(privacy=True)
+
+    # The credentials survive a reload from our generated url()
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifySMPP)
+    assert obj2.user == "us/er"
+    assert obj2.password == "p@ss/word"
+    assert obj2.host == "host"
+    assert obj2.source == "1" * 10
+    assert obj2.targets == ["2" * 10]
 
 
 @pytest.mark.skipif("smpplib" not in sys.modules, reason="Requires smpplib")

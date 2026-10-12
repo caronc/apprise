@@ -46,6 +46,7 @@ except ImportError:
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_phone_no
 from .base import NotifyBase
 
@@ -203,8 +204,10 @@ class NotifySMPP(NotifyBase):
             "{schema}://{user}:{password}@{host}/{source}/{targets}/?{params}"
         ).format(
             schema=self.secure_protocol if self.secure else self.protocol,
-            user=self.user,
-            password=self.password,
+            user=NotifySMPP.quote(self.user, safe=""),
+            password=self.pprint(
+                self.password, privacy, mode=PrivacyMode.Secret, safe=""
+            ),
             host=f"{self.host}:{self.port}" if self.port else self.host,
             source=self.source,
             targets="/".join(
