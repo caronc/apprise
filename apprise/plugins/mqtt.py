@@ -607,12 +607,19 @@ class NotifyMQTT(NotifyBase):
         """Returns the number of targets associated with this notification."""
         return len(self.topics)
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Close our broker connection and stop the network thread."""
         try:
+            # Nothing to close if we never connected
             if not self.__initial_connect:
-                self.client.disconnect()
-                self.client.loop_stop()
+                try:
+                    # Let the broker know we are leaving
+                    self.client.disconnect()
+
+                finally:
+                    # Always stop the network thread, even if the
+                    # disconnect failed
+                    self.client.loop_stop()
 
         except Exception:
             # Never raise from __del__

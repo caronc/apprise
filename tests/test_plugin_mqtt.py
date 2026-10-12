@@ -210,6 +210,9 @@ def test_plugin_mqtt_cleanup_exception(mqtt_client_mock):
     # Does not raise
     obj.__del__()
 
+    # The network thread is still stopped
+    assert call.loop_stop() in mqtt_client_mock.mock_calls
+
 
 def test_plugin_mqtt_to_success(mqtt_client_mock):
     """Verify `NotifyMQTT` succeeds with the `to=` parameter."""
