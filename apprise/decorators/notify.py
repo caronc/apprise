@@ -82,6 +82,7 @@ def notify(on, name=None, body_format=None):
                       'query': 'test.php',
 
                       'qsd': {'key': 'value', 'key2': 'value2'},
+                      'verify': True,
 
                       'asset': <AppriseAsset>,
                       'tag': set(),
@@ -92,6 +93,7 @@ def notify(on, name=None, body_format=None):
                     {
                       'schema': 'foobar',
                       'url': 'foobar://',
+                      'verify': True,
 
                       'asset': <AppriseAsset>,
                       'tag': set(),

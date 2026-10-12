@@ -27,6 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import inspect
+from typing import Any, Optional
 
 from .. import common
 from ..logger import logger
@@ -63,9 +64,19 @@ class CustomNotifyPlugin(NotifyBase):
     templates = ("{schema}://",)
 
     @staticmethod
-    def parse_url(url):
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
         """Parses the URL and returns arguments retrieved."""
-        return parse_url(url, verify_host=False, simple=True)
+        results = parse_url(url, verify_host=False, simple=True)
+        if not results:
+            # The URL could not be parsed at all
+            return results
+
+        # Apply the same query string handling every other plugin gets, so
+        # options such as ?verify=, ?user= and ?pass= behave the same.
+        results = NotifyBase.post_process_parse_url_results(results)
+
+        # Options such as ?format=, ?retry= and ?optional= work here too
+        return NotifyBase.parse_url_options(results)
 
     def url(self, privacy=False, *args, **kwargs):
         """General URL assembly."""

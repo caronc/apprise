@@ -1123,6 +1123,37 @@ def test_apprise_urlbase_object():
     assert isinstance(base.asset, AppriseAsset)
 
 
+def test_apprise_urlbase_simple_results():
+    """A simple parse without a password still applies the query string."""
+    from apprise.utils.parse import parse_url
+
+    # A simple parse leaves out the user and password entries entirely
+    results = parse_url("custom://host?x=1", verify_host=False, simple=True)
+    assert "password" not in results
+
+    # No password and no user= override
+    URLBase.post_process_parse_url_results(results)
+    assert results["verify"] is True
+    assert "password" not in results
+
+    # A user= override with no password to fall back to
+    results = parse_url(
+        "custom://host?user=bob&verify=no", verify_host=False, simple=True
+    )
+    URLBase.post_process_parse_url_results(results)
+    assert results["user"] == "bob"
+    assert results["password"] is None
+    assert results["verify"] is False
+
+    # The original user becomes the password when user= replaces it
+    results = parse_url(
+        "custom://secret@host?user=bob", verify_host=False, simple=True
+    )
+    URLBase.post_process_parse_url_results(results)
+    assert results["user"] == "bob"
+    assert results["password"] == "secret"
+
+
 def test_apprise_unique_id():
     """
     API: Apprise() Input Formats tests

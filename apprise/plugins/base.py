@@ -1668,6 +1668,20 @@ class NotifyBase(URLBase):
             # We're done; we failed to parse our url
             return results
 
+        # Apply the query string options every notification supports
+        return NotifyBase.parse_url_options(results)
+
+    @staticmethod
+    def parse_url_options(results: dict[str, Any]) -> dict[str, Any]:
+        """Apply the query string options every notification supports.
+
+        This reads ``format``, ``overflow``, ``emojis``, ``tz``, ``store``,
+        ``retry``, ``wait`` and ``optional`` from ``results["qsd"]``.
+        """
+        if not isinstance(results.get("qsd"), dict):
+            # There is no query string to read options from
+            return results
+
         # Allow overriding the default format
         if "format" in results["qsd"]:
             results["format"] = results["qsd"].get("format", "").lower()
