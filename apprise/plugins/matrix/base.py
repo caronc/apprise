@@ -3432,11 +3432,15 @@ class NotifyMatrix(NotifyBase):
                     ),
                 )
 
-            elif self.user or self.password:
-                auth = "{value}@".format(
-                    value=NotifyMatrix.quote(
-                        self.user if self.user else self.password, safe=""
-                    ),
+            elif self.password:
+                # Access token provided on its own
+                auth = "{token}@".format(
+                    token=self.pprint(self.password, privacy, safe=""),
+                )
+
+            elif self.user:
+                auth = "{user}@".format(
+                    user=NotifyMatrix.quote(self.user, safe=""),
                 )
 
         return "{schema}://{auth}{hostname}{port}/{rooms}?{params}".format(
