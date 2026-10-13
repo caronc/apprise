@@ -305,12 +305,12 @@ class NotifySeven(NotifyBase):
             "flash": "yes" if self.flash else "no",
         }
         if self.source:
-            params["from"] = self.source
+            params["source"] = self.source
         if self.label:
             params["label"] = self.label
 
-        # Our URL parameters
-        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         return "{schema}://{apikey}/{targets}/?{params}".format(
             schema=self.secure_protocol,
