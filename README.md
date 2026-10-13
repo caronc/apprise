@@ -35,8 +35,18 @@ Apprise provides one consistent URL format and notification interface for your a
 
 [![Apprise overview showing notification sources, entry points, and supported destinations](Apprise-overview.png)](Apprise-overview.png)
 
+# Apprise Mobile
+
+Use Apprise Mobile on Android, iPhone, or iPad to send notifications and attachments, manage service URLs, and review delivery reports from your phone or tablet. The app connects to your own [Apprise API server](https://github.com/caronc/apprise-api); it does not run the Python notification library on your device or replace the server.
+
+<a href="https://apps.apple.com/app/id6821633589"><img height="40" src="https://raw.githubusercontent.com/caronc/apprise/master/.github/badges/mobile/app-store-en.svg" alt="Download on the App Store"></a> <a href="https://play.google.com/store/apps/details?id=com.appriseit.mobile"><img height="40" src="https://raw.githubusercontent.com/caronc/apprise/master/.github/badges/mobile/google-play-en.svg" alt="Get it on Google Play"></a>
+
+See [Apprise Mobile](https://appriseit.com/mobile/) for supported devices, screenshots, and [setup instructions](https://appriseit.com/mobile/getting-started/).
+
+
 # Table of Contents
 <!--ts-->
+* [Apprise Mobile](#apprise-mobile)
 * [Supported Notifications](#supported-notifications)
   * [Productivity Based Notifications](#productivity-based-notifications)
   * [SMS Notifications](#sms-notifications)
