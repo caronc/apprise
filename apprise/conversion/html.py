@@ -162,7 +162,7 @@ class HTMLConverter(HTMLParser):
         # Should we store the text content or not?
         self._do_store = True
 
-        # Count the open <pre> elements; text inside keeps its line breaks.
+        # Count the open <pre> elements so text inside keeps its line breaks.
         self._pre_depth = 0
 
         # Initialize internal result list
@@ -222,14 +222,14 @@ class HTMLConverter(HTMLParser):
 
         # Ignore data while an ignored container is active.
         if self._do_store:
-            if self._pre_depth:
-                # Keep the line breaks and indentation inside <pre>; only
-                # the line break style is normalized.
-                content = data.replace("\r\n", "\n").replace("\r", "\n")
-
-            else:
-                # Collapse whitespace before buffering visible text.
-                content = self.WS_TRIM.sub(" ", data)
+            # Collapse whitespace before buffering visible text.  Text
+            # inside <pre> keeps its line breaks and indentation, and only
+            # its line break style is normalized.
+            content = (
+                data.replace("\r\n", "\n").replace("\r", "\n")
+                if self._pre_depth
+                else self.WS_TRIM.sub(" ", data)
+            )
 
             # Preserve the normalized fragment for final assembly.
             self._result.append(content)
