@@ -405,7 +405,9 @@ def test_detect_language_precedence(mock_getlocale):
             # nothing below LC_ALL gets a say, LANGUAGE included
             assert locale.AppriseLocale.detect_language() == default
 
-    with environ("LC_ALL", "LC_CTYPE", LANG="C", LC_MESSAGES="fr_CA"):
+    with environ(
+        "LANGUAGE", "LC_ALL", "LC_CTYPE", LANG="C", LC_MESSAGES="fr_CA"
+    ):
         # A higher priority category still decides; only the locale actually
         # in charge of messages can silence translation
         assert locale.AppriseLocale.detect_language() == "fr_CA"
