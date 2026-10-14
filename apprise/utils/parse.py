@@ -1170,8 +1170,8 @@ def urlencode(query, doseq=False, safe="", encoding=None, errors=None):
 
 
 def parse_urls(*args, store_unparseable=True, **kwargs):
-    """Takes a string containing URLs separated by comma's and/or spaces and
-    returns a list."""
+    """Takes a string containing URLs separated by commas, semicolons and/or
+    spaces and returns a list."""
 
     result = []
     for arg in args:
