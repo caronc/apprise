@@ -268,6 +268,49 @@ def test_conversion_html_to_text():
         assert to_html(object)
 
 
+def test_conversion_html_to_text_pre():
+    """conversion: Test HTML to plain text keeps <pre> formatting"""
+
+    def to_html(body):
+        """A function to simply html conversion tests."""
+        return convert_between(NotifyFormat.HTML, NotifyFormat.TEXT, body)
+
+    # Line breaks inside <pre> are kept
+    assert to_html("<pre>a\nb</pre>") == "a\nb"
+
+    # Line breaks and indentation of the lines after the first are kept
+    trace = (
+        "Traceback (most recent call last):\n"
+        '  File "x.py", line 1\n'
+        "    raise E\n"
+        "E: boom"
+    )
+    assert to_html(f"<pre>{trace}</pre>") == trace
+    assert to_html(f"<div><pre>{trace}</pre></div>") == trace
+
+    # Text around the block is converted as before
+    assert (
+        to_html("<p>intro</p><pre>x\n  y</pre><p>outro</p>")
+        == "intro\nx\n  y\noutro"
+    )
+
+    # Tags nested in <pre> stay part of the preformatted region
+    assert to_html("<pre><code>a\n  b</code></pre>") == "a\n  b"
+    assert to_html("<pre>a\n  <span>b\n    c</span>\n  d</pre>") == (
+        "a\n  b\n    c\n  d"
+    )
+
+    # Windows line breaks are normalized
+    assert to_html("<pre>a\r\n  b\r\n    c</pre>") == "a\n  b\n    c"
+
+    # Whitespace outside of <pre> is still condensed
+    assert to_html("<p>x  \n  y</p><pre>a</pre>  b \n  c") == "x y\na\nb c"
+    assert to_html("<pre>a\n b</pre><p>c\n  d</p>") == "a\n b\nc d"
+
+    # The Markdown conversion is not affected
+    assert html_to_markdown("<pre>a\n  b</pre>") == "```\na\n  b\n```"
+
+
 def test_conversion_html_to_markdown():
     """Test basic HTML-to-Markdown conversion."""
 
