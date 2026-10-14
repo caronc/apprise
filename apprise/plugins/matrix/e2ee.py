@@ -362,8 +362,8 @@ def encrypt_attachment(data):
 
     # JWK key: base64url no-padding
     k_b64url = base64.urlsafe_b64encode(key).rstrip(b"=").decode()
-    # IV: base64url no-padding (spec uses unpadded base64)
-    iv_b64url = base64.urlsafe_b64encode(iv).rstrip(b"=").decode()
+    # IV: standard base64 without padding (Matrix encrypted file spec)
+    iv_b64 = base64.b64encode(iv).rstrip(b"=").decode()
     # SHA-256 hash: standard base64 no-padding
     sha256_b64 = base64.b64encode(sha256_digest).rstrip(b"=").decode()
 
@@ -376,7 +376,7 @@ def encrypt_attachment(data):
             "k": k_b64url,
             "ext": True,
         },
-        "iv": iv_b64url,
+        "iv": iv_b64,
         "hashes": {"sha256": sha256_b64},
     }
 
