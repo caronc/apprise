@@ -575,8 +575,15 @@ class NotifyPingram(NotifyBase):
             params["region"] = self.region
 
         # handle from=
-        if self.from_addr and self.names[self.from_addr] != self.app_id:
-            params["from"] = self.names[self.from_addr]
+        if self.from_addr:
+            params["from"] = (
+                self.from_addr
+                if self.names[self.from_addr] == self.app_id
+                else formataddr(
+                    (self.names[self.from_addr], self.from_addr),
+                    charset="utf-8",
+                )
+            )
 
         # Store any template entries if specified
         params.update({f":{k}": v for k, v in self.tokens.items()})
