@@ -270,6 +270,26 @@ def test_plugin_whatsapp_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
+def test_plugin_whatsapp_url_language():
+    """NotifyWhatsApp() url() writes the template language as language=."""
+
+    obj = Apprise.instantiate(
+        "whatsapp://template:{}@12345/{}?lang=fr_CA".format("e" * 32, "4" * 11)
+    )
+    assert isinstance(obj, NotifyWhatsApp)
+
+    # lang= is an alias, so url() writes the value back as language=
+    url = obj.url()
+    assert "language=fr_CA" in url
+    assert "lang=" not in url
+
+    # Reloading our URL keeps the language
+    obj2 = Apprise.instantiate(url)
+    assert isinstance(obj2, NotifyWhatsApp)
+    assert obj2.language == "fr_CA"
+    assert obj2.url() == url
+
+
 @mock.patch("requests.post")
 def test_plugin_whatsapp_auth(mock_post):
     """NotifyWhatsApp() Auth.

@@ -137,6 +137,26 @@ def test_plugin_smsmgr_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
+def test_plugin_smsmgr_url_from():
+    """NotifySMSManager() url() writes the sender back as from=."""
+
+    obj = Apprise.instantiate(
+        "smsmgr://{}?key={}&sender=user".format("1" * 11, "a" * 10)
+    )
+    assert isinstance(obj, NotifySMSManager)
+
+    # sender= is an alias, so url() writes the value back as from=
+    url = obj.url()
+    assert "from=user" in url
+    assert "sender=" not in url
+
+    # Reloading our URL keeps the sender
+    obj2 = Apprise.instantiate(url)
+    assert isinstance(obj2, NotifySMSManager)
+    assert obj2.sender == "user"
+    assert obj2.url() == url
+
+
 @mock.patch("requests.get")
 def test_plugin_smsmgr_edge_cases(mock_get):
     """NotifySMSManager() Edge Cases."""

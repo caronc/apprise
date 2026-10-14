@@ -372,7 +372,7 @@ class NotifySMSManager(NotifyBase):
 
         if self.sender:
             # Set our sender if it was set
-            params["sender"] = self.sender
+            params["from"] = self.sender
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))

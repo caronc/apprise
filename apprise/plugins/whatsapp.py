@@ -591,7 +591,7 @@ class NotifyWhatsApp(NotifyBase):
         params = {}
         if self.template:
             # Add language to our URL
-            params["lang"] = self.language
+            params["language"] = self.language
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -663,6 +663,9 @@ class NotifyWhatsApp(NotifyBase):
         # Template Language
         if "lang" in results["qsd"] and len(results["qsd"]["lang"]):
             results["language"] = results["qsd"]["lang"]
+
+        if "language" in results["qsd"] and len(results["qsd"]["language"]):
+            results["language"] = results["qsd"]["language"]
 
         # Support the 'from'  and 'source' variable so that we can support
         # targets this way too.

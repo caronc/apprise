@@ -369,7 +369,7 @@ class NotifyD7Networks(NotifyBase):
         }
 
         if self.source:
-            params["from"] = self.source
+            params["source"] = self.source
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
