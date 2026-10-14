@@ -101,9 +101,9 @@ _delivery_index: contextvars.ContextVar[int] = contextvars.ContextVar(
     "apprise_delivery_index", default=0
 )
 
-# Marks a whole message piece as accepted. The name cannot collide with the
-# keys that plugins track their own targets under.
-_PIECE_DELIVERED = "__piece__"
+# Marks a whole message piece as accepted. A private object is used so it
+# can never match a key a plugin tracks its own targets under.
+_PIECE_DELIVERED = object()
 
 
 class NotifyBase(URLBase):
@@ -927,6 +927,7 @@ class NotifyBase(URLBase):
 
             result = send_fn(**kwargs)
             if result:
+                # Remember the accepted piece so a retry can skip it.
                 self.mark_delivered(_PIECE_DELIVERED)
 
         finally:

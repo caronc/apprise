@@ -649,9 +649,10 @@ def _json_post(fail_times=1):
       always.
     """
     seen = []
-    state = {"n": 0}
+    refused = 0
 
     def handler(method, url, *args, **kwargs):
+        nonlocal refused
         body = loads(kwargs["data"])["message"]
         r = requests.Request()
         r.status_code = requests.codes.ok
@@ -659,8 +660,8 @@ def _json_post(fail_times=1):
         r.headers = {}
 
         if "PIECE3" in body:
-            state["n"] += 1
-            if fail_times is None or state["n"] <= fail_times:
+            refused += 1
+            if fail_times is None or refused <= fail_times:
                 r.status_code = requests.codes.internal_server_error
                 seen.append("PIECE3 refused")
                 return r
@@ -686,7 +687,7 @@ def _three_pieces():
     return "\n".join(pieces)
 
 
-def test_accepted_pieces_are_not_resent_on_retry():
+def test_piece_retry_skips_accepted():
     """Only the piece that failed is sent again."""
 
     handler, seen = _json_post(fail_times=1)
@@ -699,7 +700,7 @@ def test_accepted_pieces_are_not_resent_on_retry():
     assert seen == ["PIECE1", "PIECE2", "PIECE3 refused", "PIECE3"]
 
 
-def test_accepted_pieces_are_sent_once_without_retry():
+def test_piece_no_retry():
     """With retry off every piece goes out once and a failure is final."""
 
     handler, seen = _json_post(fail_times=1)
@@ -712,9 +713,8 @@ def test_accepted_pieces_are_sent_once_without_retry():
     assert seen == ["PIECE1", "PIECE2", "PIECE3 refused"]
 
 
-def test_failing_piece_exhausts_retries_without_resending_others():
-    """A piece that never succeeds fails the notification, but the pieces
-    before it are still only sent once."""
+def test_piece_retry_exhausted():
+    """A piece that never succeeds fails, and earlier pieces go out once."""
 
     handler, seen = _json_post(fail_times=None)
     with mock.patch("requests.request", side_effect=handler):
@@ -726,7 +726,7 @@ def test_failing_piece_exhausts_retries_without_resending_others():
     assert seen == ["PIECE1", "PIECE2"] + ["PIECE3 refused"] * 3
 
 
-def test_async_accepted_pieces_are_not_resent_on_retry():
+def test_async_piece_retry_skips_accepted():
     """The asynchronous path skips accepted pieces as well."""
 
     handler, seen = _json_post(fail_times=1)
