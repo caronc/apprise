@@ -2817,11 +2817,11 @@ def test_plugin_matrix_encrypted_attachment_iv_standard_base64():
     random_iv = bytes.fromhex("813e84ed303f9c97")
     with mock.patch(
         "apprise.plugins.matrix.e2ee.os.urandom",
-        side_effect=[b"\\x11" * 32, random_iv],
+        side_effect=[b"\x11" * 32, random_iv],
     ):
         encrypted, info = encrypt_attachment(b"test image bytes")
 
-    iv = random_iv + b"\\x00" * 8
+    iv = random_iv + b"\x00" * 8
     assert info["iv"] == base64.b64encode(iv).decode().rstrip("=")
     assert "/" in info["iv"]
     assert "_" not in info["iv"]
