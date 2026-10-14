@@ -650,6 +650,26 @@ def test_plugin_mailgun_url_from_round_trip(mock_post):
     assert "from=" not in obj.url()
     assert "name=" not in obj.url()
 
+    # A name matching the default app name is still kept with the address
+    obj = Apprise.instantiate(
+        f"mailgun://user@localhost.localdomain/{apikey}"
+        "?from=Apprise<luke@rebels.com>"
+    )
+    assert isinstance(obj, NotifyMailgun)
+    reloaded = Apprise.instantiate(obj.url())
+    assert isinstance(reloaded, NotifyMailgun)
+    assert tuple(reloaded.from_addr) == ("Apprise", "luke@rebels.com")
+
+    # A named target matching the sender address stays in the url
+    obj = Apprise.instantiate(
+        f"mailgun://user@localhost.localdomain/{apikey}"
+        "/Luke:luke@rebels.com?from=luke@rebels.com"
+    )
+    assert isinstance(obj, NotifyMailgun)
+    reloaded = Apprise.instantiate(obj.url())
+    assert isinstance(reloaded, NotifyMailgun)
+    assert reloaded.targets == [("Luke", "luke@rebels.com")]
+
 
 def test_plugin_mailgun_cc_bcc_invalid_branch():
     """NotifyMailgun() CC/BCC validation: invalid entries are dropped."""

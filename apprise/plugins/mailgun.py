@@ -653,7 +653,7 @@ class NotifyMailgun(NotifyBase):
             # A from_addr address was specified; pass it back on the url
             params["from"] = (
                 formataddr(self.from_addr, charset="utf-8")
-                if self.from_addr[0] and self.from_addr[0] != self.app_id
+                if self.from_addr[0]
                 else self.from_addr[1]
             )
 
@@ -680,7 +680,8 @@ class NotifyMailgun(NotifyBase):
         # a simple boolean check as to whether we display our target emails
         # or not
         has_targets = not (
-            len(self.targets) == 1 and self.targets[0][1] == self.from_addr[1]
+            len(self.targets) == 1
+            and self.targets[0] == (False, self.from_addr[1])
         )
 
         return "{schema}://{user}@{host}/{apikey}/{targets}/?{params}".format(
