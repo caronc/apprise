@@ -177,6 +177,24 @@ def test_plugin_d7networks_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
+def test_plugin_d7networks_url_source():
+    """NotifyD7Networks() url() writes the sender back as source=."""
+
+    obj = Apprise.instantiate("d7sms://token@{}?from=apprise".format("3" * 14))
+    assert isinstance(obj, NotifyD7Networks)
+
+    # from= is an alias, so url() writes the value back as source=
+    url = obj.url()
+    assert "source=apprise" in url
+    assert "from=" not in url
+
+    # Reloading our URL keeps the sender
+    obj2 = Apprise.instantiate(url)
+    assert isinstance(obj2, NotifyD7Networks)
+    assert obj2.source == "apprise"
+    assert obj2.url() == url
+
+
 @mock.patch("requests.post")
 def test_plugin_d7networks_edge_cases(mock_post):
     """NotifyD7Networks() Edge Cases tests."""
