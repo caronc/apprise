@@ -37,7 +37,7 @@ import time
 from unittest import mock
 from urllib.parse import unquote
 
-from apprise import NotificationManager, utils
+from apprise import Apprise, NotificationManager, utils
 from apprise.tag import AppriseTag
 
 logging.disable(logging.CRITICAL)
@@ -2589,6 +2589,48 @@ def test_parse_urls():
     results = utils.parse.parse_urls("https://example.com" + " " * 50000)
     assert time.monotonic() - t0 < 5.0
     assert results == ["https://example.com"]
+
+
+def test_parse_urls_semicolon_delimiter():
+    """utils: parse_urls() accepts a semicolon between URLs"""
+
+    # A semicolon is a delimiter just like the comma and whitespace
+    for text in (
+        "json://a/;json://b/",
+        "json://a/ ; json://b/",
+        "json://a/; json://b/",
+        "json://a/,;  json://b/",
+        "json://a/ ,; json://b/",
+    ):
+        assert utils.parse.parse_urls(text) == ["json://a/", "json://b/"]
+
+    results = utils.parse.parse_urls("json://a/;json://b/;mailto://c/")
+    assert results == ["json://a/", "json://b/", "mailto://c/"]
+
+    # Each URL becomes its own service, the same as the comma form
+    for text in (
+        "json://a/;json://b/",
+        "mailtos://u:p@h.com;json://b/",
+    ):
+        asset = Apprise()
+        assert asset.add(text) is True
+        assert len(asset) == 2
+        comma = Apprise()
+        assert comma.add(text.replace(";", ",")) is True
+        assert len(asset) == len(comma)
+
+    # A semicolon not followed by another URL is part of the URL
+    for text in (
+        "json://a/?x=1;2",
+        "json://u:p;w@h/",
+        "json://a/;b",
+        "json://a/?url=x;y,z",
+    ):
+        assert utils.parse.parse_urls(text) == [text]
+
+    # Even when other URLs are present
+    results = utils.parse.parse_urls("json://a/?x=1;2;json://u:p;w@h/")
+    assert results == ["json://a/?x=1;2", "json://u:p;w@h/"]
 
 
 def test_dict_full_update():

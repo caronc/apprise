@@ -148,7 +148,7 @@ CALL_SIGN_DETECTION_RE = re.compile(
 
 # Regular expression used to destinguish between multiple URLs.
 URL_DETECTION_RE = re.compile(
-    r"([a-z0-9]+?:\/\/.*?)(?=$|[\s,]{1,32}[a-z0-9]{1,32}?:\/\/)", re.I
+    r"([a-z0-9]+?:\/\/.*?)(?=$|[\s,;]{1,32}[a-z0-9]{1,32}?:\/\/)", re.I
 )
 
 # No leading separator; first-char anchors make separator positions O(1)-fail
@@ -1170,8 +1170,8 @@ def urlencode(query, doseq=False, safe="", encoding=None, errors=None):
 
 
 def parse_urls(*args, store_unparseable=True, **kwargs):
-    """Takes a string containing URLs separated by comma's and/or spaces and
-    returns a list."""
+    """Takes a string containing URLs separated by commas, semicolons and/or
+    spaces and returns a list."""
 
     result = []
     for arg in args:
