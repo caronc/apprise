@@ -197,6 +197,29 @@ def test_plugin_smpp_url_credentials():
 
 
 @pytest.mark.skipif("smpplib" not in sys.modules, reason="Requires smpplib")
+def test_plugin_smpp_port():
+    """NotifySMPP() connects to the port given in the URL."""
+
+    for url, port in (
+        # A port in the URL is used as-is
+        ("smpp://user:pass@host:9999", 9999),
+        ("smpps://user:pass@host:9998", 9998),
+        # Otherwise the default for the protocol is used
+        ("smpp://user:pass@host", NotifySMPP.default_port),
+        ("smpps://user:pass@host", NotifySMPP.default_secure_port),
+    ):
+        with mock.patch("smpplib.client.Client") as mock_client_class:
+            obj = Apprise.instantiate(
+                "{}/{}/{}".format(url, "1" * 10, "2" * 10)
+            )
+            assert isinstance(obj, NotifySMPP)
+            assert obj.notify("body") is True
+
+            # Our client was pointed at the expected host and port
+            assert mock_client_class.call_args[0][:2] == ("host", port)
+
+
+@pytest.mark.skipif("smpplib" not in sys.modules, reason="Requires smpplib")
 def test_plugin_smpp_edge_case():
     """NotifySMPP() Apprise Edge Case."""
 

@@ -243,8 +243,15 @@ class NotifySMPP(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
+        # A port in the URL wins; otherwise use the default for our protocol
         port = (
-            self.default_port if not self.secure else self.default_secure_port
+            self.port
+            if self.port
+            else (
+                self.default_port
+                if not self.secure
+                else self.default_secure_port
+            )
         )
 
         client = smpplib.client.Client(
