@@ -2829,13 +2829,8 @@ def test_plugin_matrix_encrypted_attachment_iv_standard_base64():
 
     decoded_iv = base64.b64decode(info["iv"] + "==", validate=True)
     key = base64.urlsafe_b64decode(info["key"]["k"] + "==")
-    decryptor = Cipher(
-        algorithms.AES(key), modes.CTR(decoded_iv)
-    ).decryptor()
-    assert (
-        decryptor.update(encrypted) + decryptor.finalize()
-        == b"test image bytes"
-    )
+    decryptor = Cipher(algorithms.AES(key), modes.CTR(decoded_iv)).decryptor()
+    assert decryptor.update(encrypted) + decryptor.finalize() == b"test image bytes"
 
 
 def _rand_b64_32():
