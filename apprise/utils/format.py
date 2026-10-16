@@ -239,12 +239,20 @@ def smart_split(
             break
 
         window_end = min(start + limit, length)
+
+        # Each chunk is trimmed before it is sent, so a boundary inside the
+        # whitespace that opens this window would produce an empty message.
+        # Only look for boundaries after the first visible character.
+        visible = start
+        while visible < window_end and text[visible].isspace():
+            visible += 1
+
         #
         # Priority 1: Search for newline
         #
         last_nl_idx = max(
-            text.rfind("\n", start, window_end),
-            text.rfind("\r", start, window_end),
+            text.rfind("\n", visible, window_end),
+            text.rfind("\r", visible, window_end),
         )
         split_nl = last_nl_idx + 1 if last_nl_idx != -1 else -1
 
@@ -252,8 +260,8 @@ def smart_split(
         # Priority 2: Search for ending Space and/or Tab
         #
         last_space_tab_idx = max(
-            text.rfind(" ", start, window_end),
-            text.rfind("\t", start, window_end),
+            text.rfind(" ", visible, window_end),
+            text.rfind("\t", visible, window_end),
         )
         split_space_tab = (
             last_space_tab_idx + 1 if last_space_tab_idx != -1 else -1
@@ -263,7 +271,7 @@ def smart_split(
         # Priority 3: Last punctuation + whitespace
         #
         split_punct = -1
-        for match in PUNCT_SPLIT_PATTERN.finditer(text, start, window_end):
+        for match in PUNCT_SPLIT_PATTERN.finditer(text, visible, window_end):
             split_punct = match.end()
 
         # Determine the best soft split point
