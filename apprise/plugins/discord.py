@@ -68,6 +68,21 @@ USER_ROLE_DETECTION_RE = re.compile(
     r"\s*(?:<?@(?P<role>&?)(?P<id>[0-9]+)>?|@(?P<value>[a-z0-9]+))", re.I
 )
 
+# Discord draws any :name: it recognizes as an emoji, even in the middle
+# of a word, so 2001:db8:100::1 would show an emoji in place of :100:.
+# This finds every colon that opens a :name: so it can be escaped.  These
+# are stepped over and left exactly as they are:
+#  - Characters that are already escaped.
+#  - Code, where Discord never draws emoji.
+#  - Discord tokens such as <:party:123>, <t:1700000000:R> and <@123>.
+#  - Web links, so an address like http://[fe80::1:2]/ keeps working.
+DISCORD_EMOJI_ESCAPE_RE = re.compile(
+    r"(?P<skip>\\.|(?P<tick>`+).+?(?P=tick)|<[^<>\s]*>"
+    r"|(?i:https?)://\S+)"
+    r"|:(?=[a-z0-9_+-]+:)",
+    re.S,
+)
+
 
 class NotifyDiscord(NotifyBase):
     """A wrapper to Discord Notifications."""
@@ -509,6 +524,28 @@ class NotifyDiscord(NotifyBase):
         # Return the validated payload content dict
         return content
 
+    def dialect_convert(
+        self,
+        body: str,
+        body_format: NotifyFormat | None = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> str:
+        """Escape each ``:name:`` so Discord shows it as text.
+
+        This only happens when emoji support is turned off.
+        """
+        if self.interpret_emojis is not False:
+            # Left unset, Discord draws emoji as it always has.  Turned on,
+            # Apprise already converted the names it knows and Discord is
+            # free to draw the rest.
+            return body
+
+        # Discord shows \: as a plain colon, in text and markdown alike.
+        return DISCORD_EMOJI_ESCAPE_RE.sub(
+            lambda m: m.group("skip") or "\\:", body
+        )
+
     def send(
         self,
         body: str,
@@ -521,6 +558,10 @@ class NotifyDiscord(NotifyBase):
         """Perform Discord Notification."""
 
         # body_format arrives as the resolved render target.
+
+        if title and not kwargs.get("body_passthrough"):
+            # The title skips dialect_convert(), so protect it here too.
+            title = self.dialect_convert(title)
 
         # Use embeds only when the URL explicitly selects Markdown. Discord
         # already renders Markdown sent as regular content.
