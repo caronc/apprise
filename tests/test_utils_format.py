@@ -52,12 +52,8 @@ def test_smart_split_prefers_newlines_over_spaces_and_punctuation():
     assert "".join(chunks) == text
 
 
-def test_smart_split_never_returns_a_blank_chunk():
-    """A boundary in the whitespace that opens a window is skipped.
-
-    Splitting there left a chunk holding only a line break or a space,
-    which split mode then sent as an empty message.
-    """
+def test_smart_split_leading_whitespace():
+    """A boundary in the whitespace that opens a window is skipped."""
     # The first window ends between the CR and LF of a line break, so the
     # second window opens with the LF
     text = "a" * 9 + "\r\n" + "b" * 15

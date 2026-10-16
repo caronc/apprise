@@ -4312,7 +4312,7 @@ def test_markdown_overflow_keeps_escape_with_its_character():
     assert obj.sent[-1]["body"] == "x" * 18 + "\\\\"
 
 
-def test_overflow_split_never_sends_an_empty_piece():
+def test_overflow_split_leading_whitespace():
     """Split mode does not send a piece that is only whitespace."""
 
     # A CRLF line break straddles the 10 character limit, and the line
