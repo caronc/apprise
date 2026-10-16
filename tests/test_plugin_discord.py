@@ -2097,24 +2097,28 @@ def test_plugin_discord_emoji_escape_cases(text, expected):
 
 
 @pytest.mark.parametrize(
-    "text",
+    "prefix, piece, count",
     (
-        "`x" * 100000,
-        "``x" * 70000,
-        "``" + "x" * 200000,
-        "<a:b:" * 40000,
-        "http://" + ":a" * 100000,
-        "a:" * 100000,
-        ":" * 200000,
-        "\\" * 200000,
-        "`a:b\\:<" * 30000,
+        ("", "`x", 100000),
+        ("", "``x", 70000),
+        ("``", "x", 200000),
+        ("", "<a:b:", 40000),
+        ("http://", ":a", 100000),
+        ("", "a:", 100000),
+        ("", ":", 200000),
+        ("", "\\", 200000),
+        ("", "`a:b\\:<", 30000),
     ),
 )
-def test_plugin_discord_emoji_escape_speed(text):
+def test_plugin_discord_emoji_escape_speed(prefix, piece, count):
     """Hostile input is escaped quickly, without slowing to a crawl."""
     obj = NotifyDiscord(
         webhook_id="A" * 24, webhook_token="B" * 64, emojis=False
     )
+
+    # Build the text here so the test name stays short.  Windows limits
+    # the length of the name pytest stores while a test runs.
+    text = prefix + piece * count
 
     # Each of these takes well under 0.1s.  A pattern that rereads the
     # text over and over would take minutes, so this limit is generous
