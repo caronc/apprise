@@ -271,6 +271,14 @@ apprise_url_tests = (
             "instance": NotifyMatrix,
         },
     ),
+    (
+        "matrixs://hooktoken@hookshot.example?mode=hookshot",
+        {
+            "instance": NotifyMatrix,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "matrixs://h...n@hookshot.example/",
+        },
+    ),
     # Image Reference
     (
         "matrixs://user:token@localhost?mode=slack&format=markdown&image=True",
@@ -358,6 +366,8 @@ apprise_url_tests = (
         "matrix://token@localhost/?mode=Matrix",
         {
             "instance": NotifyMatrix,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "matrix://t...n@localhost/",
             "response": False,
             "requests_response_code": requests.codes.internal_server_error,
         },
@@ -375,6 +385,8 @@ apprise_url_tests = (
         "matrix://token@localhost:8080/?mode=slack",
         {
             "instance": NotifyMatrix,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "matrix://t...n@localhost:8080/",
             # Throws a series of i/o exceptions with this flag
             # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
@@ -1398,6 +1410,30 @@ def test_plugin_matrix_url_parsing():
     nm.home_server = "localhost"
     # this should NOT be rejected by the regex
     assert IS_ROOM_ID.match("!Jm_LvU1nas_8KJPBmN9n:nginx.eu")
+
+
+def test_plugin_matrix_url_token_privacy():
+    """NotifyMatrix() hides a token given without a user in url()."""
+
+    token = "syt_abcdef/123456"
+    obj = Apprise.instantiate("matrixs://syt_abcdef%2F123456@localhost/#room")
+    assert isinstance(obj, NotifyMatrix)
+    assert obj.user is None
+    assert obj.password == token
+
+    # The token is never shown in a privacy url
+    url = obj.url(privacy=True)
+    assert url.startswith("matrixs://s...6@localhost/")
+    assert "abcdef" not in url
+
+    # The token survives a reload from our generated url()
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyMatrix)
+    assert obj2.user is None
+    assert obj2.password == token
+    assert obj2.host == "localhost"
+    assert obj2.rooms == ["#room"]
+    assert obj2.url() == obj.url()
 
 
 @mock.patch("requests.put")
