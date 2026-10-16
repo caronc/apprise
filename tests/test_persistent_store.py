@@ -178,6 +178,33 @@ def test_persistent_storage_init(tmpdir):
         PersistentStore(namespace="%", path=str(tmpdir))
 
 
+def test_persistent_storage_path_traversal(tmpdir):
+    """Namespaces and keys that try to leave the storage path are rejected."""
+    bad_entries = (
+        "default/../../escaped_ns",
+        "pwned/../../../outside",
+        "abc/def",
+        "abc\\def",
+        "abc%",
+    )
+
+    for entry in bad_entries:
+        with pytest.raises(exception.AppriseImproperlyConfigured):
+            PersistentStore(namespace=entry, path=str(tmpdir))
+
+    pc = PersistentStore(path=str(tmpdir), mode="flush")
+    for entry in bad_entries:
+        with pytest.raises(exception.AppriseImproperlyConfigured):
+            pc.open(entry)
+
+        with pytest.raises(exception.AppriseImproperlyConfigured):
+            pc.write(b"data", key=entry)
+
+    # Nothing was written outside of our storage path
+    assert not os.path.exists(os.path.join(str(tmpdir), "..", "outside"))
+    assert not os.path.exists(os.path.join(str(tmpdir), "escaped_ns"))
+
+
 def test_persistent_storage_general(tmpdir):
     """Persistent Storage General Testing."""
     namespace = "abc"
