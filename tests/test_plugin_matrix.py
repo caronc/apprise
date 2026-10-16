@@ -2835,6 +2835,41 @@ def test_plugin_matrix_room_create_e2ee_initial_state(
     assert obj.store.get("e2ee_room_enc_{}".format(room_id)) is True
 
 
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_attachment_iv_base64():
+    """Encrypted attachment IV must use standard, unpadded Base64."""
+    import base64
+
+    from cryptography.hazmat.primitives.ciphers import (
+        Cipher,
+        algorithms,
+        modes,
+    )
+
+    from apprise.plugins.matrix.e2ee import encrypt_attachment
+
+    # Force an IV whose standard Base64 includes '/' (URL-safe would
+    # incorrectly emit '_', which strict Matrix clients reject).
+    random_iv = bytes.fromhex("813e84ed303f9c97")
+    with mock.patch(
+        "apprise.plugins.matrix.e2ee.os.urandom",
+        side_effect=[b"\x11" * 32, random_iv],
+    ):
+        encrypted, info = encrypt_attachment(b"test image bytes")
+
+    iv = random_iv + b"\x00" * 8
+    assert info["iv"] == base64.b64encode(iv).decode().rstrip("=")
+    assert "/" in info["iv"]
+    assert "_" not in info["iv"]
+    assert "-" not in info["iv"]
+
+    decoded_iv = base64.b64decode(info["iv"] + "==", validate=True)
+    key = base64.urlsafe_b64decode(info["key"]["k"] + "==")
+    decryptor = Cipher(algorithms.AES(key), modes.CTR(decoded_iv)).decryptor()
+    decrypted = decryptor.update(encrypted) + decryptor.finalize()
+    assert decrypted == b"test image bytes"
+
+
 def _rand_b64_32():
     """32 bytes of random data encoded as unpadded base64."""
     import base64
