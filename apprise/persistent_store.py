@@ -395,7 +395,7 @@ class PersistentStore:
         # Files to renew on calls to flush
         self.__renew = set()
 
-        if not isinstance(namespace, str) or not self.__valid_key.match(
+        if not isinstance(namespace, str) or not self.__valid_key.fullmatch(
             namespace
         ):
             raise AppriseImproperlyConfigured(
@@ -498,7 +498,7 @@ class PersistentStore:
         if key is None:
             key = self.base_key
 
-        elif not isinstance(key, str) or not self.__valid_key.match(key):
+        elif not isinstance(key, str) or not self.__valid_key.fullmatch(key):
             raise AppriseImproperlyConfigured(
                 f"Persistent Storage key ({key} provided is invalid"
             )
@@ -757,7 +757,7 @@ class PersistentStore:
         if key is None:
             key = self.base_key
 
-        elif not isinstance(key, str) or not self.__valid_key.match(key):
+        elif not isinstance(key, str) or not self.__valid_key.fullmatch(key):
             raise AppriseImproperlyConfigured(
                 f"Persistent Storage key ({key} provided is invalid"
             )
@@ -1348,7 +1348,7 @@ class PersistentStore:
             """Validate what was detected is a valid namespace."""
             return os.path.isdir(
                 os.path.join(path, x)
-            ) and PersistentStore.__valid_key.match(x)
+            ) and PersistentStore.__valid_key.fullmatch(x)
 
         # Handle our namespace searching
         if namespace:
@@ -1746,7 +1746,7 @@ class PersistentStore:
                     if not result
                     else (
                         result["key"]
-                        if self.__valid_key.match(result["key"])
+                        if self.__valid_key.fullmatch(result["key"])
                         else None
                     )
                 )
@@ -1770,7 +1770,7 @@ class PersistentStore:
                     if not result
                     else (
                         result["key"]
-                        if self.__valid_key.match(result["key"])
+                        if self.__valid_key.fullmatch(result["key"])
                         else None
                     )
                 )
