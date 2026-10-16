@@ -263,11 +263,8 @@ def test_apprise_escaping(mock_request):
 
 
 @mock.patch("requests.request")
-def test_apprise_escaping_keeps_invalid_sequences(mock_request):
-    """A backslash that starts no valid escape is kept as written.
-
-    Before, one such sequence (the \\U of C:\\Users) failed every service.
-    """
+def test_apprise_escaping_invalid_sequences(mock_request):
+    """A backslash that starts no valid escape is kept as written."""
     response = mock.Mock()
     response.content = ""
     response.status_code = requests.codes.ok

@@ -109,13 +109,17 @@ def decode_escapes(content: str) -> str:
     """Return ``content`` with its backslash escapes interpreted."""
 
     def _decode(match: re.Match) -> str:
+        """Return one escape as its character, or as written if invalid."""
         try:
+            # Let Python turn the single escape into its character
             return codecs.decode(match.group(0), "unicode_escape")
 
         except UnicodeDecodeError:
-            # A character name that does not exist, such as \N{NOPE}
+            # An unknown name such as \N{NOPE}, or a \U value past the
+            # last Unicode character, is kept as written
             return match.group(0)
 
+    # Only well-formed escapes change, so all other text is left alone
     return ESCAPE_SEQUENCE_RE.sub(_decode, content)
 
 
