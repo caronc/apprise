@@ -161,7 +161,7 @@ def test_apprise_trans_gettext_lang_at(mock_getlocale):
     fallback = locale.AppriseLocale._default_language
     mock_getlocale.return_value = None
 
-    with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", "LANG"):
+    with environ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE", "LANG"):
         # Our default language
         locale.AppriseLocale._default_language = "zz"
 
@@ -405,7 +405,9 @@ def test_detect_language_precedence(mock_getlocale):
             # nothing below LC_ALL gets a say, LANGUAGE included
             assert locale.AppriseLocale.detect_language() == default
 
-    with environ("LC_ALL", "LC_CTYPE", LANG="C", LC_MESSAGES="fr_CA"):
+    with environ(
+        "LANGUAGE", "LC_ALL", "LC_CTYPE", LANG="C", LC_MESSAGES="fr_CA"
+    ):
         # A higher priority category still decides; only the locale actually
         # in charge of messages can silence translation
         assert locale.AppriseLocale.detect_language() == "fr_CA"
@@ -555,7 +557,7 @@ def test_apprise_trans_windows_users_win(mock_getlocale):
         # 4105 = en_CA
         ui_lang.return_value = 4105
 
-        with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", "LANG"):
+        with environ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE", "LANG"):
             # Our default language
             locale.AppriseLocale._default_language = "zz"
 
@@ -563,11 +565,13 @@ def test_apprise_trans_windows_users_win(mock_getlocale):
             assert locale.AppriseLocale.detect_language() == "en_CA"
 
         # Environment variables take precedence over the Windows locale.
-        with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", LANG="es_AR"):
+        with environ(
+            "LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE", LANG="es_AR"
+        ):
             assert locale.AppriseLocale.detect_language() == "es_AR"
 
         # Without environment variables, use the Windows locale.
-        with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", "LANG"):
+        with environ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE", "LANG"):
             assert locale.AppriseLocale.detect_language() == "en_CA"
 
         assert (
@@ -576,7 +580,7 @@ def test_apprise_trans_windows_users_win(mock_getlocale):
 
         # 0 = IndexError
         ui_lang.return_value = 0
-        with environ("LANGUAGE", "LANG", "LC_ALL", "LC_CTYPE"):
+        with environ("LANGUAGE", "LANG", "LC_ALL", "LC_MESSAGES", "LC_CTYPE"):
             # Fall back to the POSIX locale.
             assert locale.AppriseLocale.detect_language() == "fr_CA"
 
@@ -603,7 +607,7 @@ def test_apprise_trans_windows_users_nux(mock_getlocale):
     # Store default value to not break other tests
     default_language = locale.AppriseLocale._default_language
 
-    with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", "LANG"):
+    with environ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE", "LANG"):
         # Our default language
         locale.AppriseLocale._default_language = "zz"
 
@@ -611,18 +615,20 @@ def test_apprise_trans_windows_users_nux(mock_getlocale):
         assert locale.AppriseLocale.detect_language() == "en_CA"
 
     # Environment variables take precedence over the Windows locale.
-    with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", LANG="es_AR"):
+    with environ(
+        "LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE", LANG="es_AR"
+    ):
         assert locale.AppriseLocale.detect_language() == "es_AR"
 
     # Without environment variables, use the Windows locale.
-    with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", "LANG"):
+    with environ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE", "LANG"):
         assert locale.AppriseLocale.detect_language() == "en_CA"
 
     assert locale.AppriseLocale.detect_language(detect_fallback=False) is None
 
     # 0 = IndexError
     windll.kernel32.GetUserDefaultUILanguage.return_value = 0
-    with environ("LANGUAGE", "LANG", "LC_ALL", "LC_CTYPE"):
+    with environ("LANGUAGE", "LANG", "LC_ALL", "LC_MESSAGES", "LC_CTYPE"):
         # Fall back to the POSIX locale.
         assert locale.AppriseLocale.detect_language() == "fr_CA"
 
@@ -642,17 +648,19 @@ def test_detect_language_using_env(mock_getlocale):
 
     # The below accesses the windows fallback code and fail
     # then it will resort to the environment variables.
-    with environ("LANG", "LANGUAGE", "LC_ALL", "LC_CTYPE"):
+    with environ("LANG", "LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE"):
         # Language can now be detected in this case
         assert isinstance(locale.AppriseLocale.detect_language(), str)
 
     # Detect French language.
-    with environ("LANGUAGE", "LC_ALL", LC_CTYPE="garbage", LANG="fr_CA"):
+    with environ(
+        "LANGUAGE", "LC_ALL", "LC_MESSAGES", LC_CTYPE="garbage", LANG="fr_CA"
+    ):
         assert locale.AppriseLocale.detect_language() == "fr_CA"
 
     # A system reporting the C locale falls back to our default language
     mock_getlocale.return_value = ("C", "UTF-8")
-    with environ("LANG", "LANGUAGE", "LC_ALL", "LC_CTYPE"):
+    with environ("LANG", "LANGUAGE", "LC_ALL", "LC_MESSAGES", "LC_CTYPE"):
         assert (
             locale.AppriseLocale.detect_language()
             == locale.AppriseLocale._default_language
@@ -675,11 +683,11 @@ def test_detect_language_using_env(mock_getlocale):
 
     # Handle case where getlocale() can't be detected
     mock_getlocale.return_value = None
-    with environ("LC_ALL", "LC_CTYPE", "LANG", "LANGUAGE"):
+    with environ("LC_ALL", "LC_MESSAGES", "LC_CTYPE", "LANG", "LANGUAGE"):
         assert locale.AppriseLocale.detect_language() is None
 
     mock_getlocale.return_value = (None, None)
-    with environ("LC_ALL", "LC_CTYPE", "LANG", "LANGUAGE"):
+    with environ("LC_ALL", "LC_MESSAGES", "LC_CTYPE", "LANG", "LANGUAGE"):
         assert locale.AppriseLocale.detect_language() is None
 
     # if detect_language and windows env fail us, then we don't
