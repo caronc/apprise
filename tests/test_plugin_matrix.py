@@ -2800,7 +2800,7 @@ def test_plugin_matrix_room_create_e2ee_initial_state(
 
 
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
-def test_plugin_matrix_encrypted_attachment_iv_standard_base64():
+def test_plugin_matrix_attachment_iv_base64():
     """Encrypted attachment IV must use standard, unpadded Base64."""
     import base64
 

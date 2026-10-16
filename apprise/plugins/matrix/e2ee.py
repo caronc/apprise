@@ -339,7 +339,7 @@ def encrypt_attachment(data):
             "v": "v2",
             "key": { "kty": "oct", "alg": "A256CTR", "k": "<key>",
                      "key_ops": ["encrypt", "decrypt"], "ext": true },
-            "iv": "<base64url-nopad 16-byte IV>",
+            "iv": "<unpadded base64 16-byte IV>",
             "hashes": { "sha256": "<base64 SHA-256 of ciphertext>" }
         }
     """
