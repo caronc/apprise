@@ -2827,28 +2827,33 @@ def test_plugin_slack_retry_skips_sent_message(mock_request):
     """A retry without attachments leaves a delivered message alone."""
 
     # Slack accepts the message without naming the channel it used
-    mock_request.return_value = mock.Mock(
-        content=dumps({"ok": True}), status_code=requests.codes.ok
+    ok = mock.Mock(content=dumps({"ok": True}), status_code=requests.codes.ok)
+    bad = mock.Mock(
+        content=b"", status_code=requests.codes.internal_server_error
     )
+
+    # The second channel fails once, so the retry reaches send() again
+    mock_request.side_effect = [ok, bad, ok]
 
     obj = NotifySlack(
         access_token="xoxb-1234-1234-abc124",
-        targets=["#general"],
+        targets=["#general", "#random"],
     )
 
     # Retries turn on delivery marks and remembered values together
     tracker_token = _delivery_tracker.set(set())
     memo_token = _delivery_memo.set({})
     try:
-        assert obj.notify(body="body") is True
+        assert obj.notify(body="body") is False
         assert obj.notify(body="body") is True
 
     finally:
         _delivery_tracker.reset(tracker_token)
         _delivery_memo.reset(memo_token)
 
-    # Only the first attempt posted the message
-    assert mock_request.call_count == 1
+    # The retry only posted to the channel that missed the message
+    assert mock_request.call_count == 3
+    assert loads(mock_request.call_args[1]["data"])["channel"] == "#random"
 
 
 @mock.patch("requests.request")
