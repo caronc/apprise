@@ -271,6 +271,14 @@ apprise_url_tests = (
             "instance": NotifyMatrix,
         },
     ),
+    (
+        "matrixs://hooktoken@hookshot.example?mode=hookshot",
+        {
+            "instance": NotifyMatrix,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "matrixs://h...n@hookshot.example/",
+        },
+    ),
     # Image Reference
     (
         "matrixs://user:token@localhost?mode=slack&format=markdown&image=True",
