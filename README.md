@@ -118,6 +118,7 @@ The table below identifies the services this tool supports and some example serv
 | [Notica](https://appriseit.com/services/notica/) | notica://  | (TCP) 443   | notica://Token/
 | [Notifiarr](https://appriseit.com/services/notifiarr/) | notifiarr:// | (TCP) 443 | notifiarr://apikey/#channel<br />notifiarr://apikey/#channel1/#channel2/#channeln
 | [Notifico](https://appriseit.com/services/notifico/) | notifico:// or notificos://  | (TCP) 80 or 443   | notifico://ProjectID/MessageHook/<br />notifico://host/ProjectID/MessageHook/<br />notificos://host/ProjectID/MessageHook/
+| [Nowlark](https://appriseit.com/services/nowlark/) | nowlark:// | (TCP) 443 | nowlark://apikey<br />nowlark://apikey/source
 | [ntfy](https://appriseit.com/services/ntfy/) | ntfy://  | (TCP) 80 or 443   | ntfy://topic/<br/>ntfys://topic/
 | [Octopush](https://appriseit.com/services/octopush/) | octopush:// | (TCP) 443 | octopush://APILogin/APIKey/TargetPhoneNo<br />octopush://Sender:APILogin/APIKey/TargetPhoneNo<br />octopush://Sender:APILogin/APIKey/TargetPhoneNo1/TargetPhoneNo2/TargetPhoneNoN
 | [Office 365](https://appriseit.com/services/office365/) | o365://  | (TCP) 443   | o365://TenantID:AccountEmail/ClientID/ClientSecret<br />o365://TenantID:AccountEmail/ClientID/ClientSecret/TargetEmail<br />o365://TenantID:AccountEmail/ClientID/ClientSecret/TargetEmail1/TargetEmail2/TargetEmailN
