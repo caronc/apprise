@@ -262,6 +262,33 @@ def test_apprise_escaping(mock_request):
     )
 
 
+@mock.patch("requests.request")
+def test_apprise_escaping_invalid_sequences(mock_request):
+    """A backslash that starts no valid escape is kept as written."""
+    response = mock.Mock()
+    response.content = ""
+    response.status_code = requests.codes.ok
+    mock_request.return_value = response
+
+    a = apprise.Apprise()
+    a.add("json://localhost")
+
+    assert a.notify(
+        title="C:\\Users\\kim\\x.txt",
+        body="Backup of C:\\Users\\kim failed\\n\\N{NOPE} \\xZZ \\q \\\\n"
+        "\\u00e9\\N{BULLET}\\x41\\101\\t\\\u00e9",
+        interpret_escapes=True,
+    )
+
+    assert mock_request.call_count == 1
+    result = loads(mock_request.call_args_list[0][1]["data"])
+    assert result["title"] == "C:\\Users\\kim\\x.txt"
+    assert result["message"] == (
+        "Backup of C:\\Users\\kim failed\n\\N{NOPE} \\xZZ \\q \\n"
+        "\u00e9\u2022AA\t\\\u00e9"
+    )
+
+
 def test_apprise_escaping_non_string_inputs(caplog):
     """Reject non-string message bodies and titles during escape handling."""
     # Some test modules disable logging globally at import time
