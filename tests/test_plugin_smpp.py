@@ -120,6 +120,10 @@ apprise_url_tests = (
         "smpp://user:pass@host/{}/{}".format("1" * 10, "1" * 10),
         {
             "instance": NotifySMPP,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "smpp://user:****@host/{}/{}".format(
+                "1" * 10, "1" * 10
+            ),
         },
     ),
     (
@@ -165,6 +169,54 @@ def test_plugin_smpp_urls():
 
         # Run our general tests
         AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@pytest.mark.skipif("smpplib" not in sys.modules, reason="Requires smpplib")
+def test_plugin_smpp_url_credentials():
+    """NotifySMPP() credentials are escaped and hidden in url()."""
+
+    obj = Apprise.instantiate(
+        "smpp://us%2Fer:p%40ss%2Fword@host/{}/{}".format("1" * 10, "2" * 10)
+    )
+    assert isinstance(obj, NotifySMPP)
+    assert obj.user == "us/er"
+    assert obj.password == "p@ss/word"
+
+    # The password is never shown in a privacy url
+    assert "p@ss" not in obj.url(privacy=True)
+    assert "p%40ss" not in obj.url(privacy=True)
+
+    # The credentials survive a reload from our generated url()
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifySMPP)
+    assert obj2.user == "us/er"
+    assert obj2.password == "p@ss/word"
+    assert obj2.host == "host"
+    assert obj2.source == "1" * 10
+    assert obj2.targets == ["2" * 10]
+
+
+@pytest.mark.skipif("smpplib" not in sys.modules, reason="Requires smpplib")
+def test_plugin_smpp_port():
+    """NotifySMPP() connects to the port given in the URL."""
+
+    for url, port in (
+        # A port in the URL is used as-is
+        ("smpp://user:pass@host:9999", 9999),
+        ("smpps://user:pass@host:9998", 9998),
+        # Otherwise the default for the protocol is used
+        ("smpp://user:pass@host", NotifySMPP.default_port),
+        ("smpps://user:pass@host", NotifySMPP.default_secure_port),
+    ):
+        with mock.patch("smpplib.client.Client") as mock_client_class:
+            obj = Apprise.instantiate(
+                "{}/{}/{}".format(url, "1" * 10, "2" * 10)
+            )
+            assert isinstance(obj, NotifySMPP)
+            assert obj.notify("body") is True
+
+            # Our client was pointed at the expected host and port
+            assert mock_client_class.call_args[0][:2] == ("host", port)
 
 
 @pytest.mark.skipif("smpplib" not in sys.modules, reason="Requires smpplib")

@@ -46,6 +46,7 @@ except ImportError:
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_phone_no
 from .base import NotifyBase
 
@@ -203,8 +204,10 @@ class NotifySMPP(NotifyBase):
             "{schema}://{user}:{password}@{host}/{source}/{targets}/?{params}"
         ).format(
             schema=self.secure_protocol if self.secure else self.protocol,
-            user=self.user,
-            password=self.password,
+            user=NotifySMPP.quote(self.user, safe=""),
+            password=self.pprint(
+                self.password, privacy, mode=PrivacyMode.Secret, safe=""
+            ),
             host=f"{self.host}:{self.port}" if self.port else self.host,
             source=self.source,
             targets="/".join(
@@ -240,8 +243,15 @@ class NotifySMPP(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
+        # A port in the URL wins; otherwise use the default for our protocol
         port = (
-            self.default_port if not self.secure else self.default_secure_port
+            self.port
+            if self.port
+            else (
+                self.default_port
+                if not self.secure
+                else self.default_secure_port
+            )
         )
 
         client = smpplib.client.Client(
