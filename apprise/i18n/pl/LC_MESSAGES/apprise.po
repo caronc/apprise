@@ -176,6 +176,34 @@ msgstr "Tryb SMS"
 msgid "Batch Mode"
 msgstr "Tryb wsadowy"
 
+#: apprise/plugins/amqp/base.py:101
+msgid "Install pika for AMQP 0.9.1, python-qpid-proton for AMQP 1.0, or both."
+msgstr "Zainstaluj pika dla AMQP 0.9.1, python-qpid-proton dla AMQP 1.0 lub oba."
+
+#: apprise/plugins/amqp/base.py:207
+msgid "Exchange"
+msgstr "Exchange"
+
+#: apprise/plugins/amqp/base.py:211
+msgid "Virtual Host"
+msgstr "Host wirtualny"
+
+#: apprise/plugins/amqp/base.py:215
+msgid "Persistent"
+msgstr "Trwały"
+
+#: apprise/plugins/amqp/base.py:220
+msgid "Mandatory"
+msgstr "Obowiązkowy"
+
+#: apprise/plugins/amqp/base.py:231
+msgid "Time To Live"
+msgstr "Czas życia (TTL)"
+
+#: apprise/plugins/amqp/base.py:246
+msgid "Message Headers"
+msgstr "Nagłówki wiadomości"
+
 #: apprise/plugins/apprise_api.py:126 apprise/plugins/bark.py:153
 #: apprise/plugins/custom_form.py:140 apprise/plugins/custom_json.py:122
 #: apprise/plugins/custom_xml.py:122 apprise/plugins/emby.py:86

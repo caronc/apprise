@@ -175,6 +175,34 @@ msgstr "SMS kipi"
 msgid "Batch Mode"
 msgstr "Toplu kip"
 
+#: apprise/plugins/amqp/base.py:101
+msgid "Install pika for AMQP 0.9.1, python-qpid-proton for AMQP 1.0, or both."
+msgstr "AMQP 0.9.1 için pika, AMQP 1.0 için python-qpid-proton veya her ikisini kurun."
+
+#: apprise/plugins/amqp/base.py:207
+msgid "Exchange"
+msgstr "Exchange"
+
+#: apprise/plugins/amqp/base.py:211
+msgid "Virtual Host"
+msgstr "Sanal Ana Bilgisayar"
+
+#: apprise/plugins/amqp/base.py:215
+msgid "Persistent"
+msgstr "Kalıcı"
+
+#: apprise/plugins/amqp/base.py:220
+msgid "Mandatory"
+msgstr "Zorunlu"
+
+#: apprise/plugins/amqp/base.py:231
+msgid "Time To Live"
+msgstr "Yaşam Süresi (TTL)"
+
+#: apprise/plugins/amqp/base.py:246
+msgid "Message Headers"
+msgstr "Mesaj Başlıkları"
+
 #: apprise/plugins/apprise_api.py:126 apprise/plugins/bark.py:153
 #: apprise/plugins/custom_form.py:140 apprise/plugins/custom_json.py:122
 #: apprise/plugins/custom_xml.py:122 apprise/plugins/emby.py:86
