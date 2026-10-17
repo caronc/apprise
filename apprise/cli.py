@@ -95,14 +95,37 @@ DEFAULT_ENV_APPRISE_STORAGE_PRUNE_DAYS = "APPRISE_STORAGE_PRUNE_DAYS"
 # Environment variable controlling generated storage URL ID length
 DEFAULT_ENV_APPRISE_STORAGE_UID_LENGTH = "APPRISE_STORAGE_UID_LENGTH"
 
+
+def _env_int(name, default):
+    """Return the integer value of an environment variable.
+
+    An unset or empty variable gives the default; so does a value that is not
+    an integer, with a warning naming the variable, instead of failing the
+    whole CLI at import time.
+    """
+    value = os.environ.get(name, "").strip()
+    if not value:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        logger.warning(
+            "Ignoring %s=%r: expected an integer, using %d.",
+            name,
+            value,
+            default,
+        )
+        return default
+
+
 # Default number of days to prune persistent storage
-DEFAULT_STORAGE_PRUNE_DAYS = int(
-    os.environ.get(DEFAULT_ENV_APPRISE_STORAGE_PRUNE_DAYS, 30)
+DEFAULT_STORAGE_PRUNE_DAYS = _env_int(
+    DEFAULT_ENV_APPRISE_STORAGE_PRUNE_DAYS, 30
 )
 
 # The default URL ID Length
-DEFAULT_STORAGE_UID_LENGTH = int(
-    os.environ.get(DEFAULT_ENV_APPRISE_STORAGE_UID_LENGTH, 8)
+DEFAULT_STORAGE_UID_LENGTH = _env_int(
+    DEFAULT_ENV_APPRISE_STORAGE_UID_LENGTH, 8
 )
 
 # Grace period for abandoned service calls to finish before forced exit.

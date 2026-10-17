@@ -1956,6 +1956,38 @@ def test_apprise_cli_persistent_storage(tmpdir):
     N_MGR.unload_modules()
 
 
+@pytest.mark.parametrize(
+    "prune_days, uid_length, expected",
+    [
+        ("", "", (30, 8)),
+        ("   ", "abc", (30, 8)),
+        ("not-a-number", "", (30, 8)),
+        ("45", " 12 ", (45, 12)),
+    ],
+)
+def test_apprise_cli_storage_env_defaults(prune_days, uid_length, expected):
+    """
+    CLI: an empty or invalid storage environment variable falls back to the
+    default instead of failing the import of the CLI
+
+    """
+    try:
+        with environ(
+            APPRISE_STORAGE_PRUNE_DAYS=prune_days,
+            APPRISE_STORAGE_UID_LENGTH=uid_length,
+        ):
+            reload(cli)
+            assert expected == (
+                cli.DEFAULT_STORAGE_PRUNE_DAYS,
+                cli.DEFAULT_STORAGE_UID_LENGTH,
+            )
+
+            result = CliRunner().invoke(cli.main, ["--help"])
+            assert result.exit_code == 0
+    finally:
+        reload(cli)
+
+
 def test_apprise_cli_details(tmpdir):
     """
     CLI: --details (-l)
