@@ -1407,9 +1407,10 @@ class PersistentStore:
         ``action=True`` removes them and records the result.
         """
 
-        # Prepare our File Expiry
-        expires = (
-            datetime.now() - timedelta(seconds=expires)
+        # Prepare our File Expiry.  A missing or negative value falls
+        # back to the default expiry.
+        expires = datetime.now() - timedelta(
+            seconds=expires
             if isinstance(expires, (float, int)) and expires >= 0
             else PersistentStore.default_file_expiry
         )
