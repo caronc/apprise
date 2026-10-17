@@ -59,6 +59,7 @@ keywords = [
     "800.com",
     "Africas Talking",
     "Alerts",
+    "AMQP",
     "Apprise API",
     "Automated Packet Reporting System",
     "Amazon Chime",
@@ -255,6 +256,13 @@ all-plugins = [
 
     # Provides encrypted spush:// sends
     "PyNaCl",
+
+    # Provides amqp:// support for AMQP 0.9.1
+    "pika",
+
+    # AMQP 1.0 requires a source build on Linux. Install it separately with:
+    #   pip install python-qpid-proton
+    # "python-qpid-proton",
 
     # provides growl:// support
     "gntp",

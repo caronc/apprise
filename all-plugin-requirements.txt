@@ -10,6 +10,13 @@ cryptography
 # Provides encrypted spush:// sends
 PyNaCl
 
+# Provides amqp:// support for AMQP 0.9.1
+pika
+
+# AMQP 1.0 requires a source build on Linux. Uncomment this when a compiler
+# and the OpenSSL development headers are available.
+# python-qpid-proton
+
 # Provides growl:// support
 gntp
 

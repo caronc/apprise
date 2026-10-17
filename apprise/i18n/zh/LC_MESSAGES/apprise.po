@@ -175,6 +175,34 @@ msgstr "短信模式"
 msgid "Batch Mode"
 msgstr "批量模式"
 
+#: apprise/plugins/amqp/base.py:101
+msgid "Install pika for AMQP 0.9.1, python-qpid-proton for AMQP 1.0, or both."
+msgstr "为 AMQP 0.9.1 安装 pika，为 AMQP 1.0 安装 python-qpid-proton，或两者都安装。"
+
+#: apprise/plugins/amqp/base.py:207
+msgid "Exchange"
+msgstr "交换机"
+
+#: apprise/plugins/amqp/base.py:211
+msgid "Virtual Host"
+msgstr "虚拟主机"
+
+#: apprise/plugins/amqp/base.py:215
+msgid "Persistent"
+msgstr "持久化"
+
+#: apprise/plugins/amqp/base.py:220
+msgid "Mandatory"
+msgstr "强制"
+
+#: apprise/plugins/amqp/base.py:231
+msgid "Time To Live"
+msgstr "生存时间 (TTL)"
+
+#: apprise/plugins/amqp/base.py:246
+msgid "Message Headers"
+msgstr "消息头"
+
 #: apprise/plugins/apprise_api.py:126 apprise/plugins/bark.py:153
 #: apprise/plugins/custom_form.py:140 apprise/plugins/custom_json.py:122
 #: apprise/plugins/custom_xml.py:122 apprise/plugins/emby.py:86

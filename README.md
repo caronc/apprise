@@ -67,6 +67,7 @@ The table below identifies the services this tool supports and some example serv
 
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
+| [AMQP](https://appriseit.com/services/amqp/) | amqp:// or amqps:// | (TCP) 5672 or 5671 | amqp://hostname/queue<br />amqp://user:pass@hostname/queue1/queue2<br />amqps://user:pass@hostname/?exchange=alerts<br />amqps://user:pass@hostname/?version=1.0&to=/queues/name
 | [Apprise API](https://appriseit.com/services/apprise_api/)  | apprise:// or apprises:// | (TCP) 80 or 443 | apprise://hostname/Token<br/>apprise://:password@hostname/Token<br/>apprise://user:password@hostname/Token
 | [AWS SES](https://appriseit.com/services/ses/)  | ses://   | (TCP) 443   | ses://user@domain/AccessKeyID/AccessSecretKey/RegionName<br/>ses://user@domain/AccessKeyID/AccessSecretKey/RegionName/email1/email2/emailN
 | [Bark](https://appriseit.com/services/bark/)  | bark://   | (TCP) 80 or 443   | bark://hostname<br />bark://hostname/device_key<br />bark://hostname/device_key1/device_key2/device_keyN<br/>barks://hostname<br />barks://hostname/device_key<br />barks://hostname/device_key1/device_key2/device_keyN
