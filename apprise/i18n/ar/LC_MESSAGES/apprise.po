@@ -176,6 +176,34 @@ msgstr "وضع الرسائل القصيرة"
 msgid "Batch Mode"
 msgstr "وضع الدفعات"
 
+#: apprise/plugins/amqp/base.py:101
+msgid "Install pika for AMQP 0.9.1, python-qpid-proton for AMQP 1.0, or both."
+msgstr "ثبّت pika لـ AMQP 0.9.1، أو python-qpid-proton لـ AMQP 1.0، أو كليهما."
+
+#: apprise/plugins/amqp/base.py:207
+msgid "Exchange"
+msgstr "المُبادِل"
+
+#: apprise/plugins/amqp/base.py:211
+msgid "Virtual Host"
+msgstr "المضيف الافتراضي"
+
+#: apprise/plugins/amqp/base.py:215
+msgid "Persistent"
+msgstr "دائم"
+
+#: apprise/plugins/amqp/base.py:220
+msgid "Mandatory"
+msgstr "إلزامي"
+
+#: apprise/plugins/amqp/base.py:231
+msgid "Time To Live"
+msgstr "مدة الصلاحية (TTL)"
+
+#: apprise/plugins/amqp/base.py:246
+msgid "Message Headers"
+msgstr "ترويسات الرسالة"
+
 #: apprise/plugins/apprise_api.py:126 apprise/plugins/bark.py:153
 #: apprise/plugins/custom_form.py:140 apprise/plugins/custom_json.py:122
 #: apprise/plugins/custom_xml.py:122 apprise/plugins/emby.py:86

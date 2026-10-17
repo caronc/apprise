@@ -175,6 +175,34 @@ msgstr "โหมด SMS"
 msgid "Batch Mode"
 msgstr "โหมดรวมชุด"
 
+#: apprise/plugins/amqp/base.py:101
+msgid "Install pika for AMQP 0.9.1, python-qpid-proton for AMQP 1.0, or both."
+msgstr "ติดตั้ง pika สำหรับ AMQP 0.9.1, python-qpid-proton สำหรับ AMQP 1.0 หรือทั้งสองอย่าง"
+
+#: apprise/plugins/amqp/base.py:207
+msgid "Exchange"
+msgstr "เอ็กซ์เชนจ์"
+
+#: apprise/plugins/amqp/base.py:211
+msgid "Virtual Host"
+msgstr "โฮสต์เสมือน"
+
+#: apprise/plugins/amqp/base.py:215
+msgid "Persistent"
+msgstr "คงทน"
+
+#: apprise/plugins/amqp/base.py:220
+msgid "Mandatory"
+msgstr "บังคับ"
+
+#: apprise/plugins/amqp/base.py:231
+msgid "Time To Live"
+msgstr "อายุข้อความ (TTL)"
+
+#: apprise/plugins/amqp/base.py:246
+msgid "Message Headers"
+msgstr "ส่วนหัวข้อความ"
+
 #: apprise/plugins/apprise_api.py:126 apprise/plugins/bark.py:153
 #: apprise/plugins/custom_form.py:140 apprise/plugins/custom_json.py:122
 #: apprise/plugins/custom_xml.py:122 apprise/plugins/emby.py:86
