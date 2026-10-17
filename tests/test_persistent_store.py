@@ -1660,6 +1660,34 @@ def test_persistent_storage_disk_prune(tmpdir):
         assert pc.read() is None
 
 
+def test_persistent_storage_prune_default_expiry(tmpdir):
+    """A missing or negative expires falls back to the default expiry."""
+
+    # Store some data in two namespaces
+    for ns in ("t01", "t02"):
+        pc = PersistentStore(
+            path=str(tmpdir), namespace=ns, mode=PersistentStoreMode.FLUSH
+        )
+        assert pc.write(b"data") is True
+
+    # Age the t01 file just past the default expiry
+    stale = time.time() - PersistentStore.default_file_expiry - 60
+    path = os.path.join(
+        str(tmpdir),
+        "t01",
+        PersistentStore.data_dir,
+        PersistentStore.base_key + ".psdata",
+    )
+    os.utime(path, (stale, stale))
+
+    for expires in (None, -1):
+        results = PersistentStore.disk_prune(path=str(tmpdir), expires=expires)
+
+        # Only the aged file matches; the fresh one is left alone
+        assert len(results["t01"]) == 1
+        assert len(results["t02"]) == 0
+
+
 def test_persistent_storage_disk_changes(tmpdir):
     """General testing of a Persistent Store with underlining disk changes."""
 
