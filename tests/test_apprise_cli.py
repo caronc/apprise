@@ -1967,8 +1967,8 @@ def test_apprise_cli_persistent_storage(tmpdir):
 )
 def test_apprise_cli_storage_env_defaults(prune_days, uid_length, expected):
     """
-    CLI: an empty or invalid storage environment variable falls back to the
-    default instead of failing the import of the CLI
+    CLI: an empty or invalid storage environment variable no longer breaks
+    loading the CLI or --help
 
     """
     try:
@@ -1984,6 +1984,25 @@ def test_apprise_cli_storage_env_defaults(prune_days, uid_length, expected):
 
             result = CliRunner().invoke(cli.main, ["--help"])
             assert result.exit_code == 0
+    finally:
+        reload(cli)
+
+
+def test_apprise_cli_storage_env_invalid():
+    """CLI: a non-numeric storage environment variable stops the CLI."""
+    try:
+        with environ(APPRISE_STORAGE_PRUNE_DAYS="abc"):
+            reload(cli)
+            assert cli.INVALID_ENV == [("APPRISE_STORAGE_PRUNE_DAYS", "abc")]
+
+            # --help still works so the user can find the right value
+            result = CliRunner().invoke(cli.main, ["--help"])
+            assert result.exit_code == 0
+
+            # Anything else stops with a message naming the variable
+            result = CliRunner().invoke(cli.main, ["-b", "test"])
+            assert result.exit_code == 2
+            assert "APPRISE_STORAGE_PRUNE_DAYS" in result.output
     finally:
         reload(cli)
 

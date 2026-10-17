@@ -95,26 +95,24 @@ DEFAULT_ENV_APPRISE_STORAGE_PRUNE_DAYS = "APPRISE_STORAGE_PRUNE_DAYS"
 # Environment variable controlling generated storage URL ID length
 DEFAULT_ENV_APPRISE_STORAGE_UID_LENGTH = "APPRISE_STORAGE_UID_LENGTH"
 
+# Environment variables holding a value that is not a valid number, as
+# (name, value).  main() reports them and exits instead of guessing.
+INVALID_ENV: list[tuple[str, str]] = []
 
-def _env_int(name, default):
-    """Return the integer value of an environment variable.
 
-    An unset or empty variable gives the default; so does a value that is not
-    an integer, with a warning naming the variable, instead of failing the
-    whole CLI at import time.
-    """
+def _env_int(name: str, default: int) -> int:
+    """Return environment variable ``name`` as an int, else ``default``."""
+    # An unset or empty variable quietly uses the default
     value = os.environ.get(name, "").strip()
     if not value:
         return default
+
     try:
         return int(value)
+
     except ValueError:
-        logger.warning(
-            "Ignoring %s=%r: expected an integer, using %d.",
-            name,
-            value,
-            default,
-        )
+        # Let the module load so main() can explain the problem clearly
+        INVALID_ENV.append((name, value))
         return default
 
 
@@ -1014,6 +1012,19 @@ def main(
         if plugin_path
         else [path for path in plugin_paths_ if exists(path_decode(path))]
     )
+
+    if INVALID_ENV:
+        for name, value in INVALID_ENV:
+            click.echo(
+                f"The {name} environment variable value of {value!r} is not"
+                " a valid number."
+            )
+
+        click.echo("Try 'apprise --help' for more information.")
+
+        # 2 is the same exit code returned by Click if there is a
+        # parameter issue.  For consistency, we also return a 2
+        ctx.exit(2)
 
     if storage_uid_length < 2:
         click.echo(
