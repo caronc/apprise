@@ -33,6 +33,7 @@ import logging
 import os
 from random import choice
 from string import ascii_uppercase as str_alpha, digits as str_num
+import time
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -1935,6 +1936,196 @@ def test_plugin_discord_markdown_content(mock_post):
         assert payload["embeds"][0]["title"] == "Build"
         assert payload["embeds"][0]["fields"][0]["name"] == "Summary"
         assert payload["allow_mentions"]["users"] == ["123"]
+
+
+@mock.patch("requests.post")
+def test_plugin_discord_emoji_escape(mock_post):
+    """Emoji names are escaped only when emoji support is turned off."""
+
+    response = mock.Mock()
+    response.content = ""
+    response.status_code = requests.codes.ok
+    response.headers = {}
+    mock_post.return_value = response
+
+    webhook_id = "A" * 24
+    webhook_token = "B" * 64
+    body = (
+        "Peer 2001:db8:100::1 :smile: `00:ab:cd` <t:1700000000:R> "
+        "<:party:123> https://[fe80::1:2]/ a\\:b:"
+    )
+    escaped = (
+        "Peer 2001\\:db8\\:100::1 \\:smile: `00:ab:cd` <t:1700000000:R> "
+        "<:party:123> https://[fe80::1:2]/ a\\:b:"
+    )
+
+    # Text and markdown content are both escaped, title included
+    for fmt in (NotifyFormat.TEXT, NotifyFormat.MARKDOWN):
+        mock_post.reset_mock()
+        aobj = Apprise()
+        aobj.add(f"discord://{webhook_id}/{webhook_token}/?emojis=no")
+        assert aobj.notify(title="MAC 00:ab:cd:", body=body, body_format=fmt)
+        payload = loads(mock_post.call_args_list[0][1]["data"])
+        assert payload["content"] == f"MAC 00\\:ab\\:cd:\r\n{escaped}"
+
+    # Embeds are escaped the same way
+    mock_post.reset_mock()
+    aobj = Apprise()
+    aobj.add(
+        f"discord://{webhook_id}/{webhook_token}/?format=markdown&emojis=no"
+    )
+    assert aobj.notify(
+        title="MAC 00:ab:cd:", body=body, body_format=NotifyFormat.MARKDOWN
+    )
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["embeds"][0]["title"] == "MAC 00\\:ab\\:cd:"
+    assert payload["embeds"][0]["description"] == escaped
+
+    # Left unset, everything goes to Discord as it always has
+    mock_post.reset_mock()
+    aobj = Apprise()
+    aobj.add(f"discord://{webhook_id}/{webhook_token}/")
+    assert aobj.notify(
+        title="MAC 00:ab:cd:", body=body, body_format=NotifyFormat.TEXT
+    )
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["content"] == f"MAC 00:ab:cd:\r\n{body}"
+
+    # With emoji turned on, Apprise converts what it knows and leaves the
+    # rest for Discord, as before
+    mock_post.reset_mock()
+    aobj = Apprise()
+    aobj.add(f"discord://{webhook_id}/{webhook_token}/?emojis=yes")
+    assert aobj.notify(
+        body=":smile: :not_an_apprise_emoji:", body_format=NotifyFormat.TEXT
+    )
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["content"] == "😄 :not_an_apprise_emoji:"
+
+    # Content with no declared format is relayed untouched
+    mock_post.reset_mock()
+    aobj = Apprise()
+    aobj.add(f"discord://{webhook_id}/{webhook_token}/?emojis=no")
+    assert aobj.notify(title="MAC 00:ab:cd:", body=body, body_format=None)
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["content"] == f"MAC 00:ab:cd:\r\n{body}"
+
+    # A message full of names still fits once its escapes are added
+    mock_post.reset_mock()
+    aobj = Apprise()
+    aobj.add(
+        f"discord://{webhook_id}/{webhook_token}/?overflow=split&emojis=no"
+    )
+    assert aobj.notify(body=":a" * 1500 + ":", body_format=NotifyFormat.TEXT)
+    contents = [
+        loads(c[1]["data"])["content"] for c in mock_post.call_args_list
+    ]
+    assert len(contents) > 1
+    assert all(len(c) <= NotifyDiscord.body_maxlen for c in contents)
+    assert "".join(contents).replace("\\:", ":") == ":a" * 1500 + ":"
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    (
+        # Addresses and times lose the emoji Discord would draw
+        ("2001:db8:100::1", "2001\\:db8\\:100::1"),
+        ("00:ab:cd:ef:12:34", "00\\:ab\\:cd\\:ef\\:12:34"),
+        ("12:30:45", "12\\:30:45"),
+        # Every name is escaped, including back to back ones
+        (":smile:", "\\:smile:"),
+        (":smile::smile:", "\\:smile:\\:smile:"),
+        (":a:b:", "\\:a\\:b:"),
+        ("ok:smile:ok", "ok\\:smile:ok"),
+        (":+1: :-1:", "\\:+1: \\:-1:"),
+        # Markdown around a name still works
+        ("**:fire:**", "**\\:fire:**"),
+        ("_:fire:_", "_\\:fire:_"),
+        ("# Title :fire:", "# Title \\:fire:"),
+        ("> quote :fire:", "> quote \\:fire:"),
+        ("- item :fire:", "- item \\:fire:"),
+        # Inline code is left alone
+        ("`2001:db8:100::1`", "`2001:db8:100::1`"),
+        ("``a:b:c``", "``a:b:c``"),
+        ("x `:a:` :b: `:c:`", "x `:a:` \\:b: `:c:`"),
+        # Code blocks are left alone, text after them is not
+        ("```\n:smile:\n```", "```\n:smile:\n```"),
+        (
+            "```py\nx = {'a:b:': 1}\n```\n:c:",
+            "```py\nx = {'a:b:': 1}\n```\n\\:c:",
+        ),
+        # An unclosed backtick is plain text
+        ("`:smile:", "`\\:smile:"),
+        # Discord tokens are left alone
+        ("<:party:123>", "<:party:123>"),
+        ("<a:wave:456>", "<a:wave:456>"),
+        ("<t:1700000000:R>", "<t:1700000000:R>"),
+        ("<@123> <@&456> <#789> </cmd:9>", "<@123> <@&456> <#789> </cmd:9>"),
+        # A loose angle bracket does not hide what follows
+        ("a < b :c: > d", "a < b \\:c: > d"),
+        # Links are left alone
+        ("https://[fe80::1:2]/x:y:", "https://[fe80::1:2]/x:y:"),
+        ("HTTP://a.ca/:b:", "HTTP://a.ca/:b:"),
+        ("http://host:8080/", "http://host:8080/"),
+        ("<https://a.ca/:b:>", "<https://a.ca/:b:>"),
+        ("[link](https://a.ca/:b:) :c:", "[link](https://a.ca/:b:) \\:c:"),
+        # Existing escapes are not doubled
+        ("\\:smile:", "\\:smile:"),
+        ("\\\\:smile:", "\\\\\\:smile:"),
+        # Colons that cannot open a name are left alone
+        ("time: 5", "time: 5"),
+        ("a::b", "a::b"),
+        (":AB:", ":AB:"),
+        (":", ":"),
+        ("", ""),
+    ),
+)
+def test_plugin_discord_emoji_escape_cases(text, expected):
+    """Escaping changes only the colons Discord would draw as emoji."""
+    obj = NotifyDiscord(webhook_id="A" * 24, webhook_token="B" * 64)
+
+    # Unset leaves everything to Discord
+    assert obj.dialect_convert(text) == text
+
+    # Turned off escapes the names
+    obj.interpret_emojis = False
+    assert obj.dialect_convert(text) == expected
+
+    # Turned on leaves the rest to Discord
+    obj.interpret_emojis = True
+    assert obj.dialect_convert(text) == text
+
+
+@pytest.mark.parametrize(
+    "prefix, piece, count",
+    (
+        ("", "`x", 100000),
+        ("", "``x", 70000),
+        ("``", "x", 200000),
+        ("", "<a:b:", 40000),
+        ("http://", ":a", 100000),
+        ("", "a:", 100000),
+        ("", ":", 200000),
+        ("", "\\", 200000),
+        ("", "`a:b\\:<", 30000),
+    ),
+)
+def test_plugin_discord_emoji_escape_speed(prefix, piece, count):
+    """Hostile input is escaped quickly, without slowing to a crawl."""
+    obj = NotifyDiscord(
+        webhook_id="A" * 24, webhook_token="B" * 64, emojis=False
+    )
+
+    # Build the text here so the test name stays short.  Windows limits
+    # the length of the name pytest stores while a test runs.
+    text = prefix + piece * count
+
+    # Each of these takes well under 0.1s.  A pattern that rereads the
+    # text over and over would take minutes, so this limit is generous
+    # for busy build servers while still catching that.
+    start = time.perf_counter()
+    obj.dialect_convert(text)
+    assert time.perf_counter() - start < 2.0
 
 
 def test_plugin_discord_long_fields():
