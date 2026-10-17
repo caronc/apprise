@@ -1787,3 +1787,26 @@ def test_persistent_storage_writes_to_disk_when_left_on(tmpdir):
     service.flush_store()
 
     assert os.listdir(str(tmpdir)) == [service.url_id()]
+
+
+@pytest.mark.parametrize("expires", [None, -1])
+def test_persistent_storage_disk_prune_default_expiry(tmpdir, expires):
+    """Prune with no (or an invalid) expiry uses the default file expiry."""
+
+    for namespace in ("old", "new"):
+        pc = PersistentStore(
+            path=str(tmpdir),
+            namespace=namespace,
+            mode=PersistentStoreMode.FLUSH,
+        )
+        assert pc.write(b"data") is True
+
+    # Age everything in the "old" namespace past the default expiry
+    stale = time.time() - PersistentStore.default_file_expiry - 3600
+    for root, _, files in os.walk(str(tmpdir.join("old"))):
+        for name in files:
+            os.utime(os.path.join(root, name), (stale, stale))
+
+    results = PersistentStore.disk_prune(path=str(tmpdir), expires=expires)
+    assert len(results["old"]) > 0
+    assert len(results["new"]) == 0
