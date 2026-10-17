@@ -16,6 +16,9 @@ jobs:
     name: Python ${{ matrix.python-version }} – ${{ matrix.tox_env }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
 
+    # Allow selected matrix jobs to fail without failing the workflow
+    continue-on-error: ${{ matrix.continue-on-error || false }}
+
     strategy:
       fail-fast: false  # Let all jobs run, even if one fails
       matrix:
@@ -28,36 +31,49 @@ jobs:
             tox_env: qa
           - python-version: "3.12"
             tox_env: qa
-
-          # Pre-release testing (won't fail entire workflow if this fails)
-          - python-version: "3.13-dev"
+          - python-version: "3.13"
             tox_env: qa
-            continue-on-error: true
 
-          - python-version: "3.14-dev"
+          # Test compiled libraries omitted from all-plugins
+          - python-version: "3.14"
             tox_env: qa
-            continue-on-error: true
+            qa_deps: python-qpid-proton
 
-          - python-version: "3.15-dev"
+          # The newest Python may lack dependency wheels, so this is optional
+          - python-version: "3.15"
             tox_env: qa
+            build_tools: true
             continue-on-error: true
 
           # Platform validation only (one version)
           - os: windows-latest
-            python-version: "3.12"
+            python-version: "3.14"
             tox_env: qa
 
           - os: macos-latest
-            python-version: "3.12"
+            python-version: "3.14"
             tox_env: qa
 
-          # Minimal test run on latest Python only
+          # Minimal test run on our main Python only
           # this verifies Apprise still works when extra libraries are not available
-          - python-version: "3.12"
+          - python-version: "3.14"
             tox_env: minimal
 
     steps:
       - uses: actions/checkout@v7
+
+      # Run on the Python version this matrix entry names
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Install headers needed when dependency wheels are unavailable
+      - name: Install build tools for compiled libraries
+        if: matrix.build_tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libusb-1.0-0-dev libudev-dev
 
       # Install tox for isolated environment and plugin test orchestration
       - name: Install tox
@@ -66,6 +82,8 @@ jobs:
       # Run tox with the specified environment (qa, minimal, etc.)
       - name: Run tox for ${{ matrix.tox_env }}
         run: tox -e ${{ matrix.tox_env }}
+        env:
+          APPRISE_QA_DEPS: ${{ matrix.qa_deps }}
 
       - name: Upload coverage report
         if: always()

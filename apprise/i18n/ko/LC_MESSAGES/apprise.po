@@ -175,6 +175,34 @@ msgstr "SMS 모드"
 msgid "Batch Mode"
 msgstr "일괄 모드"
 
+#: apprise/plugins/amqp/base.py:101
+msgid "Install pika for AMQP 0.9.1, python-qpid-proton for AMQP 1.0, or both."
+msgstr "AMQP 0.9.1에는 pika를, AMQP 1.0에는 python-qpid-proton을, 또는 둘 다 설치하세요."
+
+#: apprise/plugins/amqp/base.py:207
+msgid "Exchange"
+msgstr "익스체인지"
+
+#: apprise/plugins/amqp/base.py:211
+msgid "Virtual Host"
+msgstr "가상 호스트"
+
+#: apprise/plugins/amqp/base.py:215
+msgid "Persistent"
+msgstr "영구 저장"
+
+#: apprise/plugins/amqp/base.py:220
+msgid "Mandatory"
+msgstr "필수"
+
+#: apprise/plugins/amqp/base.py:231
+msgid "Time To Live"
+msgstr "유효 기간 (TTL)"
+
+#: apprise/plugins/amqp/base.py:246
+msgid "Message Headers"
+msgstr "메시지 헤더"
+
 #: apprise/plugins/apprise_api.py:126 apprise/plugins/bark.py:153
 #: apprise/plugins/custom_form.py:140 apprise/plugins/custom_json.py:122
 #: apprise/plugins/custom_xml.py:122 apprise/plugins/emby.py:86

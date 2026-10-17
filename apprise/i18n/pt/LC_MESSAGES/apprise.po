@@ -175,6 +175,34 @@ msgstr "Modo SMS"
 msgid "Batch Mode"
 msgstr "Modo por lotes"
 
+#: apprise/plugins/amqp/base.py:101
+msgid "Install pika for AMQP 0.9.1, python-qpid-proton for AMQP 1.0, or both."
+msgstr "Instale pika para AMQP 0.9.1, python-qpid-proton para AMQP 1.0, ou ambos."
+
+#: apprise/plugins/amqp/base.py:207
+msgid "Exchange"
+msgstr "Exchange"
+
+#: apprise/plugins/amqp/base.py:211
+msgid "Virtual Host"
+msgstr "Host virtual"
+
+#: apprise/plugins/amqp/base.py:215
+msgid "Persistent"
+msgstr "Persistente"
+
+#: apprise/plugins/amqp/base.py:220
+msgid "Mandatory"
+msgstr "Obrigatório"
+
+#: apprise/plugins/amqp/base.py:231
+msgid "Time To Live"
+msgstr "Tempo de vida"
+
+#: apprise/plugins/amqp/base.py:246
+msgid "Message Headers"
+msgstr "Cabeçalhos da mensagem"
+
 #: apprise/plugins/apprise_api.py:126 apprise/plugins/bark.py:153
 #: apprise/plugins/custom_form.py:140 apprise/plugins/custom_json.py:122
 #: apprise/plugins/custom_xml.py:122 apprise/plugins/emby.py:86

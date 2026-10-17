@@ -4680,15 +4680,18 @@ class TestServiceTimeout:
         N_MGR["slow"] = _SlowNotify
 
         try:
-            asset = AppriseAsset(async_mode=True, service_timeout=0.05)
+            # A call still queued when the timeout hits is cancelled rather
+            # than abandoned, so give a busy machine plenty of time to start
+            # it, and keep it running well past the timeout.
+            asset = AppriseAsset(async_mode=True, service_timeout=0.5)
             a = Apprise(asset=asset)
-            service = _SlowNotify(host="host", asset=asset, delay=0.5)
+            service = _SlowNotify(host="host", asset=asset, delay=2.0)
             a.add(service)
 
             result = a.notify(body="test")
             assert result.status == AppriseResultStatus.TIMEOUT
 
-            # The 0.5s send() is still running in the background --
+            # The 2s send() is still running in the background --
             # notify() only gave up waiting on it, it did not stop it.
             assert apprise_module.any_abandoned_calls_still_running() is True
 
@@ -4707,10 +4710,13 @@ class TestServiceTimeout:
         N_MGR["slow"] = _SlowNotify
 
         try:
-            asset = AppriseAsset(async_mode=True, service_timeout=0.05)
+            # A call still queued when the timeout hits is cancelled rather
+            # than abandoned, so give a busy machine plenty of time to start
+            # it, and keep it running well past the timeout.
+            asset = AppriseAsset(async_mode=True, service_timeout=0.5)
             a = Apprise(asset=asset)
             service = _SlowNotify(
-                host="descriptionhost", asset=asset, delay=0.5
+                host="descriptionhost", asset=asset, delay=2.0
             )
             a.add(service)
 
@@ -4952,8 +4958,11 @@ class TestAsyncAbandonedCallTracking:
         N_MGR["slowthreaded"] = _SlowThreadedNotify
 
         try:
-            asset = AppriseAsset(async_mode=True, service_timeout=0.05)
-            service = _SlowThreadedNotify(host="x", asset=asset, delay=0.3)
+            # A call still queued when the timeout hits is cancelled rather
+            # than abandoned, so give a busy machine plenty of time to start
+            # it, and keep it running well past the timeout.
+            asset = AppriseAsset(async_mode=True, service_timeout=0.5)
+            service = _SlowThreadedNotify(host="x", asset=asset, delay=2.0)
             a = Apprise(asset=asset)
             a.add(service)
 
@@ -4967,8 +4976,7 @@ class TestAsyncAbandonedCallTracking:
 
             # Once the real delay elapses, it drops out of the list.
             wait_until(
-                lambda: not apprise_module.any_abandoned_calls_still_running(),
-                timeout=2.0,
+                lambda: not apprise_module.any_abandoned_calls_still_running()
             )
             assert apprise_module.any_abandoned_calls_still_running() is False
             assert service.calls == 1
