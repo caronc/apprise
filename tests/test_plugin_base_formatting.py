@@ -4312,6 +4312,21 @@ def test_markdown_overflow_keeps_escape_with_its_character():
     assert obj.sent[-1]["body"] == "x" * 18 + "\\\\"
 
 
+def test_overflow_split_leading_whitespace():
+    """Split mode does not send a piece that is only whitespace."""
+
+    # A CRLF line break straddles the 10 character limit, and the line
+    # after it is longer than the limit
+    body = "a" * 9 + "\r\n" + "b" * 15
+    obj = _format_recorder(
+        NotifyFormat.TEXT, body_maxlen=10, overflow=OverflowMode.SPLIT
+    )
+    ap_obj = Apprise()
+    ap_obj.add(obj)
+    assert ap_obj.notify(body=body)
+    assert [s["body"] for s in obj.sent] == ["a" * 9, "b" * 9, "b" * 6]
+
+
 def test_direct_notify_converts_declared_source_format():
     """A direct plugin call converts its declared source format."""
 
