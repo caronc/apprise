@@ -1060,6 +1060,12 @@ def test_persistent_custom_io(tmpdir):
     with pc.open("new-key", "wb") as fd:
         fd.write(b"data")
 
+    # Omitting the key opens the same default file read() uses
+    with pc.open(mode="wb") as fd:
+        fd.write(b"default data")
+
+    assert pc.read(compress=False) == b"default data"
+
     with mock.patch(
         "builtins.open",
         new_callable=mock.mock_open,
@@ -1813,22 +1819,24 @@ def test_persistent_storage_disk_prune_default_expiry(tmpdir, expires):
 
 
 @pytest.mark.parametrize("key", [None, "default", "named"])
-@pytest.mark.parametrize("compress", [False, True])
+@pytest.mark.parametrize("cache", [False, True])
 @pytest.mark.parametrize("expires", [False, True])
 def test_persistent_storage_read_renews_served_file(
-    tmpdir, key, compress, expires
+    tmpdir, key, cache, expires
 ):
     """Reading renews the served file unless expiry is explicitly enabled."""
     store = PersistentStore(path=str(tmpdir), namespace="abc")
-    # Load the cache so flush also processes pending file renewals.
-    assert store.set("state", "present")
-    assert store.write(b"stored data", key=key, compress=compress)
+    if cache:
+        # Renewal must work whether or not the cache is also in use.
+        assert store.set("state", "present")
+
+    assert store.write(b"stored data", key=key)
     file_key = store.base_key if key is None else key
     data_file = os.path.join(store.path, store.data_dir, f"{file_key}.psdata")
     stale = time.time() - PersistentStore.default_file_expiry - 3600
     os.utime(data_file, (stale, stale))
 
-    kwargs = {"compress": compress, "expires": expires}
+    kwargs = {"expires": expires}
     if key is not None:
         kwargs["key"] = key
     assert store.read(**kwargs) == b"stored data"
