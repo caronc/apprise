@@ -74,6 +74,19 @@ def test_attach_http_parse_url():
     assert AttachHTTP.parse_url("http://") is None
 
 
+def test_attach_http_encoded_path():
+    """AttachHTTP() keeps an encoded path intact through url()."""
+
+    # A GitLab style file path with encoded slashes
+    url = "https://example.com/api/v4/projects/my%2Frepo/files/a%2Fb.txt"
+    results = AttachHTTP.parse_url(url)
+    attach = AttachHTTP(**results)
+    assert attach.fullpath == "/api/v4/projects/my%2Frepo/files/a%2Fb.txt"
+
+    # url() does not encode the path a second time
+    assert attach.url().startswith(url + "?")
+
+
 def test_attach_http_query_string_dictionary():
     """
     API: AttachHTTP() Query String Dictionary

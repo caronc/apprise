@@ -34,7 +34,7 @@ from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import URL_PATH_SAFE_CHARS
+from ..utils.parse import URL_ENCODED_PATH_SAFE_CHARS
 from .base import NotifyBase
 
 # For API Details see:
@@ -224,7 +224,7 @@ class NotifySynology(NotifyBase):
                 token=self.pprint(self.token, privacy, safe=""),
                 fullpath=(
                     NotifySynology.quote(
-                        self.fullpath, safe=URL_PATH_SAFE_CHARS
+                        self.fullpath, safe=URL_ENCODED_PATH_SAFE_CHARS
                     )
                     if self.fullpath
                     else "/"

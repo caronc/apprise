@@ -384,6 +384,36 @@ def test_plugin_custom_json_edge_cases(mock_request):
 
 
 @mock.patch("requests.request")
+def test_plugin_custom_json_encoded_path(mock_request):
+    """NotifyJSON() keeps an encoded path intact when sending and in url()."""
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    mock_request.return_value = response
+
+    # An encoded slash and space both belong to their segment
+    url = "json://localhost/api/v4/projects/my%2Frepo/a%20b"
+    obj = Apprise.instantiate(url)
+    assert isinstance(obj, NotifyJSON)
+
+    # The request reaches the endpoint exactly as it was written
+    assert obj.notify(body="body", title="title") is True
+    assert mock_request.call_count == 1
+    assert mock_request.call_args[0][1] == (
+        "http://localhost/api/v4/projects/my%2Frepo/a%20b"
+    )
+
+    # url() does not encode the path a second time
+    assert obj.url().startswith(url + "?")
+
+    # A round trip leaves the path unchanged
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyJSON)
+    assert obj2.fullpath == obj.fullpath
+
+
+@mock.patch("requests.request")
 def test_notify_json_plugin_attachments(mock_request):
     """NotifyJSON() Attachments."""
 

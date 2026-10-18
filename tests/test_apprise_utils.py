@@ -842,6 +842,14 @@ def test_parse_url_general():
     assert "[" not in result["fullpath"]
     assert "]" not in result["fullpath"]
 
+    # An encoded slash belongs to its segment and must not become a
+    # separator, while a literal slash still splits the path.
+    result = utils.parse.parse_url(
+        "https://example.com/api/v4/projects/my%2Frepo/file%2fname"
+    )
+    assert result["fullpath"] == "/api/v4/projects/my%2Frepo/file%2Fname"
+    assert result["query"] == "file%2Fname"
+
 
 def test_parse_url_markdown_content():
     """

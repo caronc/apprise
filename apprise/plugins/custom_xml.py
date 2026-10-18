@@ -35,7 +35,7 @@ from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import URL_PATH_SAFE_CHARS
+from ..utils.parse import URL_ENCODED_PATH_SAFE_CHARS
 from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
@@ -521,7 +521,9 @@ class NotifyXML(NotifyBase):
                 else f":{self.port}"
             ),
             fullpath=(
-                NotifyXML.quote(self.fullpath, safe=URL_PATH_SAFE_CHARS)
+                NotifyXML.quote(
+                    self.fullpath, safe=URL_ENCODED_PATH_SAFE_CHARS
+                )
                 if self.fullpath
                 else "/"
             ),
