@@ -4725,9 +4725,13 @@ def test_plugin_email_retry_skips_delivered_recipients():
         ("Ünal Müller <u@example.com>", "Ünal Müller"),
         # Both
         ('"Müller, Ünal" <m@example.com>', "Müller, Ünal"),
+        # A backslash in the name
+        ('"Back\\slash" <b@example.com>', "Back\\slash"),
+        # Two entries that both hold a comma
+        ('"A, B" <a@example.com>,"C, D" <c@example.com>', "C, D"),
     ),
 )
-def test_plugin_email_url_keeps_recipient_names(key, recipient, name):
+def test_plugin_email_recipient_names(key, recipient, name):
     """NotifyEmail.url() emits cc/bcc/reply names that parse back as is."""
 
     url = "mailtos://user:pass@gmail.com?{}={}".format(

@@ -738,27 +738,20 @@ class NotifyEmail(NotifyBase):
 
         return not has_error
 
-    def _url_address(self, email):
-        """Return an address (with its display name, if any) for url().
-
-        The name is kept as is (no RFC 2047 encoding) since the URL is
-        parsed by Apprise and not read by a mail server. A comma in the
-        name needs no escaping either: the name is quoted, and urlencode()
-        escapes the comma when the URL is built.
-        """
+    def _url_address(self, email: str) -> str:
+        """Return ``email`` with its display name (if any) for url()."""
         name = self.names.get(email)
         if not name:
             return email
 
-        try:
-            name.encode("ascii")
-
-        except UnicodeEncodeError:
-            # formataddr() would turn this name into an encoded word
-            name = name.replace("\\", "\\\\").replace('"', '\\"')
-            return f'"{name}" <{email}>'
-
-        return formataddr((name, email))
+        # Quote a name holding a list delimiter (or @) so it is not split
+        # apart.  Apprise parses the name back as is, so no RFC 2047
+        # encoding or escaping is wanted here.
+        return (
+            f'"{name}" <{email}>'
+            if any(c in name for c in ",;@")
+            else f"{name} <{email}>"
+        )
 
     def url(self, privacy=False, *args, **kwargs):
         """
