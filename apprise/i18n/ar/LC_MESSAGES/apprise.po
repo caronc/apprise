@@ -1690,6 +1690,26 @@ msgstr "الوميض"
 msgid "Label"
 msgstr "التسمية"
 
+#: apprise/plugins/github.py:204
+msgid "Owner"
+msgstr "المالك"
+
+#: apprise/plugins/github.py:210
+msgid "Repository"
+msgstr "المستودع"
+
+#: apprise/plugins/github.py:222
+msgid "Number"
+msgstr "الرقم"
+
+#: apprise/plugins/github.py:237
+msgid "Labels"
+msgstr "التسميات"
+
+#: apprise/plugins/github.py:241
+msgid "Assignees"
+msgstr "المكلَّفون"
+
 #: apprise/plugins/sfr.py:59
 msgid "Société Française du Radiotéléphone"
 msgstr "Société Française du Radiotéléphone"

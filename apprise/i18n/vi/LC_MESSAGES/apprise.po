@@ -1689,6 +1689,26 @@ msgstr "Đèn nháy"
 msgid "Label"
 msgstr "Nhãn"
 
+#: apprise/plugins/github.py:204
+msgid "Owner"
+msgstr "Chủ sở hữu"
+
+#: apprise/plugins/github.py:210
+msgid "Repository"
+msgstr "Kho mã"
+
+#: apprise/plugins/github.py:222
+msgid "Number"
+msgstr "Số"
+
+#: apprise/plugins/github.py:237
+msgid "Labels"
+msgstr "Các nhãn"
+
+#: apprise/plugins/github.py:241
+msgid "Assignees"
+msgstr "Người được giao"
+
 #: apprise/plugins/sfr.py:59
 msgid "Société Française du Radiotéléphone"
 msgstr "Société Française du Radiotéléphone"

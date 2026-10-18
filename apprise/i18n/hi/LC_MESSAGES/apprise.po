@@ -1689,6 +1689,26 @@ msgstr "फ़्लैश"
 msgid "Label"
 msgstr "लेबल"
 
+#: apprise/plugins/github.py:204
+msgid "Owner"
+msgstr "स्वामी"
+
+#: apprise/plugins/github.py:210
+msgid "Repository"
+msgstr "रिपॉज़िटरी"
+
+#: apprise/plugins/github.py:222
+msgid "Number"
+msgstr "संख्या"
+
+#: apprise/plugins/github.py:237
+msgid "Labels"
+msgstr "लेबल्स"
+
+#: apprise/plugins/github.py:241
+msgid "Assignees"
+msgstr "असाइनी"
+
 #: apprise/plugins/sfr.py:59
 msgid "Société Française du Radiotéléphone"
 msgstr "Société Française du Radiotéléphone"
