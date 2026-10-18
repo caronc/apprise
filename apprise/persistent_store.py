@@ -850,8 +850,9 @@ class PersistentStore:
         # Store our new cache
         self._cache[key] = CacheObject(value, expires, persistent=persistent)
 
-        # Set our dirty flag
-        self.__dirty = persistent
+        # Set our dirty flag; a non-persistent entry must not clear the
+        # pending write of an earlier persistent one
+        self.__dirty = self.__dirty or persistent
 
         if self.__dirty and self.__mode == PersistentStoreMode.FLUSH:
             # Flush changes to disk

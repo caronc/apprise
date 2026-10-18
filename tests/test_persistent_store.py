@@ -1810,3 +1810,20 @@ def test_persistent_storage_disk_prune_default_expiry(tmpdir, expires):
     results = PersistentStore.disk_prune(path=str(tmpdir), expires=expires)
     assert len(results["old"]) > 0
     assert len(results["new"]) == 0
+
+
+def test_persistent_storage_non_persistent_set_keeps_pending_write(tmpdir):
+    """A non-persistent set() keeps an earlier persistent set() pending."""
+    store = PersistentStore(path=str(tmpdir), namespace="abc")
+    assert store.mode == PersistentStoreMode.AUTO
+
+    assert store.set("keep", "persistent value")
+    assert store.set("scratch", "temp value", persistent=False)
+
+    # The persistent entry is written out
+    assert store.flush()
+    del store
+
+    store = PersistentStore(path=str(tmpdir), namespace="abc")
+    assert store.get("keep") == "persistent value"
+    assert store.get("scratch") is None
