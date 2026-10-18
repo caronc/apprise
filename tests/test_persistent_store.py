@@ -1810,3 +1810,39 @@ def test_persistent_storage_disk_prune_default_expiry(tmpdir, expires):
     results = PersistentStore.disk_prune(path=str(tmpdir), expires=expires)
     assert len(results["old"]) > 0
     assert len(results["new"]) == 0
+
+
+@pytest.mark.parametrize("key", [None, "default", "named"])
+@pytest.mark.parametrize("compress", [False, True])
+@pytest.mark.parametrize("expires", [False, True])
+def test_persistent_storage_read_renews_served_file(
+    tmpdir, key, compress, expires
+):
+    """Reading renews the served file unless expiry is explicitly enabled."""
+    store = PersistentStore(path=str(tmpdir), namespace="abc")
+    # Load the cache so flush also processes pending file renewals.
+    assert store.set("state", "present")
+    assert store.write(b"stored data", key=key, compress=compress)
+    file_key = store.base_key if key is None else key
+    data_file = os.path.join(store.path, store.data_dir, f"{file_key}.psdata")
+    stale = time.time() - PersistentStore.default_file_expiry - 3600
+    os.utime(data_file, (stale, stale))
+
+    kwargs = {"compress": compress, "expires": expires}
+    if key is not None:
+        kwargs["key"] = key
+    assert store.read(**kwargs) == b"stored data"
+    assert store.flush()
+
+    results = PersistentStore.disk_prune(path=str(tmpdir), action=True)
+    assert os.path.exists(data_file) is (not expires)
+    assert not os.path.exists(
+        os.path.join(store.path, store.data_dir, "None.psdata")
+    )
+    if expires:
+        assert any(
+            entry["path"] == data_file and entry["removed"]
+            for entry in results["abc"]
+        )
+    else:
+        assert not results["abc"]

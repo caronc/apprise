@@ -457,6 +457,9 @@ class PersistentStore:
         With ``expires=False``, the entry is marked for renewal so pruning
         does not remove it.
         """
+        if key is None:
+            key = self.base_key
+
         try:
             with self.open(key, mode="rb", compress=compress) as fd:
                 results = fd.read(self.max_file_size)
