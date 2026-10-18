@@ -30,6 +30,7 @@ from email.header import decode_header
 from inspect import cleandoc
 import logging
 import os
+import pickle
 import re
 import shutil
 import smtplib
@@ -1358,6 +1359,57 @@ def test_plugin_email_dict_variations():
         suppress_exceptions=False,
     )
     assert isinstance(obj, email.NotifyEmail)
+
+
+def test_plugin_email_custom_from_url_roundtrip_1803():
+    """
+    A custom from= address must survive a url() round trip, even when no
+    explicit to= recipient was given (the recipient then defaults to it)
+    """
+
+    for url, from_addr, targets in (
+        # custom from=, no recipient
+        (
+            "mailtos://user:pass@gmail.com?from=user@other.com",
+            (False, "user@other.com"),
+            [(False, "user@other.com")],
+        ),
+        # custom from= with a display name, no recipient
+        (
+            "mailtos://user:pass@gmail.com"
+            "?from=Rene Descartes <r@example.com>",
+            ("Rene Descartes", "r@example.com"),
+            [(False, "r@example.com")],
+        ),
+        # custom from= with more than one recipient
+        (
+            "mailtos://user:pass@gmail.com/a@example.com/b@example.com"
+            "?from=user@other.com",
+            (False, "user@other.com"),
+            [(False, "a@example.com"), (False, "b@example.com")],
+        ),
+    ):
+        obj = Apprise.instantiate(url, suppress_exceptions=False)
+        assert isinstance(obj, email.NotifyEmail)
+        assert tuple(obj.from_addr) == from_addr
+        assert obj.targets == targets
+
+        obj2 = Apprise.instantiate(obj.url(), suppress_exceptions=False)
+        assert isinstance(obj2, email.NotifyEmail)
+        assert tuple(obj2.from_addr) == from_addr
+        assert obj2.targets == targets
+
+    # Pickling goes through url() as well
+    a = Apprise()
+    assert a.add("mailtos://user:pass@gmail.com?from=user@other.com")
+    b = pickle.loads(pickle.dumps(a))
+    assert tuple(b[0].from_addr) == (False, "user@other.com")
+    assert b[0].targets == [(False, "user@other.com")]
+
+    # No custom from=; nothing extra is added to the URL
+    obj = Apprise.instantiate("mailtos://user:pass@gmail.com/a@example.com")
+    assert isinstance(obj, email.NotifyEmail)
+    assert "from=" not in obj.url()
 
 
 @mock.patch("smtplib.SMTP_SSL")

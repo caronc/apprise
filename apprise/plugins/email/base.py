@@ -787,8 +787,12 @@ class NotifyEmail(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         from_addr = None
-        if len(self.targets) == 1 and self.targets[0][1] != self.from_addr[1]:
-            # A custom email was provided
+        if self.user and self.from_addr[1] != "{}@{}".format(
+            re.split(r"[\s@]+", self.user)[0], self.host
+        ):
+            # A custom email was provided; compare it against the address
+            # that would be derived from user@host when the URL is parsed
+            # again, not against the targets (which default to it)
             from_addr = self.from_addr[1]
 
         if self.smtp_host != self.host:
