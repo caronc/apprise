@@ -1689,6 +1689,26 @@ msgstr "闪光"
 msgid "Label"
 msgstr "标注"
 
+#: apprise/plugins/github.py:204
+msgid "Owner"
+msgstr "所有者"
+
+#: apprise/plugins/github.py:210
+msgid "Repository"
+msgstr "仓库"
+
+#: apprise/plugins/github.py:222
+msgid "Number"
+msgstr "编号"
+
+#: apprise/plugins/github.py:237
+msgid "Labels"
+msgstr "标签"
+
+#: apprise/plugins/github.py:241
+msgid "Assignees"
+msgstr "负责人"
+
 #: apprise/plugins/sfr.py:59
 msgid "Société Française du Radiotéléphone"
 msgstr "Société Française du Radiotéléphone"

@@ -1690,6 +1690,26 @@ msgstr "Вспышка"
 msgid "Label"
 msgstr "Подпись"
 
+#: apprise/plugins/github.py:204
+msgid "Owner"
+msgstr "Владелец"
+
+#: apprise/plugins/github.py:210
+msgid "Repository"
+msgstr "Репозиторий"
+
+#: apprise/plugins/github.py:222
+msgid "Number"
+msgstr "Номер"
+
+#: apprise/plugins/github.py:237
+msgid "Labels"
+msgstr "Метки"
+
+#: apprise/plugins/github.py:241
+msgid "Assignees"
+msgstr "Исполнители"
+
 #: apprise/plugins/sfr.py:59
 msgid "Société Française du Radiotéléphone"
 msgstr "Société Française du Radiotéléphone"

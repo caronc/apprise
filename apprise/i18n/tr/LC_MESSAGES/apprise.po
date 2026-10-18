@@ -1689,6 +1689,26 @@ msgstr "Flaş"
 msgid "Label"
 msgstr "Etiket"
 
+#: apprise/plugins/github.py:204
+msgid "Owner"
+msgstr "Sahip"
+
+#: apprise/plugins/github.py:210
+msgid "Repository"
+msgstr "Depo"
+
+#: apprise/plugins/github.py:222
+msgid "Number"
+msgstr "Numara"
+
+#: apprise/plugins/github.py:237
+msgid "Labels"
+msgstr "Etiketler"
+
+#: apprise/plugins/github.py:241
+msgid "Assignees"
+msgstr "Atananlar"
+
 #: apprise/plugins/sfr.py:59
 msgid "Société Française du Radiotéléphone"
 msgstr "Société Française du Radiotéléphone"
