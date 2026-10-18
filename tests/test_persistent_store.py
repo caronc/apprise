@@ -1818,6 +1818,31 @@ def test_persistent_storage_disk_prune_default_expiry(tmpdir, expires):
     assert len(results["new"]) == 0
 
 
+def test_persistent_storage_mixed_set(tmpdir):
+    """Mixing persistent and non-persistent set() calls saves correctly."""
+    store = PersistentStore(path=str(tmpdir), namespace="abc")
+    assert store.mode == PersistentStoreMode.AUTO
+
+    assert store.set("keep", "persistent value")
+    assert store.set("scratch", "temp value", persistent=False)
+
+    # The persistent entry is written out
+    assert store.flush()
+    del store
+
+    store = PersistentStore(path=str(tmpdir), namespace="abc")
+    assert store.get("keep") == "persistent value"
+    assert store.get("scratch") is None
+
+    # Turning a saved entry into a non-persistent one removes it from disk
+    assert store.set("keep", "temp value", persistent=False)
+    assert store.flush()
+    del store
+
+    store = PersistentStore(path=str(tmpdir), namespace="abc")
+    assert store.get("keep") is None
+
+
 @pytest.mark.parametrize("key", [None, "default", "named"])
 @pytest.mark.parametrize("cache", [False, True])
 @pytest.mark.parametrize("expires", [False, True])
