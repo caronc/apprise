@@ -738,6 +738,21 @@ class NotifyEmail(NotifyBase):
 
         return not has_error
 
+    def _url_address(self, email: str) -> str:
+        """Return ``email`` with its display name (if any) for url()."""
+        name = self.names.get(email)
+        if not name:
+            return email
+
+        # Quote a name holding a list delimiter (or @) so it is not split
+        # apart.  Apprise parses the name back as is, so no RFC 2047
+        # encoding or escaping is wanted here.
+        return (
+            f'"{name}" <{email}>'
+            if any(c in name for c in ",;@")
+            else f"{name} <{email}>"
+        )
+
     def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
@@ -817,44 +832,16 @@ class NotifyEmail(NotifyBase):
 
         if self.cc:
             # Handle our Carbon Copy Addresses
-            params["cc"] = ",".join(
-                [
-                    formataddr(
-                        (self.names.get(e, False), e),
-                        # Swap comma for its escaped url code (if
-                        # detected) since we use it as a delimiter
-                        charset="utf-8",
-                    ).replace(",", "%2C")
-                    for e in self.cc
-                ]
-            )
+            params["cc"] = ",".join([self._url_address(e) for e in self.cc])
 
         if self.bcc:
             # Handle our Blind Carbon Copy Addresses
-            params["bcc"] = ",".join(
-                [
-                    formataddr(
-                        (self.names.get(e, False), e),
-                        # Swap comma for its escaped url code (if
-                        # detected) since we use it as a delimiter
-                        charset="utf-8",
-                    ).replace(",", "%2C")
-                    for e in self.bcc
-                ]
-            )
+            params["bcc"] = ",".join([self._url_address(e) for e in self.bcc])
 
         if self.reply_to:
             # Handle our Reply-To Addresses
             params["reply"] = ",".join(
-                [
-                    formataddr(
-                        (self.names.get(e, False), e),
-                        # Swap comma for its escaped url code (if
-                        # detected) since we use it as a delimiter
-                        charset="utf-8",
-                    ).replace(",", "%2C")
-                    for e in self.reply_to
-                ]
+                [self._url_address(e) for e in self.reply_to]
             )
 
         # pull email suffix from username (if present)
