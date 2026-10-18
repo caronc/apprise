@@ -1689,6 +1689,26 @@ msgstr "Flits"
 msgid "Label"
 msgstr "Label"
 
+#: apprise/plugins/github.py:204
+msgid "Owner"
+msgstr "Eigenaar"
+
+#: apprise/plugins/github.py:210
+msgid "Repository"
+msgstr "Repository"
+
+#: apprise/plugins/github.py:222
+msgid "Number"
+msgstr "Nummer"
+
+#: apprise/plugins/github.py:237
+msgid "Labels"
+msgstr "Labels"
+
+#: apprise/plugins/github.py:241
+msgid "Assignees"
+msgstr "Toegewezen personen"
+
 #: apprise/plugins/sfr.py:59
 msgid "Société Française du Radiotéléphone"
 msgstr "Société Française du Radiotéléphone"

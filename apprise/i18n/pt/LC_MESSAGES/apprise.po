@@ -1689,6 +1689,26 @@ msgstr "Flash"
 msgid "Label"
 msgstr "Etiqueta"
 
+#: apprise/plugins/github.py:204
+msgid "Owner"
+msgstr "Proprietário"
+
+#: apprise/plugins/github.py:210
+msgid "Repository"
+msgstr "Repositório"
+
+#: apprise/plugins/github.py:222
+msgid "Number"
+msgstr "Número"
+
+#: apprise/plugins/github.py:237
+msgid "Labels"
+msgstr "Etiquetas"
+
+#: apprise/plugins/github.py:241
+msgid "Assignees"
+msgstr "Responsáveis"
+
 #: apprise/plugins/sfr.py:59
 msgid "Société Française du Radiotéléphone"
 msgstr "Société Française du Radiotéléphone"

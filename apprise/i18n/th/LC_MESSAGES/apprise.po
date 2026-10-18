@@ -1689,6 +1689,26 @@ msgstr "แฟลช"
 msgid "Label"
 msgstr "ป้ายชื่อ"
 
+#: apprise/plugins/github.py:204
+msgid "Owner"
+msgstr "เจ้าของ"
+
+#: apprise/plugins/github.py:210
+msgid "Repository"
+msgstr "รีโพสิทอรี"
+
+#: apprise/plugins/github.py:222
+msgid "Number"
+msgstr "หมายเลข"
+
+#: apprise/plugins/github.py:237
+msgid "Labels"
+msgstr "ป้ายกำกับ"
+
+#: apprise/plugins/github.py:241
+msgid "Assignees"
+msgstr "ผู้รับผิดชอบ"
+
 #: apprise/plugins/sfr.py:59
 msgid "Société Française du Radiotéléphone"
 msgstr "Société Française du Radiotéléphone"
