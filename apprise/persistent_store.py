@@ -847,12 +847,15 @@ class PersistentStore:
         except KeyError:
             pass
 
+        # Replacing a saved entry changes what is on disk too
+        replaced = key in self._cache and self._cache[key].persistent
+
         # Store our new cache
         self._cache[key] = CacheObject(value, expires, persistent=persistent)
 
-        # Set our dirty flag; a non-persistent entry must not clear the
-        # pending write of an earlier persistent one
-        self.__dirty = self.__dirty or persistent
+        # Set our dirty flag, but never clear it.  An earlier change may
+        # still be waiting to be written.
+        self.__dirty = self.__dirty or persistent or replaced
 
         if self.__dirty and self.__mode == PersistentStoreMode.FLUSH:
             # Flush changes to disk
