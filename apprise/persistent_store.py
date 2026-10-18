@@ -457,6 +457,10 @@ class PersistentStore:
         With ``expires=False``, the entry is marked for renewal so pruning
         does not remove it.
         """
+        # Use the default key so renewal targets the file actually read.
+        if key is None:
+            key = self.base_key
+
         try:
             with self.open(key, mode="rb", compress=compress) as fd:
                 results = fd.read(self.max_file_size)
@@ -1073,7 +1077,7 @@ class PersistentStore:
     ) -> bool:
         """Save the cache to disk."""
 
-        if self._cache is None or self.__mode == PersistentStoreMode.MEMORY:
+        if self.__mode == PersistentStoreMode.MEMORY:
             # nothing to do
             return True
 
@@ -1095,6 +1099,10 @@ class PersistentStore:
                 # We can't access the file or it does not exist
                 logger.debug("Could not update file timestamp: %s", path)
                 logger.debug("Persistent Storage Exception: %s", str(e))
+
+        if self._cache is None:
+            # The cache was never loaded, so there is nothing to save
+            return True
 
         if not force and self.__dirty is False:
             # Nothing further to do
