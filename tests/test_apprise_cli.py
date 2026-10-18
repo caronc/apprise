@@ -1956,6 +1956,57 @@ def test_apprise_cli_persistent_storage(tmpdir):
     N_MGR.unload_modules()
 
 
+@pytest.mark.parametrize(
+    "prune_days, uid_length, expected",
+    [
+        ("", "", (30, 8)),
+        ("   ", "abc", (30, 8)),
+        ("not-a-number", "", (30, 8)),
+        ("45", " 12 ", (45, 12)),
+    ],
+)
+def test_apprise_cli_storage_env_defaults(prune_days, uid_length, expected):
+    """
+    CLI: an empty or invalid storage environment variable no longer breaks
+    loading the CLI or --help
+
+    """
+    try:
+        with environ(
+            APPRISE_STORAGE_PRUNE_DAYS=prune_days,
+            APPRISE_STORAGE_UID_LENGTH=uid_length,
+        ):
+            reload(cli)
+            assert expected == (
+                cli.DEFAULT_STORAGE_PRUNE_DAYS,
+                cli.DEFAULT_STORAGE_UID_LENGTH,
+            )
+
+            result = CliRunner().invoke(cli.main, ["--help"])
+            assert result.exit_code == 0
+    finally:
+        reload(cli)
+
+
+def test_apprise_cli_storage_env_invalid():
+    """CLI: a non-numeric storage environment variable stops the CLI."""
+    try:
+        with environ(APPRISE_STORAGE_PRUNE_DAYS="abc"):
+            reload(cli)
+            assert cli.INVALID_ENV == [("APPRISE_STORAGE_PRUNE_DAYS", "abc")]
+
+            # --help still works so the user can find the right value
+            result = CliRunner().invoke(cli.main, ["--help"])
+            assert result.exit_code == 0
+
+            # Anything else stops with a message naming the variable
+            result = CliRunner().invoke(cli.main, ["-b", "test"])
+            assert result.exit_code == 2
+            assert "APPRISE_STORAGE_PRUNE_DAYS" in result.output
+    finally:
+        reload(cli)
+
+
 def test_apprise_cli_details(tmpdir):
     """
     CLI: --details (-l)

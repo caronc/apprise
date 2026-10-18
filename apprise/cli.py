@@ -95,14 +95,35 @@ DEFAULT_ENV_APPRISE_STORAGE_PRUNE_DAYS = "APPRISE_STORAGE_PRUNE_DAYS"
 # Environment variable controlling generated storage URL ID length
 DEFAULT_ENV_APPRISE_STORAGE_UID_LENGTH = "APPRISE_STORAGE_UID_LENGTH"
 
+# Environment variables holding a value that is not a valid number, as
+# (name, value).  main() reports them and exits instead of guessing.
+INVALID_ENV: list[tuple[str, str]] = []
+
+
+def _env_int(name: str, default: int) -> int:
+    """Return environment variable ``name`` as an int, else ``default``."""
+    # An unset or empty variable quietly uses the default
+    value = os.environ.get(name, "").strip()
+    if not value:
+        return default
+
+    try:
+        return int(value)
+
+    except ValueError:
+        # Let the module load so main() can explain the problem clearly
+        INVALID_ENV.append((name, value))
+        return default
+
+
 # Default number of days to prune persistent storage
-DEFAULT_STORAGE_PRUNE_DAYS = int(
-    os.environ.get(DEFAULT_ENV_APPRISE_STORAGE_PRUNE_DAYS, 30)
+DEFAULT_STORAGE_PRUNE_DAYS = _env_int(
+    DEFAULT_ENV_APPRISE_STORAGE_PRUNE_DAYS, 30
 )
 
 # The default URL ID Length
-DEFAULT_STORAGE_UID_LENGTH = int(
-    os.environ.get(DEFAULT_ENV_APPRISE_STORAGE_UID_LENGTH, 8)
+DEFAULT_STORAGE_UID_LENGTH = _env_int(
+    DEFAULT_ENV_APPRISE_STORAGE_UID_LENGTH, 8
 )
 
 # Grace period for abandoned service calls to finish before forced exit.
@@ -991,6 +1012,19 @@ def main(
         if plugin_path
         else [path for path in plugin_paths_ if exists(path_decode(path))]
     )
+
+    if INVALID_ENV:
+        for name, value in INVALID_ENV:
+            click.echo(
+                f"The {name} environment variable value of {value!r} is not"
+                " a valid number."
+            )
+
+        click.echo("Try 'apprise --help' for more information.")
+
+        # 2 is the same exit code returned by Click if there is a
+        # parameter issue.  For consistency, we also return a 2
+        ctx.exit(2)
 
     if storage_uid_length < 2:
         click.echo(
