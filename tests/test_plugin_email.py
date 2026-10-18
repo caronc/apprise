@@ -1361,11 +1361,8 @@ def test_plugin_email_dict_variations():
     assert isinstance(obj, email.NotifyEmail)
 
 
-def test_plugin_email_custom_from_url_roundtrip_1803():
-    """
-    A custom from= address must survive a url() round trip, even when no
-    explicit to= recipient was given (the recipient then defaults to it)
-    """
+def test_plugin_email_from_roundtrip():
+    """A custom from= address survives a url() round trip."""
 
     for url, from_addr, targets in (
         # custom from=, no recipient
@@ -1387,6 +1384,13 @@ def test_plugin_email_custom_from_url_roundtrip_1803():
             "?from=user@other.com",
             (False, "user@other.com"),
             [(False, "a@example.com"), (False, "b@example.com")],
+        ),
+        # custom from= with a display name and no user
+        (
+            "mailto://example.com?smtp=smtp.example.com"
+            "&from=Rene%20%3Cr%40example.com%3E",
+            ("Rene", "r@example.com"),
+            [(False, "r@example.com")],
         ),
     ):
         obj = Apprise.instantiate(url, suppress_exceptions=False)

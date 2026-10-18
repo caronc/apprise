@@ -787,12 +787,11 @@ class NotifyEmail(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         from_addr = None
-        if self.user and self.from_addr[1] != "{}@{}".format(
+        if not self.user or self.from_addr[1] != "{}@{}".format(
             re.split(r"[\s@]+", self.user)[0], self.host
         ):
-            # A custom email was provided; compare it against the address
-            # that would be derived from user@host when the URL is parsed
-            # again, not against the targets (which default to it)
+            # A custom email was provided.  Write it out unless the next
+            # parse would rebuild the same address from user@host.
             from_addr = self.from_addr[1]
 
         if self.smtp_host != self.host:
@@ -815,11 +814,6 @@ class NotifyEmail(NotifyBase):
 
         elif from_addr:
             params["from"] = formataddr((False, from_addr), charset="utf-8")
-
-        elif not self.user:
-            params["from"] = formataddr(
-                (False, self.from_addr[1]), charset="utf-8"
-            )
 
         if self.cc:
             # Handle our Carbon Copy Addresses
