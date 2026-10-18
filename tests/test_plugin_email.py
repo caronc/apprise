@@ -4713,3 +4713,30 @@ def test_plugin_email_retry_skips_delivered_recipients():
     # The healthy recipient is contacted once, the failing one twice
     assert sent.count("a@example.com") == 1
     assert sent.count("b@example.com") == 2
+
+
+@pytest.mark.parametrize("key", ("cc", "bcc", "reply"))
+@pytest.mark.parametrize(
+    "recipient, name",
+    (
+        # A comma in the name
+        ('"Doe, John" <j@example.com>', "Doe, John"),
+        # A non-ASCII name
+        ("Ünal Müller <u@example.com>", "Ünal Müller"),
+        # Both
+        ('"Müller, Ünal" <m@example.com>', "Müller, Ünal"),
+    ),
+)
+def test_plugin_email_url_keeps_recipient_names(key, recipient, name):
+    """NotifyEmail.url() emits cc/bcc/reply names that parse back as is."""
+
+    url = "mailtos://user:pass@gmail.com?{}={}".format(
+        key, email.NotifyEmail.quote(recipient, safe="")
+    )
+    obj = Apprise.instantiate(url, suppress_exceptions=False)
+    addr = recipient.rsplit("<", 1)[1].rstrip(">")
+    assert obj.names[addr] == name
+
+    # Parse the URL it gives back
+    obj2 = Apprise.instantiate(obj.url(), suppress_exceptions=False)
+    assert obj2.names[addr] == name
