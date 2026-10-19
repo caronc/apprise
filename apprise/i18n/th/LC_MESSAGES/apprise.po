@@ -1265,6 +1265,10 @@ msgstr "ส่วนหัวของโทรสาร"
 msgid "Topic"
 msgstr "หัวข้อ"
 
+#: apprise/plugins/gorush.py:192
+msgid "Platform"
+msgstr "แพลตฟอร์ม"
+
 #: apprise/plugins/ntfy.py:254
 msgid "Attach"
 msgstr "ไฟล์แนบ"

@@ -1265,6 +1265,10 @@ msgstr "Header ng fax"
 msgid "Topic"
 msgstr "Paksa"
 
+#: apprise/plugins/gorush.py:192
+msgid "Platform"
+msgstr "Plataporma"
+
 #: apprise/plugins/ntfy.py:254
 msgid "Attach"
 msgstr "Kalakip"
