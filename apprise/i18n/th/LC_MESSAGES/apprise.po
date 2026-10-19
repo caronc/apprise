@@ -448,6 +448,18 @@ msgstr "เวลารอระหว่างการลองใหม่"
 msgid "Optional Service"
 msgstr "บริการที่เลือกใช้ได้"
 
+#: apprise/plugins/betterstack.py:186
+msgid "Escalation Policy"
+msgstr "นโยบายการยกระดับ"
+
+#: apprise/plugins/betterstack.py:190
+msgid "Alert Methods"
+msgstr "วิธีการแจ้งเตือน"
+
+#: apprise/plugins/betterstack.py:194
+msgid "Team Wait"
+msgstr "เวลารอของทีม"
+
 #: apprise/plugins/blink1.py:152
 msgid "blink(1)"
 msgstr "blink(1)"

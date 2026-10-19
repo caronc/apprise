@@ -448,6 +448,18 @@ msgstr "Thời gian chờ giữa các lần thử"
 msgid "Optional Service"
 msgstr "Dịch vụ tùy chọn"
 
+#: apprise/plugins/betterstack.py:186
+msgid "Escalation Policy"
+msgstr "Chính sách leo thang"
+
+#: apprise/plugins/betterstack.py:190
+msgid "Alert Methods"
+msgstr "Phương thức cảnh báo"
+
+#: apprise/plugins/betterstack.py:194
+msgid "Team Wait"
+msgstr "Thời gian chờ nhóm"
+
 #: apprise/plugins/blink1.py:152
 msgid "blink(1)"
 msgstr "blink(1)"

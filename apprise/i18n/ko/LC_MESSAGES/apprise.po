@@ -448,6 +448,18 @@ msgstr "재시도 간 대기 시간"
 msgid "Optional Service"
 msgstr "선택 서비스"
 
+#: apprise/plugins/betterstack.py:186
+msgid "Escalation Policy"
+msgstr "에스컬레이션 정책"
+
+#: apprise/plugins/betterstack.py:190
+msgid "Alert Methods"
+msgstr "알림 방법"
+
+#: apprise/plugins/betterstack.py:194
+msgid "Team Wait"
+msgstr "팀 대기 시간"
+
 #: apprise/plugins/blink1.py:152
 msgid "blink(1)"
 msgstr "blink(1)"

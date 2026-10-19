@@ -449,6 +449,18 @@ msgstr "Ожидание между попытками"
 msgid "Optional Service"
 msgstr "Необязательная служба"
 
+#: apprise/plugins/betterstack.py:186
+msgid "Escalation Policy"
+msgstr "Политика эскалации"
+
+#: apprise/plugins/betterstack.py:190
+msgid "Alert Methods"
+msgstr "Способы оповещения"
+
+#: apprise/plugins/betterstack.py:194
+msgid "Team Wait"
+msgstr "Ожидание команды"
+
 #: apprise/plugins/blink1.py:152
 msgid "blink(1)"
 msgstr "blink(1)"

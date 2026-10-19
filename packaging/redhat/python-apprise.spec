@@ -63,8 +63,8 @@ notification services. It supports sending alerts to platforms such as: \
 \
 `46elks`, `800.com`, `AfricasTalking`, `Amazon Chime`, `AMQP`, \
 `Apprise API`, `APRS`, \
-`AWS SES`, `AWS SNS`, `Bark`, `Blink(1)`, `BlueSky`, `Brevo`, \
-`Burst SMS`, `BulkSMS`, `BulkVS`, \
+`AWS SES`, `AWS SNS`, `Bark`, `Better Stack`, `Blink(1)`, `BlueSky`, \
+`Brevo`, `Burst SMS`, `BulkSMS`, `BulkVS`, \
 `Chanify`, `Clickatell`, `ClickSend`, `DAPNET`, `Delta Chat`, \
 `DingTalk`, `Discord`, \
 `Dot. (Quote/0)`, `E-Mail`, `Emby`, `Evolution API`, `Exotel`, \
