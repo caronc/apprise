@@ -1265,6 +1265,10 @@ msgstr "팩스 헤더"
 msgid "Topic"
 msgstr "주제"
 
+#: apprise/plugins/gorush.py:192
+msgid "Platform"
+msgstr "플랫폼"
+
 #: apprise/plugins/ntfy.py:254
 msgid "Attach"
 msgstr "첨부 파일"

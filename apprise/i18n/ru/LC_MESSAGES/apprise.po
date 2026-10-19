@@ -1266,6 +1266,10 @@ msgstr "Заголовок факса"
 msgid "Topic"
 msgstr "Тема"
 
+#: apprise/plugins/gorush.py:192
+msgid "Platform"
+msgstr "Платформа"
+
 #: apprise/plugins/ntfy.py:254
 msgid "Attach"
 msgstr "Вложение"

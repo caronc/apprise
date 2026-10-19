@@ -1265,6 +1265,10 @@ msgstr "फ़ैक्स शीर्षलेख"
 msgid "Topic"
 msgstr "विषय"
 
+#: apprise/plugins/gorush.py:192
+msgid "Platform"
+msgstr "प्लेटफ़ॉर्म"
+
 #: apprise/plugins/ntfy.py:254
 msgid "Attach"
 msgstr "अनुलग्नक"

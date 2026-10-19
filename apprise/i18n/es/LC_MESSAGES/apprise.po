@@ -1265,6 +1265,10 @@ msgstr "Encabezado del fax"
 msgid "Topic"
 msgstr "Tema"
 
+#: apprise/plugins/gorush.py:192
+msgid "Platform"
+msgstr "Plataforma"
+
 #: apprise/plugins/ntfy.py:254
 msgid "Attach"
 msgstr "Adjuntar"

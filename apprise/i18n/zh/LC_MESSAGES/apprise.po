@@ -1265,6 +1265,10 @@ msgstr "传真标头"
 msgid "Topic"
 msgstr "主题"
 
+#: apprise/plugins/gorush.py:192
+msgid "Platform"
+msgstr "平台"
+
 #: apprise/plugins/ntfy.py:254
 msgid "Attach"
 msgstr "附件"

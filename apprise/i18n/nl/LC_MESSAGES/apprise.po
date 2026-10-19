@@ -1265,6 +1265,10 @@ msgstr "Faxheader"
 msgid "Topic"
 msgstr "Onderwerp"
 
+#: apprise/plugins/gorush.py:192
+msgid "Platform"
+msgstr "Platform"
+
 #: apprise/plugins/ntfy.py:254
 msgid "Attach"
 msgstr "Bijlage"

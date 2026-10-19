@@ -1265,6 +1265,10 @@ msgstr "Tiêu đề fax"
 msgid "Topic"
 msgstr "Chủ đề"
 
+#: apprise/plugins/gorush.py:192
+msgid "Platform"
+msgstr "Nền tảng"
+
 #: apprise/plugins/ntfy.py:254
 msgid "Attach"
 msgstr "Tệp đính kèm"
