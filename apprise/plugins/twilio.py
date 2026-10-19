@@ -593,8 +593,11 @@ class NotifyTwilio(NotifyBase):
         params["method"] = self.method
 
         if self.apikey is not None:
-            # apikey specified; pass it back on the url
-            params["apikey"] = self.apikey
+            # apikey specified; pass it back on the url (urlencode() quotes
+            # it for us)
+            params["apikey"] = self.pprint(
+                self.apikey, privacy, mode=PrivacyMode.Tail, quote=False
+            )
 
         return "{schema}://{sid}:{token}@{source}/{targets}/?{params}".format(
             schema=self.secure_protocol,
