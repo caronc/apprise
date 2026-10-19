@@ -52,6 +52,15 @@ VALID_QUERY_RE = re.compile(r"^(?P<path>.*[/\\])(?P<query>[^/\\]+)?$")
 # URL is reconstructed.
 URL_PATH_SAFE_CHARS = "/:@!$&'()*+="
 
+# The same characters without the slash, for quoting one path segment.
+# An encoded slash (%2F) inside a segment then stays encoded.
+URL_SEGMENT_SAFE_CHARS = URL_PATH_SAFE_CHARS.replace("/", "")
+
+# The same characters plus '%', for quoting a path that is already
+# percent-encoded (the way parse_url() returns it).  Existing escapes
+# such as %20 or %2F are kept instead of being encoded a second time.
+URL_ENCODED_PATH_SAFE_CHARS = URL_PATH_SAFE_CHARS + "%"
+
 # delimiters used to separate values when content is passed in by string.
 # This is useful when turning a string into a list
 STRING_DELIMITERS = r"[\[\]\;,\s]+"
@@ -772,9 +781,12 @@ def parse_url(
     result["host"] = parsed[1].strip()
     # Preserve RFC 3986 path characters used literally by some services.
     # Keep commas and semicolons encoded because Apprise uses them as
-    # delimiters.
-    result["fullpath"] = quote(
-        unquote(tidy_path(parsed[2].strip())), safe=URL_PATH_SAFE_CHARS
+    # delimiters.  Each segment is decoded and re-encoded on its own so
+    # an encoded slash (%2F) stays part of its segment instead of
+    # becoming a separator.
+    result["fullpath"] = "/".join(
+        quote(unquote(segment), safe=URL_SEGMENT_SAFE_CHARS)
+        for segment in tidy_path(parsed[2].strip()).split("/")
     )
 
     try:
