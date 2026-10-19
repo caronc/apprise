@@ -340,6 +340,30 @@ def test_plugin_twilio_auth(mock_post):
     assert third_call[1]["auth"] == (account_sid, auth_token)
 
 
+def test_plugin_twilio_url_apikey_privacy():
+    """NotifyTwilio() API Key in url()."""
+
+    account_sid = "AC{}".format("a" * 32)
+    apikey = "SK{}".format("c" * 32)
+    auth_token = "{}".format("b" * 32)
+
+    obj = Apprise.instantiate(
+        f"twilio://{account_sid}:{auth_token}@12345/{'4' * 11}?apikey={apikey}"
+    )
+    assert isinstance(obj, NotifyTwilio)
+
+    # The API Key is written back so the URL can be reloaded
+    assert f"apikey={apikey}" in obj.url()
+    obj_cmp = Apprise.instantiate(obj.url())
+    assert isinstance(obj_cmp, NotifyTwilio)
+    assert obj_cmp.apikey == apikey
+
+    # It is hidden the same way as the Account SID with privacy=True
+    privacy_url = obj.url(privacy=True)
+    assert apikey not in privacy_url
+    assert "apikey=...cccc" in privacy_url
+
+
 @mock.patch("requests.post")
 def test_plugin_twilio_edge_cases(mock_post):
     """NotifyTwilio() Edge Cases."""
