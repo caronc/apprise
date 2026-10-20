@@ -25,18 +25,23 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.# BSD 2-Clause License
 
+import json
 from json import dumps
 
 # Disable logging for a cleaner testing output
 import logging
+from unittest import mock
 
 from helpers import AppriseURLTester
+import pytest
+import requests
 
 from apprise import Apprise, NotifyFormat
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.signl4 import (
     NotifySIGNL4,
     NotifyType,
+    SIGNL4Action,
 )
 
 logging.disable(logging.CRITICAL)
@@ -240,3 +245,93 @@ def test_plugin_signl4_filtering_parsing():
     obj = Apprise.instantiate("signl4://secret/?filtering=%25zz")
     assert isinstance(obj, NotifySIGNL4)
     assert obj.filtering is NotifySIGNL4.template_args["filtering"]["default"]
+
+
+@mock.patch("requests.post")
+def test_plugin_signl4_actions(mock_post):
+    """NotifySIGNL4() raises, acknowledges or resolves alerts by action."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_post.return_value = response
+
+    def sent():
+        return json.loads(mock_post.call_args[1]["data"])
+
+    # The default raises a new alert with no status or ID
+    obj = Apprise.instantiate("signl4://secret")
+    assert obj.action == SIGNL4Action.TRIGGER
+    assert obj.notify(
+        title="Disk full", body="db01", notify_type=NotifyType.SUCCESS
+    )
+    assert "X-S4-Status" not in sent()
+    assert "X-S4-ExternalID" not in sent()
+
+    # Map raises on failure and resolves on success
+    obj = Apprise.instantiate("signl4://secret?action=map")
+    assert obj.action == SIGNL4Action.MAP
+    for notify_type, status in (
+        (NotifyType.INFO, None),
+        (NotifyType.WARNING, None),
+        (NotifyType.FAILURE, None),
+        (NotifyType.SUCCESS, "resolved"),
+    ):
+        assert obj.notify(
+            title="Disk full", body="db01", notify_type=notify_type
+        )
+        assert sent().get("X-S4-Status") == status
+
+    # The same title gives the same ID, so the success resolves the
+    # alert the failure raised
+    assert obj.notify(
+        title="Disk full", body="at 95%", notify_type=NotifyType.FAILURE
+    )
+    raised = sent()["X-S4-ExternalID"]
+    assert obj.notify(
+        title="Disk full", body="normal", notify_type=NotifyType.SUCCESS
+    )
+    assert sent()["X-S4-ExternalID"] == raised
+
+    # Without a title, the first line of the message is used
+    assert obj.notify(body="Disk full\nat 95%")
+    assert sent()["X-S4-ExternalID"] == raised
+    assert obj.notify(body="one")
+    untitled = sent()["X-S4-ExternalID"]
+    assert obj.notify(body="two")
+    assert sent()["X-S4-ExternalID"] != untitled
+
+    # Acknowledge and resolve ignore the notification type
+    obj = Apprise.instantiate("signl4://secret?action=ack")
+    assert obj.notify(title="Disk full", body="db01")
+    assert sent()["X-S4-Status"] == "acknowledged"
+    assert sent()["X-S4-ExternalID"] == raised
+
+    obj = Apprise.instantiate("signl4://secret?action=resolve")
+    assert obj.notify(
+        title="Disk full", body="db01", notify_type=NotifyType.FAILURE
+    )
+    assert sent()["X-S4-Status"] == "resolved"
+
+    # ?dedup= sets the ID, the same as ?external_id=
+    obj = Apprise.instantiate("signl4://secret?action=map&dedup=disk-full")
+    assert obj.external_id == "disk-full"
+    assert obj.notify(body="db01", notify_type=NotifyType.SUCCESS)
+    assert sent()["X-S4-ExternalID"] == "disk-full"
+
+    # A status given directly always wins over the action
+    obj = Apprise.instantiate(
+        "signl4://secret?action=map&status=new&external_id=a1"
+    )
+    assert obj.notify(body="db01", notify_type=NotifyType.SUCCESS)
+    assert sent()["X-S4-Status"] == "new"
+
+    # The action survives a round trip
+    result = NotifySIGNL4.parse_url(obj.url())
+    obj2 = NotifySIGNL4(**result)
+    assert obj2.action == SIGNL4Action.MAP
+    assert obj2.status == "new"
+    assert obj2.external_id == "a1"
+
+    # An invalid action is refused
+    with pytest.raises(AppriseImproperlyConfigured):
+        NotifySIGNL4(secret="secret", action="invalid")

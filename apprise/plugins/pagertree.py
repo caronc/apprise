@@ -25,7 +25,11 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from __future__ import annotations
+
+from hashlib import sha256
 from json import dumps
+from typing import Any, Optional
 from uuid import uuid4
 
 import requests
@@ -43,6 +47,9 @@ class PagerTreeAction:
     ACKNOWLEDGE = "acknowledge"
     RESOLVE = "resolve"
 
+    # Resolve alerts on success, create them otherwise
+    MAP = "map"
+
 
 # Urgencies
 class PagerTreeUrgency:
@@ -57,6 +64,7 @@ PAGERTREE_ACTIONS = {
     PagerTreeAction.CREATE: "create",
     PagerTreeAction.ACKNOWLEDGE: "acknowledge",
     PagerTreeAction.RESOLVE: "resolve",
+    PagerTreeAction.MAP: "map",
 }
 
 PAGERTREE_URGENCIES = {
@@ -125,6 +133,12 @@ class NotifyPagerTree(NotifyBase):
                 "name": _("Third Party ID"),
                 "type": "string",
             },
+            "tid": {
+                "alias_of": "thirdparty",
+            },
+            "dedup": {
+                "alias_of": "thirdparty",
+            },
             "urgency": {
                 "name": _("Urgency"),
                 "type": "choice:string",
@@ -155,16 +169,16 @@ class NotifyPagerTree(NotifyBase):
 
     def __init__(
         self,
-        integration,
-        action=None,
-        thirdparty=None,
-        urgency=None,
-        tags=None,
-        headers=None,
-        payload_extras=None,
-        meta_extras=None,
-        **kwargs,
-    ):
+        integration: str,
+        action: Optional[str] = None,
+        thirdparty: Optional[str] = None,
+        urgency: Optional[str] = None,
+        tags: Optional[str] = None,
+        headers: Optional[dict[str, str]] = None,
+        payload_extras: Optional[dict[str, str]] = None,
+        meta_extras: Optional[dict[str, str]] = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize PagerTree Object."""
         super().__init__(**kwargs)
 
@@ -224,8 +238,45 @@ class NotifyPagerTree(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform PagerTree Notification."""
+
+        # Map resolves on success and creates an alert otherwise
+        event_type = (
+            (
+                PagerTreeAction.RESOLVE
+                if notify_type == NotifyType.SUCCESS
+                else PagerTreeAction.CREATE
+            )
+            if self.action == PagerTreeAction.MAP
+            else self.action
+        )
+
+        # Our own ID always wins
+        alert_id = self.thirdparty
+        if not alert_id and self.action == PagerTreeAction.CREATE:
+            # Each notification creates its own alert.  The ID is kept
+            # across retries so a retry never creates a second one.
+            alert_id = self.recall("alert_id")
+            if alert_id is None:
+                alert_id = str(uuid4())
+                self.remember("alert_id", alert_id)
+
+        elif not alert_id:
+            # Every other action needs an ID that stays the same between
+            # notifications.  The title (or the first line of the body
+            # when there is none) stands in for it.
+            alert_id = sha256(
+                (title if title else body.split("\n", 1)[0].strip()).encode(
+                    "utf-8"
+                )
+            ).hexdigest()
 
         # Prepare our headers
         headers = {
@@ -239,12 +290,11 @@ class NotifyPagerTree(NotifyBase):
 
         # prepare JSON Object
         payload = {
-            # Generate an ID (unless one was explicitly forced to be used)
-            "id": self.thirdparty if self.thirdparty else str(uuid4()),
-            "event_type": self.action,
+            "id": alert_id,
+            "event_type": event_type,
         }
 
-        if self.action == PagerTreeAction.CREATE:
+        if event_type == PagerTreeAction.CREATE:
             payload["title"] = title if title else self.app_desc
             payload["description"] = body
 
@@ -326,7 +376,7 @@ class NotifyPagerTree(NotifyBase):
         """
         return (self.secure_protocol, self.integration)
 
-    def url(self, privacy=False, *args, **kwargs):
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
@@ -366,7 +416,7 @@ class NotifyPagerTree(NotifyBase):
         )
 
     @staticmethod
-    def parse_url(url):
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
@@ -424,6 +474,12 @@ class NotifyPagerTree(NotifyBase):
         ):
             results["thirdparty"] = NotifyPagerTree.unquote(
                 results["qsd"]["thirdparty"]
+            )
+
+        elif "dedup" in results["qsd"] and results["qsd"]["dedup"]:
+            # The name other on-call plugins use for this key
+            results["thirdparty"] = NotifyPagerTree.unquote(
+                results["qsd"]["dedup"]
             )
 
         # Set our urgency

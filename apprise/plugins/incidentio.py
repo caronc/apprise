@@ -46,6 +46,7 @@ from hashlib import sha256
 from json import dumps
 import re
 from typing import Any, Optional
+from uuid import uuid4
 
 import requests
 
@@ -73,7 +74,7 @@ class IncidentIOAction:
     # Resolve alerts on success, raise them otherwise
     MAP = "map"
 
-    # Always raise (or update) an alert
+    # Always raise a new alert
     TRIGGER = "trigger"
 
     # Always resolve the alert that shares the same deduplication key
@@ -248,15 +249,26 @@ class NotifyIncidentIO(NotifyBase):
             and notify_type == NotifyType.SUCCESS
         )
 
-        # Without our own key, alerts sharing a title share one key, so a
-        # later success can resolve the alert a failure raised
-        dedup = (
-            self.dedup
-            if self.dedup
-            else sha256(
-                (title if title else self.app_id).encode("utf-8")
+        # Our own key always wins
+        dedup = self.dedup
+        if not dedup and self.action == IncidentIOAction.TRIGGER:
+            # Each notification raises its own alert.  The key is kept
+            # across retries so a retry never raises a second one.
+            dedup = self.recall("dedup")
+            if dedup is None:
+                dedup = str(uuid4())
+                self.remember("dedup", dedup)
+
+        elif not dedup:
+            # Map and resolve need a key that stays the same between
+            # notifications, so a later success can find the alert a
+            # failure raised.  The title (or the first line of the body
+            # when there is none) stands in for it.
+            dedup = sha256(
+                (title if title else body.split("\n", 1)[0].strip()).encode(
+                    "utf-8"
+                )
             ).hexdigest()
-        )
 
         # A title is required and is plain text.  Without one, fall back
         # to the body without the markdown escapes Apprise added to it.
