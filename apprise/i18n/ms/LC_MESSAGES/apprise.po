@@ -456,6 +456,10 @@ msgstr "Polisi Eskalasi"
 msgid "Alert Methods"
 msgstr "Kaedah Amaran"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "ID Sumber Amaran"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "Masa Menunggu Pasukan"

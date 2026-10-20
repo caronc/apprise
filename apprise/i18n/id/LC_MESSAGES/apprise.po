@@ -456,6 +456,10 @@ msgstr "Kebijakan Eskalasi"
 msgid "Alert Methods"
 msgstr "Metode Peringatan"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "ID Sumber Peringatan"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "Waktu Tunggu Tim"

@@ -456,6 +456,10 @@ msgstr "นโยบายการยกระดับ"
 msgid "Alert Methods"
 msgstr "วิธีการแจ้งเตือน"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "รหัสแหล่งที่มาการแจ้งเตือน"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "เวลารอของทีม"

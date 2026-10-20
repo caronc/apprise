@@ -457,6 +457,10 @@ msgstr "سياسة التصعيد"
 msgid "Alert Methods"
 msgstr "طرق التنبيه"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "معرّف مصدر التنبيه"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "مهلة انتظار الفريق"

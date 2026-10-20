@@ -456,6 +456,10 @@ msgstr "Chính sách leo thang"
 msgid "Alert Methods"
 msgstr "Phương thức cảnh báo"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "ID nguồn cảnh báo"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "Thời gian chờ nhóm"

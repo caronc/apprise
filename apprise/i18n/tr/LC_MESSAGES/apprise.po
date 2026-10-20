@@ -456,6 +456,10 @@ msgstr "Eskalasyon Politikası"
 msgid "Alert Methods"
 msgstr "Uyarı Yöntemleri"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "Uyarı Kaynağı Kimliği"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "Ekip Bekleme Süresi"
