@@ -448,6 +448,18 @@ msgstr "Espera entre tentativas"
 msgid "Optional Service"
 msgstr "Serviço opcional"
 
+#: apprise/plugins/betterstack.py:186
+msgid "Escalation Policy"
+msgstr "Política de escalonamento"
+
+#: apprise/plugins/betterstack.py:190
+msgid "Alert Methods"
+msgstr "Métodos de alerta"
+
+#: apprise/plugins/betterstack.py:194
+msgid "Team Wait"
+msgstr "Espera da equipa"
+
 #: apprise/plugins/blink1.py:152
 msgid "blink(1)"
 msgstr "blink(1)"

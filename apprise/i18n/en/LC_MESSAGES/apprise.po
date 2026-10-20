@@ -448,6 +448,18 @@ msgstr "Inter-Retry Wait"
 msgid "Optional Service"
 msgstr "Optional Service"
 
+#: apprise/plugins/betterstack.py:186
+msgid "Escalation Policy"
+msgstr "Escalation Policy"
+
+#: apprise/plugins/betterstack.py:190
+msgid "Alert Methods"
+msgstr "Alert Methods"
+
+#: apprise/plugins/betterstack.py:194
+msgid "Team Wait"
+msgstr "Team Wait"
+
 #: apprise/plugins/blink1.py:152
 msgid "blink(1)"
 msgstr "blink(1)"

@@ -448,6 +448,18 @@ msgstr "Paghihintay sa pagitan ng mga pagsubok"
 msgid "Optional Service"
 msgstr "Opsyonal na serbisyo"
 
+#: apprise/plugins/betterstack.py:186
+msgid "Escalation Policy"
+msgstr "Patakaran sa Escalation"
+
+#: apprise/plugins/betterstack.py:190
+msgid "Alert Methods"
+msgstr "Mga Paraan ng Alerto"
+
+#: apprise/plugins/betterstack.py:194
+msgid "Team Wait"
+msgstr "Paghihintay ng Team"
+
 #: apprise/plugins/blink1.py:152
 msgid "blink(1)"
 msgstr "blink(1)"

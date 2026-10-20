@@ -448,6 +448,18 @@ msgstr "再試行の間隔"
 msgid "Optional Service"
 msgstr "任意のサービス"
 
+#: apprise/plugins/betterstack.py:186
+msgid "Escalation Policy"
+msgstr "エスカレーションポリシー"
+
+#: apprise/plugins/betterstack.py:190
+msgid "Alert Methods"
+msgstr "アラート方法"
+
+#: apprise/plugins/betterstack.py:194
+msgid "Team Wait"
+msgstr "チーム待機時間"
+
 #: apprise/plugins/blink1.py:152
 msgid "blink(1)"
 msgstr "blink(1)"

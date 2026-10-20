@@ -448,6 +448,18 @@ msgstr "重试间隔"
 msgid "Optional Service"
 msgstr "可选服务"
 
+#: apprise/plugins/betterstack.py:186
+msgid "Escalation Policy"
+msgstr "升级策略"
+
+#: apprise/plugins/betterstack.py:190
+msgid "Alert Methods"
+msgstr "告警方式"
+
+#: apprise/plugins/betterstack.py:194
+msgid "Team Wait"
+msgstr "团队等待时间"
+
 #: apprise/plugins/blink1.py:152
 msgid "blink(1)"
 msgstr "blink(1)"

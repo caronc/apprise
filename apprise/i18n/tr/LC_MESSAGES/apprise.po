@@ -448,6 +448,18 @@ msgstr "Denemeler arası bekleme"
 msgid "Optional Service"
 msgstr "İsteğe bağlı hizmet"
 
+#: apprise/plugins/betterstack.py:186
+msgid "Escalation Policy"
+msgstr "Eskalasyon Politikası"
+
+#: apprise/plugins/betterstack.py:190
+msgid "Alert Methods"
+msgstr "Uyarı Yöntemleri"
+
+#: apprise/plugins/betterstack.py:194
+msgid "Team Wait"
+msgstr "Ekip Bekleme Süresi"
+
 #: apprise/plugins/blink1.py:152
 msgid "blink(1)"
 msgstr "blink(1)"

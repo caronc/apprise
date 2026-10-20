@@ -448,6 +448,18 @@ msgstr "प्रयासों के बीच प्रतीक्षा"
 msgid "Optional Service"
 msgstr "वैकल्पिक सेवा"
 
+#: apprise/plugins/betterstack.py:186
+msgid "Escalation Policy"
+msgstr "एस्केलेशन नीति"
+
+#: apprise/plugins/betterstack.py:190
+msgid "Alert Methods"
+msgstr "अलर्ट के तरीके"
+
+#: apprise/plugins/betterstack.py:194
+msgid "Team Wait"
+msgstr "टीम प्रतीक्षा समय"
+
 #: apprise/plugins/blink1.py:152
 msgid "blink(1)"
 msgstr "blink(1)"

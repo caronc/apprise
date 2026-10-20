@@ -414,6 +414,13 @@ FLEET = (
         "2222222222",
         {},
     ),
+    (
+        "betterstack",
+        f"betterstack://{TOKEN}/user@example.com/team0001/team9999",
+        "team0001",
+        "team9999",
+        {"__http__": requests.codes.created},
+    ),
 )
 
 # Names only, for readable test ids
