@@ -456,6 +456,10 @@ msgstr "Criterio di escalation"
 msgid "Alert Methods"
 msgstr "Metodi di avviso"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "ID origine avvisi"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "Attesa del team"

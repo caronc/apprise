@@ -456,6 +456,10 @@ msgstr "에스컬레이션 정책"
 msgid "Alert Methods"
 msgstr "알림 방법"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "알림 소스 ID"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "팀 대기 시간"

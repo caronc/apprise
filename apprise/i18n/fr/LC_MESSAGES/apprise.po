@@ -456,6 +456,10 @@ msgstr "Politique d'escalade"
 msgid "Alert Methods"
 msgstr "Méthodes d'alerte"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "ID de la source d'alertes"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "Délai d'attente de l'équipe"

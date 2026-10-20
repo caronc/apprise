@@ -456,6 +456,10 @@ msgstr "升级策略"
 msgid "Alert Methods"
 msgstr "告警方式"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "告警来源 ID"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "团队等待时间"

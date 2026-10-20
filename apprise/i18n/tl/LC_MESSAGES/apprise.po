@@ -456,6 +456,10 @@ msgstr "Patakaran sa Escalation"
 msgid "Alert Methods"
 msgstr "Mga Paraan ng Alerto"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "ID ng Pinagmulan ng Alerto"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "Paghihintay ng Team"

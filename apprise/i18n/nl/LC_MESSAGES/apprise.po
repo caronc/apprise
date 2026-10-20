@@ -456,6 +456,10 @@ msgstr "Escalatiebeleid"
 msgid "Alert Methods"
 msgstr "Waarschuwingsmethoden"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "Waarschuwingsbron-ID"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "Wachttijd team"

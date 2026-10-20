@@ -457,6 +457,10 @@ msgstr "Zasady eskalacji"
 msgid "Alert Methods"
 msgstr "Metody alarmowania"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "Identyfikator źródła alertów"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "Czas oczekiwania zespołu"

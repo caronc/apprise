@@ -457,6 +457,10 @@ msgstr "Политика эскалации"
 msgid "Alert Methods"
 msgstr "Способы оповещения"
 
+#: apprise/plugins/incidentio.py:120
+msgid "Alert Source ID"
+msgstr "Идентификатор источника оповещений"
+
 #: apprise/plugins/betterstack.py:194
 msgid "Team Wait"
 msgstr "Ожидание команды"
