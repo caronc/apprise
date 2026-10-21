@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from collections.abc import Sequence
 from datetime import datetime, tzinfo
 import math
 from os.path import abspath, dirname, isfile, join
@@ -279,7 +280,7 @@ class AppriseAsset:
 
     def __init__(
         self,
-        plugin_paths: Optional[list[str]] = None,
+        plugin_paths: Optional[Sequence[str]] = None,
         storage_path: Optional[str] = None,
         storage_mode: Optional[Union[str, PersistentStoreMode]] = None,
         storage_salt: Optional[Union[str, bytes]] = None,
@@ -755,7 +756,7 @@ class AppriseAsset:
         return int(value.lstrip("#"), 16)
 
     @property
-    def plugin_paths(self) -> list[str]:
+    def plugin_paths(self) -> Sequence[str]:
         """Return the plugin paths defined."""
         return self.__plugin_paths
 

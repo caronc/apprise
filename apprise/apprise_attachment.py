@@ -25,7 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence, Set as AbstractSet
 from typing import Any, Optional, Union
 
 from .asset import AppriseAsset
@@ -48,7 +48,12 @@ class AppriseAttachment:
     def __init__(
         self,
         paths: Optional[
-            Union[str, list[Union[str, AttachBase, "AppriseAttachment"]]]
+            Union[
+                str,
+                AttachBase,
+                Sequence[Union[str, AttachBase, "AppriseAttachment"]],
+                AbstractSet[Union[str, AttachBase, "AppriseAttachment"]],
+            ]
         ] = None,
         asset: Optional[AppriseAsset] = None,
         cache: Union[bool, int] = True,
@@ -136,7 +141,8 @@ class AppriseAttachment:
             str,
             AttachBase,
             "AppriseAttachment",
-            list[Union[str, AttachBase, "AppriseAttachment"]],
+            Sequence[Union[str, AttachBase, "AppriseAttachment"]],
+            AbstractSet[Union[str, AttachBase, "AppriseAttachment"]],
         ],
         asset: Optional[AppriseAsset] = None,
         cache: Optional[Union[bool, int]] = None,

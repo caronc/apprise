@@ -28,6 +28,7 @@
 import base64
 import binascii
 import builtins
+from collections.abc import Sequence, Set as AbstractSet
 import contextlib
 from datetime import datetime, timedelta, timezone
 import glob
@@ -1349,7 +1350,9 @@ class PersistentStore:
     @staticmethod
     def disk_scan(
         path: str,
-        namespace: Optional[Union[str, list[str]]] = None,
+        namespace: Optional[
+            Union[str, Sequence[str], AbstractSet[str]]
+        ] = None,
         closest: bool = True,
     ) -> list[str]:
         """Scan a path and return the detected namespaces."""
@@ -1409,7 +1412,9 @@ class PersistentStore:
     @staticmethod
     def disk_prune(
         path: str,
-        namespace: Optional[Union[str, list[str]]] = None,
+        namespace: Optional[
+            Union[str, Sequence[str], AbstractSet[str]]
+        ] = None,
         expires: Optional[Union[int, float]] = None,
         action: bool = False,
     ) -> dict[str, list[dict[str, Union[str, bool]]]]:
