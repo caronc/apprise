@@ -238,3 +238,40 @@ def test_plugin_streamlabs_donation_payload(mock_post):
     mock_post.reset_mock()
     assert obj.notify(body="b" * 255, title="t" * 20) is True
     assert len(mock_post.call_args[1]["data"]["message"]) == 254
+
+
+@mock.patch("requests.post")
+def test_plugin_streamlabs_preserves_case(mock_post):
+    """NotifyStreamlabs() does not change the case of user values."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    obj = apprise.Apprise.instantiate(
+        "strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=donations"
+        "&name=Chris&identifier=MyDonor"
+    )
+    assert isinstance(obj, NotifyStreamlabs)
+
+    assert obj.notify(body="the body") is True
+    data = mock_post.call_args[1]["data"]
+    assert data["name"] == "Chris"
+    assert data["identifier"] == "MyDonor"
+
+    # The case also survives a round trip through url()
+    obj = apprise.Apprise.instantiate(obj.url())
+    assert isinstance(obj, NotifyStreamlabs)
+    assert obj.name == "Chris"
+    assert obj.identifier == "MyDonor"
+
+    # URLs are case sensitive
+    obj = apprise.Apprise.instantiate(
+        "strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=alerts"
+        "&sound_href=https://example.org/Sounds/Alert.mp3"
+    )
+    assert isinstance(obj, NotifyStreamlabs)
+
+    mock_post.reset_mock()
+    assert obj.notify(body="the body") is True
+    data = mock_post.call_args[1]["data"]
+    assert data["sound_href"] == "https://example.org/Sounds/Alert.mp3"
