@@ -258,6 +258,12 @@ def test_plugin_streamlabs_preserves_case(mock_post):
     assert data["name"] == "Chris"
     assert data["identifier"] == "MyDonor"
 
+    # The case also survives a round trip through url()
+    obj = apprise.Apprise.instantiate(obj.url())
+    assert isinstance(obj, NotifyStreamlabs)
+    assert obj.name == "Chris"
+    assert obj.identifier == "MyDonor"
+
     # URLs are case sensitive
     obj = apprise.Apprise.instantiate(
         "strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=alerts"
