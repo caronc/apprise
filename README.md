@@ -76,7 +76,6 @@ The table below identifies the services this tool supports and some example serv
 | [BlueSky](https://appriseit.com/services/bluesky/) | bluesky://  | (TCP) 443   | bluesky://Handle:AppPw<br />bluesky://Handle:AppPw/TargetHandle<br />bluesky://Handle:AppPw/TargetHandle1/TargetHandle2/TargetHandleN
 | [Brevo](https://appriseit.com/services/brevo/) | brevo://  | (TCP) 443   | brevo://APIToken:FromEmail/<br />brevo://APIToken:FromEmail/ToEmail<br />brevo://APIToken:FromEmail/ToEmail1/ToEmail2/ToEmailN/
 | [Chanify](https://appriseit.com/services/chanify/) | chantify://    | (TCP) 443    | chantify://token
-| [Amazon Chime](https://appriseit.com/services/chime/) | chime://   | (TCP) 443   | chime://WebhookID/Token
 | [Delta Chat](https://appriseit.com/services/deltachat/) | deltachat:// or deltachats:// | (TCP) 25 or 587 | deltachat://user:pass@smtp.example.com/friend@example.org<br />deltachats://user:pass@smtp.example.com/friend1@example.org/friend2@example.org
 | [Discord](https://appriseit.com/services/discord/)  | discord://   | (TCP) 443   | discord://webhook_id/webhook_token<br />discord://avatar@webhook_id/webhook_token
 | [Dot.](https://appriseit.com/services/dot/)  | dot:// | (TCP) 443 | dot://apikey@device_id/text/<br />dot://apikey@device_id/image/<br />**Note**: `device_id` is the Quote/0 hardware serial
