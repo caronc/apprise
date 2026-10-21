@@ -29,6 +29,7 @@
 #   - https://docs.signl4.com/integrations/webhook/webhook.html
 #
 
+from hashlib import sha256
 from json import dumps
 from typing import Any, Optional
 
@@ -40,6 +41,31 @@ from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, validate_regex
 from .base import NotifyBase
+
+
+class SIGNL4Action:
+    """Tracks the actions supported by the SIGNL4 plugin."""
+
+    # Always raise a new alert
+    TRIGGER = "trigger"
+
+    # Resolve alerts on success, raise them otherwise
+    MAP = "map"
+
+    # Always acknowledge the alert that shares the same external ID
+    ACKNOWLEDGE = "acknowledge"
+
+    # Always resolve the alert that shares the same external ID
+    RESOLVE = "resolve"
+
+
+# Define our SIGNL4 actions
+SIGNL4_ACTIONS = (
+    SIGNL4Action.TRIGGER,
+    SIGNL4Action.MAP,
+    SIGNL4Action.ACKNOWLEDGE,
+    SIGNL4Action.RESOLVE,
+)
 
 
 class NotifySIGNL4(NotifyBase):
@@ -58,9 +84,6 @@ class NotifySIGNL4(NotifyBase):
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/signl4/"
-
-    # Our event action type
-    event_action = "trigger"
 
     # Our default notification URL
     notify_url = "https://connect.signl4.com/webhook/{secret}/"
@@ -107,6 +130,15 @@ class NotifySIGNL4(NotifyBase):
                 "name": _("External ID"),
                 "type": "string",
             },
+            "dedup": {
+                "alias_of": "external_id",
+            },
+            "action": {
+                "name": _("Action"),
+                "type": "choice:string",
+                "values": SIGNL4_ACTIONS,
+                "default": SIGNL4Action.TRIGGER,
+            },
             "status": {
                 "name": _("Status"),
                 "type": "string",
@@ -123,6 +155,7 @@ class NotifySIGNL4(NotifyBase):
         filtering: Optional[bool] = None,
         external_id: Optional[str] = None,
         status: Optional[str] = None,
+        action: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -162,12 +195,66 @@ class NotifySIGNL4(NotifyBase):
         # A location option for notifications
         self.status = status
 
+        # Resolve our action; partial names such as "r" are accepted
+        if action and isinstance(action, str):
+            self.action = next(
+                (
+                    a
+                    for a in SIGNL4_ACTIONS
+                    if a.startswith(action.strip().lower())
+                ),
+                None,
+            )
+            if not self.action:
+                msg = f"The SIGNL4 action specified ({action}) is invalid."
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
+        else:
+            # Default to raising a new alert every time
+            self.action = self.template_args["action"]["default"]
+
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """
         Send our SIGNL4 Notification
         """
+
+        # A status given directly is passed along as-is.  Otherwise our
+        # action decides it, and a new alert needs no status at all.
+        status = self.status
+        if not status:
+            status = (
+                "resolved"
+                if self.action == SIGNL4Action.RESOLVE
+                or (
+                    self.action == SIGNL4Action.MAP
+                    and notify_type == NotifyType.SUCCESS
+                )
+                else (
+                    "acknowledged"
+                    if self.action == SIGNL4Action.ACKNOWLEDGE
+                    else None
+                )
+            )
+
+        # Our own ID always wins.  Every action but trigger needs one that
+        # stays the same between notifications.  The title (or the first
+        # line of the body when there is none) stands in for it.
+        external_id = self.external_id
+        if not external_id and self.action != SIGNL4Action.TRIGGER:
+            external_id = sha256(
+                (title if title else body.split("\n", 1)[0].strip()).encode(
+                    "utf-8"
+                )
+            ).hexdigest()
 
         # Prepare our headers
         headers = {
@@ -193,11 +280,11 @@ class NotifySIGNL4(NotifyBase):
         if self.filtering:
             payload["X-S4-Filtering"] = self.filtering
 
-        if self.external_id:
-            payload["X-S4-ExternalID"] = self.external_id
+        if external_id:
+            payload["X-S4-ExternalID"] = external_id
 
-        if self.status:
-            payload["X-S4-Status"] = self.status
+        if status:
+            payload["X-S4-Status"] = status
 
         # Prepare our URL
         notify_url = self.notify_url.format(secret=self.secret)
@@ -272,7 +359,7 @@ class NotifySIGNL4(NotifyBase):
             self.secret,
         )
 
-    def url(self, privacy=False, *args, **kwargs):
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -299,6 +386,9 @@ class NotifySIGNL4(NotifyBase):
         if self.status is not None:
             params["status"] = self.status
 
+        if self.action != self.template_args["action"]["default"]:
+            params["action"] = self.action
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -314,7 +404,7 @@ class NotifySIGNL4(NotifyBase):
         )
 
     @staticmethod
-    def parse_url(url):
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
         """
         Parses the URL and returns enough arguments that can allow
         us to re-instantiate this object.
@@ -361,7 +451,16 @@ class NotifySIGNL4(NotifyBase):
                 results["qsd"]["external_id"]
             )
 
+        elif "dedup" in results["qsd"] and results["qsd"]["dedup"]:
+            # The name other on-call plugins use for this key
+            results["external_id"] = NotifySIGNL4.unquote(
+                results["qsd"]["dedup"]
+            )
+
         if "status" in results["qsd"] and len(results["qsd"]["status"]):
             results["status"] = NotifySIGNL4.unquote(results["qsd"]["status"])
+
+        if "action" in results["qsd"] and results["qsd"]["action"]:
+            results["action"] = NotifySIGNL4.unquote(results["qsd"]["action"])
 
         return results

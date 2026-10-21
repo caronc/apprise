@@ -247,16 +247,24 @@ def test_plugin_incidentio_action_map(mock_post):
     assert obj.notify(title="CPU hot", body="a")
     assert sent()["deduplication_key"] != raised
 
-    # Without a title, every alert shares one key
+    # Without a title, the first line of the message is used
+    assert obj.notify(body="Disk full\nat 95%")
+    assert sent()["deduplication_key"] == raised
     assert obj.notify(body="one")
     untitled = sent()["deduplication_key"]
     assert obj.notify(body="two")
-    assert sent()["deduplication_key"] == untitled
+    assert sent()["deduplication_key"] != untitled
 
-    # A fixed action ignores the notification type
+    # Trigger ignores the notification type and raises a new alert
+    # every time, even with the same title
     obj = NotifyIncidentIO(source=SOURCE, token="secret", action="trigger")
-    assert obj.notify(body="ok", notify_type=NotifyType.SUCCESS)
+    assert obj.notify(
+        title="Disk full", body="ok", notify_type=NotifyType.SUCCESS
+    )
     assert sent()["status"] == "firing"
+    first = sent()["deduplication_key"]
+    assert obj.notify(title="Disk full", body="ok")
+    assert sent()["deduplication_key"] != first
 
     obj = NotifyIncidentIO(source=SOURCE, token="secret", action="RESOLVE")
     assert obj.notify(body="bad", notify_type=NotifyType.FAILURE)
@@ -298,3 +306,31 @@ def test_plugin_incidentio_init():
     # A different source is a different connection
     other = NotifyIncidentIO(source="01ABC", token="secret")
     assert other.url_identifier != obj.url_identifier
+
+
+@mock.patch("requests.post")
+def test_plugin_incidentio_retry_key(mock_post):
+    """NotifyIncidentIO() keeps its trigger key across retries."""
+
+    bad = mock.Mock()
+    bad.status_code = requests.codes.internal_server_error
+    bad.content = b""
+    good = mock.Mock()
+    good.status_code = requests.codes.accepted
+    good.content = b""
+    mock_post.side_effect = [bad, good]
+
+    aobj = Apprise()
+    assert aobj.add(
+        "incidentio://{}/secret?action=trigger&retry=1&wait=0".format(SOURCE)
+    )
+    with mock.patch("apprise.apprise.time.sleep"):
+        assert aobj.notify(body="Server down")
+
+    # The retry reused the key so incident.io sees one alert
+    assert mock_post.call_count == 2
+    keys = {
+        json.loads(c[1]["data"])["deduplication_key"]
+        for c in mock_post.call_args_list
+    }
+    assert len(keys) == 1

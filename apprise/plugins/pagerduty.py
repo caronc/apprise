@@ -30,7 +30,11 @@
 #       368ae3d938c9e-send-an-event-to-pager-duty
 #
 
+from __future__ import annotations
+
+from hashlib import sha256
 from json import dumps
+from typing import Any, Optional
 
 import requests
 
@@ -67,6 +71,27 @@ PAGERDUTY_SEVERITIES = (
     PagerDutySeverity.WARNING,
     PagerDutySeverity.CRITICAL,
     PagerDutySeverity.ERROR,
+)
+
+
+class PagerDutyAction:
+    """Tracks the actions supported by the Pager Duty plugin."""
+
+    # Always raise (or update) an incident
+    TRIGGER = "trigger"
+
+    # Resolve incidents on success, raise them otherwise
+    MAP = "map"
+
+    # Always resolve the incident that shares the same deduplication key
+    RESOLVE = "resolve"
+
+
+# Define our Pager Duty actions
+PAGERDUTY_ACTIONS = (
+    PagerDutyAction.TRIGGER,
+    PagerDutyAction.MAP,
+    PagerDutyAction.RESOLVE,
 )
 
 
@@ -110,9 +135,6 @@ class NotifyPagerDuty(NotifyBase):
     # Allows the user to specify the NotifyImageSize object; this is supported
     # through the webhook
     image_size = NotifyImageSize.XY_128
-
-    # Our event action type
-    event_action = "trigger"
 
     # The default region to use if one isn't otherwise specified
     default_region = PagerDutyRegion.US
@@ -194,6 +216,16 @@ class NotifyPagerDuty(NotifyBase):
                 "default": True,
                 "map_to": "include_image",
             },
+            "action": {
+                "name": _("Action"),
+                "type": "choice:string",
+                "values": PAGERDUTY_ACTIONS,
+                "default": PagerDutyAction.TRIGGER,
+            },
+            "dedup": {
+                "name": _("Deduplication Key"),
+                "type": "string",
+            },
         },
     )
 
@@ -207,19 +239,21 @@ class NotifyPagerDuty(NotifyBase):
 
     def __init__(
         self,
-        apikey,
-        integrationkey=None,
-        source=None,
-        component=None,
-        group=None,
-        class_id=None,
-        include_image=True,
-        click=None,
-        details=None,
-        region_name=None,
-        severity=None,
-        **kwargs,
-    ):
+        apikey: str,
+        integrationkey: Optional[str] = None,
+        source: Optional[str] = None,
+        component: Optional[str] = None,
+        group: Optional[str] = None,
+        class_id: Optional[str] = None,
+        include_image: bool = True,
+        click: Optional[str] = None,
+        details: Optional[dict[str, str]] = None,
+        region_name: Optional[str] = None,
+        severity: Optional[str] = None,
+        action: Optional[str] = None,
+        dedup: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize Pager Duty Object."""
         super().__init__(**kwargs)
 
@@ -322,10 +356,54 @@ class NotifyPagerDuty(NotifyBase):
         # Display our Apprise Image
         self.include_image = include_image
 
+        # Resolve our action; partial names such as "r" are accepted
+        if action and isinstance(action, str):
+            self.action = next(
+                (
+                    a
+                    for a in PAGERDUTY_ACTIONS
+                    if a.startswith(action.strip().lower())
+                ),
+                None,
+            )
+            if not self.action:
+                msg = f"The PagerDuty action specified ({action}) is invalid."
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
+        else:
+            # Default to raising an incident every time
+            self.action = self.template_args["action"]["default"]
+
+        # A fixed key lets several notifications update the same incident
+        self.dedup = dedup.strip() if dedup and dedup.strip() else None
+
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Send our PagerDuty Notification."""
+
+        # Work out whether we raise or resolve the incident
+        resolve = self.action == PagerDutyAction.RESOLVE or (
+            self.action == PagerDutyAction.MAP
+            and notify_type == NotifyType.SUCCESS
+        )
+
+        # Our own key always wins.  Otherwise map and resolve need a key
+        # that stays the same between notifications, so a later success
+        # can find the incident a failure raised.  The title is merged
+        # into the first line of the body, so that line stands in for it.
+        dedup = self.dedup
+        if not dedup and self.action != PagerDutyAction.TRIGGER:
+            dedup = sha256(
+                body.split("\n", 1)[0].strip().encode("utf-8")
+            ).hexdigest()
 
         # Prepare our headers
         headers = {
@@ -353,8 +431,12 @@ class NotifyPagerDuty(NotifyBase):
             },
             "client": self.app_id,
             # Our Event Action
-            "event_action": self.event_action,
+            "event_action": "resolve" if resolve else "trigger",
         }
+
+        # Tie this event to an existing incident
+        if dedup:
+            payload["dedup_key"] = dedup
 
         if self.group:
             payload["payload"]["group"] = self.group
@@ -387,6 +469,15 @@ class NotifyPagerDuty(NotifyBase):
             # Apply any provided custom details
             for k, v in self.details.items():
                 payload["payload"]["custom_details"][k] = v
+
+        if resolve:
+            # A resolve only names the incident, as in PagerDuty's own
+            # example
+            payload = {
+                "routing_key": self.integration_key,
+                "event_action": "resolve",
+                "dedup_key": dedup,
+            }
 
         # Prepare our URL based on region
         notify_url = PAGERDUTY_API_LOOKUP[self.region_name]
@@ -462,7 +553,7 @@ class NotifyPagerDuty(NotifyBase):
             self.source,
         )
 
-    def url(self, privacy=False, *args, **kwargs):
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
@@ -481,6 +572,12 @@ class NotifyPagerDuty(NotifyBase):
 
         if self.severity:
             params["severity"] = self.severity
+
+        if self.action != self.template_args["action"]["default"]:
+            params["action"] = self.action
+
+        if self.dedup:
+            params["dedup"] = self.dedup
 
         # Append our custom entries our parameters
         params.update({f"+{k}": v for k, v in self.details.items()})
@@ -508,7 +605,7 @@ class NotifyPagerDuty(NotifyBase):
         )
 
     @staticmethod
-    def parse_url(url):
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
 
@@ -552,6 +649,14 @@ class NotifyPagerDuty(NotifyBase):
             results["severity"] = NotifyPagerDuty.unquote(
                 results["qsd"]["severity"]
             )
+
+        if "action" in results["qsd"] and results["qsd"]["action"]:
+            results["action"] = NotifyPagerDuty.unquote(
+                results["qsd"]["action"]
+            )
+
+        if "dedup" in results["qsd"] and results["qsd"]["dedup"]:
+            results["dedup"] = NotifyPagerDuty.unquote(results["qsd"]["dedup"])
 
         # Acquire our full path
         fullpath = NotifyPagerDuty.split_path(results["fullpath"])

@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+import json
 import logging
 from unittest import mock
 
@@ -33,8 +34,9 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise import Apprise, NotifyType
 from apprise.exception import AppriseImproperlyConfigured
-from apprise.plugins.pagertree import NotifyPagerTree
+from apprise.plugins.pagertree import NotifyPagerTree, PagerTreeAction
 
 logging.disable(logging.CRITICAL)
 
@@ -175,3 +177,103 @@ def test_plugin_pagertree_general(mock_post):
     # Invalid thirdparty id
     with pytest.raises(AppriseImproperlyConfigured):
         NotifyPagerTree(integration=INTEGRATION_ID, thirdparty="   ")
+
+
+@mock.patch("requests.post")
+def test_plugin_pagertree_action_map(mock_post):
+    """NotifyPagerTree() creates or resolves alerts by action."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_post.return_value = response
+
+    def sent():
+        return json.loads(mock_post.call_args[1]["data"])
+
+    # The default creates a new alert with a new ID every time
+    obj = Apprise.instantiate(f"pagertree://{INTEGRATION_ID}")
+    assert obj.action == PagerTreeAction.CREATE
+    assert obj.notify(
+        title="Disk full", body="db01", notify_type=NotifyType.SUCCESS
+    )
+    first = sent()
+    assert first["event_type"] == "create"
+    assert obj.notify(title="Disk full", body="db01")
+    assert sent()["id"] != first["id"]
+
+    # Map creates on failure and resolves on success
+    obj = Apprise.instantiate(f"pagertree://{INTEGRATION_ID}?action=map")
+    assert obj.action == PagerTreeAction.MAP
+    for notify_type, event in (
+        (NotifyType.INFO, "create"),
+        (NotifyType.WARNING, "create"),
+        (NotifyType.FAILURE, "create"),
+        (NotifyType.SUCCESS, "resolve"),
+    ):
+        assert obj.notify(
+            title="Disk full", body="db01", notify_type=notify_type
+        )
+        assert sent()["event_type"] == event
+
+    # The same title gives the same ID, so the success resolves the
+    # alert the failure created
+    assert obj.notify(
+        title="Disk full", body="at 95%", notify_type=NotifyType.FAILURE
+    )
+    created = sent()
+    assert created["title"] == "Disk full"
+    assert obj.notify(
+        title="Disk full", body="normal", notify_type=NotifyType.SUCCESS
+    )
+    assert sent()["id"] == created["id"]
+    assert "title" not in sent()
+
+    # Without a title, the first line of the message is used
+    assert obj.notify(body="Disk full\nat 95%")
+    assert sent()["id"] == created["id"]
+    assert obj.notify(body="one")
+    untitled = sent()["id"]
+    assert obj.notify(body="two")
+    assert sent()["id"] != untitled
+
+    # A resolve without its own ID uses the title as well
+    obj = Apprise.instantiate(f"pagertree://{INTEGRATION_ID}?action=resolve")
+    assert obj.notify(title="Disk full", body="normal")
+    assert sent()["id"] == created["id"]
+
+    # ?dedup= sets the ID, the same as ?tid=
+    obj = Apprise.instantiate(
+        f"pagertree://{INTEGRATION_ID}?action=map&dedup=disk-full"
+    )
+    assert obj.thirdparty == "disk-full"
+    assert obj.notify(body="db01", notify_type=NotifyType.FAILURE)
+    assert sent()["id"] == "disk-full"
+
+    # The action and ID survive a round trip
+    result = NotifyPagerTree.parse_url(obj.url())
+    obj2 = NotifyPagerTree(**result)
+    assert obj2.action == PagerTreeAction.MAP
+    assert obj2.thirdparty == "disk-full"
+
+
+@mock.patch("requests.post")
+def test_plugin_pagertree_retry_id(mock_post):
+    """NotifyPagerTree() keeps its create ID across retries."""
+
+    bad = mock.Mock()
+    bad.status_code = requests.codes.internal_server_error
+    bad.content = b""
+    good = mock.Mock()
+    good.status_code = requests.codes.ok
+    good.content = b""
+    mock_post.side_effect = [bad, good]
+
+    aobj = Apprise()
+    assert aobj.add(f"pagertree://{INTEGRATION_ID}?retry=1&wait=0")
+    with mock.patch("apprise.apprise.time.sleep"):
+        assert aobj.notify(body="Server down")
+
+    # The retry reused the ID so PagerTree sees one alert
+    assert mock_post.call_count == 2
+    ids = {json.loads(c[1]["data"])["id"] for c in mock_post.call_args_list}
+    assert len(ids) == 1

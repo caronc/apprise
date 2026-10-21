@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+import json
 import logging
 from unittest import mock
 
@@ -34,7 +35,7 @@ import requests
 
 from apprise import Apprise, NotifyType
 from apprise.exception import AppriseImproperlyConfigured
-from apprise.plugins.pagerduty import NotifyPagerDuty
+from apprise.plugins.pagerduty import NotifyPagerDuty, PagerDutyAction
 
 logging.disable(logging.CRITICAL)
 
@@ -168,6 +169,27 @@ apprise_url_tests = (
         },
     ),
     (
+        "pagerduty://routekey@apikey/?action=map&dedup=disk-full",
+        {
+            # Map our notification type with a fixed key
+            "instance": NotifyPagerDuty,
+        },
+    ),
+    (
+        "pagerduty://routekey@apikey/?action=resolve",
+        {
+            # Always resolve
+            "instance": NotifyPagerDuty,
+        },
+    ),
+    (
+        "pagerduty://routekey@apikey/?action=invalid",
+        {
+            # An invalid action
+            "instance": AppriseImproperlyConfigured,
+        },
+    ),
+    (
         "pagerduty://somerkey@someapikey/bizarre/code",
         {
             "instance": NotifyPagerDuty,
@@ -220,3 +242,101 @@ def test_plugin_pagerduty_notify_type_is_string(mock_post):
     payload_text = payload if isinstance(payload, str) else str(payload)
 
     assert "NotifyType." not in payload_text
+
+
+@mock.patch("requests.post")
+def test_plugin_pagerduty_actions(mock_post):
+    """NotifyPagerDuty() raises or resolves incidents by action."""
+    response = mock.Mock()
+    response.status_code = requests.codes.accepted
+    response.content = b""
+    mock_post.return_value = response
+
+    def sent():
+        return json.loads(mock_post.call_args[1]["data"])
+
+    # The default always raises an incident and sends no key
+    obj = Apprise.instantiate("pagerduty://routekey@apikey")
+    assert obj.action == PagerDutyAction.TRIGGER
+    assert obj.notify(
+        title="Disk full", body="db01", notify_type=NotifyType.SUCCESS
+    )
+    assert sent()["event_action"] == "trigger"
+    assert "dedup_key" not in sent()
+
+    # A fixed key is sent with every event
+    obj = Apprise.instantiate("pagerduty://routekey@apikey?dedup=disk-full")
+    assert obj.notify(body="db01", notify_type=NotifyType.FAILURE)
+    assert sent()["event_action"] == "trigger"
+    assert sent()["dedup_key"] == "disk-full"
+
+    # Map raises on failure and resolves on success
+    obj = Apprise.instantiate("pagerduty://routekey@apikey?action=map")
+    assert obj.action == PagerDutyAction.MAP
+    for notify_type, event in (
+        (NotifyType.INFO, "trigger"),
+        (NotifyType.WARNING, "trigger"),
+        (NotifyType.FAILURE, "trigger"),
+        (NotifyType.SUCCESS, "resolve"),
+    ):
+        assert obj.notify(
+            title="Disk full", body="db01", notify_type=notify_type
+        )
+        assert sent()["event_action"] == event
+
+    # The same title gives the same key, so the success resolves the
+    # incident the failure raised
+    assert obj.notify(
+        title="Disk full", body="at 95%", notify_type=NotifyType.FAILURE
+    )
+    raised = sent()["dedup_key"]
+    assert sent()["payload"]["summary"].startswith("Disk full")
+    assert obj.notify(
+        title="Disk full",
+        body="back to normal",
+        notify_type=NotifyType.SUCCESS,
+    )
+    assert sent()["dedup_key"] == raised
+
+    # A resolve only names the incident
+    assert sent() == {
+        "routing_key": "routekey",
+        "event_action": "resolve",
+        "dedup_key": raised,
+    }
+
+    # A different title is a different incident
+    assert obj.notify(title="CPU hot", body="db01")
+    assert sent()["dedup_key"] != raised
+
+    # Resolve ignores the notification type
+    obj = NotifyPagerDuty(
+        apikey="apikey", integrationkey="routekey", action="RES"
+    )
+    assert obj.notify(body="db01", notify_type=NotifyType.FAILURE)
+    assert sent()["event_action"] == "resolve"
+
+
+def test_plugin_pagerduty_action_url():
+    """NotifyPagerDuty() keeps its action and key in the URL."""
+
+    obj = NotifyPagerDuty(
+        apikey="apikey",
+        integrationkey="routekey",
+        action="map",
+        dedup="  disk-full  ",
+    )
+    assert obj.dedup == "disk-full"
+
+    # Both survive a round trip
+    result = NotifyPagerDuty.parse_url(obj.url())
+    obj2 = NotifyPagerDuty(**result)
+    assert obj2.action == PagerDutyAction.MAP
+    assert obj2.dedup == "disk-full"
+    assert obj.url_identifier == obj2.url_identifier
+
+    # The default action is left out of the URL
+    obj = NotifyPagerDuty(apikey="apikey", integrationkey="routekey")
+    assert "action=" not in obj.url()
+    assert "dedup=" not in obj.url()
+    assert obj.dedup is None
