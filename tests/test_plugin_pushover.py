@@ -697,6 +697,41 @@ def test_plugin_pushover_markdown_uses_supported_html(mock_post):
 
 
 @mock.patch("requests.post")
+def test_plugin_pushover_markdown_without_text(mock_post):
+    """Markup that leaves no text is still sent as a message."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    aobj = apprise.Apprise()
+    assert aobj.add("pover://{}@{}".format("u" * 30, "a" * 30))
+
+    # A lone divider reduces to nothing; Pushover rejects an empty message
+    assert aobj.notify(
+        body="---\n", title="Test", body_format=apprise.NotifyFormat.MARKDOWN
+    )
+    sent = mock_post.call_args[1]["data"]
+    assert sent["html"] == 1
+    assert sent["message"] == "---"
+
+    obj = NotifyPushover(user_key="u" * 30, token="a" * 30)
+
+    # HTML without text falls back to its escaped source
+    assert (
+        obj.dialect_convert(
+            "<hr>\n<img src='x.png'>", apprise.NotifyFormat.HTML
+        )
+        == "&lt;hr&gt;<br>&lt;img src='x.png'&gt;"
+    )
+
+    # Bodies with text, and blank bodies, are not affected
+    assert (
+        obj.dialect_convert("a\n\n---\n", apprise.NotifyFormat.MARKDOWN) == "a"
+    )
+    assert obj.dialect_convert("  \n", apprise.NotifyFormat.MARKDOWN) == ""
+
+
+@mock.patch("requests.post")
 def test_plugin_pushover_markdown_split_limit(mock_post):
     """Split Markdown is sized after it becomes HTML."""
 
