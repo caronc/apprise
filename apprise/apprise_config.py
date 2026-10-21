@@ -27,7 +27,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from collections.abc import Sequence, Set as AbstractSet
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from . import common
 from .asset import AppriseAsset
@@ -59,7 +60,14 @@ class AppriseConfig:
 
     def __init__(
         self,
-        paths: str | list[str] | None = None,
+        paths: Optional[
+            Union[
+                str,
+                ConfigBase,
+                Sequence[Union[str, ConfigBase]],
+                AbstractSet[Union[str, ConfigBase]],
+            ]
+        ] = None,
         asset: AppriseAsset | None = None,
         cache: bool | int = True,
         recursion: int = 0,
@@ -123,9 +131,14 @@ class AppriseConfig:
 
     def add(
         self,
-        configs: str | ConfigBase | list[str | ConfigBase],
+        configs: Union[
+            str,
+            ConfigBase,
+            Sequence[Union[str, ConfigBase]],
+            AbstractSet[Union[str, ConfigBase]],
+        ],
         asset: AppriseAsset | None = None,
-        tag: str | list[str] | None = None,
+        tag: Optional[Union[str, Sequence[str], AbstractSet[str]]] = None,
         cache: bool | int = True,
         recursion: int | None = None,
         insecure_includes: bool | None = None,
@@ -239,7 +252,7 @@ class AppriseConfig:
         self,
         content: str,
         asset: AppriseAsset | None = None,
-        tag: str | list[str] | None = None,
+        tag: Optional[Union[str, Sequence[str], AbstractSet[str]]] = None,
         format: str | None = None,
         recursion: int | None = None,
         insecure_includes: bool | None = None,
@@ -309,7 +322,7 @@ class AppriseConfig:
 
     def services(
         self,
-        tag: str | list[str] = common.MATCH_ALL_TAG,
+        tag: Any = common.MATCH_ALL_TAG,
         match_always: bool = True,
         *args: Any,
         **kwargs: Any,
@@ -361,7 +374,7 @@ class AppriseConfig:
     def instantiate(
         url: str,
         asset: AppriseAsset | None = None,
-        tag: str | list[str] | None = None,
+        tag: Optional[Union[str, Sequence[str], AbstractSet[str]]] = None,
         cache: bool | int | None = None,
         recursion: int = 0,
         insecure_includes: bool = False,

@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import codecs
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence, Set as AbstractSet
 import concurrent.futures as cf
 import contextvars
 from functools import partial
@@ -227,7 +227,10 @@ class Apprise:
                 NotifyBase,
                 AppriseConfig,
                 ConfigBase,
-                list[Union[str, dict, NotifyBase, AppriseConfig, ConfigBase]],
+                Sequence[
+                    Union[str, dict, NotifyBase, AppriseConfig, ConfigBase]
+                ],
+                AbstractSet[Union[str, NotifyBase, AppriseConfig, ConfigBase]],
             ]
         ] = None,
         asset: Optional[AppriseAsset] = None,
@@ -299,7 +302,7 @@ class Apprise:
     def instantiate(
         url: Union[str, dict],
         asset: Optional[AppriseAsset] = None,
-        tag: Optional[Union[str, list[str]]] = None,
+        tag: Optional[Union[str, Sequence[str], AbstractSet[str]]] = None,
         suppress_exceptions: bool = True,
     ) -> Optional[NotifyBase]:
         """Create a notification service from a URL or URL dictionary.
@@ -459,10 +462,11 @@ class Apprise:
             NotifyBase,
             AppriseConfig,
             ConfigBase,
-            list[Union[str, dict, NotifyBase, AppriseConfig, ConfigBase]],
+            Sequence[Union[str, dict, NotifyBase, AppriseConfig, ConfigBase]],
+            AbstractSet[Union[str, NotifyBase, AppriseConfig, ConfigBase]],
         ],
         asset: Optional[AppriseAsset] = None,
-        tag: Optional[Union[str, list[str]]] = None,
+        tag: Optional[Union[str, Sequence[str], AbstractSet[str]]] = None,
     ) -> bool:
         """Add one or more notification services or configuration sources.
 
