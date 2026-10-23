@@ -4771,6 +4771,62 @@ def test_plugin_email_retry_skips_delivered_recipients():
     assert sent.count("b@example.com") == 2
 
 
+def test_plugin_email_reply_to_multiple_recipients():
+    """NotifyEmail() sets Reply-To on the email of every recipient."""
+
+    sent = {}
+
+    def sendmail(from_addr, to_addrs, body):
+        # Keep the message sent to each recipient
+        sent[to_addrs[0]] = body
+        return True
+
+    controller = mock.MagicMock()
+    controller.return_value.__enter__.return_value.sendmail.side_effect = (
+        sendmail
+    )
+
+    with mock.patch.object(email.base, "AppriseSMTPController", controller):
+        aobj = Apprise()
+        assert aobj.add(
+            "mailto://user:pass@example.com"
+            "?to=a@example.com,b@example.com,c@example.com"
+            "&reply=Chris<noreply@example.com>"
+        )
+        assert aobj.notify(body="body", title="title")
+
+    # Each recipient got its own email with the Reply-To header
+    assert sorted(sent) == ["a@example.com", "b@example.com", "c@example.com"]
+    for body in sent.values():
+        headers = body.split("\n\n", 1)[0].splitlines()
+        assert "Reply-To: Chris <noreply@example.com>" in headers
+
+
+def test_plugin_email_cc_without_recipient():
+    """NotifyEmail() leaves out the Cc header when it would be empty."""
+
+    messages = list(
+        email.NotifyEmail.prepare_emails(
+            subject="title",
+            body="body",
+            from_addr=("Apprise", "user@example.com"),
+            to=[(None, "a@example.com"), (None, "b@example.com")],
+            cc={"a@example.com"},
+        )
+    )
+
+    assert len(messages) == 2
+    headers = {
+        m.recipient: m.body.split("\n\n", 1)[0].splitlines() for m in messages
+    }
+
+    # The only Cc address is the recipient itself, so no Cc header is set
+    assert not [h for h in headers["a@example.com"] if h.startswith("Cc:")]
+
+    # Every other recipient still sees the Cc address
+    assert "Cc: a@example.com" in headers["b@example.com"]
+
+
 @pytest.mark.parametrize("key", ("cc", "bcc", "reply"))
 @pytest.mark.parametrize(
     "recipient, name",

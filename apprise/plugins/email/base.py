@@ -1172,12 +1172,11 @@ class NotifyEmail(NotifyBase):
                 for addr in bcc_
             ]
 
-            if reply_to_:
-                # Format our reply-to addresses to support the Name field
-                reply_to = [
-                    formataddr((names.get(addr, False), addr), charset="utf-8")
-                    for addr in reply_to_
-                ]
+            # Format our reply-to addresses to support the Name field
+            reply_to_ = [
+                formataddr((names.get(addr, False), addr), charset="utf-8")
+                for addr in reply_to_
+            ]
 
             logger.debug(
                 "Email From: {}".format(formataddr(from_addr, charset="utf-8"))
@@ -1500,11 +1499,11 @@ class NotifyEmail(NotifyBase):
             base["Message-ID"] = make_msgid(domain=smtp_host)
             base["Date"] = format_datetime(datetime.now(tz=tzinfo))
 
-            if cc:
+            if cc_:
                 base["Cc"] = ",".join(cc_)
 
             if reply_to_:
-                base["Reply-To"] = ",".join(reply_to)
+                base["Reply-To"] = ",".join(reply_to_)
 
             yield EmailMessage(
                 recipient=to_addr,
