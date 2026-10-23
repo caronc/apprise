@@ -685,6 +685,8 @@ class NotifyPushover(NotifyBase):
 
         # Keep only the tags Pushover supports
         body = PushoverHTMLReducer().reduce(body)
+
+        # Text survived, or the source was blank to begin with
         if body or not source.strip():
             return body
 
