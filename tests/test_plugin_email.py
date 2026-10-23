@@ -4802,6 +4802,31 @@ def test_plugin_email_reply_to_multiple_recipients():
         assert "Reply-To: Chris <noreply@example.com>" in headers
 
 
+def test_plugin_email_cc_without_recipient():
+    """NotifyEmail() leaves out the Cc header when it would be empty."""
+
+    messages = list(
+        email.NotifyEmail.prepare_emails(
+            subject="title",
+            body="body",
+            from_addr=("Apprise", "user@example.com"),
+            to=[(None, "a@example.com"), (None, "b@example.com")],
+            cc={"a@example.com"},
+        )
+    )
+
+    assert len(messages) == 2
+    headers = {
+        m.recipient: m.body.split("\n\n", 1)[0].splitlines() for m in messages
+    }
+
+    # The only Cc address is the recipient itself, so no Cc header is set
+    assert not [h for h in headers["a@example.com"] if h.startswith("Cc:")]
+
+    # Every other recipient still sees the Cc address
+    assert "Cc: a@example.com" in headers["b@example.com"]
+
+
 @pytest.mark.parametrize("key", ("cc", "bcc", "reply"))
 @pytest.mark.parametrize(
     "recipient, name",

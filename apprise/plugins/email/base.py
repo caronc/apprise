@@ -1499,7 +1499,7 @@ class NotifyEmail(NotifyBase):
             base["Message-ID"] = make_msgid(domain=smtp_host)
             base["Date"] = format_datetime(datetime.now(tz=tzinfo))
 
-            if cc:
+            if cc_:
                 base["Cc"] = ",".join(cc_)
 
             if reply_to_:
