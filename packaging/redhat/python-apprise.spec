@@ -71,7 +71,7 @@ notification services. It supports sending alerts to platforms such as: \
 `FCM`, `Feishu`, `Flock`, `Flowtriq`, `Fluxer`, `Free Mobile`, `GitHub`, \
 `GoAlert`, `Google Chat`, `Gorush`, `Gotify`, `GroupMe`, `Growl`, \
 `Guilded`, `Home Assistant`, `httpSMS`, \
-`HumHub`, `IFTTT`, `incident.io`, \
+`HumHub`, `IFTTT`, `ilert`, `incident.io`, \
 `IRC`, `Jellyfin`, `Jira`, `Join`, `Kavenegar`, `KODI`, `Kook`, \
 `Kumulos`, `LaMetric`, `Lark`, `Lauther`, `Line`, `MacOSX`, `Mailgun`, \
 `MailerSend`, \
