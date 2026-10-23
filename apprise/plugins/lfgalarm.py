@@ -212,6 +212,15 @@ class NotifyLFGAlarm(NotifyBase):
                 # Return; we're done
                 return False
 
+            # A 200 reply only counts when it confirms the alarm rang
+            fired = response.get("fired")
+            if fired is not True:
+                self.logger.warning("LFG Alarm did not ring: fired=%r.", fired)
+                self.logger.debug("Response Details:\r\n%r", r.content)
+
+                # Return; we're done
+                return False
+
             devices = response.get("devices")
             if isinstance(devices, int):
                 self.logger.info(

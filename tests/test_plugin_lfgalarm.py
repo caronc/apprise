@@ -116,7 +116,8 @@ apprise_url_tests = (
         "lfg://{}".format(TOKEN),
         {
             "instance": NotifyLFGAlarm,
-            # A reply we can not read is still a ring
+            # A reply we can not read does not confirm a ring
+            "response": False,
             "requests_response_text": "not json",
         },
     ),
@@ -206,10 +207,21 @@ def test_plugin_lfgalarm_send(mock_post):
     assert "data" not in mock_post.call_args[1]
     assert "json" not in mock_post.call_args[1]
 
-    # A reply that is not an object, or names a single phone, still rings
-    for content in (b"[]", json.dumps({"devices": 1}).encode("utf-8")):
-        response.content = content
+    # A confirmed ring, with or without a phone count
+    for reply in ({"fired": True, "devices": 1}, {"fired": True}):
+        response.content = json.dumps(reply).encode("utf-8")
         assert obj.notify(body="ring")
+
+    # Anything short of fired=true is a failure
+    for content in (
+        b"[]",
+        json.dumps({"devices": 1}).encode("utf-8"),
+        json.dumps({"fired": None}).encode("utf-8"),
+        json.dumps({"fired": False}).encode("utf-8"),
+        json.dumps({"fired": "cooling_down"}).encode("utf-8"),
+    ):
+        response.content = content
+        assert obj.notify(body="ring") is False
 
 
 @mock.patch("requests.post")
