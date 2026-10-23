@@ -56,7 +56,7 @@ from typing import Any, Optional
 
 import requests
 
-from ..common import NotifyType
+from ..common import NotifyType, OverflowMode
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
@@ -118,6 +118,10 @@ class NotifyLFGAlarm(NotifyBase):
     def __init__(self, token: str, **kwargs: Any) -> None:
         """Initialize LFG Alarm Object."""
         super().__init__(**kwargs)
+
+        # The body is never sent, so splitting it would only ring the alarm
+        # again during its cooldown and report a failure.
+        self.overflow_mode = OverflowMode.UPSTREAM
 
         # The token identifies the alarm we ring
         self.token = validate_regex(

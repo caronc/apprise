@@ -213,6 +213,23 @@ def test_plugin_lfgalarm_send(mock_post):
 
 
 @mock.patch("requests.post")
+def test_plugin_lfgalarm_rings_once(mock_post):
+    """NotifyLFGAlarm() rings once even when asked to split a long body."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = RANG.encode("utf-8")
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate("lfg://{}?overflow=split".format(TOKEN))
+    assert isinstance(obj, NotifyLFGAlarm)
+    assert obj.notify(title="t" * 400, body="b" * 70000)
+
+    # A second post would land in the cooldown and fail
+    assert mock_post.call_count == 1
+
+
+@mock.patch("requests.post")
 def test_plugin_lfgalarm_nothing_rang(mock_post):
     """NotifyLFGAlarm() reports a cooldown or a switched off alarm."""
 
