@@ -209,10 +209,12 @@ class NotifyIFTTT(NotifyBase):
 
         # Eliminate fields flagged for removal otherwise ensure all tokens are
         # lowercase since that is what the IFTTT server expects from us.
+        # Removals are matched without case so -Value1 drops value1.
+        del_tokens = {x.lower() for x in self.del_tokens}
         payload = {
             x.lower(): y
             for x, y in payload.items()
-            if x not in self.del_tokens
+            if x.lower() not in del_tokens
         }
 
         # error tracking (used for function return)
