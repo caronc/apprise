@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+from json import loads
 import logging
 from unittest import mock
 
@@ -33,7 +34,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import NotifyType
+from apprise import Apprise, NotifyType
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.ifttt import NotifyIFTTT
 
@@ -270,3 +271,50 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     )
 
     assert isinstance(obj, NotifyIFTTT)
+
+
+@mock.patch("requests.post")
+def test_plugin_ifttt_url_tokens(mock_post):
+    """URL +/- tokens reach the payload and survive url()."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b""
+
+    obj = Apprise.instantiate(
+        "ifttt://WebHookID@EventID/?+switch=on&-value1&-value2"
+    )
+    assert isinstance(obj, NotifyIFTTT)
+    assert obj.add_tokens == {"switch": "on"}
+    assert set(obj.del_tokens) == {"value1", "value2"}
+
+    # +switch=on is added to the payload and -value1/-value2 are removed
+    assert obj.notify(body="body", title="title") is True
+    assert mock_post.call_count == 1
+    assert loads(mock_post.call_args[1]["data"]) == {
+        "value3": "info",
+        "switch": "on",
+    }
+
+    # url() writes the tokens back so that reloading it keeps them
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyIFTTT)
+    assert obj2.add_tokens == {"switch": "on"}
+    assert set(obj2.del_tokens) == {"value1", "value2"}
+
+
+@mock.patch("requests.post")
+def test_plugin_ifttt_del_token_case(mock_post):
+    """A -Value1 token removes value1 regardless of case."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b""
+
+    obj = Apprise.instantiate("ifttt://WebHookID@EventID/?-Value1&-VALUE2")
+    assert isinstance(obj, NotifyIFTTT)
+
+    # Both entries are dropped even though IFTTT expects lowercase keys
+    assert obj.notify(body="body", title="title") is True
+    assert mock_post.call_count == 1
+    assert loads(mock_post.call_args[1]["data"]) == {"value3": "info"}

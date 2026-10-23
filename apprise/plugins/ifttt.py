@@ -209,10 +209,12 @@ class NotifyIFTTT(NotifyBase):
 
         # Eliminate fields flagged for removal otherwise ensure all tokens are
         # lowercase since that is what the IFTTT server expects from us.
+        # Removals are matched without case so -Value1 drops value1.
+        del_tokens = {x.lower() for x in self.del_tokens}
         payload = {
             x.lower(): y
             for x, y in payload.items()
-            if x not in self.del_tokens
+            if x.lower() not in del_tokens
         }
 
         # error tracking (used for function return)
@@ -318,7 +320,7 @@ class NotifyIFTTT(NotifyBase):
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         # Store any new key/value pairs added to our list
-        params.update({f"+{k}": v for k, v in self.add_tokens})
+        params.update({f"+{k}": v for k, v in self.add_tokens.items()})
         params.update({f"-{k}": "" for k in self.del_tokens})
 
         return "{schema}://{webhook_id}@{events}/?{params}".format(
@@ -351,9 +353,9 @@ class NotifyIFTTT(NotifyBase):
         # Unquote our API Key
         results["webhook_id"] = NotifyIFTTT.unquote(results["webhook_id"])
 
-        # Parse our add_token and del_token arguments (if specified)
-        results["add_token"] = results["qsd+"]
-        results["del_token"] = results["qsd-"]
+        # Parse our add_tokens and del_tokens arguments (if specified)
+        results["add_tokens"] = results["qsd+"]
+        results["del_tokens"] = results["qsd-"]
 
         # Our Event
         results["events"] = []
