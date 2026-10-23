@@ -667,7 +667,12 @@ class NotifyPushover(NotifyBase):
         - Markdown is turned into HTML first (Pushover has no Markdown).
         - HTML is reduced to the few tags Pushover shows.
         - Plain text is returned unchanged.
+        - A body that reduces to nothing (such as a lone ``---``) is sent
+          as escaped text, since Pushover rejects an empty message.
         """
+        # Keep the source in case nothing visible survives the reduction
+        source = body
+
         if body_format == NotifyFormat.MARKDOWN:
             # Pushover has no Markdown; render it as HTML
             body = convert_between(
@@ -679,7 +684,16 @@ class NotifyPushover(NotifyBase):
             return body
 
         # Keep only the tags Pushover supports
-        return PushoverHTMLReducer().reduce(body)
+        body = PushoverHTMLReducer().reduce(body)
+
+        # Text survived, or the source was blank to begin with
+        if body or not source.strip():
+            return body
+
+        # Only markup without text was given; send it as plain text
+        return PUSHOVER_HTML_BR.join(
+            escape(line, quote=False) for line in source.strip().splitlines()
+        )
 
     def send(
         self,
