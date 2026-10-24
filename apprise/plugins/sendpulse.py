@@ -613,8 +613,10 @@ class NotifySendPulse(NotifyBase):
             if self.is_delivered(target):
                 continue
 
-            # Create a copy of our template
-            payload = payload_.copy()
+            # Create a copy of our template.  The email section is copied
+            # too so one target's cc and bcc lists never carry over to the
+            # next target.
+            payload = {**payload_, "email": dict(payload_["email"])}
 
             # the cc, bcc, to field must be unique or SendMail will fail, the
             # below code prepares this by ensuring the target isn't in the cc
