@@ -1168,6 +1168,14 @@ msgstr "Gebruiker"
 msgid "Target Channel"
 msgstr "Doelkanaal"
 
+#: apprise/plugins/cliq.py:185
+msgid "Target Bot"
+msgstr "Doelbot"
+
+#: apprise/plugins/cliq.py:218
+msgid "Company ID"
+msgstr "Bedrijfs-ID"
+
 #: apprise/plugins/mattermost.py:189 apprise/plugins/twist.py:119
 msgid "Target Channel ID"
 msgstr "Id van het doelkanaal"

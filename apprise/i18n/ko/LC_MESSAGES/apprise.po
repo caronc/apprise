@@ -1168,6 +1168,14 @@ msgstr "사용자"
 msgid "Target Channel"
 msgstr "대상 채널"
 
+#: apprise/plugins/cliq.py:185
+msgid "Target Bot"
+msgstr "대상 봇"
+
+#: apprise/plugins/cliq.py:218
+msgid "Company ID"
+msgstr "회사 ID"
+
 #: apprise/plugins/mattermost.py:189 apprise/plugins/twist.py:119
 msgid "Target Channel ID"
 msgstr "대상 채널 ID"

@@ -1168,6 +1168,14 @@ msgstr "User"
 msgid "Target Channel"
 msgstr "Channel na padadalhan"
 
+#: apprise/plugins/cliq.py:185
+msgid "Target Bot"
+msgstr "Bot na padadalhan"
+
+#: apprise/plugins/cliq.py:218
+msgid "Company ID"
+msgstr "ID ng kumpanya"
+
 #: apprise/plugins/mattermost.py:189 apprise/plugins/twist.py:119
 msgid "Target Channel ID"
 msgstr "ID ng channel na padadalhan"
