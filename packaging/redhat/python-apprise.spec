@@ -73,7 +73,8 @@ notification services. It supports sending alerts to platforms such as: \
 `Guilded`, `Home Assistant`, `httpSMS`, \
 `HumHub`, `IFTTT`, `ilert`, `incident.io`, \
 `IRC`, `Jellyfin`, `Jira`, `Join`, `Kavenegar`, `KODI`, `Kook`, \
-`Kumulos`, `LaMetric`, `Lark`, `Lauther`, `Line`, `MacOSX`, `Mailgun`, \
+`Kumulos`, `LaMetric`, `Lark`, `Lauther`, `LFG Alarm`, `Line`, \
+`MacOSX`, `Mailgun`, \
 `MailerSend`, \
 `Mastodon`, \
 `Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
