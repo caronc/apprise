@@ -188,6 +188,7 @@ The table below identifies the services this tool supports and some example serv
 | [XBMC](https://appriseit.com/services/xbmc/) | xbmc:// or xbmcs://    | (TCP) 8080 or 443   | xbmc://hostname<br />xbmc://user@hostname<br />xbmc://user:password@hostname:port
 | [XMPP](https://appriseit.com/services/xmpp/) | xmpp:// or xmpps://    | (TCP) 5222 or 5223   | xmpp://user:pass@hostname<br />xmpps://user:pass@hostname/jid<br />xmpps://user:pass@hostname/jid1/jid2@example.ca
 | [YouLMK](https://appriseit.com/services/youlmk/) | youlmk://  | (TCP) 443   | youlmk://ylk_token<br/>youlmk://k_key<br/>youlmk://ylk_token?priority=critical<br/>youlmk://ylk_token?failure=critical&url=https://example.com/runs/1
+| [Zalo](https://appriseit.com/services/zalo/) | zalo://  | (TCP) 443   | zalo://BotToken/ChatID<br/>zalo://BotToken/ChatID1/ChatID2/ChatIDN
 | [Zoom](https://appriseit.com/services/zoom/) | zoom://  | (TCP) 443   | zoom://WebhookID/Token
 | [Zulip Chat](https://appriseit.com/services/zulip/) | zulip://  | (TCP) 443   | zulip://botname@Organization/Token<br />zulip://botname@Organization/Token/Stream<br />zulip://botname@Organization/Token/Email
 

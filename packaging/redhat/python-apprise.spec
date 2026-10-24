@@ -102,7 +102,7 @@ notification services. It supports sending alerts to platforms such as: \
 `Viber`, `VictorOps`, \
 `Voipms`, `Vonage`, `WebPush`, `WeChat (WeCom)`, `WeCom Bot`, `WhatsApp`, \
 `Webex Teams`, `Workflows`, `WPUSH`, `WxPusher`, `XBMC`, `XMPP`, `YouLMK`, \
-`Zoom`, and `Zulip`.}
+`Zalo`, `Zoom`, and `Zulip`.}
 
 Name:           python-%{pypi_name}
 Version:        2.0.1
