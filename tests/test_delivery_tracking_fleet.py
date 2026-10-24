@@ -358,6 +358,13 @@ FLEET = (
         {},
     ),
     (
+        "cliq",
+        "cliq://1001.abc.def/channel1/channel999",
+        "channel1",
+        "channel999",
+        {},
+    ),
+    (
         "notifiarr",
         f"notifiarr://{TOKEN}/#1001/#9009",
         "1001",

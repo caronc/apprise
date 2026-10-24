@@ -1169,6 +1169,14 @@ msgstr "ユーザー"
 msgid "Target Channel"
 msgstr "宛先のチャンネル"
 
+#: apprise/plugins/cliq.py:185
+msgid "Target Bot"
+msgstr "宛先のボット"
+
+#: apprise/plugins/cliq.py:218
+msgid "Company ID"
+msgstr "会社 ID"
+
 #: apprise/plugins/mattermost.py:189 apprise/plugins/twist.py:119
 msgid "Target Channel ID"
 msgstr "宛先のチャンネル ID"
