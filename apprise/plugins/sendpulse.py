@@ -639,10 +639,10 @@ class NotifySendPulse(NotifyBase):
                     item = {
                         "email": email,
                     }
-                if email in self.names:
-                    item["name"] = self.names[email]
+                    if email in self.names:
+                        item["name"] = self.names[email]
 
-                payload["email"]["cc"].append(item)
+                    payload["email"]["cc"].append(item)
 
             if len(bcc):
                 payload["email"]["bcc"] = []
@@ -650,10 +650,10 @@ class NotifySendPulse(NotifyBase):
                     item = {
                         "email": email,
                     }
-                if email in self.names:
-                    item["name"] = self.names[email]
+                    if email in self.names:
+                        item["name"] = self.names[email]
 
-                payload["email"]["bcc"].append(item)
+                    payload["email"]["bcc"].append(item)
 
             # Perform our post
             success, _response = self._fetch(
