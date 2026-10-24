@@ -669,6 +669,82 @@ def test_plugin_sendpulse_edge_cases(mock_post):
         )
 
 
+@mock.patch("requests.post")
+def test_plugin_sendpulse_multiple_cc_bcc(mock_post):
+    """
+    NotifySendPulse() Multiple CC and BCC entries
+    """
+    request = mock.Mock()
+    request.status_code = requests.codes.ok
+    request.content = SENDPULSE_GOOD_RESPONSE
+
+    # Prepare Mock
+    mock_post.return_value = request
+
+    obj = Apprise.instantiate(
+        "sendpulse://user@example.com/ci/cs/to@example.com"
+        "?cc=Alice<a@example.com>,b@example.com"
+        "&bcc=Carol<c@example.com>,d@example.com"
+    )
+    assert isinstance(obj, NotifySendPulse)
+
+    assert (
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
+        is True
+    )
+
+    # Authentication + 1 email
+    assert mock_post.call_count == 2
+
+    payload = loads(mock_post.call_args_list[1][1]["data"])
+    cc = sorted(payload["email"]["cc"], key=lambda x: x["email"])
+    bcc = sorted(payload["email"]["bcc"], key=lambda x: x["email"])
+
+    assert cc == [
+        {"email": "a@example.com", "name": "Alice"},
+        {"email": "b@example.com"},
+    ]
+    assert bcc == [
+        {"email": "c@example.com", "name": "Carol"},
+        {"email": "d@example.com"},
+    ]
+
+
+@mock.patch("requests.post")
+def test_plugin_sendpulse_cc_per_target(mock_post):
+    """NotifySendPulse() does not carry one target's cc into the next."""
+    request = mock.Mock()
+    request.status_code = requests.codes.ok
+    request.content = SENDPULSE_GOOD_RESPONSE
+
+    # Prepare Mock
+    mock_post.return_value = request
+
+    # b@example.com is both a target and a cc
+    obj = Apprise.instantiate(
+        "sendpulse://user@example.com/ci/cs/a@example.com/b@example.com"
+        "?cc=b@example.com"
+    )
+    assert isinstance(obj, NotifySendPulse)
+    assert obj.notify(body="body") is True
+
+    # Authentication + 1 email per target
+    assert mock_post.call_count == 3
+
+    emails = {}
+    for call in mock_post.call_args_list[1:]:
+        payload = loads(call[1]["data"])["email"]
+        emails[payload["to"][0]["email"]] = payload
+
+    # a@example.com is sent a copy to b@example.com
+    assert emails["a@example.com"]["cc"] == [{"email": "b@example.com"}]
+
+    # b@example.com is not also sent a copy to itself
+    assert "cc" not in emails["b@example.com"]
+
+
 def test_plugin_sendpulse_fail_cases():
     """
     NotifySendPulse() Fail Cases
