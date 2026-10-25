@@ -121,6 +121,10 @@ TRACKED = {
     "flock": "flock://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/u:0001/u:9999",
     "fortysixelks": "46elks://user:pass@sender/12125550001/12125559999",
     "google_chat": "gchat://workspace/key/token",
+    "groundmail": (
+        "groundmail://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:user@example.com/"
+        "one@example.ca"
+    ),
     "guilded": "guilded://1234567890/abcdefghijklmnop",
     "home_assistant": "hassio://localhost/prefix/path/long.lived.token",
     "httpsms": (

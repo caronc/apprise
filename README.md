@@ -91,6 +91,7 @@ The table below identifies the services this tool supports and some example serv
 | [Google Chat](https://appriseit.com/services/googlechat/) | gchat://    | (TCP) 443    | gchat://workspace/key/token
 | [Gorush](https://appriseit.com/services/gorush/) | gorush:// or gorushs://   | (TCP) 8088, 80 or 443    | gorush://hostname:8088/device_token<br />gorush://hostname:8088/device_token1/device_token2?platform=ios<br />gorushs://user:password@hostname/device_token
 | [Gotify](https://appriseit.com/services/gotify/) | gotify:// or gotifys://   | (TCP) 80 or 443    | gotify://hostname/token<br />gotifys://hostname/token?priority=high
+| [Groundmail](https://appriseit.com/services/groundmail/) | groundmail://  | (TCP) 443   | groundmail://APIKey:FromEmail/<br />groundmail://APIKey:FromEmail/ToEmail<br />groundmail://APIKey:FromEmail/ToEmail1/ToEmail2/ToEmailN/
 | [GroupMe](https://appriseit.com/services/groupme/) | groupme://   | (TCP) 443   | groupme://bot_id<br />groupme://bot_id/access_token
 | [Growl](https://appriseit.com/services/growl/)  | growl://   | (UDP) 23053   | growl://hostname<br />growl://hostname:portno<br />growl://password@hostname<br />growl://password@hostname:port</br>**Note**: you can also use the get parameter _version_ which can allow the growl request to behave using the older v1.x protocol. An example would look like: growl://hostname?version=1
 | [Guilded](https://appriseit.com/services/guilded/)  | guilded://   | (TCP) 443   | guilded://webhook_id/webhook_token<br />guilded://avatar@webhook_id/webhook_token
