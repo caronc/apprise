@@ -246,7 +246,7 @@ class NotifyRSyslog(NotifyBase):
             self.port if self.port else self.template_tokens["port"]["default"]
         )
 
-        priority = SYSLOG_PUBLISH_MAP[notify_type] + self.facility * 8
+        priority = self.facility + SYSLOG_PUBLISH_MAP[notify_type]
         payload = (
             f"<{priority}>- {os.getpid()} {body}"
             if self.log_pid

@@ -176,3 +176,33 @@ def test_plugin_rsyslog_edge_cases():
 
     with pytest.raises(AppriseImproperlyConfigured):
         NotifyRSyslog(host="localhost", facility=object)
+
+
+@pytest.mark.parametrize(
+    "facility,notify_type,priority",
+    [
+        # PRI = (facility code * 8) + severity (RFC 5424, section 6.2.1)
+        ("kern", apprise.NotifyType.SUCCESS, 5),
+        ("user", apprise.NotifyType.INFO, 14),
+        ("mail", apprise.NotifyType.FAILURE, 18),
+        ("daemon", apprise.NotifyType.WARNING, 28),
+        ("local0", apprise.NotifyType.INFO, 134),
+        ("local7", apprise.NotifyType.FAILURE, 186),
+    ],
+)
+@mock.patch("socket.socket")
+def test_plugin_rsyslog_priority(mock_socket, facility, notify_type, priority):
+    """NotifyRSyslog() PRI value."""
+    mock_connection = mock.Mock()
+    mock_connection.sendto.return_value = 100
+    mock_socket.return_value = mock_connection
+
+    obj = apprise.Apprise.instantiate(
+        f"rsyslog://localhost/{facility}?logpid=no"
+    )
+    assert isinstance(obj, NotifyRSyslog)
+    assert bool(obj.notify(body="test", notify_type=notify_type)) is True
+
+    assert mock_connection.sendto.call_count == 1
+    payload = mock_connection.sendto.call_args[0][0]
+    assert payload == f"<{priority}>- test".encode()
