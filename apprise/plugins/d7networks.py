@@ -313,7 +313,7 @@ class NotifyD7Networks(NotifyBase):
                     self.logger.warning(
                         "Failed to send D7 Networks SMS notification to {}: "
                         "{}{}error={}.".format(
-                            ", ".join(target) if self.batch else target,
+                            ", ".join(self.targets) if self.batch else target,
                             status_str,
                             ", " if status_str else "",
                             r.status_code,

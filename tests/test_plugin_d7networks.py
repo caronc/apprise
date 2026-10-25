@@ -272,3 +272,23 @@ def test_plugin_d7networks_edge_cases(mock_post):
     assert "15551231236" in message["recipients"]
     assert message["content"] == "title\r\ntest message"
     assert message["data_coding"] == "auto"
+
+
+@mock.patch("requests.post")
+def test_plugin_d7networks_batch_failure(mock_post):
+    """NotifyD7Networks() batch failure is reported, not raised."""
+
+    # Prepare Mock
+    request = mock.Mock()
+    request.content = b'{"message": "Insufficient credit"}'
+    request.status_code = requests.codes.bad_request
+    mock_post.return_value = request
+
+    obj = Apprise.instantiate(
+        "d7sms://Token@15551231234/15551231236?batch=yes"
+    )
+    assert isinstance(obj, NotifyD7Networks)
+
+    # A rejected batch returns False instead of throwing a TypeError
+    assert obj.notify(body="test", notify_type=NotifyType.INFO) is False
+    assert mock_post.call_count == 1
