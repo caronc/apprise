@@ -165,6 +165,16 @@ FLEET = (
         {},
     ),
     (
+        "groundmail",
+        (
+            f"groundmail://{TOKEN}:user@example.com"
+            "/one@example.ca/nine@example.ca"
+        ),
+        "one@example.ca",
+        "nine@example.ca",
+        {},
+    ),
+    (
         "pushbullet",
         f"pbul://{TOKEN}/#chan1/#chan999",
         "chan1",

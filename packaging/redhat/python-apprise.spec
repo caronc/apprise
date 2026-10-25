@@ -69,8 +69,8 @@ notification services. It supports sending alerts to platforms such as: \
 `DingTalk`, `Discord`, \
 `Dot. (Quote/0)`, `E-Mail`, `Emby`, `Evolution API`, `Exotel`, \
 `FCM`, `Feishu`, `Flock`, `Flowtriq`, `Fluxer`, `Free Mobile`, `GitHub`, \
-`GoAlert`, `Google Chat`, `Gorush`, `Gotify`, `GroupMe`, `Growl`, \
-`Guilded`, `Home Assistant`, `httpSMS`, \
+`GoAlert`, `Google Chat`, `Gorush`, `Gotify`, `Groundmail`, `GroupMe`, \
+`Growl`, `Guilded`, `Home Assistant`, `httpSMS`, \
 `HumHub`, `IFTTT`, `ilert`, `incident.io`, \
 `IRC`, `Jellyfin`, `Jira`, `Join`, `Kavenegar`, `KODI`, `Kook`, \
 `Kumulos`, `LaMetric`, `Lark`, `Lauther`, `LFG Alarm`, `Line`, \

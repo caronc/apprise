@@ -2860,6 +2860,8 @@ def test_apprise_details_email_token_types():
         ("NotifyResend", "target_email"),
         ("NotifyMailerSend", "from_email"),
         ("NotifyMailerSend", "target_email"),
+        ("NotifyGroundmail", "from_addr"),
+        ("NotifyGroundmail", "target_email"),
         ("NotifyOffice365", "target_email"),
         ("NotifyOctopush", "api_login"),
         ("NotifyThreema", "target_email"),
