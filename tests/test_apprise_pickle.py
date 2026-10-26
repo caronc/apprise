@@ -29,6 +29,10 @@
 import logging
 import pickle
 import sys
+from unittest import mock
+
+import pytest
+import requests
 
 from apprise import Apprise, AppriseAsset, AppriseLocale
 
@@ -110,3 +114,55 @@ def test_apprise_pickle_core(tmpdir):
 
     # Our tag was kept
     assert "email" in apobj[3].tags
+
+
+@mock.patch("requests.request")
+def test_apprise_pickle_notify(mock_request):
+    """pickle: Restored Apprise objects can send notifications."""
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    mock_request.return_value = response
+
+    apobj = Apprise()
+    assert apobj.add("json://localhost") is True
+    new_apobj = pickle.loads(pickle.dumps(apobj))
+
+    assert bool(new_apobj.notify("x")) is True
+    mock_request.assert_called_once()
+    assert mock_request.call_args.args[0] == "POST"
+
+
+@pytest.mark.parametrize(
+    "debug, log_level", [(False, None), (True, logging.DEBUG)]
+)
+def test_apprise_pickle_settings(debug, log_level):
+    """pickle: Preserve settings and discard unpicklable callbacks."""
+    apobj = Apprise(
+        debug=debug,
+        log_callback=lambda entry, service: None,
+        log_level=log_level,
+    )
+    new_apobj = pickle.loads(pickle.dumps(apobj))
+
+    assert new_apobj.debug is debug
+    assert new_apobj._log_level == log_level
+    assert new_apobj._log_callback is None
+
+    # A restored object can be pickled again
+    assert pickle.loads(pickle.dumps(new_apobj)).debug is debug
+
+
+def test_apprise_pickle_legacy_state():
+    """pickle: Load state saved before log_level was serialized."""
+    apobj = Apprise(debug=True)
+    assert apobj.add("json://localhost") is True
+    state = apobj.__getstate__()
+    state.pop("log_level", None)
+
+    new_apobj = Apprise.__new__(Apprise)
+    new_apobj.__setstate__(state)
+
+    assert new_apobj.debug is True
+    assert new_apobj._log_callback is None
+    assert new_apobj._log_level is None
+    assert new_apobj.urls() == apobj.urls()

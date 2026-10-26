@@ -2230,6 +2230,7 @@ class Apprise:
             "locale": self.locale,
             "debug": self.debug,
             "location": self.location.value if self.location else None,
+            "log_level": self._log_level,
         }
 
         return attributes
@@ -2239,6 +2240,11 @@ class Apprise:
         self.services = []
         self.asset = state["asset"]
         self.locale = state["locale"]
+        self.debug = state["debug"]
+
+        # The log callback is never pickled; older pickles have no log_level
+        self._log_callback = None
+        self._log_level = state.get("log_level")
 
         location = state.get("location")
         self.location = (
