@@ -1102,6 +1102,7 @@ def test_plugin_amqp_v10_connect_failure():
 @requires_proton
 def test_plugin_amqp_v10_publish():
     """AMQP10Adapter() sends raw bytes with the message properties."""
+    from proton import Message
     from proton.utils import LinkDetached, SendException
 
     message = AMQPMessage(
@@ -1150,7 +1151,8 @@ def test_plugin_amqp_v10_publish():
         msg = sender.send.call_args.args[0]
         assert msg.durable is False
         assert msg.priority == 4
-        assert msg.ttl == 0
+        # No expiry was set.
+        assert msg.ttl == Message().ttl
 
         # A refused message becomes AMQPError and the link is released
         sender.close.reset_mock()

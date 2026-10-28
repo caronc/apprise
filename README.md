@@ -216,6 +216,7 @@ SMS Notifications for the most part do not have a both a `title` and `body`.  Th
 | [Exotel](https://appriseit.com/services/exotel/) | exotel://  | (TCP) 443   | exotel://sid:token@FromPhoneNo<br/>exotel://sid:token@FromPhoneNo/ToPhoneNo<br/>exotel://sid:token@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN
 | [Free-Mobile](https://appriseit.com/services/freemobile/)  | freemobile://   | (TCP) 443   | freemobile://user@password/
 | [httpSMS](https://appriseit.com/services/httpsms/) | httpsms://  | (TCP) 443   | httpsms://ApiKey@FromPhoneNo<br/>httpsms://ApiKey@FromPhoneNo/ToPhoneNo<br/>httpsms://ApiKey@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
+| [Infobip](https://appriseit.com/services/infobip/) | infobip://  | (TCP) 443   | infobip://ApiKey@BaseURL/ToPhoneNo<br/>infobip://ApiKey@BaseURL/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/?from=SenderID
 | [Kavenegar](https://appriseit.com/services/kavenegar/) | kavenegar://  | (TCP) 443   | kavenegar://ApiKey/ToPhoneNo<br/>kavenegar://FromPhoneNo@ApiKey/ToPhoneNo<br/>kavenegar://ApiKey/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN
 | [MessageBird](https://appriseit.com/services/messagebird/) | msgbird://  | (TCP) 443   | msgbird://ApiKey/FromPhoneNo<br/>msgbird://ApiKey/FromPhoneNo/ToPhoneNo<br/>msgbird://ApiKey/FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Mobile Message](https://appriseit.com/services/mobilemessage/) | mobilemessage:// or mobilemsg://  | (TCP) 443   | mobilemessage://ApiUser:ApiPass@SenderID/ToPhoneNo<br/>mobilemessage://ApiUser:ApiPass@SenderID/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
