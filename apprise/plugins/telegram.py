@@ -191,6 +191,11 @@ TELEGRAM_HTML_LOOSE_ENTITY_RE = re.compile(
 # Telegram does not know &nbsp; or &emsp;, so use plain spaces instead
 TELEGRAM_HTML_SPACES = str.maketrans({"\xa0": " ", "\u2003": "   "})
 
+# Closing tags after which a written line break is kept instead of collapsed
+TELEGRAM_HTML_INLINE_CLOSE_RE = re.compile(
+    r"</(?:b|i|u|s|tg-spoiler|a|code)>$"
+)
+
 
 class TelegramHTMLReducer(HTMLTagReducer):
     """Rewrite HTML so it only uses the markup Telegram accepts.
@@ -338,6 +343,17 @@ class TelegramHTMLReducer(HTMLTagReducer):
     def _text(self, data: str) -> None:
         """Write text with its special characters escaped."""
         if not (self._is_open("pre") or self._is_open("code")):
+            if (
+                not data.strip()
+                and ("\n" in data or "\r" in data)
+                and self.out
+                and TELEGRAM_HTML_INLINE_CLOSE_RE.search(self.out[-1])
+            ):
+                # A line break written after inline formatting separates the
+                # text it follows; HTML would collapse it to a space instead
+                self.out.append(TELEGRAM_HTML_BR)
+                return
+
             # Outside code, HTML source spacing rules apply
             super()._text(data)
 
