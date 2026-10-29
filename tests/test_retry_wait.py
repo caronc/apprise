@@ -693,6 +693,13 @@ class TestAppriseTag:
         assert AppriseTag("hello") == "hello"
         assert AppriseTag("HELLO") == "hello"
 
+    def test_eq_agrees_with_hash(self):
+        """String equality matches set membership for any spelling."""
+        tags = {AppriseTag("TEAM")}
+        assert (AppriseTag("TEAM") == "TEAM") == ("TEAM" in tags)
+        assert (AppriseTag("TEAM") == "team") == ("team" in tags)
+        assert "team" in tags
+
     def test_eq_not_equal_different_name(self):
         assert AppriseTag("abc") != AppriseTag("xyz")
         assert AppriseTag("abc") != "xyz"

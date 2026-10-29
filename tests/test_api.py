@@ -570,6 +570,10 @@ def apprise_test(do_notify):
     assert "good" in plugin
     assert "bad" not in plugin
 
+    # Tag checks ignore case
+    assert "GOOD" in plugin
+    assert ["bad", "Good"] in plugin
+
     # the in (__contains__ override) is based on or'ed content; so although
     # 'bad' isn't tagged as being in the plugin, 'good' is, so the return
     # value of this is True

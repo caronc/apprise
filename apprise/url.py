@@ -557,10 +557,10 @@ class URLBase:
         tag can also be a tuple, set, and/or list
         """
         if isinstance(tags, (tuple, set, list)):
-            return bool(set(tags) & self.tags)
+            return bool({AppriseTag.parse(t) for t in tags} & self.tags)
 
         # return any match
-        return tags in self.tags
+        return AppriseTag.parse(tags) in self.tags
 
     def __str__(self):
         """Returns the url path."""
