@@ -290,5 +290,38 @@ def test_plugin_d7networks_batch_failure(mock_post):
     assert isinstance(obj, NotifyD7Networks)
 
     # A rejected batch returns False instead of throwing a TypeError
-    assert obj.notify(body="test", notify_type=NotifyType.INFO) is False
+    with mock.patch.object(obj.logger, "warning") as mock_warning:
+        assert obj.notify(body="test", notify_type=NotifyType.INFO) is False
+
     assert mock_post.call_count == 1
+
+    # The warning names every batch target and the D7 error message
+    args = mock_warning.call_args[0]
+    assert args[1] == "15551231234, 15551231236"
+    assert args[2] == "Insufficient credit"
+
+
+@mock.patch("requests.post")
+def test_plugin_d7networks_connection_error(mock_post):
+    """NotifyD7Networks() connection errors name the affected target(s)."""
+
+    mock_post.side_effect = requests.RequestException("boom")
+
+    # A batch names every target
+    obj = Apprise.instantiate(
+        "d7sms://Token@15551231234/15551231236?batch=yes"
+    )
+    with mock.patch.object(obj.logger, "warning") as mock_warning:
+        assert obj.notify(body="test", notify_type=NotifyType.INFO) is False
+
+    assert mock_warning.call_args[0][1] == "15551231234, 15551231236"
+
+    # Without a batch, each warning names only the target that failed
+    obj = Apprise.instantiate("d7sms://Token@15551231234/15551231236")
+    with mock.patch.object(obj.logger, "warning") as mock_warning:
+        assert obj.notify(body="test", notify_type=NotifyType.INFO) is False
+
+    assert [c[0][1] for c in mock_warning.call_args_list] == [
+        "15551231234",
+        "15551231236",
+    ]
