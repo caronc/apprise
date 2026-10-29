@@ -1715,6 +1715,34 @@ class HTMLTagReducer(HTMLParser):
     # Tags whose content is never shown
     SKIP_TAGS: tuple[str, ...] = ("script", "style")
 
+    # Page and block tags; whitespace written right after one only lays
+    # out the HTML source, so its line breaks are not kept
+    LAYOUT_TAGS: tuple[str, ...] = (
+        "html",
+        "head",
+        "body",
+        "meta",
+        "link",
+        "base",
+        "title",
+        "p",
+        "div",
+        "br",
+        "hr",
+        "blockquote",
+        "pre",
+        "ul",
+        "ol",
+        "li",
+        "table",
+        "thead",
+        "tbody",
+        "tfoot",
+        "tr",
+        "td",
+        "th",
+    )
+
     # What a line break looks like in the output
     LINE_BREAK = "\n"
 
@@ -1748,6 +1776,9 @@ class HTMLTagReducer(HTMLParser):
         # Number of cells written on the current table row
         self.cells = 0
 
+        # True when the last tag seen was a layout, heading or hidden tag
+        self.after_layout = False
+
     def _line(self) -> None:
         """Start a new line unless we are already on an empty one."""
         if self.out and self.out[-1] != self.LINE_BREAK:
@@ -1776,6 +1807,13 @@ class HTMLTagReducer(HTMLParser):
         self, tag: str, attrs: list[tuple[str, Optional[str]]]
     ) -> None:
         """Hide skipped tags; hand every other tag to ``_start()``."""
+        # Remember whether whitespace that follows only lays out the source
+        self.after_layout = (
+            tag in self.LAYOUT_TAGS
+            or tag in self.HEADINGS
+            or tag in self.SKIP_TAGS
+        )
+
         if tag in self.SKIP_TAGS:
             # Hide everything until this tag closes
             self.skip += 1
@@ -1842,6 +1880,13 @@ class HTMLTagReducer(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         """Show content again after a skipped tag; else call ``_end()``."""
+        # Remember whether whitespace that follows only lays out the source
+        self.after_layout = (
+            tag in self.LAYOUT_TAGS
+            or tag in self.HEADINGS
+            or tag in self.SKIP_TAGS
+        )
+
         if tag in self.SKIP_TAGS:
             # Show content again once the hidden tag closes
             self.skip = max(0, self.skip - 1)
@@ -1869,8 +1914,9 @@ class HTMLTagReducer(HTMLParser):
 
     def _text(self, data: str) -> None:
         """Write text, keeping the line breaks written inside it."""
-        if not data.strip():
-            # Whitespace between tags only lays out the HTML source
+        if self.after_layout and not data.strip():
+            # Whitespace after a layout tag only lays out the HTML source;
+            # between inline tags (</b>\n<b>) its line breaks are kept
             self._write(HTML_NEWLINE_RE.sub(" ", data))
             return
 

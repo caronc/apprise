@@ -826,6 +826,9 @@ def test_plugin_pushover_html_reduced_to_supported_tags():
     # A list closed without being opened still ends its block
     assert reduce("a</ul>b") == "a<br><br>b"
 
+    # A line break written between tags stays a line break
+    assert reduce("<b>a</b>\n<i>b</i>") == "<b>a</b><br><i>b</i>"
+
     # Blank input stays blank
     assert reduce("   \n  ") == ""
 

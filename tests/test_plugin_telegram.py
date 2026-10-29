@@ -1596,10 +1596,15 @@ def test_plugin_telegram_html_reduced_to_supported_tags():
     # A line break written between tags stays a line break
     assert reduce("<b>a</b>\n<b>b</b>") == "<b>a</b>\r\n<b>b</b>"
     assert reduce("<s>a</s>\n<b>b</b>") == "<s>a</s>\r\n<b>b</b>"
-    assert reduce("<b>a</b>\n\n<b>b</b>") == "<b>a</b>\r\n<b>b</b>"
+    assert reduce("<b>a</b>\n\n<b>b</b>") == "<b>a</b>\r\n\r\n<b>b</b>"
 
     # A space written between tags still collapses to a space
     assert reduce("<b>a</b> <b>b</b>") == "<b>a</b> <b>b</b>"
+
+    # A line break between table cells only lays out the source
+    assert reduce("<table><tr><td><b>a</b></td>\n<td>b</td></tr></table>") == (
+        "<b>a</b>  | b"
+    )
 
     # Blank input stays blank
     assert reduce("   \n  ") == ""
