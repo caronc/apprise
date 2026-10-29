@@ -2005,6 +2005,10 @@ msgstr "सामग्री का स्थान"
 msgid "Rich Message Template Path"
 msgstr "सजे संदेश के टेम्पलेट का पथ"
 
+#: apprise/plugins/telesign.py:130
+msgid "Customer ID"
+msgstr "ग्राहक आईडी"
+
 #: apprise/plugins/telnyx.py:132
 msgid "Messaging Profile ID"
 msgstr "संदेश प्रोफ़ाइल की आईडी"

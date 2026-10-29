@@ -2005,6 +2005,10 @@ msgstr "Plaatsing van de inhoud"
 msgid "Rich Message Template Path"
 msgstr "Pad naar het sjabloon voor opgemaakte berichten"
 
+#: apprise/plugins/telesign.py:130
+msgid "Customer ID"
+msgstr "Klant-ID"
+
 #: apprise/plugins/telnyx.py:132
 msgid "Messaging Profile ID"
 msgstr "Id van het berichtenprofiel"

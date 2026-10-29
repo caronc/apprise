@@ -2005,6 +2005,10 @@ msgstr "Penempatan isi"
 msgid "Rich Message Template Path"
 msgstr "Jalur templat pesan berformat"
 
+#: apprise/plugins/telesign.py:130
+msgid "Customer ID"
+msgstr "ID Pelanggan"
+
 #: apprise/plugins/telnyx.py:132
 msgid "Messaging Profile ID"
 msgstr "ID profil perpesanan"

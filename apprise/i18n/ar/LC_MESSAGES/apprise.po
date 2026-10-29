@@ -2006,6 +2006,10 @@ msgstr "موضع المحتوى"
 msgid "Rich Message Template Path"
 msgstr "مسار قالب الرسالة المنسقة"
 
+#: apprise/plugins/telesign.py:130
+msgid "Customer ID"
+msgstr "معرّف العميل"
+
 #: apprise/plugins/telnyx.py:132
 msgid "Messaging Profile ID"
 msgstr "معرّف ملف المراسلة"

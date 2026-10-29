@@ -2005,6 +2005,10 @@ msgstr "Colocação do conteúdo"
 msgid "Rich Message Template Path"
 msgstr "Caminho do modelo de mensagem formatada"
 
+#: apprise/plugins/telesign.py:130
+msgid "Customer ID"
+msgstr "ID do cliente"
+
 #: apprise/plugins/telnyx.py:132
 msgid "Messaging Profile ID"
 msgstr "Identificador do perfil de mensagens"

@@ -2005,6 +2005,10 @@ msgstr "İçerik yerleşimi"
 msgid "Rich Message Template Path"
 msgstr "Biçimli ileti şablonu yolu"
 
+#: apprise/plugins/telesign.py:130
+msgid "Customer ID"
+msgstr "Müşteri Kimliği"
+
 #: apprise/plugins/telnyx.py:132
 msgid "Messaging Profile ID"
 msgstr "İletileşme profili kimliği"

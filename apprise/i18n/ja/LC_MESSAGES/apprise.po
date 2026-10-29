@@ -2006,6 +2006,10 @@ msgstr "本文の配置"
 msgid "Rich Message Template Path"
 msgstr "リッチメッセージのテンプレートのパス"
 
+#: apprise/plugins/telesign.py:130
+msgid "Customer ID"
+msgstr "顧客ID"
+
 #: apprise/plugins/telnyx.py:132
 msgid "Messaging Profile ID"
 msgstr "メッセージプロファイルの ID"

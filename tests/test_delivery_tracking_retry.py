@@ -251,6 +251,7 @@ TRACKED = {
     "telegram": (
         "tgram://123456789:ABCdefGHIjklMNOpqrSTUvwxYZ1234567890/111/"
     ),
+    "telesign": "telesign://customerid:apikey@15551234567/15551239999",
     "telnyx": (
         "telnyx://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@12125550000/12125550001"
     ),

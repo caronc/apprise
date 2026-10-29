@@ -2005,6 +2005,10 @@ msgstr "내용 배치"
 msgid "Rich Message Template Path"
 msgstr "서식 있는 메시지 템플릿 경로"
 
+#: apprise/plugins/telesign.py:130
+msgid "Customer ID"
+msgstr "고객 ID"
+
 #: apprise/plugins/telnyx.py:132
 msgid "Messaging Profile ID"
 msgstr "메시지 프로필 ID"

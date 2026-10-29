@@ -2005,6 +2005,10 @@ msgstr "Vị trí nội dung"
 msgid "Rich Message Template Path"
 msgstr "Đường dẫn mẫu tin nhắn có định dạng"
 
+#: apprise/plugins/telesign.py:130
+msgid "Customer ID"
+msgstr "ID khách hàng"
+
 #: apprise/plugins/telnyx.py:132
 msgid "Messaging Profile ID"
 msgstr "ID hồ sơ tin nhắn"
