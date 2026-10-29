@@ -1129,6 +1129,10 @@ msgstr "مفتاح API للجهاز"
 msgid "App ID"
 msgstr "معرّف التطبيق"
 
+#: apprise/plugins/gupshup.py:119
+msgid "App Name"
+msgstr "اسم التطبيق"
+
 #: apprise/plugins/lametric.py:449
 msgid "App Version"
 msgstr "إصدار التطبيق"

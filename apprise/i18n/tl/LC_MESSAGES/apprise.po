@@ -1128,6 +1128,10 @@ msgstr "Susi ng API ng device"
 msgid "App ID"
 msgstr "ID ng app"
 
+#: apprise/plugins/gupshup.py:119
+msgid "App Name"
+msgstr "Pangalan ng app"
+
 #: apprise/plugins/lametric.py:449
 msgid "App Version"
 msgstr "Bersyon ng app"

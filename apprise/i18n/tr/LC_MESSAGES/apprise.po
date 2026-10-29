@@ -1128,6 +1128,10 @@ msgstr "Aygıt API anahtarı"
 msgid "App ID"
 msgstr "Uygulama kimliği"
 
+#: apprise/plugins/gupshup.py:119
+msgid "App Name"
+msgstr "Uygulama adı"
+
 #: apprise/plugins/lametric.py:449
 msgid "App Version"
 msgstr "Uygulama sürümü"

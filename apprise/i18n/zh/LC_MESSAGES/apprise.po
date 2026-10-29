@@ -1128,6 +1128,10 @@ msgstr "设备 API 密钥"
 msgid "App ID"
 msgstr "应用标识"
 
+#: apprise/plugins/gupshup.py:119
+msgid "App Name"
+msgstr "应用名称"
+
 #: apprise/plugins/lametric.py:449
 msgid "App Version"
 msgstr "应用版本"

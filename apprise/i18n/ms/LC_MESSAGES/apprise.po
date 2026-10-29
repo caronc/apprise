@@ -1128,6 +1128,10 @@ msgstr "Kunci API peranti"
 msgid "App ID"
 msgstr "ID aplikasi"
 
+#: apprise/plugins/gupshup.py:119
+msgid "App Name"
+msgstr "Nama aplikasi"
+
 #: apprise/plugins/lametric.py:449
 msgid "App Version"
 msgstr "Versi aplikasi"

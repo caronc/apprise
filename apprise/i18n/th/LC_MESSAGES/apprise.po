@@ -1128,6 +1128,10 @@ msgstr "คีย์ API ของอุปกรณ์"
 msgid "App ID"
 msgstr "รหัสแอป"
 
+#: apprise/plugins/gupshup.py:119
+msgid "App Name"
+msgstr "ชื่อแอป"
+
 #: apprise/plugins/lametric.py:449
 msgid "App Version"
 msgstr "รุ่นของแอป"
