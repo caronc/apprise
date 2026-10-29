@@ -1128,6 +1128,10 @@ msgstr "उपकरण की API कुंजी"
 msgid "App ID"
 msgstr "ऐप की आईडी"
 
+#: apprise/plugins/gupshup.py:119
+msgid "App Name"
+msgstr "ऐप का नाम"
+
 #: apprise/plugins/lametric.py:449
 msgid "App Version"
 msgstr "ऐप का संस्करण"

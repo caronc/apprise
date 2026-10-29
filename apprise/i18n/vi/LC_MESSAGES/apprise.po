@@ -1128,6 +1128,10 @@ msgstr "Khóa API thiết bị"
 msgid "App ID"
 msgstr "ID ứng dụng"
 
+#: apprise/plugins/gupshup.py:119
+msgid "App Name"
+msgstr "Tên ứng dụng"
+
 #: apprise/plugins/lametric.py:449
 msgid "App Version"
 msgstr "Phiên bản ứng dụng"

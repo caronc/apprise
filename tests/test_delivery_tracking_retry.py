@@ -127,6 +127,7 @@ TRACKED = {
         "one@example.ca"
     ),
     "guilded": "guilded://1234567890/abcdefghijklmnop",
+    "gupshup": "gupshup://app:apikey@917834811114/15551234567/15551239999",
     "home_assistant": "hassio://localhost/prefix/path/long.lived.token",
     "httpsms": (
         "httpsms://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@12125550000/"
