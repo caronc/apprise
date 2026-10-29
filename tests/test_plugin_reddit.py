@@ -563,3 +563,39 @@ def test_plugin_reddit_link_escapes(mock_post):
     assert obj.notify(body="https://example.com/a\\_b")
     payload = mock_post.call_args_list[-1][1]["data"]
     assert payload["url"] == "https://example.com/a\\_b"
+
+
+@mock.patch("requests.post")
+def test_plugin_reddit_ad_and_replies(mock_post):
+    """ad= and replies= reach the submitted post."""
+    NotifyReddit.clock_skew = timedelta(seconds=0)
+
+    response = mock.Mock()
+    response.content = dumps(
+        {
+            "access_token": "abc123",
+            "expires_in": 100000,
+            "json": {"errors": []},
+        }
+    )
+    response.status_code = requests.codes.ok
+    response.headers = {}
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        "reddit://user:pass@app_id/secret/apprise?ad=yes&replies=no"
+    )
+    assert obj.advertisement is True
+    assert obj.sendreplies is False
+    assert "ad=yes" in obj.url()
+    assert "replies=no" in obj.url()
+
+    assert obj.notify(body="test")
+    payload = mock_post.call_args_list[-1][1]["data"]
+    assert payload["ad"] is True
+    assert payload["sendreplies"] is False
+
+    # The defaults are kept when neither option is given
+    obj = Apprise.instantiate("reddit://user:pass@app_id/secret/apprise")
+    assert obj.advertisement is False
+    assert obj.sendreplies is True
