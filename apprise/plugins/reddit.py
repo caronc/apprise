@@ -771,13 +771,15 @@ class NotifyReddit(NotifyBase):
             results["kind"] = RedditMessageKind.AUTO
 
         # Is an Ad?
-        results["ad"] = parse_bool(results["qsd"].get("ad", False))
+        results["advertisement"] = parse_bool(results["qsd"].get("ad", False))
 
         # Get Not Safe For Work (NSFW) Flag
         results["nsfw"] = parse_bool(results["qsd"].get("nsfw", False))
 
         # Send Replies Flag
-        results["replies"] = parse_bool(results["qsd"].get("replies", True))
+        results["sendreplies"] = parse_bool(
+            results["qsd"].get("replies", True)
+        )
 
         # Resubmit Flag
         results["resubmit"] = parse_bool(results["qsd"].get("resubmit", False))
