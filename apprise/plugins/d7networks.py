@@ -311,13 +311,12 @@ class NotifyD7Networks(NotifyBase):
                         pass
 
                     self.logger.warning(
-                        "Failed to send D7 Networks SMS notification to {}: "
-                        "{}{}error={}.".format(
-                            ", ".join(target) if self.batch else target,
-                            status_str,
-                            ", " if status_str else "",
-                            r.status_code,
-                        )
+                        "Failed to send D7 Networks SMS notification to %s: "
+                        "%s%serror=%s.",
+                        ", ".join(self.targets) if self.batch else target,
+                        status_str,
+                        ", " if status_str else "",
+                        r.status_code,
                     )
 
                     self.logger.debug(
@@ -345,9 +344,8 @@ class NotifyD7Networks(NotifyBase):
             except requests.RequestException as e:
                 self.logger.warning(
                     "A Connection error occurred sending"
-                    " D7 Networks:{} notification.".format(
-                        ", ".join(self.targets)
-                    )
+                    " D7 Networks: %s notification.",
+                    ", ".join(self.targets) if self.batch else target,
                 )
                 self.logger.debug(f"Socket Exception: {e!s}")
                 # Mark our failure
