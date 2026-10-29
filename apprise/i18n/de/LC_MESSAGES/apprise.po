@@ -602,6 +602,10 @@ msgstr "Clickatell"
 msgid "API Token"
 msgstr "API-Token"
 
+#: apprise/plugins/cm.py:136
+msgid "Product Token"
+msgstr "Produkt-Token"
+
 #: apprise/plugins/cliq.py:168 apprise/plugins/discord.py:176
 #: apprise/plugins/fluxer.py:215 apprise/plugins/google_chat.py:132
 #: apprise/plugins/stackfield.py:93 apprise/plugins/webexteams.py:172

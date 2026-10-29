@@ -210,6 +210,7 @@ SMS Notifications for the most part do not have a both a `title` and `body`.  Th
 | [Burst SMS](https://appriseit.com/services/burstsms/) | burstsms://  | (TCP) 443   | burstsms://ApiKey:ApiSecret@FromPhoneNo/ToPhoneNo<br/>burstsms://ApiKey:ApiSecret@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Clickatell](https://appriseit.com/services/clickatell/)                         | clickatell://               | (TCP) 443       | clickatell://ApiKey/ToPhoneNo<br/>clickatell://FromPhoneNo@ApiKey/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN
 | [ClickSend](https://appriseit.com/services/clicksend/) | clicksend://  | (TCP) 443   | clicksend://user:pass@PhoneNo<br/>clicksend://user:pass@ToPhoneNo1/ToPhoneNo2/ToPhoneNoN
+| [CM.com](https://appriseit.com/services/cm/) | cm://  | (TCP) 443   | cm://ProductToken/ToPhoneNo<br/>cm://SenderID@ProductToken/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [DAPNET](https://appriseit.com/services/dapnet/) | dapnet://  | (TCP) 80   | dapnet://user:pass@callsign<br/>dapnet://user:pass@callsign1/callsign2/callsignN
 | [D7 Networks](https://appriseit.com/services/d7networks/) | d7sms://  | (TCP) 443   | d7sms://token@PhoneNo<br/>d7sms://token@ToPhoneNo1/ToPhoneNo2/ToPhoneNoN
 | [DingTalk](https://appriseit.com/services/dingtalk/)  | dingtalk://   | (TCP) 443   | dingtalk://token/<br />dingtalk://token/ToPhoneNo<br />dingtalk://token/ToPhoneNo1/ToPhoneNo2/ToPhoneNo1/

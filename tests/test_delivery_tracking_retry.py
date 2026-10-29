@@ -102,6 +102,7 @@ TRACKED = {
         "&from=1111111111&to=15551230001,15551239999"
     ),
     "clicksend": "clicksend://user:pass@33333333333333?batch=no",
+    "cm": "cm://0123abcd-4567-89ef-abcd-0123456789ab/15551234567/15551239999",
     "d7networks": "d7sms://token1@33333333333333?batch=no",
     "dapnet": "dapnet://user:pass@localhost/DL0001/DL9999",
     "discord": "discord://1234567890/abcdefghijklmnop",
