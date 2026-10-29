@@ -81,7 +81,7 @@ notification services. It supports sending alerts to platforms such as: \
 `Microsoft Teams`, `Misskey`, `Mobile Message`, \
 `MQTT`, `MSG91`, `MyAndroid`, `Nexmo`, `Nextcloud`, \
 `NextcloudTalk`, `Notica`, `Notifiarr`, `Notifico`, \
-`Notifyre`, \
+`Notifyre`, `Nowlark`, \
 `ntfy`, `Octopush`, `Office365`, `OneBot`, `OneSignal`, \
 `Opsgenie`, `PagerDuty`, \
 `PagerTree`, `ParsePlatform`, `Pinglet`, `Pingram`, `Plivo`, `Prowl`, \
