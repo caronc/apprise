@@ -161,7 +161,7 @@ class AppriseTag:
         if isinstance(other, AppriseTag):
             return self._tag == other._tag
         if isinstance(other, str):
-            return self._tag == other.lower()
+            return self._tag == other
         return NotImplemented
 
     def __lt__(self, other):
