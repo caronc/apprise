@@ -59,7 +59,10 @@ if [ ! -d "$DIST_DIR" ]; then
    $TOX -e build-sdist
 fi
 
-VERSION=$(rpmspec -q --qf "%{version}\n" "$APPRISE_DIR/packaging/redhat/python-apprise.spec" | head -n1)
+# Version
+VERSION=$(rpmspec -q --srpm --qf "%{version}\n" "$APPRISE_DIR/packaging/redhat/python-apprise.spec")
+VERSION="${VERSION%%$'\n'*}"
+
 TARBALL="$APPRISE_DIR/dist/apprise-${VERSION}.tar.gz"
 
 if [[ ! -f "$TARBALL" ]]; then
