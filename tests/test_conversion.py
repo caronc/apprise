@@ -4573,6 +4573,16 @@ def test_conversion_html_tag_reducer_line_breaks():
     assert "\n" not in reducer.reduce(
         "<table>\n<tr>\n<td>a</td>\n<td>b</td>\n</tr>\n</table>"
     )
+    assert "\n" not in reducer.reduce(
+        "<table><tr><td><b>a</b></td>\n<td>b</td></tr></table>"
+    )
+
+    # A break written between two inline tags is kept like one in text
+    assert reducer.reduce("<b>a</b>\n<i>b</i>") == "a\nb"
+    assert reducer.reduce("<span>a</span>\n\n<span>b</span>") == "a\n\nb"
+
+    # A space between inline tags is still just a space
+    assert reducer.reduce("<b>a</b> <i>b</i>") == "a b"
 
 
 def test_conversion_sentinel_exhausted_partners_is_fast():
