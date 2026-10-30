@@ -1408,6 +1408,10 @@ msgstr "Account Email or Object ID"
 msgid "Client Secret"
 msgstr "Client Secret"
 
+#: apprise/plugins/kakaotalk.py:172
+msgid "Refresh Token"
+msgstr "Refresh Token"
+
 #: apprise/plugins/office365.py:326
 msgid "Save to Sent Items"
 msgstr "Save to Sent Items"

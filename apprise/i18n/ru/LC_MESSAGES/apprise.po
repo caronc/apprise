@@ -1409,6 +1409,10 @@ msgstr "Электронная почта учётной записи или и�
 msgid "Client Secret"
 msgstr "Секрет клиента"
 
+#: apprise/plugins/kakaotalk.py:172
+msgid "Refresh Token"
+msgstr "Токен обновления"
+
 #: apprise/plugins/office365.py:326
 msgid "Save to Sent Items"
 msgstr "Сохранять в отправленных"

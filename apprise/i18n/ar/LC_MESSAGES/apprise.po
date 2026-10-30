@@ -1409,6 +1409,10 @@ msgstr "بريد الحساب أو معرّف الكائن"
 msgid "Client Secret"
 msgstr "سر العميل"
 
+#: apprise/plugins/kakaotalk.py:172
+msgid "Refresh Token"
+msgstr "رمز التحديث"
+
 #: apprise/plugins/office365.py:326
 msgid "Save to Sent Items"
 msgstr "الحفظ في العناصر المرسلة"

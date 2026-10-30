@@ -1408,6 +1408,10 @@ msgstr "Email tài khoản hoặc ID đối tượng"
 msgid "Client Secret"
 msgstr "Mã bí mật của ứng dụng khách"
 
+#: apprise/plugins/kakaotalk.py:172
+msgid "Refresh Token"
+msgstr "Mã làm mới"
+
 #: apprise/plugins/office365.py:326
 msgid "Save to Sent Items"
 msgstr "Lưu vào thư đã gửi"

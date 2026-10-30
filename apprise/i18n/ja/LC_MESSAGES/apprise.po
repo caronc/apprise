@@ -1409,6 +1409,10 @@ msgstr "アカウントのメールまたはオブジェクト ID"
 msgid "Client Secret"
 msgstr "クライアントシークレット"
 
+#: apprise/plugins/kakaotalk.py:172
+msgid "Refresh Token"
+msgstr "リフレッシュトークン"
+
 #: apprise/plugins/office365.py:326
 msgid "Save to Sent Items"
 msgstr "送信済みアイテムに保存"

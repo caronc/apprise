@@ -1408,6 +1408,10 @@ msgstr "खाते का ईमेल या ऑब्जेक्ट की 
 msgid "Client Secret"
 msgstr "क्लाइंट की गुप्त कुंजी"
 
+#: apprise/plugins/kakaotalk.py:172
+msgid "Refresh Token"
+msgstr "रीफ़्रेश टोकन"
+
 #: apprise/plugins/office365.py:326
 msgid "Save to Sent Items"
 msgstr "भेजे गए आइटम में सहेजें"

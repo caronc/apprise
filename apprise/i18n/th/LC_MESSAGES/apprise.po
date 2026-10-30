@@ -1408,6 +1408,10 @@ msgstr "อีเมลของบัญชีหรือรหัสวัต
 msgid "Client Secret"
 msgstr "รหัสลับของไคลเอ็นต์"
 
+#: apprise/plugins/kakaotalk.py:172
+msgid "Refresh Token"
+msgstr "โทเค็นรีเฟรช"
+
 #: apprise/plugins/office365.py:326
 msgid "Save to Sent Items"
 msgstr "บันทึกไว้ในรายการที่ส่งแล้ว"
