@@ -139,6 +139,7 @@ TRACKED = {
     "jira": "jira://apikey/user@email.com/#team/",
     "join": "join://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/device0001",
     "kaleyra": "kaleyra://sid:apikey@KLRHXA/15551234567/15551239999",
+    "kakaotalk": "kakaotalk://abcdef0123456789/refresh/friend0001/me",
     "kavenegar": "kavenegar://12125550000/12125550001/12125559999",
     "kook": "kook://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/1234567890",
     "line": "line://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/target0001",

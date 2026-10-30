@@ -125,6 +125,13 @@ FLEET = (
         {},
     ),
     (
+        "kakaotalk",
+        f"kakaotalk://abcdef0123456789/{TOKEN}/friend0001/friend9999/",
+        "friend0001",
+        "friend9999",
+        {},
+    ),
+    (
         "telesign",
         f"telesign://customerid:{TOKEN}@12125550001/12125559999/",
         "12125550001",

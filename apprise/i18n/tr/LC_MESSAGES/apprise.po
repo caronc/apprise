@@ -1408,6 +1408,10 @@ msgstr "Hesap e-postası veya nesne kimliği"
 msgid "Client Secret"
 msgstr "İstemci parolası"
 
+#: apprise/plugins/kakaotalk.py:172
+msgid "Refresh Token"
+msgstr "Yenileme belirteci"
+
 #: apprise/plugins/office365.py:326
 msgid "Save to Sent Items"
 msgstr "Gönderilmiş öğelere kaydet"
