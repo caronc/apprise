@@ -4909,14 +4909,17 @@ class TestDeadlineExpiresDuringAttempt:
         try:
             asset = AppriseAsset(async_mode=True, service_timeout=0.05)
             service = _SlowFailNotify(
-                host="x", asset=asset, retry=1, wait=1.0, delay=0.08
+                host="x", asset=asset, retry=1, wait=5.0, delay=0.25
             )
             a = Apprise(asset=asset)
             a.add(service)
 
-            # Keep the delay just above service_timeout so do_call() reaches
-            # its retry check before the outer abandon window takes over.
-            result = asyncio.run(a.async_notify(body="test"))
+            # The attempt ends well past service_timeout, and a widened
+            # grace window lets do_call() reach its retry check on a loaded
+            # runner.  A wait that was not skipped would overrun the window
+            # and report TIMEOUT instead.
+            with mock.patch("apprise.apprise._ABANDON_GRACE_SECONDS", 1.5):
+                result = asyncio.run(a.async_notify(body="test"))
 
             assert result.status == AppriseResultStatus.FAILURE
             assert service.calls == 1
