@@ -29,6 +29,7 @@ from inspect import cleandoc
 
 # Disable logging for a cleaner testing output
 import logging
+from time import process_time
 from timeit import default_timer
 from unittest import mock
 
@@ -4105,20 +4106,23 @@ def test_conversion_commonmark_match_emphasis():
     assert delimiters[1]["numdelims"] == 1
     assert delimiters[1]["events"] == []
 
-    # Compare two adversarial sizes so quadratic matching approaches 4x
-    # growth. The ratio also tolerates slower test hosts.
-    small_n = 6000
+    # Compare two adversarial sizes 4x apart. Linear matching grows about
+    # 4x while quadratic matching grows about 16x, which leaves a wide gap
+    # between the two for a busy test host to fall into.
+    small_n = 3000
     large_n = 12000
     small_body = ("*a " * small_n) + ("b* " * small_n)
     large_body = ("*a " * large_n) + ("b* " * large_n)
 
     # Interleave several rounds and keep each size's fastest result. This
     # reduces noise from scheduling, garbage collection, and background load.
+    # CPU time is used so time spent waiting on other processes is not
+    # counted.
     small_time = large_time = None
     for _ in range(5):
-        start = default_timer()
+        start = process_time()
         text, pending = commonmark_repair_chunk(small_body, {})
-        elapsed = default_timer() - start
+        elapsed = process_time() - start
         small_time = (
             elapsed if small_time is None else min(small_time, elapsed)
         )
@@ -4126,18 +4130,18 @@ def test_conversion_commonmark_match_emphasis():
         assert text == small_body
         assert pending == {}
 
-        start = default_timer()
+        start = process_time()
         text, pending = commonmark_repair_chunk(large_body, {})
-        elapsed = default_timer() - start
+        elapsed = process_time() - start
         large_time = (
             elapsed if large_time is None else min(large_time, elapsed)
         )
         assert text == large_body
         assert pending == {}
 
-    # Doubling input should remain near linear; the additive margin covers
-    # timer noise at these short runtimes.
-    assert large_time < small_time * 3.0 + 0.1
+    # Growth should stay near linear; the additive margin covers timer
+    # noise at these short runtimes.
+    assert large_time < small_time * 8.0 + 0.1
 
 
 def test_conversion_commonmark_render_emphasis_events():
