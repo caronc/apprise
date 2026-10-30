@@ -1501,7 +1501,7 @@ def main(
         if body is None:
             logger.trace("No --body (-b) specified; reading from stdin")
             # if no body was specified, then read from STDIN
-            body = click.get_text_stream("stdin").read()
+            body = sys.stdin.read()
 
         # Send the notification. AppriseResult.status maps directly to the
         # process exit values handled after the dry-run branch.
