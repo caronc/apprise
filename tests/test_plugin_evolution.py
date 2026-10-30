@@ -27,6 +27,7 @@
 
 from json import loads
 import logging
+from timeit import default_timer
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -34,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyFormat
+from apprise.conversion import MAX_LINK_DEPTH
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.evolution import NotifyEvolution
 
@@ -589,3 +591,16 @@ def test_plugin_evolution_overflow_split_code_fence(mock_post):
     for text in texts:
         # Each delivered chunk must avoid an unmatched WhatsApp code fence.
         assert "```" not in text
+
+
+def test_plugin_evolution_deeply_nested_links():
+    """Deeply nested link labels convert quickly and keep their text."""
+    depth = 20000
+    body = "[" * depth + "x" + "](u)" * depth
+
+    start = default_timer()
+    result = NotifyEvolution._commonmark_to_whatsapp(body)
+    assert default_timer() - start < 5
+
+    # Only the outer labels become links; the rest stay as plain text
+    assert result.count("](u)") == depth - MAX_LINK_DEPTH

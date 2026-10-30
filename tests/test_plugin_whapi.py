@@ -29,6 +29,7 @@
 from json import dumps, loads
 import logging
 import os
+import time
 from unittest import mock
 from urllib.parse import urlparse
 
@@ -37,6 +38,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat
+from apprise.conversion import MAX_LINK_DEPTH
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.whapi import NotifyWhapi
 
@@ -104,6 +106,7 @@ apprise_url_tests = (
         {
             # Everything given as arguments
             "instance": NotifyWhapi,
+            "requests_response_text": OK_RESPONSE,
             "privacy_url": f"whapi://A...9/15551234567/{GROUP}@g.us",
         },
     ),
@@ -275,13 +278,28 @@ def test_plugin_whapi_responses(mock_post):
     )
     assert obj.notify(body="test") is False
 
-    # A JSON answer that is not an object is ignored
-    mock_post.return_value = _mk_resp(b"[]", code=requests.codes.created)
+    # A 2xx answer only counts when it confirms the message was sent
+    for content in (b"", b"<html></html>", b"[]", b"{}"):
+        mock_post.return_value = _mk_resp(content)
+        assert obj.notify(body="test") is False
+
+    # Any 2xx code is accepted when the message was sent
+    mock_post.return_value = _mk_resp(code=requests.codes.created)
     assert obj.notify(body="test") is True
 
-    # A non-JSON answer falls back to the status code
-    mock_post.return_value = _mk_resp(b"not json")
-    assert obj.notify(body="test") is True
+
+def test_plugin_whapi_deeply_nested_links():
+    """Deeply nested link labels convert quickly and keep their text."""
+    depth = 20000
+    body = "[" * depth + "x" + "](u)" * depth
+
+    start = time.monotonic()
+    result = NotifyWhapi._commonmark_to_whatsapp(body)
+    assert time.monotonic() - start < 5
+
+    # The innermost links still convert; the extra brackets stay as text
+    assert result.startswith("[" * (depth - MAX_LINK_DEPTH))
+    assert "x (u)" in result
 
 
 @mock.patch("requests.post")
@@ -387,6 +405,18 @@ def test_plugin_whapi_attach_errors(mock_post):
     mock_post.return_value = _mk_resp(code=500)
     assert obj.notify(body="test", attach=AppriseAttachment(path)) is False
     assert mock_post.call_count == 1
+
+    # A file that was sent but fails to close still counts as sent
+    mock_post.reset_mock()
+    mock_post.return_value = _mk_resp()
+    handle = mock.Mock()
+    handle.close.side_effect = OSError("close failed")
+    with mock.patch(
+        "apprise.attachment.base.AttachBase.open", return_value=handle
+    ):
+        assert obj.notify(body="", attach=AppriseAttachment(path)) is True
+    assert mock_post.call_count == 1
+    handle.close.assert_called_once()
 
 
 @mock.patch("requests.post")

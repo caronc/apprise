@@ -47,10 +47,12 @@ from ..conversion import (
     commonmark_index_backtick_runs,
     commonmark_match_emphasis,
     commonmark_new_scan_budget,
+    commonmark_open_link_label,
     commonmark_pick_emphasis_sentinel,
     commonmark_scan_angle_dest,
     commonmark_scan_autolink_dest,
     commonmark_scan_paren_dest,
+    commonmark_take_link_label,
 )
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
@@ -357,9 +359,7 @@ class NotifySignalAPI(NotifyBase):
                 continue
 
             # Record a possible CommonMark link-label opening.
-            if ch == "[":
-                link_stack.append(len(out))
-                out.append("[")
+            if ch == "[" and commonmark_open_link_label(out, link_stack):
                 i += 1
                 continue
 
@@ -372,7 +372,7 @@ class NotifySignalAPI(NotifyBase):
 
                 if close is not None:
                     cls._append_signal_link(
-                        out, link_stack.pop(), body[i + 3 : close], escape
+                        out, link_stack, body[i + 3 : close], escape
                     )
                     # Skip past the closing ">)" of the destination.
                     i = close + 2
@@ -388,7 +388,7 @@ class NotifySignalAPI(NotifyBase):
 
                 if close is not None:
                     cls._append_signal_link(
-                        out, link_stack.pop(), body[i + 2 : close], escape
+                        out, link_stack, body[i + 2 : close], escape
                     )
                     # Skip past the closing ")" of the destination.
                     i = close + 1
@@ -529,14 +529,16 @@ class NotifySignalAPI(NotifyBase):
 
     @staticmethod
     def _append_signal_link(
-        out: list[str], open_index: int, raw_url: str, escape: dict[int, str]
+        out: list[str],
+        link_stack: list[int],
+        raw_url: str,
+        escape: dict[int, str],
     ) -> None:
         """Replace a buffered link with Signal's ``label (url)`` form."""
         url = commonmark_decode_backslash_escapes(raw_url).translate(escape)
 
         # Recover the buffered label and remove its opening ``[``.
-        text = "".join(out[open_index + 1 :])
-        del out[open_index:]
+        text = commonmark_take_link_label(out, link_stack)
 
         # Omit the label when only a bare URL is available.
         out.append(f"{text} ({url})" if text else url)

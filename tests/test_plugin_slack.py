@@ -39,6 +39,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
+from apprise.conversion import MAX_LINK_DEPTH
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.base import _delivery_memo, _delivery_tracker
 from apprise.plugins.slack import NotifySlack, SlackMode
@@ -2882,3 +2883,16 @@ def test_plugin_slack_text_split_kept(mock_request):
         for call in mock_request.call_args_list
     )
     assert sent == "a*b_c " + "&amp;" * 34000
+
+
+def test_plugin_slack_deeply_nested_links():
+    """Deeply nested link labels convert quickly and keep their text."""
+    depth = 20000
+    body = "[" * depth + "x" + "](u)" * depth
+
+    start = default_timer()
+    result = NotifySlack._commonmark_to_slack(body)
+    assert default_timer() - start < 5
+
+    # Only the outer labels become links; the rest stay as plain text
+    assert result.count("](u)") == depth - MAX_LINK_DEPTH

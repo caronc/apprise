@@ -60,11 +60,13 @@ from ..conversion import (
     commonmark_headings_to_bold,
     commonmark_index_backtick_runs,
     commonmark_new_scan_budget,
+    commonmark_open_link_label,
     commonmark_pick_emphasis_sentinel,
     commonmark_render_emphasis_markers,
     commonmark_scan_angle_dest,
     commonmark_scan_autolink_dest,
     commonmark_scan_paren_dest,
+    commonmark_take_link_label,
 )
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
@@ -210,7 +212,7 @@ class NotifyEvolution(NotifyBase):
     # Direct WhatsApp Markdown is left unchanged.
     # Syntax: https://faq.whatsapp.com/539178204879377/
     @staticmethod
-    def _append_whatsapp_link(out, open_index, raw_url):
+    def _append_whatsapp_link(out, link_stack, raw_url):
         """Replace a buffered link with WhatsApp's ``label (url)`` form.
 
         CommonMark escapes are decoded and closing parentheses are protected.
@@ -218,8 +220,7 @@ class NotifyEvolution(NotifyBase):
         url = commonmark_decode_backslash_escapes(raw_url)
 
         # Recover the buffered label and remove its opening ``[``.
-        text = "".join(out[open_index + 1 :])
-        del out[open_index:]
+        text = commonmark_take_link_label(out, link_stack)
 
         # Protect wrapper parentheses from URL content.
         safe_url = url.replace(")", "%29")
@@ -305,9 +306,7 @@ class NotifyEvolution(NotifyBase):
                 continue
 
             # Record a possible CommonMark link-label opening.
-            if ch == "[":
-                link_stack.append(len(out))
-                out.append("[")
+            if ch == "[" and commonmark_open_link_label(out, link_stack):
                 i += 1
                 continue
 
@@ -320,8 +319,7 @@ class NotifyEvolution(NotifyBase):
 
                 if close is not None:
                     raw_url = body[i + 3 : close]
-                    open_index = link_stack.pop()
-                    cls._append_whatsapp_link(out, open_index, raw_url)
+                    cls._append_whatsapp_link(out, link_stack, raw_url)
                     # Skip past the closing ">)" of the destination.
                     i = close + 2
                     continue
@@ -336,8 +334,7 @@ class NotifyEvolution(NotifyBase):
 
                 if close is not None:
                     raw_url = body[i + 2 : close]
-                    open_index = link_stack.pop()
-                    cls._append_whatsapp_link(out, open_index, raw_url)
+                    cls._append_whatsapp_link(out, link_stack, raw_url)
                     # Skip past the closing ")" of the destination.
                     i = close + 1
                     continue

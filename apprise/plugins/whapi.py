@@ -50,6 +50,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from json import dumps, loads
 import re
 from typing import Any, Optional
@@ -65,11 +66,13 @@ from ..conversion import (
     commonmark_headings_to_bold,
     commonmark_index_backtick_runs,
     commonmark_new_scan_budget,
+    commonmark_open_link_label,
     commonmark_pick_emphasis_sentinel,
     commonmark_render_emphasis_markers,
     commonmark_scan_angle_dest,
     commonmark_scan_autolink_dest,
     commonmark_scan_paren_dest,
+    commonmark_take_link_label,
 )
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
@@ -263,7 +266,7 @@ class NotifyWhapi(NotifyBase):
     # Syntax: https://faq.whatsapp.com/539178204879377/
     @staticmethod
     def _append_whatsapp_link(
-        out: list[str], open_index: int, raw_url: str
+        out: list[str], link_stack: list[int], raw_url: str
     ) -> None:
         """Replace a buffered link with WhatsApp's ``label (url)`` form.
 
@@ -272,8 +275,7 @@ class NotifyWhapi(NotifyBase):
         url = commonmark_decode_backslash_escapes(raw_url)
 
         # Recover the buffered label and remove its opening ``[``.
-        text = "".join(out[open_index + 1 :])
-        del out[open_index:]
+        text = commonmark_take_link_label(out, link_stack)
 
         # Protect wrapper parentheses from URL content.
         safe_url = url.replace(")", "%29")
@@ -365,9 +367,7 @@ class NotifyWhapi(NotifyBase):
                 continue
 
             # Record a possible CommonMark link-label opening.
-            if ch == "[":
-                link_stack.append(len(out))
-                out.append("[")
+            if ch == "[" and commonmark_open_link_label(out, link_stack):
                 i += 1
                 continue
 
@@ -380,8 +380,7 @@ class NotifyWhapi(NotifyBase):
 
                 if close is not None:
                     raw_url = body[i + 3 : close]
-                    open_index = link_stack.pop()
-                    cls._append_whatsapp_link(out, open_index, raw_url)
+                    cls._append_whatsapp_link(out, link_stack, raw_url)
                     # Skip past the closing ">)" of the destination.
                     i = close + 2
                     continue
@@ -396,8 +395,7 @@ class NotifyWhapi(NotifyBase):
 
                 if close is not None:
                     raw_url = body[i + 2 : close]
-                    open_index = link_stack.pop()
-                    cls._append_whatsapp_link(out, open_index, raw_url)
+                    cls._append_whatsapp_link(out, link_stack, raw_url)
                     # Skip past the closing ")" of the destination.
                     i = close + 1
                     continue
@@ -548,9 +546,11 @@ class NotifyWhapi(NotifyBase):
                     delivered = False
 
                 finally:
-                    # Close our file whether we succeeded or failed
+                    # Close our file whether we succeeded or failed; a failed
+                    # close does not undo a file that was already sent
                     if handle:
-                        handle.close()
+                        with suppress(OSError):
+                            handle.close()
 
                 if not delivered:
                     # Mark our failure; later files wait for a retry
@@ -600,7 +600,7 @@ class NotifyWhapi(NotifyBase):
                 content = loads(r.content)
 
             except (AttributeError, TypeError, ValueError):
-                # The response was not JSON; rely on the status code
+                # The response was not JSON
                 content = {}
 
             # A successful response looks like:
@@ -611,7 +611,11 @@ class NotifyWhapi(NotifyBase):
             if not isinstance(content, dict):
                 content = {}
 
-            if not 200 <= r.status_code < 300 or content.get("sent") is False:
+            # Only an explicit "sent": true confirms the delivery
+            if (
+                not 200 <= r.status_code < 300
+                or content.get("sent") is not True
+            ):
                 # Prefer Whapi.Cloud's own explanation when it gave one
                 error = content.get("error")
                 status_str = (

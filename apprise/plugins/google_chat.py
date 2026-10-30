@@ -66,11 +66,13 @@ from ..conversion import (
     commonmark_headings_to_bold,
     commonmark_index_backtick_runs,
     commonmark_new_scan_budget,
+    commonmark_open_link_label,
     commonmark_pick_emphasis_sentinel,
     commonmark_render_emphasis_markers,
     commonmark_scan_angle_dest,
     commonmark_scan_autolink_dest,
     commonmark_scan_paren_dest,
+    commonmark_take_link_label,
 )
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
@@ -319,9 +321,7 @@ class NotifyGoogleChat(NotifyBase):
                 continue
 
             # Record a possible CommonMark link-label opening.
-            if ch == "[":
-                link_stack.append(len(out))
-                out.append("[")
+            if ch == "[" and commonmark_open_link_label(out, link_stack):
                 i += 1
                 continue
 
@@ -337,9 +337,7 @@ class NotifyGoogleChat(NotifyBase):
                     url = commonmark_escape_link_url(body[i + 3 : close])
 
                     # Recover the buffered label and replace its opening.
-                    open_index = link_stack.pop()
-                    text = "".join(out[open_index + 1 :])
-                    del out[open_index:]
+                    text = commonmark_take_link_label(out, link_stack)
                     out.append(f"<{url}|{text}>")
                     # Skip past the closing ">)" of the destination.
                     i = close + 2
@@ -355,9 +353,7 @@ class NotifyGoogleChat(NotifyBase):
 
                 if close is not None:
                     url = commonmark_escape_link_url(body[i + 2 : close])
-                    open_index = link_stack.pop()
-                    text = "".join(out[open_index + 1 :])
-                    del out[open_index:]
+                    text = commonmark_take_link_label(out, link_stack)
                     out.append(f"<{url}|{text}>")
                     # Skip past the closing ")".
                     i = close + 1
