@@ -611,3 +611,30 @@ def test_plugin_custom_xml_edge_cases(mock_request):
     details = mock_request.call_args_list[0]
     assert details[0][0] == "OPTIONS"
     assert details[0][1] == "http://localhost"
+
+
+@mock.patch("requests.request")
+def test_plugin_custom_xml_get_params(mock_request):
+    """GET params (-param=value) reach the request."""
+
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    mock_request.return_value = response
+
+    obj = Apprise.instantiate(
+        "xml://localhost/path?-ParamA=Value&-ParamB=Other"
+    )
+    assert isinstance(obj, NotifyXML)
+    assert "-ParamA=Value" in obj.url()
+    assert obj.notify(body="body")
+    assert mock_request.call_count == 1
+    assert mock_request.call_args[1]["params"] == {
+        "ParamA": "Value",
+        "ParamB": "Other",
+    }
+
+    # No GET params are sent when none are given
+    mock_request.reset_mock()
+    obj = Apprise.instantiate("xml://localhost/path")
+    assert obj.notify(body="body")
+    assert mock_request.call_args[1]["params"] == {}

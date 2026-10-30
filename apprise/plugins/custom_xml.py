@@ -418,6 +418,7 @@ class NotifyXML(NotifyBase):
                 self.method,
                 url,
                 data=payload,
+                params=self.params,
                 headers=headers,
                 auth=auth,
                 verify=self.verify_certificate,
