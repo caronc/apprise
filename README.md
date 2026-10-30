@@ -185,6 +185,7 @@ The table below identifies the services this tool supports and some example serv
 | [Webex Teams (Cisco)](https://appriseit.com/services/wxteams/) | wxteams://  | (TCP) 443   | wxteams://Token
 | [WeChat (WeCom)](https://appriseit.com/services/wechat/) | wechat://  | (TCP) 443   | wechat://CorpID:AppSecret@AgentID/@all<br/>wechat://CorpID:AppSecret@AgentID/UserID
 | [WeCom Bot](https://appriseit.com/services/wecombot/) | wecombot://  | (TCP) 443   | wecombot://BotKey
+| [Whapi.Cloud](https://appriseit.com/services/whapi/) | whapi://  | (TCP) 443   | whapi://Token/ToPhoneNo<br/>whapi://Token/ToPhoneNo1/ToGroupID/ToPhoneNoN
 | [WhatsApp](https://appriseit.com/services/whatsapp/) | whatsapp://  | (TCP) 443   | whatsapp://AccessToken@FromPhoneID/ToPhoneNo<br/>whatsapp://Template:AccessToken@FromPhoneID/ToPhoneNo
 | [WPUSH](https://appriseit.com/services/wpush/) | wpush://  | (TCP) 443   | wpush://APIKey<br/>wpush://APIKey/Topic1/Topic2/TopicN
 | [WxPusher](https://appriseit.com/services/wxpusher/) | wxpusher://  | (TCP) 443   | wxpusher://AppToken@UserID1/UserID2/UserIDN<br/>wxpusher://AppToken@Topic1/Topic2/Topic3<br/>wxpusher://AppToken@UserID1/Topic1/
