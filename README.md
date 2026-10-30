@@ -188,6 +188,7 @@ The table below identifies the services this tool supports and some example serv
 | [WPUSH](https://appriseit.com/services/wpush/) | wpush://  | (TCP) 443   | wpush://APIKey<br/>wpush://APIKey/Topic1/Topic2/TopicN
 | [WxPusher](https://appriseit.com/services/wxpusher/) | wxpusher://  | (TCP) 443   | wxpusher://AppToken@UserID1/UserID2/UserIDN<br/>wxpusher://AppToken@Topic1/Topic2/Topic3<br/>wxpusher://AppToken@UserID1/Topic1/
 | [XBMC](https://appriseit.com/services/xbmc/) | xbmc:// or xbmcs://    | (TCP) 8080 or 443   | xbmc://hostname<br />xbmc://user@hostname<br />xbmc://user:password@hostname:port
+| [xMatters](https://appriseit.com/services/xmatters/) | xmatters://  | (TCP) 443   | xmatters://apikey@company/integration_id<br />xmatters://apikey@company/integration_id/recipient1/recipient2<br />xmatters://user:password@company.xmatters.com/integration_id/recipient
 | [XMPP](https://appriseit.com/services/xmpp/) | xmpp:// or xmpps://    | (TCP) 5222 or 5223   | xmpp://user:pass@hostname<br />xmpps://user:pass@hostname/jid<br />xmpps://user:pass@hostname/jid1/jid2@example.ca
 | [YouLMK](https://appriseit.com/services/youlmk/) | youlmk://  | (TCP) 443   | youlmk://ylk_token<br/>youlmk://k_key<br/>youlmk://ylk_token?priority=critical<br/>youlmk://ylk_token?failure=critical&url=https://example.com/runs/1
 | [Zalo](https://appriseit.com/services/zalo/) | zalo://  | (TCP) 443   | zalo://BotToken/ChatID<br/>zalo://BotToken/ChatID1/ChatID2/ChatIDN
