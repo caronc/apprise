@@ -661,6 +661,10 @@ class NotifyPushSafer(NotifyBase):
                 "d": recipient,
             }
 
+            if self.priority is not None:
+                # Only apply priority setting if it was specified
+                payload["pr"] = str(self.priority)
+
             if self.sound is not None:
                 # Only apply sound setting if it was specified
                 payload["s"] = str(self.sound)

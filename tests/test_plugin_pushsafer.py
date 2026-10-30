@@ -36,7 +36,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import AppriseAttachment, NotifyType
+from apprise import Apprise, AppriseAttachment, NotifyType
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pushsafer import NotifyPushSafer
 
@@ -379,3 +379,32 @@ def test_plugin_pushsafer_general(mock_post):
         )
         is False
     )
+
+
+@mock.patch("requests.post")
+def test_plugin_pushsafer_priority(mock_post):
+    """priority= reaches the posted payload."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = dumps(
+        {
+            "status": 1,
+            "success": "okay",
+        }
+    )
+
+    obj = Apprise.instantiate("psafer://abc123?priority=emergency")
+    assert obj.priority == 2
+    assert "priority=emergency" in obj.url()
+    assert obj.notify(body="body")
+    assert mock_post.call_args[1]["data"]["pr"] == "2"
+
+    obj = Apprise.instantiate("psafer://abc123?priority=-2")
+    assert obj.notify(body="body")
+    assert mock_post.call_args[1]["data"]["pr"] == "-2"
+
+    # The device default is kept when no priority is given
+    obj = Apprise.instantiate("psafer://abc123")
+    assert obj.notify(body="body")
+    assert "pr" not in mock_post.call_args[1]["data"]
