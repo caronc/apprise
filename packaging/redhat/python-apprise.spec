@@ -101,9 +101,9 @@ notification services. It supports sending alerts to platforms such as: \
 `Telnyx`, \
 `Threema Gateway`, `Trigv`, `Twilio`, `Twitter`, `Twist`, `Vapid`, \
 `Viber`, `VictorOps`, \
-`Voipms`, `Vonage`, `WebPush`, `WeChat (WeCom)`, `WeCom Bot`, `WhatsApp`, \
-`Webex Teams`, `Workflows`, `WPUSH`, `WxPusher`, `XBMC`, `xMatters`, \
-`XMPP`, `YouLMK`, `Zalo`, `Zoho Cliq`, `Zoom`, and `Zulip`.}
+`Voipms`, `Vonage`, `WebPush`, `WeChat (WeCom)`, `WeCom Bot`, `Whapi.Cloud`, \
+`WhatsApp`, `Webex Teams`, `Workflows`, `WPUSH`, `WxPusher`, `XBMC`, \
+`xMatters`, `XMPP`, `YouLMK`, `Zalo`, `Zoho Cliq`, `Zoom`, and `Zulip`.}
 
 Name:           python-%{pypi_name}
 Version:        2.1.0
