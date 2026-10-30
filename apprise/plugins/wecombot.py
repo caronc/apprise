@@ -84,6 +84,9 @@ class NotifyWeComBot(NotifyBase):
     # Plain Text Notification URL
     notify_url = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={key}"
 
+    # WeCom Bot text messages are limited to 2048 bytes
+    body_maxlen = 2048
+
     # Define object templates
     templates = ("{schema}://{key}",)
 

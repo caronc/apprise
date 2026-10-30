@@ -347,6 +347,9 @@ class NotifyPushSafer(NotifyBase):
     # post the message upstream.
     notify_url = "{schema}://www.pushsafer.com/api"
 
+    # Pushsafer messages are limited to 5000 characters
+    body_maxlen = 5000
+
     # Define object templates
     templates = (
         "{schema}://{privatekey}",

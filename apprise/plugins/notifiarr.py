@@ -69,6 +69,10 @@ class NotifyNotifiarr(NotifyBase):
     # The Notification URL
     notify_url = "https://notifiarr.com/api/v1/notification/apprise"
 
+    # The body becomes a Discord embed description, which Discord limits
+    # to 4096 characters
+    body_maxlen = 4096
+
     # Notifiarr Throttling (knowing in advance reduces 429 responses)
     # define('NOTIFICATION_LIMIT_SECOND_USER', 5);
     # define('NOTIFICATION_LIMIT_SECOND_PATRON', 15);

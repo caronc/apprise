@@ -129,6 +129,10 @@ class NotifyPagerDuty(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/pagerduty/"
 
+    # The body is sent as the event summary, which PagerDuty limits to
+    # 1024 characters
+    body_maxlen = 1024
+
     # We don't support titles for Pager Duty notifications
     title_maxlen = 0
 

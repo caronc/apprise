@@ -74,6 +74,14 @@ class NotifyDingTalk(NotifyBase):
     # DingTalk API
     notify_url = "https://oapi.dingtalk.com/robot/send?access_token={token}"
 
+    # DingTalk rejects a request larger than 20000 bytes.  This number
+    # leaves a little room for the rest of the payload.
+    body_maxlen = 19985
+
+    # The title is placed inside the message text, so both share the
+    # same limit.
+    overflow_amalgamate_title = True
+
     # Keep the title separate so send() can place it consistently in both
     # text and Markdown messages.
 

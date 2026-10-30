@@ -58,6 +58,14 @@ class NotifyLark(NotifyBase):
     # This is the static part of the webhook URL; only the token varies.
     notify_url = "https://open.larksuite.com/open-apis/bot/v2/hook/"
 
+    # Limit is documented to be 20K message sizes.  This number safely
+    # allows padding around that size.
+    body_maxlen = 19985
+
+    # The title is joined to the body in one text field, so both share
+    # the same limit.
+    overflow_amalgamate_title = True
+
     # Define object templates
     templates = ("{schema}://{token}",)
 

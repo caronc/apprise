@@ -57,6 +57,9 @@ class NotifyClickatell(NotifyBase):
     # Clickatell API Endpoint
     notify_url = "https://platform.clickatell.com/messages/http/send"
 
+    # The maximum length of the body
+    body_maxlen = 160
+
     # A title can not be used for SMS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
