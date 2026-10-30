@@ -138,6 +138,7 @@ TRACKED = {
     "infobip": "infobip://apikey@xyz123/15551234567/15551239999",
     "jira": "jira://apikey/user@email.com/#team/",
     "join": "join://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/device0001",
+    "kaleyra": "kaleyra://sid:apikey@KLRHXA/15551234567/15551239999",
     "kavenegar": "kavenegar://12125550000/12125550001/12125559999",
     "kook": "kook://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/1234567890",
     "line": "line://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/target0001",

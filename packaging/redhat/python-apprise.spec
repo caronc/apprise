@@ -72,8 +72,8 @@ notification services. It supports sending alerts to platforms such as: \
 `GoAlert`, `Google Chat`, `Gorush`, `Gotify`, `Groundmail`, `GroupMe`, \
 `Growl`, `Guilded`, `Gupshup`, `Home Assistant`, `httpSMS`, \
 `HumHub`, `IFTTT`, `ilert`, `incident.io`, `Infobip`, \
-`IRC`, `Jellyfin`, `Jira`, `Join`, `Kavenegar`, `KODI`, `Kook`, \
-`Kumulos`, `LaMetric`, `Lark`, `Lauther`, `LFG Alarm`, `Line`, \
+`IRC`, `Jellyfin`, `Jira`, `Join`, `Kaleyra`, `Kavenegar`, `KODI`, \
+`Kook`, `Kumulos`, `LaMetric`, `Lark`, `Lauther`, `LFG Alarm`, `Line`, \
 `MacOSX`, `Mailgun`, \
 `MailerSend`, \
 `Mastodon`, \
