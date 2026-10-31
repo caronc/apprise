@@ -978,6 +978,10 @@ msgstr "중복 제거 키"
 msgid "Metadata"
 msgstr "메타데이터"
 
+#: apprise/plugins/firehydrant.py:205
+msgid "Annotations"
+msgstr "주석"
+
 #: apprise/plugins/google_chat.py:120
 msgid "Workspace"
 msgstr "작업 공간"

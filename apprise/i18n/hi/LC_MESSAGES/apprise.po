@@ -978,6 +978,10 @@ msgstr "डुप्लिकेट-रोधी कुंजी"
 msgid "Metadata"
 msgstr "मेटाडेटा"
 
+#: apprise/plugins/firehydrant.py:205
+msgid "Annotations"
+msgstr "एनोटेशन"
+
 #: apprise/plugins/google_chat.py:120
 msgid "Workspace"
 msgstr "कार्यस्थान"

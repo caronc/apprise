@@ -979,6 +979,10 @@ msgstr "مفتاح إزالة التكرار"
 msgid "Metadata"
 msgstr "البيانات الوصفية"
 
+#: apprise/plugins/firehydrant.py:205
+msgid "Annotations"
+msgstr "التعليقات التوضيحية"
+
 #: apprise/plugins/google_chat.py:120
 msgid "Workspace"
 msgstr "مساحة العمل"

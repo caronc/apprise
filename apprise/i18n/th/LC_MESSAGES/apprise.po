@@ -978,6 +978,10 @@ msgstr "คีย์ตัดรายการซ้ำ"
 msgid "Metadata"
 msgstr "ข้อมูลกำกับ"
 
+#: apprise/plugins/firehydrant.py:205
+msgid "Annotations"
+msgstr "คำอธิบายประกอบ"
+
 #: apprise/plugins/google_chat.py:120
 msgid "Workspace"
 msgstr "พื้นที่ทำงาน"

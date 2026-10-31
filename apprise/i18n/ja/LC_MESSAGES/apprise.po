@@ -979,6 +979,10 @@ msgstr "重複排除キー"
 msgid "Metadata"
 msgstr "メタデータ"
 
+#: apprise/plugins/firehydrant.py:205
+msgid "Annotations"
+msgstr "アノテーション"
+
 #: apprise/plugins/google_chat.py:120
 msgid "Workspace"
 msgstr "ワークスペース"

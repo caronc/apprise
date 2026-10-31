@@ -979,6 +979,10 @@ msgstr "Ключ дедупликации"
 msgid "Metadata"
 msgstr "Метаданные"
 
+#: apprise/plugins/firehydrant.py:205
+msgid "Annotations"
+msgstr "Аннотации"
+
 #: apprise/plugins/google_chat.py:120
 msgid "Workspace"
 msgstr "Рабочая область"
