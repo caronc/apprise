@@ -572,3 +572,10 @@ def test_plugin_jira_non_string_region():
     for region in (42, 4.2, True, b"us", ["us"], {"region": "us"}, object()):
         with pytest.raises(AppriseImproperlyConfigured):
             NotifyJira(apikey="a" * 32, targets=["user"], region_name=region)
+
+
+def test_plugin_jira_blank_action():
+    """NotifyJira() treats a blank action as unset."""
+
+    obj = NotifyJira(apikey="a" * 32, targets=["user"], action="  ")
+    assert obj.action == NotifyJira.template_args["action"]["default"]

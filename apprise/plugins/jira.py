@@ -384,7 +384,7 @@ class NotifyJira(NotifyBase):
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
 
-        if action and isinstance(action, str):
+        if action and isinstance(action, str) and action.strip():
             self.action = next(
                 (a for a in JIRA_ACTIONS if a.startswith(action)), None
             )

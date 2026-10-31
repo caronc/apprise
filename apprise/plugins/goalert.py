@@ -216,7 +216,7 @@ class NotifyGoAlert(NotifyBase):
         super().__init__(**kwargs)
 
         # Resolve our action; partial names such as "c" are accepted
-        if action and isinstance(action, str):
+        if action and isinstance(action, str) and action.strip():
             self.action = next(
                 (
                     a

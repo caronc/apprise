@@ -306,6 +306,10 @@ def test_plugin_squadcast_init():
     assert obj.priority is None
     assert len(obj) == 1
 
+    # A blank action is treated as unset
+    blank = NotifySquadcast(key=KEY, action="  ")
+    assert blank.action == SquadcastAction.MAP
+
     # The URL survives a round trip
     result = NotifySquadcast.parse_url(obj.url())
     obj2 = NotifySquadcast(**result)

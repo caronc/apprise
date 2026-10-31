@@ -246,9 +246,10 @@ class NotifyBetterStack(NotifyBase):
         self.policy = policy.strip() if policy else None
 
         # The alert methods to switch on.  None leaves the choice to the
-        # Better Stack team settings.
+        # Better Stack team settings, and so does a blank value.  An empty
+        # list such as "," switches every method off.
         self.alert = None
-        if alert:
+        if alert and (not isinstance(alert, str) or alert.strip()):
             self.alert = []
             for method in parse_list(alert):
                 method = method.lower()
@@ -447,7 +448,8 @@ class NotifyBetterStack(NotifyBase):
             params["policy"] = self.policy
 
         if self.alert is not None:
-            params["alert"] = ",".join(self.alert)
+            # An empty list is written as "," so it stays switched off
+            params["alert"] = ",".join(self.alert) or ","
 
         if self.team_wait is not None:
             params["team_wait"] = str(self.team_wait)

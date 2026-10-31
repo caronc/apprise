@@ -299,6 +299,10 @@ def test_plugin_ilert_init():
     assert obj.include_image is False
     assert len(obj) == 1
 
+    # A blank action is treated as unset
+    blank = NotifyILert(key=KEY, action="  ")
+    assert blank.action == ILertAction.MAP
+
     # The URL survives a round trip
     result = NotifyILert.parse_url(obj.url())
     obj2 = NotifyILert(**result)

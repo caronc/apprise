@@ -340,3 +340,9 @@ def test_plugin_pagerduty_action_url():
     assert "action=" not in obj.url()
     assert "dedup=" not in obj.url()
     assert obj.dedup is None
+
+    # A blank action is treated as unset
+    obj = NotifyPagerDuty(
+        apikey="apikey", integrationkey="routekey", action="  "
+    )
+    assert obj.action == PagerDutyAction.TRIGGER

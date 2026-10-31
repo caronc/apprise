@@ -496,3 +496,10 @@ def test_plugin_opsgenie_non_string_region():
             NotifyOpsgenie(
                 apikey="a" * 32, targets=["user"], region_name=region
             )
+
+
+def test_plugin_opsgenie_blank_action():
+    """NotifyOpsgenie() treats a blank action as unset."""
+
+    obj = NotifyOpsgenie(apikey="a" * 32, targets=["user"], action="  ")
+    assert obj.action == NotifyOpsgenie.template_args["action"]["default"]

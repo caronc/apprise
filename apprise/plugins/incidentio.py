@@ -202,7 +202,7 @@ class NotifyIncidentIO(NotifyBase):
             raise AppriseImproperlyConfigured(msg)
 
         # Resolve our action; partial names such as "r" are accepted
-        if action and isinstance(action, str):
+        if action and isinstance(action, str) and action.strip():
             self.action = next(
                 (
                     a

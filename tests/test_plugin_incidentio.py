@@ -287,6 +287,10 @@ def test_plugin_incidentio_init():
     assert obj.click is None
     assert len(obj) == 1
 
+    # A blank action is treated as unset
+    blank = NotifyIncidentIO(source=SOURCE, token="secret", action="  ")
+    assert blank.action == IncidentIOAction.MAP
+
     # The URL survives a round trip
     result = NotifyIncidentIO.parse_url(obj.url())
     obj2 = NotifyIncidentIO(**result)
