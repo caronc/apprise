@@ -221,6 +221,10 @@ def test_plugin_goalert_actions(mock_post):
     obj = NotifyGoAlert(host="localhost", targets=KEY1, action=" TRIG ")
     assert obj.action == "trigger"
 
+    # A blank action is treated as unset
+    obj = NotifyGoAlert(host="localhost", targets=KEY1, action="  ")
+    assert obj.action == "map"
+
     with pytest.raises(AppriseImproperlyConfigured):
         NotifyGoAlert(host="localhost", targets=KEY1, action="nope")
 

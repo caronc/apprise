@@ -280,3 +280,10 @@ def test_plugin_splunk_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+def test_plugin_splunk_blank_action():
+    """NotifySplunk() treats a blank action as unset."""
+
+    obj = NotifySplunk(apikey="abc123", routing_key="db", action="  ")
+    assert obj.action == NotifySplunk.template_args["action"]["default"]

@@ -330,6 +330,15 @@ def test_plugin_betterstack_init():
     obj = NotifyBetterStack(token="abc", alert=["SMS", "sms", "Call"])
     assert obj.alert == ["call", "sms"]
 
+    # A blank value leaves the methods to the team settings
+    for alert in ("  ", []):
+        assert NotifyBetterStack(token="abc", alert=alert).alert is None
+
+    # An empty list switches every method off, even after a round trip
+    obj = Apprise.instantiate("betterstack://abc/?alert=,")
+    assert obj.alert == []
+    assert Apprise.instantiate(obj.url()).alert == []
+
     # Round trip keeps our connection, teams and options
     obj = NotifyBetterStack(
         token="abc",
@@ -355,3 +364,20 @@ def test_plugin_betterstack_init():
     # A token is required
     with pytest.raises(AppriseImproperlyConfigured):
         NotifyBetterStack(token="  ")
+
+
+@mock.patch("requests.post")
+def test_plugin_betterstack_alerts_off(mock_post):
+    """NotifyBetterStack() switches every alert method off for alert=,."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.created
+    response.content = b"{}"
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate("betterstack://abc123/user@example.com/?alert=,")
+    assert obj.notify(body="Quiet incident")
+
+    payload = json.loads(mock_post.call_args[1]["data"])
+    for field in ("call", "sms", "email", "push", "critical_alert"):
+        assert payload[field] is False

@@ -335,3 +335,7 @@ def test_plugin_signl4_actions(mock_post):
     # An invalid action is refused
     with pytest.raises(AppriseImproperlyConfigured):
         NotifySIGNL4(secret="secret", action="invalid")
+
+    # A blank action is treated as unset
+    obj = NotifySIGNL4(secret="secret", action="  ")
+    assert obj.action == SIGNL4Action.TRIGGER

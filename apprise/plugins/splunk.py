@@ -256,7 +256,7 @@ class NotifySplunk(NotifyBase):
             # Assign what was defined:
             self.entity_id = entity_id.strip(" \r\n\t\v/")
 
-        if action and isinstance(action, str):
+        if action and isinstance(action, str) and action.strip():
             self.action = next(
                 (a for a in SPLUNK_ACTIONS if a.startswith(action)), None
             )
