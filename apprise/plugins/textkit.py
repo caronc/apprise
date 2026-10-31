@@ -31,7 +31,7 @@
 #
 #  1. Sign in to the console and create an API key:
 #     https://jointextkit.com/console
-#  2. Keys start with ssms_sk_. A test key (ssms_sk_test_) simulates each
+#  2. Keys start with tk_sk_. A test key (tk_sk_test_) simulates each
 #     send, so nothing reaches a phone until you use a live key.
 #
 #  Your Apprise URL should be assembled as:
