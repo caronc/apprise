@@ -266,15 +266,14 @@ class NotifyFireHydrant(NotifyBase):
         self, name: str, value: Optional[str], values: tuple[str, ...]
     ) -> Optional[str]:
         """Return the entry of ``values`` that ``value`` starts, if any."""
-        # Nothing set means the caller falls back to its own default
-        if not (value and isinstance(value, str)):
+        # Nothing set (or only spaces) means the caller falls back to its
+        # own default, rather than matching whatever choice comes first
+        choice = value.strip().lower() if isinstance(value, str) else ""
+        if not choice:
             return None
 
         # Partial names such as "r" for "resolve" are accepted
-        result = next(
-            (v for v in values if v.startswith(value.strip().lower())),
-            None,
-        )
+        result = next((v for v in values if v.startswith(choice)), None)
         if not result:
             msg = "The FireHydrant {} specified ({}) is invalid.".format(
                 name, value

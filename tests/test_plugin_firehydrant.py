@@ -370,6 +370,14 @@ def test_plugin_firehydrant_init():
     # The privacy URL hides the token
     assert TOKEN not in obj.url(privacy=True)
 
+    # Blank choices are treated as unset instead of matching the first one
+    obj = NotifyFireHydrant(
+        token=TOKEN, action="  ", level="  ", priority="  "
+    )
+    assert obj.action == FireHydrantAction.MAP
+    assert obj.level is None
+    assert obj.priority is None
+
     # A missing or blank token is refused
     for token in (None, "  "):
         with pytest.raises(AppriseImproperlyConfigured):
