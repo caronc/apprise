@@ -418,6 +418,7 @@ class NotifyXML(NotifyBase):
                 self.method,
                 url,
                 data=payload,
+                params=self.params,
                 headers=headers,
                 auth=auth,
                 verify=self.verify_certificate,
@@ -429,7 +430,7 @@ class NotifyXML(NotifyBase):
                 status_str = NotifyXML.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
-                    "Failed to send JSON %s notification: %s%serror=%s.",
+                    "Failed to send XML %s notification: %s%serror=%s.",
                     self.method,
                     status_str,
                     ", " if status_str else "",
