@@ -29,6 +29,7 @@ from json import loads
 
 # Disable logging for a cleaner testing output
 import logging
+from timeit import default_timer
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -36,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyFormat, NotifyType
+from apprise.conversion import MAX_LINK_DEPTH
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.google_chat import NotifyGoogleChat
 
@@ -524,3 +526,16 @@ def test_plugin_google_chat_text_ampersand(mock_post):
     # Both the plain and the entity-looking ampersand are escaped once
     text = loads(mock_post.call_args[1]["data"])["text"]
     assert text == "A &amp; B and AT&amp;amp;T"
+
+
+def test_plugin_google_chat_deeply_nested_links():
+    """Deeply nested link labels convert quickly and keep their text."""
+    depth = 20000
+    body = "[" * depth + "x" + "](u)" * depth
+
+    start = default_timer()
+    result = NotifyGoogleChat._commonmark_to_google_chat(body)
+    assert default_timer() - start < 5
+
+    # Only the outer labels become links; the rest stay as plain text
+    assert result.count("](u)") == depth - MAX_LINK_DEPTH

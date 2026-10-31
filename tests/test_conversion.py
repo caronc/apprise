@@ -40,6 +40,7 @@ from apprise.conversion import (
     BLOCKQUOTE_DEPTH_MAX,
     LIST_DEPTH_MAX,
     MAX_FRAME_DEPTH,
+    MAX_LINK_DEPTH,
     HTMLMarkdownConverter,
     HTMLTagReducer,
     commonmark as commonmark_module,
@@ -52,6 +53,7 @@ from apprise.conversion import (
     commonmark_index_backtick_runs,
     commonmark_match_emphasis,
     commonmark_materialize_repair,
+    commonmark_open_link_label,
     commonmark_pick_emphasis_sentinel,
     commonmark_render_emphasis_events,
     commonmark_render_emphasis_markers,
@@ -62,6 +64,7 @@ from apprise.conversion import (
     commonmark_scan_paren_dest,
     commonmark_scan_repair_region,
     commonmark_sections,
+    commonmark_take_link_label,
     convert_between,
     html_to_markdown,
     markdown_to_html,
@@ -4614,3 +4617,26 @@ def test_conversion_sentinel_exhausted_partners_is_fast():
     assert default_timer() - start < 5.0
     assert picked == chr(0xE00A) + chr(0xE00C)
     assert picked not in body
+
+
+def test_commonmark_link_label_helpers():
+    """Link labels are buffered, recovered and capped in depth."""
+    out = ["a "]
+    link_stack = []
+
+    # A label is buffered from its "["
+    assert commonmark_open_link_label(out, link_stack) is True
+    out.append("label")
+    assert out == ["a ", "[", "label"]
+    assert link_stack == [1]
+
+    # Taking it back returns the text and removes it from the output
+    assert commonmark_take_link_label(out, link_stack) == "label"
+    assert out == ["a "]
+    assert link_stack == []
+
+    # Past the depth limit a "[" is left for the caller to keep as text
+    for _ in range(MAX_LINK_DEPTH):
+        assert commonmark_open_link_label(out, link_stack) is True
+    assert commonmark_open_link_label(out, link_stack) is False
+    assert len(link_stack) == MAX_LINK_DEPTH

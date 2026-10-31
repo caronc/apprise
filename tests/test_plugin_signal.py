@@ -40,6 +40,7 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
 from apprise.config import ConfigBase
+from apprise.conversion import MAX_LINK_DEPTH
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.base import NotifyFormat
 from apprise.plugins.signal_api import NotifySignalAPI
@@ -717,3 +718,16 @@ def test_plugin_signal_backslash_markers_stay_small():
         result = NotifySignalAPI._commonmark_to_signal(body)
         assert default_timer() - start < 5.0
         assert result == prefix + "\\2\\~" * 20000
+
+
+def test_plugin_signal_deeply_nested_links():
+    """Deeply nested link labels convert quickly and keep their text."""
+    depth = 20000
+    body = "[" * depth + "x" + "](u)" * depth
+
+    start = default_timer()
+    result = NotifySignalAPI._commonmark_to_signal(body)
+    assert default_timer() - start < 5
+
+    # Only the outer labels become links; the rest stay as plain text
+    assert result.count("](u)") == depth - MAX_LINK_DEPTH

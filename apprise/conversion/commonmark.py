@@ -143,6 +143,10 @@ _ATX_CLOSING_SEQUENCE_RE = re.compile(r"(?<![ \t])[ \t]+#+[ \t]*$")
 # Allow several full-body destination scans while keeping total work linear.
 SCAN_BUDGET_MULTIPLIER = 4
 
+# How deeply link labels may nest; a deeper "[" is kept as plain text so
+# heavily nested input cannot make the conversion slow
+MAX_LINK_DEPTH = 32
+
 # After the shared scan budget is spent, allow a short probe for nearby URL
 # endings without permitting an unbounded search.
 MIN_SCAN_ALLOWANCE = 256
@@ -1115,6 +1119,33 @@ def commonmark_new_scan_budget(body):
     Example: ``commonmark_new_scan_budget("abc")`` returns ``[12]``.
     """
     return [len(body) * SCAN_BUDGET_MULTIPLIER]
+
+
+def commonmark_open_link_label(out: list[str], link_stack: list[int]) -> bool:
+    """Start buffering a link label at a ``[``.
+
+    - Records where the label starts and adds the ``[`` to ``out``.
+    - Returns ``False`` once labels nest deeper than ``MAX_LINK_DEPTH``;
+      the caller then keeps the ``[`` as plain text.
+    """
+    if len(link_stack) >= MAX_LINK_DEPTH:
+        return False
+
+    link_stack.append(len(out))
+    out.append("[")
+    return True
+
+
+def commonmark_take_link_label(out: list[str], link_stack: list[int]) -> str:
+    """Remove the innermost buffered link label from ``out``.
+
+    - Drops the label's opening ``[`` and everything after it.
+    - Returns the label text, without the ``[``.
+    """
+    open_index = link_stack.pop()
+    text = "".join(out[open_index + 1 :])
+    del out[open_index:]
+    return text
 
 
 def commonmark_scan_angle_dest(body, i, n, budget=None):

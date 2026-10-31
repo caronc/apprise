@@ -28,6 +28,7 @@
 # Conversion is split by format, HTML, CommonMark repair, and dialect fitting.
 # Supported helpers are re-exported from ``apprise.conversion``.
 from .commonmark import (
+    MAX_LINK_DEPTH,
     commonmark_can_close_emphasis,
     commonmark_can_open_emphasis,
     commonmark_decode_backslash_escapes,
@@ -40,6 +41,7 @@ from .commonmark import (
     commonmark_match_emphasis,
     commonmark_materialize_repair,
     commonmark_new_scan_budget,
+    commonmark_open_link_label,
     commonmark_pick_emphasis_sentinel,
     commonmark_render_emphasis_events,
     commonmark_render_emphasis_markers,
@@ -51,6 +53,7 @@ from .commonmark import (
     commonmark_scan_paren_dest,
     commonmark_scan_repair_region,
     commonmark_sections,
+    commonmark_take_link_label,
 )
 from .dialect import split_dialect_chunk, truncate_dialect_chunk
 from .format import (
@@ -74,6 +77,7 @@ __all__ = [
     "BLOCKQUOTE_DEPTH_MAX",
     "LIST_DEPTH_MAX",
     "MAX_FRAME_DEPTH",
+    "MAX_LINK_DEPTH",
     "HTMLConverter",
     "HTMLMarkdownConverter",
     "HTMLTagReducer",
@@ -89,6 +93,7 @@ __all__ = [
     "commonmark_match_emphasis",
     "commonmark_materialize_repair",
     "commonmark_new_scan_budget",
+    "commonmark_open_link_label",
     "commonmark_pick_emphasis_sentinel",
     "commonmark_render_emphasis_events",
     "commonmark_render_emphasis_markers",
@@ -100,6 +105,7 @@ __all__ = [
     "commonmark_scan_paren_dest",
     "commonmark_scan_repair_region",
     "commonmark_sections",
+    "commonmark_take_link_label",
     "convert_between",
     "html_to_markdown",
     "html_to_text",
