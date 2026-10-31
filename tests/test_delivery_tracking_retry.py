@@ -82,6 +82,7 @@ RESPONSES = {
     "pushplus": {"body": {"code": 200}},
     "pushsafer": {"body": {"status": 1}},
     "sns": {"raw": SNS_XML},
+    "textkit": {"status": 201},
     "viber": {"body": {"status": 0}},
 }
 
@@ -258,6 +259,7 @@ TRACKED = {
     "telnyx": (
         "telnyx://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@12125550000/12125550001"
     ),
+    "textkit": "textkit://ssms_sk_test_key/15551234567/15551239999",
     "threema": (
         "threema://*GATEWAY@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/user0001"
     ),

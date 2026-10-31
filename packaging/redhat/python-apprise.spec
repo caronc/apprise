@@ -99,7 +99,7 @@ notification services. It supports sending alerts to platforms such as: \
 `Stackfield`, `Super Toasty`, \
 `Streamlabs`, `Stride`, \
 `Synology Chat`, `Syslog`, `Techulus Push`, `Telegram`, `Telesign`, \
-`Telnyx`, \
+`Telnyx`, `TextKit`, \
 `Threema Gateway`, `Trigv`, `Twilio`, `Twitter`, `Twist`, `Vapid`, \
 `Viber`, `VictorOps`, \
 `Voipms`, `Vonage`, `WebPush`, `WeChat (WeCom)`, `WeCom Bot`, `Whapi.Cloud`, \
