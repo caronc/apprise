@@ -1319,6 +1319,14 @@ msgstr "ID phòng"
 msgid "Silent Notification"
 msgstr "Thông báo im lặng"
 
+#: apprise/plugins/nostr/base.py:227
+msgid "Relays"
+msgstr "Máy chuyển tiếp"
+
+#: apprise/plugins/nostr/base.py:231
+msgid "Blossom Server"
+msgstr "Máy chủ Blossom"
+
 #: apprise/plugins/notifiarr.py:122
 msgid "Discord Event ID"
 msgstr "ID sự kiện Discord"

@@ -1319,6 +1319,14 @@ msgstr "Identifiant de la salle"
 msgid "Silent Notification"
 msgstr "Notification silencieuse"
 
+#: apprise/plugins/nostr/base.py:227
+msgid "Relays"
+msgstr "Relais"
+
+#: apprise/plugins/nostr/base.py:231
+msgid "Blossom Server"
+msgstr "Serveur Blossom"
+
 #: apprise/plugins/notifiarr.py:122
 msgid "Discord Event ID"
 msgstr "Identifiant de l'événement Discord"

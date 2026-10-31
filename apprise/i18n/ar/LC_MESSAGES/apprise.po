@@ -1320,6 +1320,14 @@ msgstr "معرّف الغرفة"
 msgid "Silent Notification"
 msgstr "إشعار صامت"
 
+#: apprise/plugins/nostr/base.py:227
+msgid "Relays"
+msgstr "المرحلات"
+
+#: apprise/plugins/nostr/base.py:231
+msgid "Blossom Server"
+msgstr "خادم Blossom"
+
 #: apprise/plugins/notifiarr.py:122
 msgid "Discord Event ID"
 msgstr "معرّف حدث Discord"

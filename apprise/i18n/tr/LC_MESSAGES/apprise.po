@@ -1319,6 +1319,14 @@ msgstr "Oda kimliği"
 msgid "Silent Notification"
 msgstr "Sessiz bildirim"
 
+#: apprise/plugins/nostr/base.py:227
+msgid "Relays"
+msgstr "Röleler"
+
+#: apprise/plugins/nostr/base.py:231
+msgid "Blossom Server"
+msgstr "Blossom Sunucusu"
+
 #: apprise/plugins/notifiarr.py:122
 msgid "Discord Event ID"
 msgstr "Discord olay kimliği"

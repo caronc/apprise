@@ -1320,6 +1320,14 @@ msgstr "ルームの ID"
 msgid "Silent Notification"
 msgstr "サイレント通知"
 
+#: apprise/plugins/nostr/base.py:227
+msgid "Relays"
+msgstr "リレー"
+
+#: apprise/plugins/nostr/base.py:231
+msgid "Blossom Server"
+msgstr "Blossom サーバー"
+
 #: apprise/plugins/notifiarr.py:122
 msgid "Discord Event ID"
 msgstr "Discord のイベント ID"

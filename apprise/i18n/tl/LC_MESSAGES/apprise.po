@@ -1319,6 +1319,14 @@ msgstr "ID ng room"
 msgid "Silent Notification"
 msgstr "Tahimik na abiso"
 
+#: apprise/plugins/nostr/base.py:227
+msgid "Relays"
+msgstr "Mga Relay"
+
+#: apprise/plugins/nostr/base.py:231
+msgid "Blossom Server"
+msgstr "Blossom Server"
+
 #: apprise/plugins/notifiarr.py:122
 msgid "Discord Event ID"
 msgstr "ID ng kaganapan sa Discord"

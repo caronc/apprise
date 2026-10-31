@@ -1320,6 +1320,14 @@ msgstr "Identyfikator pokoju"
 msgid "Silent Notification"
 msgstr "Ciche powiadomienie"
 
+#: apprise/plugins/nostr/base.py:227
+msgid "Relays"
+msgstr "Przekaźniki"
+
+#: apprise/plugins/nostr/base.py:231
+msgid "Blossom Server"
+msgstr "Serwer Blossom"
+
 #: apprise/plugins/notifiarr.py:122
 msgid "Discord Event ID"
 msgstr "Identyfikator zdarzenia Discorda"

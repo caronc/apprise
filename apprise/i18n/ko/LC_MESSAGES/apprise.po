@@ -1319,6 +1319,14 @@ msgstr "방 ID"
 msgid "Silent Notification"
 msgstr "무음 알림"
 
+#: apprise/plugins/nostr/base.py:227
+msgid "Relays"
+msgstr "릴레이"
+
+#: apprise/plugins/nostr/base.py:231
+msgid "Blossom Server"
+msgstr "Blossom 서버"
+
 #: apprise/plugins/notifiarr.py:122
 msgid "Discord Event ID"
 msgstr "Discord 이벤트 ID"

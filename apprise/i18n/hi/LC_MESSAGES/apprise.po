@@ -1319,6 +1319,14 @@ msgstr "कक्ष की आईडी"
 msgid "Silent Notification"
 msgstr "मौन अधिसूचना"
 
+#: apprise/plugins/nostr/base.py:227
+msgid "Relays"
+msgstr "रिले"
+
+#: apprise/plugins/nostr/base.py:231
+msgid "Blossom Server"
+msgstr "Blossom सर्वर"
+
 #: apprise/plugins/notifiarr.py:122
 msgid "Discord Event ID"
 msgstr "Discord घटना की आईडी"
