@@ -978,6 +978,10 @@ msgstr "Yinelenenleri kaldırma anahtarı"
 msgid "Metadata"
 msgstr "Üst veriler"
 
+#: apprise/plugins/firehydrant.py:205
+msgid "Annotations"
+msgstr "Ek Açıklamalar"
+
 #: apprise/plugins/google_chat.py:120
 msgid "Workspace"
 msgstr "Çalışma alanı"

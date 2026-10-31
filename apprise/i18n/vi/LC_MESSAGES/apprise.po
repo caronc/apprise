@@ -978,6 +978,10 @@ msgstr "Khóa chống trùng lặp"
 msgid "Metadata"
 msgstr "Dữ liệu mô tả"
 
+#: apprise/plugins/firehydrant.py:205
+msgid "Annotations"
+msgstr "Chú thích"
+
 #: apprise/plugins/google_chat.py:120
 msgid "Workspace"
 msgstr "Không gian làm việc"

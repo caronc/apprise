@@ -978,6 +978,10 @@ msgstr "Deduplizierungsschlüssel"
 msgid "Metadata"
 msgstr "Metadaten"
 
+#: apprise/plugins/firehydrant.py:205
+msgid "Annotations"
+msgstr "Anmerkungen"
+
 #: apprise/plugins/google_chat.py:120
 msgid "Workspace"
 msgstr "Arbeitsbereich"
