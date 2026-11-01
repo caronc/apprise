@@ -377,6 +377,44 @@ def test_utils_socket_tls_tests():
     assert s._wfile is not None
 
 
+def test_utils_socket_tls_shares_connect_deadline():
+    """SocketTransport() TLS only gets the time left over from connecting."""
+    s = SocketTransport("example.com", 443, secure=True, timeout=(1.0, 2.0))
+
+    # Connecting takes 0.3s of our 1.0s, so TLS is left with the rest
+    tcp_sock = _DummySocket()
+    tcp_sock.connect = mock.Mock(side_effect=lambda *_: time.sleep(0.3))
+
+    ctx = mock.Mock()
+    ctx.wrap_socket.return_value = _DummySocket()
+
+    with (
+        mock.patch("socket.socket", return_value=tcp_sock),
+        mock.patch.object(s, "_build_ssl_context", return_value=ctx),
+        mock.patch.object(
+            s, "_server_hostname_for_tls", return_value="example.com"
+        ),
+    ):
+        s.connect()
+
+    assert s.is_tls is True
+    assert 0 < tcp_sock.timeout <= 0.7
+
+    # A deadline that already passed fails before any handshake is tried
+    s = SocketTransport("example.com", 443, secure=True)
+    s._sock = _DummySocket()
+    ctx = mock.Mock()
+
+    with (
+        mock.patch.object(s, "_build_ssl_context", return_value=ctx),
+        pytest.raises(AppriseSocketError),
+    ):
+        s.start_tls(deadline=time.monotonic() - 1)
+
+    ctx.wrap_socket.assert_not_called()
+    assert s._sock is None
+
+
 def test_utils_socket_tls_handshake_timeout():
     """SocketTransport() gives up on a server that never answers TLS."""
     # A server that accepts the connection, then stays silent until the

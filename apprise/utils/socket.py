@@ -240,6 +240,14 @@ class SocketTransport:
                     (self.bind_addr or "127.0.0.1", int(self.bind_port or 0))
                 )
 
+            # One deadline covers both the TCP connection and the TLS
+            # handshake that may follow it
+            deadline = (
+                None
+                if self._connect_timeout is None
+                else time.monotonic() + self._connect_timeout
+            )
+
             if self._connect_timeout is not None:
                 sock.settimeout(self._connect_timeout)
 
@@ -254,7 +262,7 @@ class SocketTransport:
             self._had_io = False
 
             if self.secure:
-                self.start_tls()
+                self.start_tls(deadline=deadline)
 
             self.local_addr = self._sock.getsockname()
             self.remote_addr = self._sock.getpeername()
@@ -331,8 +339,13 @@ class SocketTransport:
 
         return ctx
 
-    def start_tls(self) -> None:
-        """Upgrade an existing TCP connection to TLS."""
+    def start_tls(self, deadline: Optional[float] = None) -> None:
+        """
+        Upgrade an existing TCP connection to TLS.
+
+        - deadline: a time.monotonic() value the handshake must finish by;
+          when not set, the handshake gets the full connect timeout
+        """
         if self._sock is None:
             raise AppriseSocketError("No active connection to upgrade")
 
@@ -345,7 +358,14 @@ class SocketTransport:
         try:
             # A server that never finishes the handshake can not hold us up
             # for longer than our connect timeout
-            self._sock.settimeout(self._connect_timeout)
+            timeout = self._connect_timeout
+            if deadline is not None:
+                # Only use the time left over from connecting
+                timeout = deadline - time.monotonic()
+                if timeout <= 0:
+                    raise socket.timeout("timed out")
+
+            self._sock.settimeout(timeout)
 
             ctx = self._build_ssl_context()
             tls_sock = ctx.wrap_socket(
