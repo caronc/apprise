@@ -343,6 +343,10 @@ class SocketTransport:
         logger.trace("Starting TLS upgrade: sni=%s", server_hostname)
 
         try:
+            # A server that never finishes the handshake can not hold us up
+            # for longer than our connect timeout
+            self._sock.settimeout(self._connect_timeout)
+
             ctx = self._build_ssl_context()
             tls_sock = ctx.wrap_socket(
                 self._sock,

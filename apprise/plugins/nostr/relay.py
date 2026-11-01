@@ -261,11 +261,16 @@ class NostrRelay:
                 "Relay {} has no usable public address: {}".format(self.url, e)
             ) from e
 
-        # Our sockets only speak IPv4; each address is only tried once
+        # Our sockets only speak IPv4; each address is only tried once, and
+        # only the first few are kept
         addresses: list[str] = []
+        seen: set[str] = set()
         for family, *_, address in found:
-            if family == socket.AF_INET and address[0] not in addresses:
+            if family == socket.AF_INET and address[0] not in seen:
+                seen.add(address[0])
                 addresses.append(address[0])
+                if len(addresses) >= RELAY_MAX_ADDRESSES:
+                    break
 
         # A few addresses share one connection timeout, so a long list of
         # dead addresses can not hold us up
@@ -273,7 +278,7 @@ class NostrRelay:
         error = AppriseSocketError(
             "Relay {} has no public IPv4 address.".format(self.url)
         )
-        for address in addresses[:RELAY_MAX_ADDRESSES]:
+        for address in addresses:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 error = AppriseSocketError(

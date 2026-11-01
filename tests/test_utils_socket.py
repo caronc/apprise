@@ -26,7 +26,10 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import logging
+import socket
 import ssl
+import threading
+import time
 from unittest import mock
 
 import pytest
@@ -364,12 +367,54 @@ def test_utils_socket_tls_tests():
     ):
         s.start_tls()
 
+    # The handshake was bound by our connect timeout
+    assert base_sock.timeout == s._connect_timeout
     assert s._sock is tls_sock
     assert s.is_tls is True
     assert s.local_addr == ("127.0.0.1", 12345)
     assert s.remote_addr == ("203.0.113.10", 6667)
     assert s._rfile is not None
     assert s._wfile is not None
+
+
+def test_utils_socket_tls_handshake_timeout():
+    """SocketTransport() gives up on a server that never answers TLS."""
+    # A server that accepts the connection, then stays silent until the
+    # test is done or a watchdog runs out; closing it then frees a client
+    # that is stuck, so a broken timeout fails the test instead of hanging
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+    done = threading.Event()
+
+    def accept():
+        conn, _ = server.accept()
+        done.wait(5.0)
+        conn.close()
+
+    thread = threading.Thread(target=accept, daemon=True)
+    thread.start()
+
+    s = SocketTransport(
+        "127.0.0.1",
+        server.getsockname()[1],
+        secure=True,
+        verify=False,
+        timeout=(0.3, 0.3),
+    )
+    try:
+        started = time.monotonic()
+        with pytest.raises(AppriseSocketError):
+            s.connect()
+
+        # We gave up after the connect timeout, well before the watchdog
+        assert time.monotonic() - started < 3.0
+        assert s.connected is False
+
+    finally:
+        done.set()
+        thread.join(1.0)
+        server.close()
 
 
 def test_utils_socket_connect():
