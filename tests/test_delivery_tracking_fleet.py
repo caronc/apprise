@@ -309,6 +309,13 @@ FLEET = (
         {},
     ),
     (
+        "instagram",
+        f"instagram://{TOKEN}/1111111/9999999",
+        "1111111",
+        "9999999",
+        {},
+    ),
+    (
         "voipms",
         "voipms://pass:user@example.com/12125550000/12125550001/12125559999",
         # VoIPms drops the leading country digit before sending

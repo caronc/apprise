@@ -72,7 +72,7 @@ notification services. It supports sending alerts to platforms such as: \
 `Free Mobile`, `GitHub`, `GoAlert`, `Google Chat`, `Gorush`, `Gotify`, \
 `Groundmail`, `GroupMe`, \
 `Growl`, `Guilded`, `Gupshup`, `Home Assistant`, `httpSMS`, \
-`HumHub`, `IFTTT`, `ilert`, `incident.io`, `Infobip`, \
+`HumHub`, `IFTTT`, `ilert`, `incident.io`, `Infobip`, `Instagram`, \
 `IRC`, `Jellyfin`, `Jira`, `Join`, `KakaoTalk`, `Kaleyra`, `Kavenegar`, \
 `KODI`, `Kook`, `Kudosity`, `Kumulos`, `LaMetric`, `Lark`, `Lauther`, \
 `LFG Alarm`, `Line`, `MacOSX`, `Mailgun`, \
