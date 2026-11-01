@@ -1405,8 +1405,7 @@ def test_plugin_nostr_relay_errors():
         ]
 
     for found in (
-        addresses("10.0.0.1", "127.0.0.1"),
-        addresses("2606:4700::1"),
+        addresses("10.0.0.1", "127.0.0.1", "fd00::1"),
         socket.gaierror("unknown host"),
         UnicodeError("label too long"),
     ):
@@ -1421,7 +1420,7 @@ def test_plugin_nostr_relay_errors():
 
     # ... while each public address is tried in turn until one works
     transport = FakeTransport()
-    transport.refuse_hosts.add("93.184.216.34")
+    transport.refuse_hosts.update(("2606:4700::1", "93.184.216.34"))
     with (
         mock.patch(
             "socket.getaddrinfo",
@@ -1433,7 +1432,18 @@ def test_plugin_nostr_relay_errors():
     ):
         pass
     assert transport.host == "93.184.216.35"
-    assert transport.connects == 2
+    assert transport.connects == 3
+
+    # A relay that is only reachable over IPv6 works too
+    transport = FakeTransport()
+    with (
+        mock.patch(
+            "socket.getaddrinfo", return_value=addresses("2606:4700::1")
+        ),
+        _relay(transport, public_only=True),
+    ):
+        pass
+    assert transport.host == "2606:4700::1"
 
     # Duplicates are tried once, only the first 4 are tried at all, and
     # every attempt shares one connection timeout

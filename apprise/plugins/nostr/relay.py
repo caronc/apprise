@@ -45,7 +45,6 @@ import contextlib
 import hashlib
 from json import dumps, loads
 import os
-import socket
 import time
 from typing import Any, Optional
 from urllib.parse import urlsplit
@@ -261,12 +260,11 @@ class NostrRelay:
                 "Relay {} has no usable public address: {}".format(self.url, e)
             ) from e
 
-        # Our sockets only speak IPv4; each address is only tried once, and
-        # only the first few are kept
+        # Each address is only tried once, and only the first few are kept
         addresses: list[str] = []
         seen: set[str] = set()
-        for family, *_, address in found:
-            if family == socket.AF_INET and address[0] not in seen:
+        for *_, address in found:
+            if address[0] not in seen:
                 seen.add(address[0])
                 addresses.append(address[0])
                 if len(addresses) >= RELAY_MAX_ADDRESSES:
@@ -276,7 +274,7 @@ class NostrRelay:
         # dead addresses can not hold us up
         deadline = time.monotonic() + self.connect_timeout
         error = AppriseSocketError(
-            "Relay {} has no public IPv4 address.".format(self.url)
+            "Relay {} has no public address.".format(self.url)
         )
         for address in addresses:
             remaining = deadline - time.monotonic()

@@ -74,7 +74,10 @@ class SocketTransport:
         timeout: TimeoutType = 10.0,
         retries: int = 0,
     ) -> None:
-        self.host = host
+        # An IPv6 address may arrive wrapped in brackets, as in a URL
+        self.host = (
+            host[1:-1] if host.startswith("[") and host.endswith("]") else host
+        )
         self.port = int(port)
         self.bind_addr = bind_addr
         self.bind_port = bind_port
@@ -96,8 +99,9 @@ class SocketTransport:
         # connect(). Used to decide whether reconnect attempts are allowed.
         self._had_io: bool = False
 
-        self.local_addr: Optional[tuple[str, int]] = None
-        self.remote_addr: Optional[tuple[str, int]] = None
+        # IPv6 addresses carry two extra fields (flow info and scope id)
+        self.local_addr: Optional[tuple] = None
+        self.remote_addr: Optional[tuple] = None
 
     @staticmethod
     def _coerce_timeout(
@@ -231,28 +235,65 @@ class SocketTransport:
         )
         self.close()
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # One deadline covers every address we try and the TLS handshake
+        # that may follow
+        deadline = (
+            None
+            if self._connect_timeout is None
+            else time.monotonic() + self._connect_timeout
+        )
+
+        sock = None
         try:
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-
-            if self.bind_addr is not None or self.bind_port is not None:
-                sock.bind(
-                    (self.bind_addr or "127.0.0.1", int(self.bind_port or 0))
-                )
-
-            # One deadline covers both the TCP connection and the TLS
-            # handshake that may follow it
-            deadline = (
-                None
-                if self._connect_timeout is None
-                else time.monotonic() + self._connect_timeout
+            # Look up every address the host answers on, IPv4 and IPv6 alike
+            found = socket.getaddrinfo(
+                self.host, self.port, 0, socket.SOCK_STREAM
             )
 
-            if self._connect_timeout is not None:
-                sock.settimeout(self._connect_timeout)
+            # Try each address in turn until one of them answers
+            error: Exception = OSError("No address found for host")
+            for family, socktype, proto, _, address in found:
+                sock = socket.socket(family, socktype, proto)
+                try:
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
 
-            # Establish our connection
-            sock.connect((self.host, self.port))
+                    if (
+                        self.bind_addr is not None
+                        or self.bind_port is not None
+                    ):
+                        # Default to the loopback address of the same family
+                        loopback = (
+                            "::1" if family == socket.AF_INET6 else "127.0.0.1"
+                        )
+                        sock.bind(
+                            (
+                                self.bind_addr or loopback,
+                                int(self.bind_port or 0),
+                            )
+                        )
+
+                    if deadline is not None:
+                        # Only use the time left over from earlier addresses
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise socket.timeout("timed out")
+
+                        sock.settimeout(remaining)
+
+                    # Establish our connection
+                    sock.connect(address)
+                    break
+
+                except OSError as e:
+                    # Move on to the next address
+                    with contextlib.suppress(Exception):
+                        sock.close()
+
+                    sock = None
+                    error = e
+
+            if sock is None:
+                raise error
 
             # We control I/O blocking explicitly with select()
             sock.settimeout(None)
@@ -276,8 +317,9 @@ class SocketTransport:
             )
 
         except Exception as e:
-            with contextlib.suppress(Exception):
-                sock.close()
+            if sock is not None:
+                with contextlib.suppress(Exception):
+                    sock.close()
 
             self._sock = None
             self._had_io = False

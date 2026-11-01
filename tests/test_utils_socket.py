@@ -40,6 +40,33 @@ from apprise.utils.socket import AppriseSocketError, SocketTransport
 # Disable logging for a cleaner testing output
 logging.disable(logging.CRITICAL)
 
+# Kept so a test can still use the real lookup
+_REAL_GETADDRINFO = socket.getaddrinfo
+
+
+def _answer(*hosts, port=6667):
+    """Build address lookup results for the given IP addresses."""
+    return [
+        (
+            socket.AF_INET6 if ":" in host else socket.AF_INET,
+            socket.SOCK_STREAM,
+            6,
+            "",
+            (host, port, 0, 0) if ":" in host else (host, port),
+        )
+        for host in hosts
+    ]
+
+
+@pytest.fixture(autouse=True)
+def _local_lookup():
+    """Answer address lookups without touching the network."""
+    with mock.patch(
+        "socket.getaddrinfo",
+        side_effect=lambda host, port, *_: _answer(host, port=port),
+    ) as lookup:
+        yield lookup
+
 
 class _DummyFile:
     def __init__(self) -> None:
@@ -713,6 +740,106 @@ def test_utils_socket_secure_connect():
     ):
         s.connect()
         m.assert_called_once()
+
+
+def test_utils_socket_connect_ipv6(_local_lookup):
+    """SocketTransport() connects over IPv6 and tries each address."""
+    # A bracketed IPv6 address, as found in a URL, is looked up without
+    # its brackets and connected to over IPv6
+    s = SocketTransport("[2001:db8::1]", 6667)
+    assert s.host == "2001:db8::1"
+
+    dummy = _DummySocket()
+    with mock.patch("socket.socket", return_value=dummy) as m:
+        s.connect()
+
+    assert m.call_args[0][0] == socket.AF_INET6
+    assert s.connected is True
+
+    # Binding to a port alone uses the loopback address of each family
+    s = SocketTransport("example.com", 6667, bind_port=0)
+    _local_lookup.side_effect = None
+    _local_lookup.return_value = _answer("2001:db8::1", "203.0.113.10")
+    first, second = _DummySocket(), _DummySocket()
+    first.bind = mock.Mock(side_effect=OSError("no ipv6 here"))
+    second.bind = mock.Mock()
+
+    with mock.patch("socket.socket", side_effect=[first, second]):
+        s.connect()
+
+    first.bind.assert_called_once_with(("::1", 0))
+    second.bind.assert_called_once_with(("127.0.0.1", 0))
+    assert first.closed is True
+    assert s._sock is second
+
+    # When every address fails, the last error is reported
+    s = SocketTransport("example.com", 6667)
+    refused = []
+    for _ in range(2):
+        sock = _DummySocket()
+        sock.connect = mock.Mock(side_effect=OSError("refused"))
+        refused.append(sock)
+
+    with (
+        mock.patch("socket.socket", side_effect=refused),
+        pytest.raises(AppriseSocketError, match="refused"),
+    ):
+        s.connect()
+
+    assert all(sock.closed for sock in refused)
+    assert s.connected is False
+
+    # A slow address uses up the shared timeout, so the next one is
+    # never tried
+    s = SocketTransport("example.com", 6667, timeout=(0.05, 1.0))
+
+    def slow_connect(*_args):
+        time.sleep(0.06)
+        raise OSError("slow")
+
+    slow = _DummySocket()
+    slow.connect = mock.Mock(side_effect=slow_connect)
+    spare = _DummySocket()
+    spare.connect = mock.Mock()
+
+    with (
+        mock.patch("socket.socket", side_effect=[slow, spare]),
+        pytest.raises(AppriseSocketError, match="timed out"),
+    ):
+        s.connect()
+
+    spare.connect.assert_not_called()
+
+    # A host with no addresses, or one that can not be looked up, fails
+    for found in ([], socket.gaierror("unknown host")):
+        _local_lookup.side_effect = [found]
+        with pytest.raises(AppriseSocketError):
+            SocketTransport("example.com", 6667).connect()
+
+
+def test_utils_socket_ipv6_loopback(_local_lookup):
+    """SocketTransport() talks to a real IPv6 server."""
+    try:
+        server = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        server.bind(("::1", 0))
+
+    except OSError:
+        pytest.skip("IPv6 is not available on this host")
+
+    server.listen(1)
+
+    # Use the real lookup for this one
+    _local_lookup.side_effect = _REAL_GETADDRINFO
+    try:
+        s = SocketTransport("[::1]", server.getsockname()[1])
+        s.connect()
+        conn, _ = server.accept()
+        assert s.remote_addr[0] == "::1"
+        s.close()
+        conn.close()
+
+    finally:
+        server.close()
 
 
 def test_utils_socket_connect_exceptions():
