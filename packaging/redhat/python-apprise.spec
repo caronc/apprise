@@ -94,7 +94,8 @@ notification services. It supports sending alerts to platforms such as: \
 `SendPulse`, `ServerChan`, `SerwerSMS`, `Session Open Group Server`, \
 `Seven`, `SFR`, \
 `Signal`, `Signalgrid`, `SIGNL4`, `Simplepush`, \
-`Sinch`, `Slack`, `SMPP`, `SMSC`, `SMSEagle`, `SMS Manager`, `SMTP2Go`, \
+`Sinch`, `Slack`, `SMPP`, `SMSC`, `SMSEagle`, `SMS Manager`, `SMSTunnel`, \
+`SMTP2Go`, \
 `SparkPost`, `Splunk`, `Spike`, `Spug Push`, `Squadcast`, \
 `Stackfield`, `Super Toasty`, \
 `Streamlabs`, `Stride`, \

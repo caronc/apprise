@@ -238,6 +238,13 @@ FLEET = (
         {},
     ),
     (
+        "smstunnel",
+        f"smstunnel://{TOKEN}/12125550001/12125559999",
+        "12125550001",
+        "12125559999",
+        {},
+    ),
+    (
         "line",
         f"line://{TOKEN}/target0001/target9999",
         "target0001",
