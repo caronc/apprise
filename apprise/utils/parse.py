@@ -37,9 +37,10 @@ from .disk import tidy_path
 #  - schema://path
 #  - schema://path?kwargs
 #
+#  Surrounding whitespace is stripped before matching; matching it here
+#  is very slow on long runs of spaces.
 VALID_URL_RE = re.compile(
-    r"^[\s]*((?P<schema>[^:\s]+):[/\\]+)?((?P<path>[^?]+)"
-    r"(\?(?P<kwargs>.+))?)?[\s]*$",
+    r"^((?P<schema>[^:\s]+):[/\\]+)?((?P<path>[^?]+)(\?(?P<kwargs>.+))?)?$",
 )
 VALID_QUERY_RE = re.compile(r"^(?P<path>.*[/\\])(?P<query>[^/\\]+)?$")
 
@@ -736,7 +737,7 @@ def parse_url(
     )
 
     qsdata = ""
-    match = VALID_URL_RE.search(url)
+    match = VALID_URL_RE.search(url.strip())
     if match:
         # Extract basic results (with schema present)
         result["schema"] = (
