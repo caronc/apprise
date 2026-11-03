@@ -540,19 +540,21 @@ class ConfigBase(URLBase):
         # "2:endpoint=ntfy://..." is recognised as TEXT format.
         # A tag group assignment such as "family=me,wife" carries tags instead
         # of a URL on the right hand side; it is TEXT format as well.
+        # Leading whitespace is stripped before matching; matching it here
+        # is very slow on long runs of spaces.
         valid_line_re = re.compile(
-            r"^\s*(?P<line>([;#]+(?P<comment>.*))|"
-            r"(?P<text>((?P<tag>[ \t,a-z0-9_:-]+)=)?[a-z0-9]+://.*)|"
+            r"^(?P<line>([;#]+(?P<comment>.*))|"
+            r"(?P<text>((?P<tag>[ \t,a-z0-9_:-]*)=)?[a-z0-9]+://.*)|"
             r"((?P<yaml>[a-z0-9]+):.*)|"
-            r"(?P<assign>[ \t,a-z0-9_:-]+=[a-z0-9, \t_-]+))?$",
+            r"(?P<assign>[ \t,a-z0-9_:-]*=[a-z0-9, \t_-]+))?$",
             re.I,
         )
 
         try:
             # split our content up to read line by line
-            content = re.split(r"\r*\n", content)
+            content = [line.rstrip("\r") for line in content.split("\n")]
 
-        except TypeError:
+        except (AttributeError, TypeError):
             # content was not expected string type
             ConfigBase.logger.error("Invalid Apprise configuration specified.")
             return None
@@ -564,7 +566,7 @@ class ConfigBase(URLBase):
         # iterate over each line of the file to attempt to detect it
         # stop the moment a the type has been determined
         for line, entry in enumerate(content, start=1):
-            result = valid_line_re.match(entry)
+            result = valid_line_re.match(entry.lstrip())
             if not result:
                 # Invalid syntax
                 ConfigBase.logger.error(
@@ -691,19 +693,23 @@ class ConfigBase(URLBase):
         # Define what a valid line should look like.
         # The tags group allows an optional leading "N:" priority prefix so
         # that entries like "2:endpoint=ntfy://..." are parsed correctly.
+        # Each line is stripped first, and tag lists are words separated by
+        # spaces or tabs; letting whitespace match in more than one place is
+        # very slow on long runs of spaces.
         valid_line_re = re.compile(
-            r"^\s*(?P<line>([;#]+(?P<comment>.*))|"
-            r"(\s*(?P<tags>[a-z0-9, \t_:-]+)\s*=|=)?\s*"
-            r"((?P<url>[a-z0-9]{1,32}://.*)|(?P<assign>[a-z0-9, \t_-]+))|"
-            r"include\s+(?P<config>.+))?\s*$",
+            r"^(?P<line>([;#]+(?P<comment>.*))|"
+            r"((?P<tags>[a-z0-9,_:-]+([ \t]+[a-z0-9,_:-]+)*)\s*=|=)?\s*"
+            r"((?P<url>[a-z0-9]{1,32}://.*)|"
+            r"(?P<assign>[a-z0-9,_-]+([ \t]+[a-z0-9,_-]+)*))|"
+            r"include\s+(?P<config>.+))?$",
             re.I,
         )
 
         try:
             # split our content up to read line by line
-            content = re.split(r"\r*\n", content)
+            content = [line.rstrip("\r") for line in content.split("\n")]
 
-        except TypeError:
+        except (AttributeError, TypeError):
             # content was not expected string type
             ConfigBase.logger.error(
                 "Invalid Apprise TEXT based configuration specified."
@@ -711,7 +717,7 @@ class ConfigBase(URLBase):
             return ([], [])
 
         for line, entry in enumerate(content, start=1):
-            result = valid_line_re.match(entry)
+            result = valid_line_re.match(entry.strip())
             if not result:
                 # Invalid syntax
                 ConfigBase.logger.error(

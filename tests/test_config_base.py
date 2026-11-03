@@ -31,6 +31,7 @@ from inspect import cleandoc
 # Disable logging for a cleaner testing output
 import logging
 import sys
+import time
 from typing import Any
 from unittest.mock import Mock
 
@@ -2932,3 +2933,59 @@ def test_yaml_aliases_nested_too_deep_are_refused():
         "    - to: [[[[[a@example.com]]]]]\n"
     )
     assert len(result) == 1
+
+
+@pytest.mark.parametrize(
+    "content,detected",
+    (
+        (" " * 131000 + "!", None),
+        ("a" + " " * 131000 + "!", None),
+        ("a" + " " * 131000 + "=!", None),
+        ("a=" + " " * 131000 + "!", None),
+        # Read as one blank line
+        ("\r" * 131000, ConfigFormat.TEXT),
+    ),
+)
+def test_config_text_long_runs_of_whitespace_are_quick(content, detected):
+    """Detecting and reading a TEXT config stays fast on long space runs."""
+    start = time.time()
+    assert ConfigBase.detect_config_format(content) == detected
+    result, config = ConfigBase.config_parse_text(content)
+    elapsed = time.time() - start
+
+    assert result == []
+    assert config == []
+    # The generous limit allows slower CI while catching nonlinear behavior.
+    assert elapsed < 5.0
+
+
+def test_config_text_whitespace_handling():
+    """Whitespace around and inside TEXT lines is handled as before."""
+    # Windows and stray carriage-return line endings
+    content = (
+        "  # comment \r\n"
+        "\t a  b , c=json://localhost \r\r\n"
+        "d=e  f\r\n"
+        "   json://localhost/path   "
+    )
+    assert ConfigBase.detect_config_format(content) == ConfigFormat.TEXT
+    result, config = ConfigBase.config_parse_text(content)
+    assert config == []
+    assert len(result) == 2
+    assert result[0].tags == {"a", "b", "c"}
+    assert result[1].tags == set()
+
+    # A line that only assigns a URL is TEXT too
+    assert (
+        ConfigBase.detect_config_format("=json://localhost")
+        == ConfigFormat.TEXT
+    )
+
+    # Nothing after the equal sign is a bad line, with or without
+    # trailing spaces
+    for line in ("group =", "group = ", "group =\t"):
+        result, config = ConfigBase.config_parse_text(
+            f"{line}\njson://localhost"
+        )
+        assert result == []
+        assert config == []
