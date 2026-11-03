@@ -92,8 +92,16 @@ def test_config_http(mock_post):
 
         text = default_content
 
+        encoding = "utf-8"
+
         # Pointer to file
         ptr = None
+
+        def iter_content(self, chunk_size=1, **kwargs):
+            # Stream our text back in pieces, like requests does
+            data = self.text.encode(self.encoding)
+            for i in range(0, len(data), chunk_size):
+                yield data[i : i + chunk_size]
 
         def close(self):
             return
@@ -383,3 +391,69 @@ def test_config_http(mock_post):
 
     # Restore buffer size count
     ch.max_buffer_size = max_buffer_size
+
+
+@mock.patch("requests.post")
+def test_config_http_streaming(mock_post):
+    """A response is read in pieces and dropped once it is too large."""
+
+    class StreamResponse:
+        """A response whose size is not known up front."""
+
+        status_code = requests.codes.ok
+        headers: ClassVar[dict[str, str]] = {"Content-Type": "text/plain"}
+        encoding = "utf-8"
+
+        def __init__(self, chunks):
+            self.chunks = chunks
+            self.read = 0
+
+        def iter_content(self, chunk_size=1, **kwargs):
+            for chunk in self.chunks:
+                self.read += len(chunk)
+                yield chunk
+
+        def raise_for_status(self):
+            return
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args, **kwargs):
+            return
+
+    chunk = b"json://localhost\n" * 512
+
+    def endless():
+        # No Content-Length and no end; like a chunked or compressed reply
+        while True:
+            yield chunk
+
+    ch = ConfigHTTP(**ConfigHTTP.parse_url("http://localhost/"))
+
+    response = StreamResponse(endless())
+    mock_post.return_value = response
+    assert ch.read() is None
+    # Reading stopped just past the limit
+    assert ch.max_buffer_size < response.read
+    assert response.read <= ch.max_buffer_size + len(chunk)
+
+    # Content within the limit is decoded with the character set given
+    mock_post.return_value = StreamResponse(["café".encode("latin-1")])
+    mock_post.return_value.encoding = "latin-1"
+    assert ch.read() == "café"
+
+    # An unknown character set falls back to UTF-8
+    mock_post.return_value = StreamResponse(["café".encode()])
+    mock_post.return_value.encoding = "not-a-charset"
+    assert ch.read() == "café"
+
+    # No character set at all is read as UTF-8
+    mock_post.return_value = StreamResponse(["café".encode()])
+    mock_post.return_value.encoding = None
+    assert ch.read() == "café"
+
+    # A limit of zero means there is no limit
+    ch.max_buffer_size = 0
+    mock_post.return_value = StreamResponse([b"a" * 300000])
+    assert ch.read() == "a" * 300000

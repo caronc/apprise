@@ -66,6 +66,9 @@ class ConfigHTTP(ConfigBase):
     # from queries to services that may be untrusted.
     max_error_buffer_size = 2048
 
+    # Bytes read per streamed response chunk.
+    chunk_size = 8192
+
     # Configuration file inclusion can always include this type
     allow_cross_includes = ContentIncludeMode.ALWAYS
 
@@ -230,19 +233,31 @@ class ConfigHTTP(ConfigBase):
                     # Return None - buffer execeeded
                     return None
 
-                # Store our result (but no more than our buffer length)
-                response = r.text[: self.max_buffer_size + 1]
+                # Stream the body because Content-Length may be missing or
+                # may describe compressed rather than expanded content.
+                content = bytearray()
+                for chunk in r.iter_content(chunk_size=self.chunk_size):
+                    content += chunk
+                    if (
+                        self.max_buffer_size > 0
+                        and len(content) > self.max_buffer_size
+                    ):
+                        # Reject content larger than the configured limit.
+                        self.logger.error(
+                            "HTTP config response exceeds maximum buffer "
+                            f"length ({int(self.max_buffer_size / 1024)}KB);"
+                        )
 
-                # Verify that our content did not exceed the buffer size:
-                if len(response) > self.max_buffer_size:
-                    # Provide warning of data truncation
-                    self.logger.error(
-                        "HTTP config response exceeds maximum buffer length "
-                        f"({int(self.max_buffer_size / 1024)}KB);"
+                        return None
+
+                try:
+                    response = content.decode(
+                        r.encoding or "utf-8", errors="replace"
                     )
 
-                    # Return None - buffer execeeded
-                    return None
+                except LookupError:
+                    # The server named a character set we don't know
+                    response = content.decode("utf-8", errors="replace")
 
                 # Detect config format based on mime if the format isn't
                 # already enforced

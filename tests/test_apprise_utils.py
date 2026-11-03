@@ -887,8 +887,7 @@ def test_parse_url_whitespace_no_redos():
     "utils: parse_url() stays fast on long runs of whitespace"
 
     start = time.time()
-    # Each of these took seconds to hours before surrounding whitespace was
-    # stripped ahead of the URL pattern
+    # Exercise whitespace around each URL component.
     assert utils.parse.parse_url(" " * 5000 + "json://h/?a\n!") is None
     assert utils.parse.parse_url("json://h/?a=" + " " * 50000 + "\n!") is None
     assert utils.parse.parse_url("json://" + " " * 50000 + "\n?") is None

@@ -134,11 +134,8 @@ def test_yaml_templated_tag_handles_encoded_and_global_values():
     assert not templated_tag({"tag": set()}, None)
 
 
-def test_yaml_expanded_size_counts_aliases_and_finds_loops():
-    """Shared values count every time they are used; loops return None.
-
-    - Results are ``(values, depth)``.
-    """
+def test_yaml_expanded_size():
+    """Count expanded values and depth while rejecting loops."""
     assert expanded_size("text") == (1, 0)
     assert expanded_size(None) == (1, 0)
     assert expanded_size([]) == (1, 1)

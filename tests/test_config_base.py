@@ -75,6 +75,8 @@ def requests_remote_config(mocker: MockerFixture) -> Mock:
         resp.status_code = requests.codes.ok
         resp.url = url
         resp._content = body.encode("utf-8")  # type: ignore[attr-defined]
+        # The body is already in memory, so streaming hands it back
+        resp._content_consumed = True  # type: ignore[attr-defined]
         resp.encoding = "utf-8"
         return resp
 
@@ -2914,7 +2916,7 @@ urls:
     assert result[1].tags == {"a@example.com", "b@example.com"}
 
 
-def test_yaml_aliases_nested_too_deep_are_refused():
+def test_yaml_alias_depth_is_refused():
     """Aliases placed inside each other can not stack up deep nesting."""
     lines = ["version: 1", "chain:", "  - &a0 x"]
     for i in range(1, 31):
@@ -2946,7 +2948,7 @@ def test_yaml_aliases_nested_too_deep_are_refused():
         ("\r" * 131000, ConfigFormat.TEXT),
     ),
 )
-def test_config_text_long_runs_of_whitespace_are_quick(content, detected):
+def test_config_text_whitespace_performance(content, detected):
     """Detecting and reading a TEXT config stays fast on long space runs."""
     start = time.time()
     assert ConfigBase.detect_config_format(content) == detected

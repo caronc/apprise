@@ -56,9 +56,7 @@ YAML_REAPPLY_SKIP = frozenset(("tag", "tags", "asset"))
 # Maximum values allowed after YAML aliases (``*name``) are expanded.
 YAML_EXPANDED_MAX = 100000
 
-# Maximum nesting allowed after YAML aliases are expanded. A real Apprise
-# configuration is rarely more than 7 levels deep, but aliases placed inside
-# each other can stack up thousands.
+# Maximum nesting allowed after YAML aliases are expanded.
 YAML_DEPTH_MAX = 20
 
 
