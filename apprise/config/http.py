@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import math
 import re
 
 import requests
@@ -32,6 +33,7 @@ import requests
 from ..common import ConfigFormat, ContentIncludeMode
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
+from ..utils.http import read_bounded_response
 from ..utils.parse import URL_ENCODED_PATH_SAFE_CHARS
 from .base import ConfigBase
 
@@ -65,9 +67,6 @@ class ConfigHTTP(ConfigBase):
     # The idea behind enforcing this kind of restriction is to prevent abuse
     # from queries to services that may be untrusted.
     max_error_buffer_size = 2048
-
-    # Bytes read per streamed response chunk.
-    chunk_size = 8192
 
     # Configuration file inclusion can always include this type
     allow_cross_includes = ContentIncludeMode.ALWAYS
@@ -219,34 +218,29 @@ class ConfigHTTP(ConfigBase):
                     # Handle edge case where Content-Length is a bad value
                     file_size = 0
 
-                # Reject advertised bodies over the limit before streaming.
-                if (
-                    self.max_buffer_size > 0
-                    and file_size > self.max_buffer_size
-                ):
+                # A limit of zero means there is no limit
+                limit = (
+                    self.max_buffer_size
+                    if self.max_buffer_size > 0
+                    else math.inf
+                )
+
+                # Refuse a body that says up front it is too large; otherwise
+                # stream it, since Content-Length may be missing or may
+                # describe compressed rather than expanded content.
+                content = (
+                    read_bounded_response(r, limit)
+                    if file_size <= limit
+                    else None
+                )
+
+                if content is None:
                     self.logger.error(
                         "HTTP config response exceeds maximum buffer length "
-                        f"({int(self.max_buffer_size / 1024)}KB);"
+                        "(%sKB)",
+                        int(self.max_buffer_size / 1024),
                     )
-
                     return None
-
-                # Stream the body because Content-Length may be missing or
-                # may describe compressed rather than expanded content.
-                content = bytearray()
-                for chunk in r.iter_content(chunk_size=self.chunk_size):
-                    content += chunk
-                    if (
-                        self.max_buffer_size > 0
-                        and len(content) > self.max_buffer_size
-                    ):
-                        # Reject content larger than the configured limit.
-                        self.logger.error(
-                            "HTTP config response exceeds maximum buffer "
-                            f"length ({int(self.max_buffer_size / 1024)}KB);"
-                        )
-
-                        return None
 
                 try:
                     response = content.decode(

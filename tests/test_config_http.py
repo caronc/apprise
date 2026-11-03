@@ -413,6 +413,9 @@ def test_config_http_streaming(mock_post):
                 self.read += len(chunk)
                 yield chunk
 
+        def close(self):
+            return
+
         def raise_for_status(self):
             return
 
