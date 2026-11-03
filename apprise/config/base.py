@@ -385,79 +385,46 @@ class ConfigBase(URLBase):
         return True
 
     @staticmethod
-    def __normalize_tag_groups(group_tags: dict[str, set[str]]) -> None:
+    def __tag_group_lookup(group_tags: dict[str, set[str]]):
+        """Return a function that lists the groups a service's tags reach.
+
+        - A tag belongs to every group that lists it, then to every group
+          that lists one of those groups, and so on.
+        - Groups may list each other in a loop (a=b and b=a).
+        - Only plain tags count; a service tagged with a group's name does
+          not join the groups that list that group.
+
+        Example: with ``a=x,b`` and ``b=y``, the tags ``{y}`` reach the
+        groups ``{a, b}``.
         """
-        Used to normalize a tag assign map which looks like:
-          {
-             'group': set('{tag1}', '{group1}', '{tag2}'),
-             'group1': set('{tag2}','{tag3}'),
-          }
+        groups = {str(group) for group in group_tags}
 
-          Then normalized it (merging groups); with respect to the above, the
-          output would be:
-          {
-             'group': set('{tag1}', '{tag2}', '{tag3}),
-             'group1': set('{tag2}','{tag3}'),
-          }
+        # For each tag or group, the groups that list it
+        parents = {}
+        for group, members in group_tags.items():
+            for member in members:
+                parents.setdefault(member, set()).add(str(group))
 
-        """
-        # Prepare a key set list we can use
-        tag_groups = {str(x) for x in group_tags}
+        def groups_for(tags):
+            # Walk up from each plain tag through the groups that list it;
+            # remembering where we have been stops us going round a loop
+            found = set()
+            pending = [tag for tag in tags if tag not in groups]
+            while pending:
+                for group in parents.get(pending.pop(), ()):
+                    if group not in found:
+                        found.add(group)
+                        pending.append(group)
+            return found
 
-        def _expand(tags, ignore=None):
-            """Expands based on tag provided and returns a set.
+        # A group that reaches no plain tag can never match a service
+        reached = groups_for(tag for tag in parents if tag not in groups)
+        for group in sorted(groups - reached):
+            ConfigBase.logger.warning(
+                "The group %s has no tags assigned to it", group
+            )
 
-            this also updates the group_tags while it goes
-            """
-
-            # Prepare ourselves a return set
-            results = set()
-            ignore = set() if ignore is None else ignore
-
-            # track groups
-            groups = set()
-
-            for tag in tags:
-                if tag in ignore:
-                    continue
-
-                # Track our groups
-                groups.add(tag)
-
-                # Store what we know is worth keeping
-                if tag not in group_tags:  # pragma: no cover
-                    # handle cases where the tag doesn't exist
-                    group_tags[tag] = set()
-
-                results |= group_tags[tag] - tag_groups
-
-                # Get simple tag assignments
-                found = group_tags[tag] & tag_groups
-                if not found:
-                    continue
-
-                for gtag in found:
-                    if gtag in ignore:
-                        continue
-
-                    # Go deeper (recursion)
-                    ignore.add(tag)
-                    group_tags[gtag] = _expand({gtag}, ignore=ignore)
-                    results |= group_tags[gtag]
-
-                    # Pop ignore
-                    ignore.remove(tag)
-
-            return results
-
-        for tag in tag_groups:
-            # Get our tags
-            group_tags[tag] |= _expand({tag})
-            if not group_tags[tag]:
-                ConfigBase.logger.warning(
-                    f"The group {tag} has no tags assigned to it"
-                )
-                del group_tags[tag]
+        return groups_for
 
     @staticmethod
     def parse_url(
@@ -824,10 +791,10 @@ class ConfigBase(URLBase):
             )
 
         #
-        # Normalize Tag Groups
-        # - Expand Groups of Groups so that they don't exist
+        # Tag Groups
+        # - Find which groups (and groups of groups) each service is in
         #
-        ConfigBase.__normalize_tag_groups(group_tags)
+        groups_for = ConfigBase.__tag_group_lookup(group_tags)
 
         #
         # URL Processing
@@ -839,13 +806,7 @@ class ConfigBase(URLBase):
             #
             # Apply our tag groups if they're defined
             #
-            for group, tags in group_tags.items():
-                # Detect if anything assigned to this tag also maps back to a
-                # group.  If so we want to add the group to our list
-                if next(
-                    (True for tag in results["tag"] if tag in tags), False
-                ):
-                    results["tag"].add(group)
+            results["tag"] |= groups_for(results["tag"])
 
             try:
                 # Attempt to create an instance of our plugin using the
@@ -1739,10 +1700,10 @@ class ConfigBase(URLBase):
                 )
 
         #
-        # Normalize Tag Groups
-        # - Expand Groups of Groups so that they don't exist
+        # Tag Groups
+        # - Find which groups (and groups of groups) each service is in
         #
-        ConfigBase.__normalize_tag_groups(group_tags)
+        groups_for = ConfigBase.__tag_group_lookup(group_tags)
 
         #
         # URL Processing
@@ -1754,13 +1715,7 @@ class ConfigBase(URLBase):
             #
             # Apply our tag groups if they're defined
             #
-            for group, tags in group_tags.items():
-                # Detect if anything assigned to this tag also maps back to a
-                # group.  If so we want to add the group to our list
-                if next(
-                    (True for tag in results["tag"] if tag in tags), False
-                ):
-                    results["tag"].add(group)
+            results["tag"] |= groups_for(results["tag"])
 
             if placeholders:
                 needed = placeholders.used(results)

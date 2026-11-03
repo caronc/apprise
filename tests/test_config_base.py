@@ -32,6 +32,7 @@ from inspect import cleandoc
 import logging
 import sys
 import time
+import tracemalloc
 from typing import Any
 from unittest.mock import Mock
 
@@ -2991,3 +2992,71 @@ def test_config_text_whitespace_handling():
         )
         assert result == []
         assert config == []
+
+
+def test_config_group_chain():
+    """A long chain of groups is expanded without running out of stack."""
+    chain = "\n".join(f"g{i}=g{i + 1}" for i in range(2000))
+    result, _ = ConfigBase.config_parse_text(
+        f"{chain}\ng2000=t\nt=json://localhost"
+    )
+    assert len(result) == 1
+    assert {"g0", "g1000", "g2000"} <= result[0].tags
+
+    chain = "\n".join(f"  - g{i}: g{i + 1}" for i in range(2000))
+    result, _ = ConfigBase.config_parse_yaml(
+        f"groups:\n{chain}\n  - g2000: t\n"
+        "urls:\n  - json://localhost:\n    - tag: t\n"
+    )
+    assert len(result) == 1
+    assert {"g0", "g1000", "g2000"} <= result[0].tags
+
+    # Ordinary nesting keeps working
+    result, _ = ConfigBase.config_parse_text(
+        "a=b\nb=c\nc=t\nt=json://localhost"
+    )
+    assert len(result) == 1
+    assert {"a", "b", "c", "t"} <= result[0].tags
+
+    # Each group in a long chain with its own tag must not store a copy of
+    # every tag below it; that took over 1GB for 7,000 groups
+    chain = "\n".join(f"g{i}=t{i},g{i + 1}" for i in range(5000))
+    tracemalloc.start()
+    try:
+        result, _ = ConfigBase.config_parse_text(
+            f"{chain}\ng5000=t5000\nt5000=json://localhost"
+        )
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+
+    assert {"g0", "g4999", "g5000"} <= result[0].tags
+    # About 50MB normally; storing copies needs several hundred
+    assert peak < 256 * 1024 * 1024
+
+
+def test_config_group_cycles():
+    """Every group in a loop reaches every service in that loop."""
+    # A ring of groups; each includes the next and has its own service
+    names = ["red", "blue", "green", "gold", "pink", "gray"]
+    lines = [
+        f"{name}=t{i},{names[(i + 1) % len(names)]}"
+        for i, name in enumerate(names)
+    ]
+    lines += [f"t{i}=json://localhost/{i}" for i in range(len(names))]
+
+    result, _ = ConfigBase.config_parse_text("\n".join(lines))
+    assert len(result) == len(names)
+    for service in result:
+        assert set(names) <= service.tags
+
+    # A group outside the loop that includes it reaches all of it too, while
+    # the loop does not reach back out to it
+    result, _ = ConfigBase.config_parse_text(
+        "\n".join(lines) + "\nall=red\nlone=t9\nt9=json://localhost/9"
+    )
+    for service in result:
+        if service.url(privacy=True).startswith("json://localhost/9"):
+            assert service.tags == {"t9", "lone"}
+        else:
+            assert {"all", *names} <= service.tags

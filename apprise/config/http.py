@@ -219,18 +219,16 @@ class ConfigHTTP(ConfigBase):
                     # Handle edge case where Content-Length is a bad value
                     file_size = 0
 
-                # Store our response
+                # Reject advertised bodies over the limit before streaming.
                 if (
                     self.max_buffer_size > 0
                     and file_size > self.max_buffer_size
                 ):
-                    # Provide warning of data truncation
                     self.logger.error(
                         "HTTP config response exceeds maximum buffer length "
                         f"({int(self.max_buffer_size / 1024)}KB);"
                     )
 
-                    # Return None - buffer execeeded
                     return None
 
                 # Stream the body because Content-Length may be missing or
