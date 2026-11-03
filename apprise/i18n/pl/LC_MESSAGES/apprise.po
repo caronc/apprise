@@ -399,6 +399,18 @@ msgstr "Adres URL ikony"
 msgid "Call"
 msgstr "Połączenie"
 
+#: apprise/plugins/bark.py:262
+msgid "Copy Content"
+msgstr "Treść do skopiowania"
+
+#: apprise/plugins/bark.py:271
+msgid "Archive"
+msgstr "Archiwizuj"
+
+#: apprise/plugins/bark.py:288
+msgid "Delete Notification"
+msgstr "Usuń powiadomienie"
+
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"
 msgstr "Klucz szyfrowania"

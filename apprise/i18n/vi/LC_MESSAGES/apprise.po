@@ -398,6 +398,18 @@ msgstr "URL biểu tượng"
 msgid "Call"
 msgstr "Cuộc gọi"
 
+#: apprise/plugins/bark.py:262
+msgid "Copy Content"
+msgstr "Nội dung sao chép"
+
+#: apprise/plugins/bark.py:271
+msgid "Archive"
+msgstr "Lưu trữ"
+
+#: apprise/plugins/bark.py:288
+msgid "Delete Notification"
+msgstr "Xóa thông báo"
+
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"
 msgstr "Khóa mã hóa"

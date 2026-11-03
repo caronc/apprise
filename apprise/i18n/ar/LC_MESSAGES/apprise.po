@@ -399,6 +399,18 @@ msgstr "رابط الأيقونة"
 msgid "Call"
 msgstr "المكالمة"
 
+#: apprise/plugins/bark.py:262
+msgid "Copy Content"
+msgstr "محتوى النسخ"
+
+#: apprise/plugins/bark.py:271
+msgid "Archive"
+msgstr "أرشفة"
+
+#: apprise/plugins/bark.py:288
+msgid "Delete Notification"
+msgstr "حذف الإشعار"
+
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"
 msgstr "مفتاح التشفير"

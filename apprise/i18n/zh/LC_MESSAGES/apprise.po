@@ -398,6 +398,18 @@ msgstr "图标网址"
 msgid "Call"
 msgstr "通话"
 
+#: apprise/plugins/bark.py:262
+msgid "Copy Content"
+msgstr "复制内容"
+
+#: apprise/plugins/bark.py:271
+msgid "Archive"
+msgstr "存档"
+
+#: apprise/plugins/bark.py:288
+msgid "Delete Notification"
+msgstr "删除通知"
+
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"
 msgstr "加密密钥"

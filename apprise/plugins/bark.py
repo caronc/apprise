@@ -270,9 +270,12 @@ class NotifyBark(NotifyBase):
             "archive": {
                 "name": _("Archive"),
                 "type": "bool",
+                # Bark archives by default; when unset, the app setting
+                # decides and nothing is sent
+                "default": True,
             },
             "ttl": {
-                "name": _("Archive TTL"),
+                "name": _("Time To Live"),
                 "type": "int",
                 "min": 1,
             },

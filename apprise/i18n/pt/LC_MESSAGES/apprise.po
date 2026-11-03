@@ -398,6 +398,18 @@ msgstr "URL do ícone"
 msgid "Call"
 msgstr "Chamada"
 
+#: apprise/plugins/bark.py:262
+msgid "Copy Content"
+msgstr "Conteúdo a copiar"
+
+#: apprise/plugins/bark.py:271
+msgid "Archive"
+msgstr "Arquivar"
+
+#: apprise/plugins/bark.py:288
+msgid "Delete Notification"
+msgstr "Excluir a notificação"
+
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"
 msgstr "Chave de cifragem"

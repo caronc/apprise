@@ -398,6 +398,18 @@ msgstr "आइकन का URL"
 msgid "Call"
 msgstr "कॉल"
 
+#: apprise/plugins/bark.py:262
+msgid "Copy Content"
+msgstr "कॉपी करने की सामग्री"
+
+#: apprise/plugins/bark.py:271
+msgid "Archive"
+msgstr "संग्रहित करें"
+
+#: apprise/plugins/bark.py:288
+msgid "Delete Notification"
+msgstr "अधिसूचना हटाएँ"
+
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"
 msgstr "कूटलेखन कुंजी"

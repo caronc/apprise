@@ -398,6 +398,18 @@ msgstr "Icon URL"
 msgid "Call"
 msgstr "Call"
 
+#: apprise/plugins/bark.py:262
+msgid "Copy Content"
+msgstr "Copy Content"
+
+#: apprise/plugins/bark.py:271
+msgid "Archive"
+msgstr "Archive"
+
+#: apprise/plugins/bark.py:288
+msgid "Delete Notification"
+msgstr "Delete Notification"
+
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"
 msgstr "Encryption Key"

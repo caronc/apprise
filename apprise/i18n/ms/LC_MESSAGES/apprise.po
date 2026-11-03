@@ -398,6 +398,18 @@ msgstr "URL ikon"
 msgid "Call"
 msgstr "Panggilan"
 
+#: apprise/plugins/bark.py:262
+msgid "Copy Content"
+msgstr "Kandungan untuk disalin"
+
+#: apprise/plugins/bark.py:271
+msgid "Archive"
+msgstr "Arkibkan"
+
+#: apprise/plugins/bark.py:288
+msgid "Delete Notification"
+msgstr "Padam pemberitahuan"
+
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"
 msgstr "Kunci penyulitan"
