@@ -3035,6 +3035,39 @@ def test_config_group_chain():
     assert peak < 256 * 1024 * 1024
 
 
+def test_config_group_membership_limit(monkeypatch):
+    """Too many group memberships across all services refuses the config."""
+    # Three groups that all list tag t, and a service per tag line
+    groups = "a=t\nb=t\nc=t\n"
+    monkeypatch.setattr(ConfigBase, "max_group_memberships", 9)
+
+    def yaml_config(count):
+        # The same three groups with count services, as YAML
+        entries = "".join(
+            f"  - json://localhost/{i}:\n    - tag: t\n" for i in range(count)
+        )
+        return f"groups:\n  a: t\n  b: t\n  c: t\nurls:\n{entries}"
+
+    # Three services joining three groups each is 9; that is allowed
+    services = "".join(f"t=json://localhost/{i}\n" for i in range(3))
+    result, _ = ConfigBase.config_parse_text(groups + services)
+    assert len(result) == 3
+    assert all({"a", "b", "c"} <= service.tags for service in result)
+
+    result, _ = ConfigBase.config_parse_yaml(yaml_config(3))
+    assert len(result) == 3
+
+    # A fourth service makes 12, so nothing is loaded
+    services += "t=json://localhost/3\n"
+    result, config = ConfigBase.config_parse_text(groups + services)
+    assert result == []
+    assert config == []
+
+    result, config = ConfigBase.config_parse_yaml(yaml_config(4))
+    assert result == []
+    assert config == []
+
+
 def test_config_group_cycles():
     """Every group in a loop reaches every service in that loop."""
     # A ring of groups; each includes the next and has its own service

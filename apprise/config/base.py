@@ -94,6 +94,11 @@ class ConfigBase(URLBase):
     # anything else. 128KB (131072B)
     max_buffer_size = 131072
 
+    # The most group memberships tag groups may add across all of one
+    # configuration's services. Thousands of services that each join
+    # thousands of groups would otherwise take minutes and gigabytes.
+    max_group_memberships = 100000
+
     # By default all configuration is not includable using the 'include'
     # line found in configuration files.
     allow_cross_includes = common.ContentIncludeMode.NEVER
@@ -393,6 +398,8 @@ class ConfigBase(URLBase):
         - Groups may list each other in a loop (a=b and b=a).
         - Only plain tags count; a service tagged with a group's name does
           not join the groups that list that group.
+        - It returns None once all services together have been added to
+          more than ``max_group_memberships`` groups.
 
         Example: with ``a=x,b`` and ``b=y``, the tags ``{y}`` reach the
         groups ``{a, b}``.
@@ -405,7 +412,7 @@ class ConfigBase(URLBase):
             for member in members:
                 parents.setdefault(member, set()).add(str(group))
 
-        def groups_for(tags):
+        def reach(tags):
             # Walk up from each plain tag through the groups that list it;
             # remembering where we have been stops us going round a loop
             found = set()
@@ -418,11 +425,29 @@ class ConfigBase(URLBase):
             return found
 
         # A group that reaches no plain tag can never match a service
-        reached = groups_for(tag for tag in parents if tag not in groups)
+        reached = reach(tag for tag in parents if tag not in groups)
         for group in sorted(groups - reached):
             ConfigBase.logger.warning(
                 "The group %s has no tags assigned to it", group
             )
+
+        # Every group added to a service counts against one budget for the
+        # whole configuration
+        remaining = ConfigBase.max_group_memberships
+
+        def groups_for(tags):
+            # The groups these tags reach, or None once over budget
+            nonlocal remaining
+            found = reach(tags)
+            remaining -= len(found)
+            if remaining < 0:
+                ConfigBase.logger.error(
+                    "Tag groups add more than %d group memberships across"
+                    " this configuration's services.",
+                    ConfigBase.max_group_memberships,
+                )
+                return None
+            return found
 
         return groups_for
 
@@ -806,7 +831,11 @@ class ConfigBase(URLBase):
             #
             # Apply our tag groups if they're defined
             #
-            results["tag"] |= groups_for(results["tag"])
+            found = groups_for(results["tag"])
+            if found is None:
+                # Too many group memberships; refuse the configuration
+                return ([], [])
+            results["tag"] |= found
 
             try:
                 # Attempt to create an instance of our plugin using the
@@ -1715,7 +1744,11 @@ class ConfigBase(URLBase):
             #
             # Apply our tag groups if they're defined
             #
-            results["tag"] |= groups_for(results["tag"])
+            found = groups_for(results["tag"])
+            if found is None:
+                # Too many group memberships; refuse the configuration
+                return ([], [])
+            results["tag"] |= found
 
             if placeholders:
                 needed = placeholders.used(results)
