@@ -963,27 +963,28 @@ def parse_bool(arg, default=False):
 def _flatten_values(*args):
     """Yield values from nested lists, sets, and tuples.
 
-    Iterative traversal handles deep nesting, while visiting each container
-    once safely handles shared or looping values.
+    Iterative traversal handles deep nesting. A list that appears more than
+    once is walked each time, but a list found inside itself is skipped.
     """
-    visited = set()
-    pending = [iter(args)]
+    # The lists we are currently inside of
+    active = set()
+    pending = [(None, iter(args))]
     while pending:
-        for arg in pending[-1]:
+        for arg in pending[-1][1]:
             if not isinstance(arg, (set, list, tuple)):
                 yield arg
                 continue
 
-            if id(arg) not in visited:
+            if id(arg) not in active:
                 # Walk this list first, then resume its parent where we left
                 # off so the original order is kept
-                visited.add(id(arg))
-                pending.append(iter(arg))
+                active.add(id(arg))
+                pending.append((id(arg), iter(arg)))
                 break
 
         else:
             # Everything at this level has been handled
-            pending.pop()
+            active.discard(pending.pop()[0])
 
 
 def parse_domain_service_targets(

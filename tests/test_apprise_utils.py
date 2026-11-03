@@ -2809,7 +2809,7 @@ def test_parse_list():
 
 
 def test_parse_helpers_nested_lists():
-    """Nested input is walked without recursion and each list only once."""
+    """Nested input is walked without recursion and loops are skipped."""
     parse = utils.parse
 
     # Nesting far deeper than Python's recursion limit
@@ -2835,12 +2835,12 @@ def test_parse_helpers_nested_lists():
     ):
         assert fn(loop) == fn(flat)
 
-    # The same list repeated many times over is only walked once
+    # A list that appears more than once keeps all of its values
     shared = ["c"]
-    for _ in range(64):
-        shared = [shared, shared]
-
-    assert parse.parse_list(shared, sort=False) == ["c"]
+    assert parse.parse_list([shared, shared], sort=False) == ["c", "c"]
+    assert parse.parse_list([loop, loop], sort=False) == (
+        parse.parse_list(flat + flat, sort=False)
+    )
 
     # Order is kept when sorting is turned off
     assert parse.parse_list(["c", ("a", ["b"])], "d", sort=False) == [
