@@ -400,7 +400,7 @@ msgstr "通话"
 
 #: apprise/plugins/bark.py:262
 msgid "Copy Content"
-msgstr "复制内容"
+msgstr "要复制的内容"
 
 #: apprise/plugins/bark.py:271
 msgid "Archive"

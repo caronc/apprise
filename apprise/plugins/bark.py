@@ -606,13 +606,18 @@ class NotifyBark(NotifyBase):
             payload["isArchive"] = "1" if self.archive else "0"
 
         if self.ttl:
-            payload["ttl"] = self.ttl
+            # A string, as the server turns large numbers into "1e+06"
+            payload["ttl"] = str(self.ttl)
 
         # The server reads these to address the notification on the device,
-        # so they are never encrypted; Bark requires the id to be a string
+        # so they are never only encrypted; Bark requires the id to be a
+        # string
         routing = {}
         if self.notification_id:
             routing["id"] = self.notification_id
+
+            # The app files the decrypted payload in its history by this id
+            payload["id"] = self.notification_id
 
         if self.delete:
             routing["delete"] = "1"

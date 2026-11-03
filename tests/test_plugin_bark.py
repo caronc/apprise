@@ -432,7 +432,7 @@ def test_plugin_bark_extra_parameters(mock_post):
         "copy": "123456",
         "action": "none",
         "isArchive": "0",
-        "ttl": 60,
+        "ttl": "60",
         "id": "build-42",
     }
 

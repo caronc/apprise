@@ -408,7 +408,7 @@ msgstr "Arquivar"
 
 #: apprise/plugins/bark.py:288
 msgid "Delete Notification"
-msgstr "Excluir a notificação"
+msgstr "Eliminar a notificação"
 
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"

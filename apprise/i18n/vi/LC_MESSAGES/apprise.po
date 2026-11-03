@@ -400,7 +400,7 @@ msgstr "Cuộc gọi"
 
 #: apprise/plugins/bark.py:262
 msgid "Copy Content"
-msgstr "Nội dung sao chép"
+msgstr "Nội dung cần sao chép"
 
 #: apprise/plugins/bark.py:271
 msgid "Archive"

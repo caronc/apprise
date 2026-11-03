@@ -401,7 +401,7 @@ msgstr "المكالمة"
 
 #: apprise/plugins/bark.py:262
 msgid "Copy Content"
-msgstr "محتوى النسخ"
+msgstr "المحتوى المراد نسخه"
 
 #: apprise/plugins/bark.py:271
 msgid "Archive"

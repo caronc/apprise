@@ -404,7 +404,7 @@ msgstr "कॉपी करने की सामग्री"
 
 #: apprise/plugins/bark.py:271
 msgid "Archive"
-msgstr "संग्रहित करें"
+msgstr "संग्रहीत करें"
 
 #: apprise/plugins/bark.py:288
 msgid "Delete Notification"
