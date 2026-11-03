@@ -294,6 +294,76 @@ apprise_url_tests = (
             "instance": NotifyBark,
         },
     ),
+    (
+        "bark://192.168.0.6:8081/device_key/?subtitle=Sub&copy=123456",
+        {
+            # subtitle and copy content
+            "instance": NotifyBark,
+        },
+    ),
+    (
+        "bark://192.168.0.6:8081/device_key/?action=alert",
+        {
+            # tap action
+            "instance": NotifyBark,
+        },
+    ),
+    (
+        "bark://192.168.0.6:8081/device_key/?action=invalid",
+        {
+            # bad action, but we go ahead anyway
+            "instance": NotifyBark,
+        },
+    ),
+    (
+        "bark://192.168.0.6:8081/device_key/?archive=yes&ttl=3600",
+        {
+            # archived for an hour
+            "instance": NotifyBark,
+        },
+    ),
+    (
+        "bark://192.168.0.6:8081/device_key/?archive=no",
+        {
+            # not archived
+            "instance": NotifyBark,
+        },
+    ),
+    (
+        "bark://192.168.0.6:8081/device_key/?ttl=invalid",
+        {
+            # bad ttl, but we go ahead anyway
+            "instance": NotifyBark,
+        },
+    ),
+    (
+        "bark://192.168.0.6:8081/device_key/?ttl=0",
+        {
+            # ttl must be positive, but we go ahead anyway
+            "instance": NotifyBark,
+        },
+    ),
+    (
+        "bark://192.168.0.6:8081/device_key/?id=build-42",
+        {
+            # replaceable notification
+            "instance": NotifyBark,
+        },
+    ),
+    (
+        "bark://192.168.0.6:8081/device_key/?id=build-42&delete=yes",
+        {
+            # delete a notification
+            "instance": NotifyBark,
+        },
+    ),
+    (
+        "bark://192.168.0.6:8081/device_key/?delete=yes",
+        {
+            # a notification can only be deleted by its id
+            "instance": AppriseImproperlyConfigured,
+        },
+    ),
 )
 
 
@@ -332,6 +402,76 @@ def test_plugin_bark_html_to_markdown_format(mock_post):
     # The body must arrive as Markdown, not stripped plain text
     payload = json.loads(mock_post.call_args_list[0][1]["data"])
     assert payload["markdown"] == "**hello** *world*"
+
+
+@mock.patch("requests.post")
+def test_plugin_bark_extra_parameters(mock_post):
+    """NotifyBark() sends the subtitle, copy, action, archive and id."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    url = (
+        "bark://192.168.0.6:8081/device_key/?subtitle=Sub&copy=123456"
+        "&action=none&archive=no&ttl=60&id=build-42&image=no"
+    )
+    obj = Apprise.instantiate(url)
+    assert isinstance(obj, NotifyBark)
+
+    # The URL survives a round trip
+    obj2 = Apprise.instantiate(obj.url())
+    assert obj2.url() == obj.url()
+
+    assert obj.notify(body="body", title="title") is True
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    assert payload == {
+        "device_key": "device_key",
+        "title": "title",
+        "body": "body",
+        "subtitle": "Sub",
+        "copy": "123456",
+        "action": "none",
+        "isArchive": "0",
+        "ttl": 60,
+        "id": "build-42",
+    }
+
+    # Deleting sends the id, which the server needs, and the flag
+    mock_post.reset_mock()
+    obj = Apprise.instantiate(
+        "bark://192.168.0.6:8081/device_key/?id=build-42&delete=yes"
+    )
+    assert obj.notify(body="body") is True
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["id"] == "build-42"
+    assert payload["delete"] == "1"
+    assert "delete=yes" in obj.url()
+
+
+@mock.patch("requests.post")
+def test_plugin_bark_encrypted_keeps_id_and_delete_in_clear(
+    mock_post, monkeypatch
+):
+    """NotifyBark() leaves the id and delete flag outside the ciphertext."""
+    pytest.importorskip("cryptography.hazmat.primitives.ciphers.aead")
+    monkeypatch.setattr(
+        bark_module.secrets, "token_urlsafe", lambda length: "abcdefghijkl"
+    )
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    obj = NotifyBark(
+        host="localhost",
+        targets=["device_key"],
+        encryption_key="k" * 16,
+        notification_id="build-42",
+        delete=True,
+    )
+    assert obj.send(body="body") is True
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    assert set(payload) == {"device_key", "ciphertext", "iv", "id", "delete"}
+    assert payload["id"] == "build-42"
+    assert payload["delete"] == "1"
 
 
 @pytest.mark.parametrize(
