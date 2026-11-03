@@ -2782,6 +2782,52 @@ def test_parse_list():
     )
 
 
+def test_parse_helpers_nested_lists():
+    """Nested input is walked without recursion and each list only once."""
+    parse = utils.parse
+
+    # Nesting far deeper than Python's recursion limit
+    deep = ["a@example.com"]
+    for _ in range(sys.getrecursionlimit() * 5):
+        deep = [deep]
+
+    assert parse.parse_list(deep) == ["a@example.com"]
+    assert parse.parse_emails(deep) == ["a@example.com"]
+
+    # A list that contains itself gives the same result as its flat form
+    loop = ["b@example.com", "+15551234567", "DF1ABC", "light.on"]
+    flat = list(loop)
+    loop.append(loop)
+
+    for fn in (
+        parse.parse_list,
+        parse.parse_emails,
+        parse.parse_urls,
+        parse.parse_phone_no,
+        parse.parse_call_sign,
+        parse.parse_domain_service_targets,
+    ):
+        assert fn(loop) == fn(flat)
+
+    # The same list repeated many times over is only walked once
+    shared = ["c"]
+    for _ in range(64):
+        shared = [shared, shared]
+
+    assert parse.parse_list(shared, sort=False) == ["c"]
+
+    # Order is kept when sorting is turned off
+    assert parse.parse_list(["c", ("a", ["b"])], "d", sort=False) == [
+        "c",
+        "a",
+        "b",
+        "d",
+    ]
+
+    # Only top-level values are cast; non-strings inside a list are skipped
+    assert parse.parse_list(1, [2, "x"], cast=str) == ["1", "x"]
+
+
 def test_import_module(tmpdir):
     """utils: import_module testing"""
     # Prepare ourselves a file to work with

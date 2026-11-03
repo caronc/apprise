@@ -55,8 +55,11 @@ from ..utils.template import (
 )
 from ..utils.time import zoneinfo
 from ..utils.yaml import (
+    YAML_DEPTH_MAX,
+    YAML_EXPANDED_MAX,
     YAML_REAPPLY_SKIP,
     dropped_template,
+    expanded_size,
     template_in_schema,
     template_references,
     templated_tag,
@@ -912,12 +915,40 @@ class ConfigBase(URLBase):
 
         except (
             AttributeError,
+            # PyYAML runs out of stack on very deeply nested lists or maps
+            RecursionError,
             yaml.parser.ParserError,
             yaml.error.MarkedYAMLError,
         ) as e:
             # Invalid content
             ConfigBase.logger.error("Invalid Apprise YAML data specified.")
             ConfigBase.logger.debug(f"YAML Exception:{os.linesep}{e}")
+            return ([], [])
+
+        # Aliases (*name) let a few lines describe a huge, deep or looping
+        # structure; refuse those before anything walks through them
+        measured = expanded_size(result)
+        if measured is None:
+            ConfigBase.logger.error(
+                "Looping structure found in Apprise YAML configuration."
+            )
+            return ([], [])
+
+        size, depth = measured
+        if size > YAML_EXPANDED_MAX:
+            ConfigBase.logger.error(
+                "Apprise YAML configuration expands to more than %d values"
+                " once its aliases are followed.",
+                YAML_EXPANDED_MAX,
+            )
+            return ([], [])
+
+        if depth > YAML_DEPTH_MAX:
+            ConfigBase.logger.error(
+                "Apprise YAML configuration is nested more than %d levels"
+                " deep once its aliases are followed.",
+                YAML_DEPTH_MAX,
+            )
             return ([], [])
 
         # The host decides whether this configuration may use templates.

@@ -959,6 +959,32 @@ def parse_bool(arg, default=False):
     return bool(arg)
 
 
+def _flatten_values(*args):
+    """Yield values from nested lists, sets, and tuples.
+
+    Iterative traversal handles deep nesting, while visiting each container
+    once safely handles shared or looping values.
+    """
+    visited = set()
+    pending = [iter(args)]
+    while pending:
+        for arg in pending[-1]:
+            if not isinstance(arg, (set, list, tuple)):
+                yield arg
+                continue
+
+            if id(arg) not in visited:
+                # Walk this list first, then resume its parent where we left
+                # off so the original order is kept
+                visited.add(id(arg))
+                pending.append(iter(arg))
+                break
+
+        else:
+            # Everything at this level has been handled
+            pending.pop()
+
+
 def parse_domain_service_targets(
     *args, store_unparseable=True, domain="notify", **kwargs
 ):
@@ -976,27 +1002,15 @@ def parse_domain_service_targets(
     """
 
     result = []
-    for arg in args:
+    for arg in _flatten_values(*args):
         if isinstance(arg, str) and arg:
             _result = DOMAIN_SERVICE_TARGET_DETECTION_RE.findall(arg)
             if _result:
                 result += _result
 
             elif not _result and store_unparseable:
-                # we had content passed into us that was lost because it was
-                # so poorly formatted that it didn't even come close to
-                # meeting the regular expression we defined. We intentially
-                # keep it as part of our result set so that parsing done
-                # at a higher level can at least report this to the end user
-                # and hopefully give them some indication as to what they
-                # may have done wrong.
+                # Keep invalid values so callers can report them to the user.
                 result += list(filter(bool, re.split(STRING_DELIMITERS, arg)))
-
-        elif isinstance(arg, (set, list, tuple)):
-            # Use recursion to handle the list of phone numbers
-            result += parse_domain_service_targets(
-                *arg, store_unparseable=store_unparseable, domain=domain
-            )
 
     return result
 
@@ -1006,7 +1020,7 @@ def parse_phone_no(*args, store_unparseable=True, prefix=False, **kwargs):
     spaces and returns a list."""
 
     result = []
-    for arg in args:
+    for arg in _flatten_values(*args):
         if isinstance(arg, str) and arg:
             result_ = (
                 PHONE_NO_DETECTION_RE
@@ -1017,20 +1031,8 @@ def parse_phone_no(*args, store_unparseable=True, prefix=False, **kwargs):
                 result += result_
 
             elif not result_ and store_unparseable:
-                # we had content passed into us that was lost because it was
-                # so poorly formatted that it didn't even come close to
-                # meeting the regular expression we defined. We intentially
-                # keep it as part of our result set so that parsing done
-                # at a higher level can at least report this to the end user
-                # and hopefully give them some indication as to what they
-                # may have done wrong.
+                # Keep invalid values so callers can report them to the user.
                 result += list(filter(bool, re.split(STRING_DELIMITERS, arg)))
-
-        elif isinstance(arg, (set, list, tuple)):
-            # Use recursion to handle the list of phone numbers
-            result += parse_phone_no(
-                *arg, store_unparseable=store_unparseable, prefix=prefix
-            )
 
     return result
 
@@ -1040,27 +1042,15 @@ def parse_call_sign(*args, store_unparseable=True, **kwargs):
     spacesand returns a list."""
 
     result = []
-    for arg in args:
+    for arg in _flatten_values(*args):
         if isinstance(arg, str) and arg:
             result_ = CALL_SIGN_DETECTION_RE.findall(arg)
             if result_:
                 result += result_
 
             elif not result_ and store_unparseable:
-                # we had content passed into us that was lost because it was
-                # so poorly formatted that it didn't even come close to
-                # meeting the regular expression we defined. We intentially
-                # keep it as part of our result set so that parsing done
-                # at a higher level can at least report this to the end user
-                # and hopefully give them some indication as to what they
-                # may have done wrong.
+                # Keep invalid values so callers can report them to the user.
                 result += list(filter(bool, re.split(STRING_DELIMITERS, arg)))
-
-        elif isinstance(arg, (set, list, tuple)):
-            # Use recursion to handle the list of call signs
-            result += parse_call_sign(
-                *arg, store_unparseable=store_unparseable
-            )
 
     return result
 
@@ -1070,28 +1060,15 @@ def parse_emails(*args, store_unparseable=True, **kwargs):
     returns a list."""
 
     result = []
-    for arg in args:
+    for arg in _flatten_values(*args):
         if isinstance(arg, str) and arg:
             result_ = EMAIL_DETECTION_RE.findall(arg) if "@" in arg else []
             if result_:
                 result += result_
 
             elif not result_ and store_unparseable:
-                # we had content passed into us that was lost because it was
-                # so poorly formatted that it didn't even come close to
-                # meeting the regular expression we defined. We intentially
-                # keep it as part of our result set so that parsing done
-                # at a higher level can at least report this to the end user
-                # and hopefully give them some indication as to what they
-                # may have done wrong.
+                # Keep invalid values so callers can report them to the user.
                 result += list(filter(bool, re.split(STRING_DELIMITERS, arg)))
-
-        elif isinstance(arg, (set, list, tuple)):
-            # Use recursion to handle the list of Emails
-            result += parse_emails(
-                *arg,
-                store_unparseable=store_unparseable,
-            )
 
     return result
 
@@ -1186,7 +1163,7 @@ def parse_urls(*args, store_unparseable=True, **kwargs):
     spaces and returns a list."""
 
     result = []
-    for arg in args:
+    for arg in _flatten_values(*args):
         if isinstance(arg, str) and arg:
             result_ = (
                 URL_DETECTION_RE.findall(arg.rstrip()) if "://" in arg else []
@@ -1195,39 +1172,24 @@ def parse_urls(*args, store_unparseable=True, **kwargs):
                 result += result_
 
             elif not result_ and store_unparseable:
-                # we had content passed into us that was lost because it was
-                # so poorly formatted that it didn't even come close to
-                # meeting the regular expression we defined. We intentially
-                # keep it as part of our result set so that parsing done
-                # at a higher level can at least report this to the end user
-                # and hopefully give them some indication as to what they
-                # may have done wrong.
+                # Keep invalid values so callers can report them to the user.
                 result += list(filter(bool, re.split(STRING_DELIMITERS, arg)))
-
-        elif isinstance(arg, (set, list, tuple)):
-            # Use recursion to handle the list of URLs
-            result += parse_urls(*arg, store_unparseable=store_unparseable)
 
     return result
 
 
 def parse_list(*args, cast=None, allow_whitespace=True, sort=True):
-    """Take a string list and break it into a delimited list of arguments. This
-    funciton also supports the processing of a list of delmited strings and
-    will always return a unique set of arguments. Duplicates are always
-    combined in the final results.
+    """Split strings and nested containers into a list of values.
 
-    You can append as many items to the argument listing for
-    parsing.
+    Results are unique and sorted by default. Set ``sort=False`` to preserve
+    their order and duplicates. Accepted delimiters include whitespace,
+    slashes, commas, semicolons, and pipes.
 
-    Hence: parse_list('.mkv, .iso, .avi') becomes:
+    ``parse_list('.mkv, .iso, .avi')`` becomes:
         ['.mkv', '.iso', '.avi']
 
-    Hence: parse_list('.mkv, .iso, .avi', ['.avi', '.mp4']) becomes:
+    ``parse_list('.mkv, .iso, .avi', ['.avi', '.mp4'])`` becomes:
         ['.mkv', '.iso', '.avi', '.mp4']
-
-    The parsing is very forgiving and accepts spaces, slashes, commas
-    semicolons, and pipes as delimiters
     """
 
     result = []
@@ -1235,27 +1197,20 @@ def parse_list(*args, cast=None, allow_whitespace=True, sort=True):
         if not isinstance(arg, (str, set, list, bool, tuple)) and arg and cast:
             arg = cast(arg)
 
-        if isinstance(arg, str):
-            result += re.split(
-                (
-                    STRING_DELIMITERS
-                    if allow_whitespace
-                    else STRING_DELIMITERS_NO_WS
-                ),
-                arg,
-            )
+        # Only top-level values are cast; inside a list, strings are kept
+        # and anything else is skipped
+        for value in _flatten_values(arg):
+            if isinstance(value, str):
+                result += re.split(
+                    (
+                        STRING_DELIMITERS
+                        if allow_whitespace
+                        else STRING_DELIMITERS_NO_WS
+                    ),
+                    value,
+                )
 
-        elif isinstance(arg, (set, list, tuple)):
-            result += parse_list(
-                *arg, allow_whitespace=allow_whitespace, sort=sort
-            )
-
-    #
-    # filter() eliminates any empty entries
-    #
-    # Since Python v3 returns a filter (iterator) whereas Python v2 returned
-    # a list, we need to change it into a list object to remain compatible with
-    # both distribution types.
+    # Remove empty entries; sorting also removes duplicates.
     if sort:
         return (
             sorted(filter(bool, list(set(result))))

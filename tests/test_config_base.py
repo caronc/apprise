@@ -2845,3 +2845,90 @@ urls:
 """)
 
     assert len(result) == 1
+
+
+def test_yaml_alias_bomb_is_refused():
+    """Aliases that expand into a huge structure are refused quickly."""
+    lines = ["version: 1", "_bomb:", "  a0: &a0 [x@example.com]"]
+    for i in range(1, 40):
+        lines.append(f"  a{i}: &a{i} [*a{i - 1}, *a{i - 1}]")
+
+    for entry in (
+        # A global tag
+        ["tag: *a39", "urls: [json://localhost]"],
+        # A plugin setting
+        ["urls:", "  - mailto://user:pass@example.com:", "    - to: *a39"],
+        # A value that is turned into text
+        ["urls:", "  - json://localhost:", "    - +X-Header: *a39"],
+    ):
+        result, config = ConfigBase.config_parse_yaml("\n".join(lines + entry))
+        assert result == []
+        assert config == []
+
+
+@pytest.mark.parametrize(
+    "content",
+    (
+        "tag: &a [*a]\nurls: [json://localhost]",
+        "groups:\n  g: &a [*a]\nurls: [json://localhost]",
+        "urls:\n  - mailto://user:pass@example.com:\n"
+        "    - to: &a [x@example.com, *a]",
+    ),
+)
+def test_yaml_looping_alias_is_refused(content):
+    """An alias that points back at itself is refused without crashing."""
+    result, config = ConfigBase.config_parse_yaml(f"version: 1\n{content}")
+    assert result == []
+    assert config == []
+
+
+def test_yaml_deep_nesting_is_refused():
+    """Nesting deeper than PyYAML can handle is refused without crashing."""
+    depth = sys.getrecursionlimit() * 3
+    result, config = ConfigBase.config_parse_yaml(
+        "version: 1\ntag: {}x{}\nurls: [json://localhost]".format(
+            "[" * depth, "]" * depth
+        )
+    )
+    assert result == []
+    assert config == []
+
+
+def test_yaml_shared_alias_still_loads():
+    """A list shared between several entries through an alias still works."""
+    result, _ = ConfigBase.config_parse_yaml("""
+version: 1
+people: &people [a@example.com, b@example.com]
+urls:
+  - mailto://user:pass@example.com:
+    - to: *people
+  - mailto://user:pass@example.net:
+    - to: *people
+      tag: *people
+""")
+
+    assert len(result) == 2
+    assert result[0].targets == result[1].targets
+    assert len(result[0].targets) == 2
+    assert result[1].tags == {"a@example.com", "b@example.com"}
+
+
+def test_yaml_aliases_nested_too_deep_are_refused():
+    """Aliases placed inside each other can not stack up deep nesting."""
+    lines = ["version: 1", "chain:", "  - &a0 x"]
+    for i in range(1, 31):
+        lines.append(
+            "  - &a{} {}*a{}{}".format(i, "[" * 100, i - 1, "]" * 100)
+        )
+    lines += ["urls:", "  - json://localhost:", "    - to: *a30"]
+
+    result, config = ConfigBase.config_parse_yaml("\n".join(lines))
+    assert result == []
+    assert config == []
+
+    # Ordinary nesting well inside the limit still loads
+    result, _ = ConfigBase.config_parse_yaml(
+        "version: 1\nurls:\n  - json://localhost:\n"
+        "    - to: [[[[[a@example.com]]]]]\n"
+    )
+    assert len(result) == 1
