@@ -29,6 +29,7 @@
 
 from json import dumps
 import re
+from uuid import uuid4
 
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
@@ -39,12 +40,42 @@ from .base import NotifyBase
 
 try:
     import boto3
+    from boto3.exceptions import Boto3Error
     from botocore.config import Config
     from botocore.exceptions import BotoCoreError, ClientError
 
     AWS_WHATSAPP_SUPPORT_ENABLED = True
 except ImportError:
     AWS_WHATSAPP_SUPPORT_ENABLED = False
+
+
+# AWS/WhatsApp limits, in bytes. MIME validation happens before any uploads.
+MEDIA_TYPES = {
+    "image/jpeg": ("image", 5 * 1024**2),
+    "image/png": ("image", 5 * 1024**2),
+    "image/webp": ("sticker", 100 * 1024),
+    **dict.fromkeys(
+        ("audio/aac", "audio/amr", "audio/mpeg", "audio/mp4", "audio/ogg"),
+        ("audio", 16 * 1024**2),
+    ),
+    **dict.fromkeys(
+        ("video/mp4", "video/3gp", "video/3gpp"),
+        ("video", 16 * 1024**2),
+    ),
+    **dict.fromkeys(
+        (
+            "text/plain",
+            "application/pdf",
+            "application/msword",
+            "application/vnd.ms-excel",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ),
+        ("document", 100 * 1024**2),
+    ),
+}
 
 
 class NotifyAWSWhatsApp(NotifyBase):
@@ -58,6 +89,7 @@ class NotifyAWSWhatsApp(NotifyBase):
     setup_url = "https://appriseit.com/services/aws-whatsapp/"
     title_maxlen = 0
     body_maxlen = 1024
+    attachment_support = True
     request_rate_per_sec = 0.2
 
     templates = (
@@ -113,6 +145,10 @@ class NotifyAWSWhatsApp(NotifyBase):
                 "map_to": "session_token",
             },
             "template": {"name": _("Template Name"), "type": "string"},
+            "bucket": {
+                "name": _("S3 Bucket"),
+                "type": "string",
+            },
             "lang": {
                 "name": _("Language"),
                 "type": "string",
@@ -146,6 +182,7 @@ class NotifyAWSWhatsApp(NotifyBase):
         language="en_US",
         meta_api_version="v23.0",
         template_mapping=None,
+        bucket=None,
         **kwargs,
     ):
         """Validate settings without credential discovery or network access."""
@@ -180,6 +217,12 @@ class NotifyAWSWhatsApp(NotifyBase):
         self.secret_access_key = secret_access_key or None
         self.session_token = session_token or None
         self.template = template
+        if bucket is not None and (
+            not isinstance(bucket, str)
+            or not re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", bucket)
+        ):
+            raise AppriseImproperlyConfigured("Invalid S3 staging bucket.")
+        self.bucket = bucket
         self.language = language
         self.meta_api_version = meta_api_version
         self.template_mapping = dict(template_mapping or {})
@@ -218,9 +261,54 @@ class NotifyAWSWhatsApp(NotifyBase):
             if number not in self.targets:
                 self.targets.append(number)
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
         """Send each recipient separately and preserve partial successes."""
         if not self.targets or not self.enabled:
+            return False
+        if self.template and kwargs.get("total", 1) > 1:
+            self.logger.warning(
+                "WhatsApp templates require one message piece."
+            )
+            return False
+
+        attachments = []
+        if attach and self.attachment_support:
+            if not self.bucket:
+                self.logger.warning(
+                    "AWS WhatsApp attachments require bucket=."
+                )
+                return False
+
+            for attachment in attach:
+                if not attachment:
+                    self.logger.warning(
+                        "Could not read AWS WhatsApp attachment."
+                    )
+                    return False
+                kind, limit = MEDIA_TYPES.get(attachment.mimetype, (None, 0))
+                if not kind or not 0 < len(attachment) <= limit:
+                    self.logger.warning(
+                        "Unsupported AWS WhatsApp attachment type or size."
+                    )
+                    return False
+                attachments.append((attachment, kind))
+            if self.template and (
+                len(attachments) != 1
+                or attachments[0][1] not in ("image", "video", "document")
+            ):
+                self.logger.warning(
+                    "A media template requires one image, video or document."
+                )
+                return False
+
+        if not (body or self.template or attachments):
             return False
 
         credentials = {}
@@ -231,24 +319,53 @@ class NotifyAWSWhatsApp(NotifyBase):
                 "aws_session_token": self.session_token,
             }
         try:
-            client = boto3.Session(**credentials).client(
+            session = boto3.Session(**credentials)
+            config = Config(
+                connect_timeout=self.socket_connect_timeout,
+                read_timeout=self.socket_read_timeout,
+                # No idempotency token: retrying an ambiguous timeout can
+                # deliver the same notification twice.
+                retries={"total_max_attempts": 1, "mode": "standard"},
+            )
+            client = session.client(
                 "socialmessaging",
                 region_name=self.region_name,
                 verify=self.verify_certificate,
-                config=Config(
-                    connect_timeout=self.socket_connect_timeout,
-                    read_timeout=self.socket_read_timeout,
-                    # This API has no idempotency token: SDK retries after an
-                    # ambiguous timeout could send the same notification twice.
-                    retries={"total_max_attempts": 1, "mode": "standard"},
-                ),
+                config=config,
             )
         except (BotoCoreError, ClientError):
             self.logger.warning("Could not initialize AWS WhatsApp client.")
             return False
 
         has_error = False
+        s3 = None
         try:
+            media = []
+            for index, (attachment, kind) in enumerate(attachments):
+                media_id = self.recall(("media", index), per_message=True)
+                if not media_id:
+                    if s3 is None:
+                        try:
+                            s3 = session.client(
+                                "s3",
+                                region_name=self.region_name,
+                                verify=self.verify_certificate,
+                                config=config,
+                            )
+                        except (BotoCoreError, ClientError):
+                            self.logger.warning(
+                                "Could not initialize S3 client."
+                            )
+                            return False
+                    media_id = self._upload_media(client, s3, attachment)
+                    if not media_id:
+                        return False
+                    self.remember(("media", index), media_id, per_message=True)
+                content = {"id": media_id}
+                if kind == "document":
+                    content["filename"] = attachment.name
+                media.append((kind, content))
+
             for target in self.targets:
                 if self.is_delivered(target):
                     continue
@@ -281,36 +398,117 @@ class NotifyAWSWhatsApp(NotifyBase):
                             }
                         ]
                     payload["template"] = template
+                    if media:
+                        kind, content = media[0]
+                        # Filenames belong to document messages, not headers.
+                        template.setdefault("components", []).append(
+                            {
+                                "type": "header",
+                                "parameters": [
+                                    {
+                                        "type": kind,
+                                        kind: {"id": content["id"]},
+                                    }
+                                ],
+                            }
+                        )
                 else:
                     payload["text"] = {"body": body}
-                self.throttle()
-                try:
-                    response = client.send_whatsapp_message(
-                        originationPhoneNumberId=self.from_phone_id,
-                        metaApiVersion=self.meta_api_version,
-                        message=dumps(payload, ensure_ascii=False).encode(
-                            "utf-8"
-                        ),
-                    )
-                except ClientError as error:
-                    self.logger.warning(
-                        "AWS WhatsApp request failed: %s.",
-                        error.response.get("Error", {}).get("Code", "Unknown"),
-                    )
+                delivered = True
+                body_key = ("body", target)
+                if (self.template or body) and not self.is_delivered(body_key):
+                    if self._send_payload(client, payload):
+                        self.mark_delivered(body_key)
+                    else:
+                        delivered = False
+                if not self.template:
+                    for index, (kind, content) in enumerate(media):
+                        key = ("attachment", target, index)
+                        if self.is_delivered(key, per_message=True):
+                            continue
+                        if self._send_payload(
+                            client,
+                            {
+                                "messaging_product": "whatsapp",
+                                "to": target.lstrip("+"),
+                                "type": kind,
+                                kind: content,
+                            },
+                        ):
+                            self.mark_delivered(key, per_message=True)
+                        else:
+                            delivered = False
+                if delivered:
+                    self.mark_delivered(target)
+                else:
                     has_error = True
-                    continue
-                except BotoCoreError:
-                    self.logger.warning("AWS WhatsApp connection failed.")
-                    has_error = True
-                    continue
-                if not response.get("messageId"):
-                    self.logger.warning("AWS WhatsApp returned no message ID.")
-                    has_error = True
-                    continue
-                self.mark_delivered(target)
         finally:
+            if s3 is not None:
+                s3.close()
             client.close()
         return not has_error
+
+    def _upload_media(self, client, s3, attachment):
+        """Stage a private S3 object, import it to WhatsApp and remove it."""
+        key = f"apprise/{uuid4().hex}"
+        try:
+            with attachment.open() as stream:
+                s3.upload_fileobj(
+                    stream,
+                    self.bucket,
+                    key,
+                    ExtraArgs={"ContentType": attachment.mimetype},
+                )
+            url = s3.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket, "Key": key},
+                ExpiresIn=300,
+            )
+            self.throttle()
+            response = client.post_whatsapp_message_media(
+                originationPhoneNumberId=self.from_phone_id,
+                sourceS3PresignedUrl={
+                    "url": url,
+                    "headers": {"Content-Type": attachment.mimetype},
+                },
+            )
+            media_id = response.get("mediaId")
+            if media_id:
+                return media_id
+            self.logger.warning("AWS WhatsApp returned no media ID.")
+        except (Boto3Error, BotoCoreError, ClientError, OSError):
+            self.logger.warning("AWS WhatsApp media upload failed.")
+        finally:
+            try:
+                s3.delete_object(Bucket=self.bucket, Key=key)
+            except (BotoCoreError, ClientError):
+                self.logger.warning(
+                    "Could not remove temporary AWS WhatsApp S3 object."
+                )
+        return None
+
+    def _send_payload(self, client, payload):
+        """Return whether AWS accepted one text, template or media message."""
+        self.throttle()
+        try:
+            response = client.send_whatsapp_message(
+                originationPhoneNumberId=self.from_phone_id,
+                metaApiVersion=self.meta_api_version,
+                message=dumps(payload, ensure_ascii=False).encode("utf-8"),
+            )
+        except ClientError as error:
+            self.logger.warning(
+                "AWS WhatsApp request failed: %s.",
+                error.response.get("Error", {}).get("Code", "Unknown"),
+            )
+            return False
+        except BotoCoreError:
+            self.logger.warning("AWS WhatsApp connection failed.")
+            return False
+        if not response.get("messageId"):
+            self.logger.warning("AWS WhatsApp returned no message ID.")
+            return False
+        return True
 
     @property
     def url_identifier(self):
@@ -328,6 +526,8 @@ class NotifyAWSWhatsApp(NotifyBase):
         params.update(lang=self.language, version=self.meta_api_version)
         if self.template:
             params["template"] = self.template
+        if self.bucket:
+            params["bucket"] = self.bucket
         if self.session_token:
             params["token"] = (
                 self.pprint(
@@ -383,6 +583,7 @@ class NotifyAWSWhatsApp(NotifyBase):
             ("template", "template"),
             ("lang", "language"),
             ("version", "meta_api_version"),
+            ("bucket", "bucket"),
         ):
             if query in results["qsd"]:
                 results[name] = results["qsd"][query]
