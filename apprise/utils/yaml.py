@@ -53,6 +53,62 @@ from .template import (
 # behavior explicit without adding YAML details back to config/base.py.
 YAML_REAPPLY_SKIP = frozenset(("tag", "tags", "asset"))
 
+# Maximum values allowed after YAML aliases (``*name``) are expanded.
+YAML_EXPANDED_MAX = 100000
+
+# Maximum nesting allowed after YAML aliases are expanded.
+YAML_DEPTH_MAX = 20
+
+
+def expanded_size(value: Any) -> Optional[tuple[int, int]]:
+    """Return ``(values, depth)`` after aliases expand, or None for a loop.
+
+    Each container is measured once, and iterative traversal safely handles
+    shared or deeply nested structures.
+    """
+    sizes = {}
+    active = set()
+    pending = [(value, False)]
+
+    while pending:
+        current, measured = pending.pop()
+        if not isinstance(current, (dict, list, tuple, set)):
+            continue
+
+        marker = id(current)
+        children = (
+            list(current.values()) if isinstance(current, dict) else current
+        )
+
+        if measured:
+            # Every child has been measured; add up sizes, keep the deepest
+            measures = [
+                sizes[id(child)]
+                if isinstance(child, (dict, list, tuple, set))
+                else (1, 0)
+                for child in children
+            ]
+            sizes[marker] = (
+                1 + sum(size for size, _ in measures),
+                1 + max((depth for _, depth in measures), default=0),
+            )
+            active.discard(marker)
+            continue
+
+        if marker in sizes:
+            # An alias of something already measured
+            continue
+
+        if marker in active:
+            # We reached a list or mapping from inside itself
+            return None
+
+        active.add(marker)
+        pending.append((current, True))
+        pending.extend((child, False) for child in children)
+
+    return sizes.get(id(value), (1, 0))
+
 
 def template_references(value: Any) -> set[str]:
     """Return normalized ``${NAME}`` references from YAML URL values.

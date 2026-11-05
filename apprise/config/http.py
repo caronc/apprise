@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import math
 import re
 
 import requests
@@ -32,6 +33,7 @@ import requests
 from ..common import ConfigFormat, ContentIncludeMode
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
+from ..utils.http import read_bounded_response
 from ..utils.parse import URL_ENCODED_PATH_SAFE_CHARS
 from .base import ConfigBase
 
@@ -216,33 +218,38 @@ class ConfigHTTP(ConfigBase):
                     # Handle edge case where Content-Length is a bad value
                     file_size = 0
 
-                # Store our response
-                if (
-                    self.max_buffer_size > 0
-                    and file_size > self.max_buffer_size
-                ):
-                    # Provide warning of data truncation
+                # A limit of zero means there is no limit
+                limit = (
+                    self.max_buffer_size
+                    if self.max_buffer_size > 0
+                    else math.inf
+                )
+
+                # Refuse a body that says up front it is too large; otherwise
+                # stream it, since Content-Length may be missing or may
+                # describe compressed rather than expanded content.
+                content = (
+                    read_bounded_response(r, limit)
+                    if file_size <= limit
+                    else None
+                )
+
+                if content is None:
                     self.logger.error(
                         "HTTP config response exceeds maximum buffer length "
-                        f"({int(self.max_buffer_size / 1024)}KB);"
+                        "(%sKB)",
+                        int(self.max_buffer_size / 1024),
                     )
-
-                    # Return None - buffer execeeded
                     return None
 
-                # Store our result (but no more than our buffer length)
-                response = r.text[: self.max_buffer_size + 1]
-
-                # Verify that our content did not exceed the buffer size:
-                if len(response) > self.max_buffer_size:
-                    # Provide warning of data truncation
-                    self.logger.error(
-                        "HTTP config response exceeds maximum buffer length "
-                        f"({int(self.max_buffer_size / 1024)}KB);"
+                try:
+                    response = content.decode(
+                        r.encoding or "utf-8", errors="replace"
                     )
 
-                    # Return None - buffer execeeded
-                    return None
+                except LookupError:
+                    # The server named a character set we don't know
+                    response = content.decode("utf-8", errors="replace")
 
                 # Detect config format based on mime if the format isn't
                 # already enforced

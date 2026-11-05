@@ -55,8 +55,11 @@ from ..utils.template import (
 )
 from ..utils.time import zoneinfo
 from ..utils.yaml import (
+    YAML_DEPTH_MAX,
+    YAML_EXPANDED_MAX,
     YAML_REAPPLY_SKIP,
     dropped_template,
+    expanded_size,
     template_in_schema,
     template_references,
     templated_tag,
@@ -90,6 +93,11 @@ class ConfigBase(URLBase):
     # reason we should be reading in more. This is more of a safe guard then
     # anything else. 128KB (131072B)
     max_buffer_size = 131072
+
+    # The most group memberships tag groups may add across all of one
+    # configuration's services. Thousands of services that each join
+    # thousands of groups would otherwise take minutes and gigabytes.
+    max_group_memberships = 100000
 
     # By default all configuration is not includable using the 'include'
     # line found in configuration files.
@@ -382,79 +390,66 @@ class ConfigBase(URLBase):
         return True
 
     @staticmethod
-    def __normalize_tag_groups(group_tags: dict[str, set[str]]) -> None:
+    def __tag_group_lookup(group_tags: dict[str, set[str]]):
+        """Return a function that lists the groups a service's tags reach.
+
+        - A tag belongs to every group that lists it, then to every group
+          that lists one of those groups, and so on.
+        - Groups may list each other in a loop (a=b and b=a).
+        - Only plain tags count; a service tagged with a group's name does
+          not join the groups that list that group.
+        - It returns None once all services together have been added to
+          more than ``max_group_memberships`` groups.
+
+        Example: with ``a=x,b`` and ``b=y``, the tags ``{y}`` reach the
+        groups ``{a, b}``.
         """
-        Used to normalize a tag assign map which looks like:
-          {
-             'group': set('{tag1}', '{group1}', '{tag2}'),
-             'group1': set('{tag2}','{tag3}'),
-          }
+        groups = {str(group) for group in group_tags}
 
-          Then normalized it (merging groups); with respect to the above, the
-          output would be:
-          {
-             'group': set('{tag1}', '{tag2}', '{tag3}),
-             'group1': set('{tag2}','{tag3}'),
-          }
+        # For each tag or group, the groups that list it
+        parents = {}
+        for group, members in group_tags.items():
+            for member in members:
+                parents.setdefault(member, set()).add(str(group))
 
-        """
-        # Prepare a key set list we can use
-        tag_groups = {str(x) for x in group_tags}
+        def reach(tags):
+            # Walk up from each plain tag through the groups that list it;
+            # remembering where we have been stops us going round a loop
+            found = set()
+            pending = [tag for tag in tags if tag not in groups]
+            while pending:
+                for group in parents.get(pending.pop(), ()):
+                    if group not in found:
+                        found.add(group)
+                        pending.append(group)
+            return found
 
-        def _expand(tags, ignore=None):
-            """Expands based on tag provided and returns a set.
+        # A group that reaches no plain tag can never match a service
+        reached = reach(tag for tag in parents if tag not in groups)
+        for group in sorted(groups - reached):
+            ConfigBase.logger.warning(
+                "The group %s has no tags assigned to it", group
+            )
 
-            this also updates the group_tags while it goes
-            """
+        # Every group added to a service counts against one budget for the
+        # whole configuration
+        remaining = ConfigBase.max_group_memberships
 
-            # Prepare ourselves a return set
-            results = set()
-            ignore = set() if ignore is None else ignore
-
-            # track groups
-            groups = set()
-
-            for tag in tags:
-                if tag in ignore:
-                    continue
-
-                # Track our groups
-                groups.add(tag)
-
-                # Store what we know is worth keeping
-                if tag not in group_tags:  # pragma: no cover
-                    # handle cases where the tag doesn't exist
-                    group_tags[tag] = set()
-
-                results |= group_tags[tag] - tag_groups
-
-                # Get simple tag assignments
-                found = group_tags[tag] & tag_groups
-                if not found:
-                    continue
-
-                for gtag in found:
-                    if gtag in ignore:
-                        continue
-
-                    # Go deeper (recursion)
-                    ignore.add(tag)
-                    group_tags[gtag] = _expand({gtag}, ignore=ignore)
-                    results |= group_tags[gtag]
-
-                    # Pop ignore
-                    ignore.remove(tag)
-
-            return results
-
-        for tag in tag_groups:
-            # Get our tags
-            group_tags[tag] |= _expand({tag})
-            if not group_tags[tag]:
-                ConfigBase.logger.warning(
-                    f"The group {tag} has no tags assigned to it"
+        def groups_for(tags):
+            # The groups these tags reach, or None once over budget
+            nonlocal remaining
+            found = reach(tags)
+            remaining -= len(found)
+            if remaining < 0:
+                ConfigBase.logger.error(
+                    "Tag groups add more than %d group memberships across"
+                    " this configuration's services.",
+                    ConfigBase.max_group_memberships,
                 )
-                del group_tags[tag]
+                return None
+            return found
+
+        return groups_for
 
     @staticmethod
     def parse_url(
@@ -537,19 +532,21 @@ class ConfigBase(URLBase):
         # "2:endpoint=ntfy://..." is recognised as TEXT format.
         # A tag group assignment such as "family=me,wife" carries tags instead
         # of a URL on the right hand side; it is TEXT format as well.
+        # Leading whitespace is stripped before matching; matching it here
+        # is very slow on long runs of spaces.
         valid_line_re = re.compile(
-            r"^\s*(?P<line>([;#]+(?P<comment>.*))|"
-            r"(?P<text>((?P<tag>[ \t,a-z0-9_:-]+)=)?[a-z0-9]+://.*)|"
+            r"^(?P<line>([;#]+(?P<comment>.*))|"
+            r"(?P<text>((?P<tag>[ \t,a-z0-9_:-]*)=)?[a-z0-9]+://.*)|"
             r"((?P<yaml>[a-z0-9]+):.*)|"
-            r"(?P<assign>[ \t,a-z0-9_:-]+=[a-z0-9, \t_-]+))?$",
+            r"(?P<assign>[ \t,a-z0-9_:-]*=[a-z0-9, \t_-]+))?$",
             re.I,
         )
 
         try:
             # split our content up to read line by line
-            content = re.split(r"\r*\n", content)
+            content = [line.rstrip("\r") for line in content.split("\n")]
 
-        except TypeError:
+        except (AttributeError, TypeError):
             # content was not expected string type
             ConfigBase.logger.error("Invalid Apprise configuration specified.")
             return None
@@ -561,7 +558,7 @@ class ConfigBase(URLBase):
         # iterate over each line of the file to attempt to detect it
         # stop the moment a the type has been determined
         for line, entry in enumerate(content, start=1):
-            result = valid_line_re.match(entry)
+            result = valid_line_re.match(entry.lstrip())
             if not result:
                 # Invalid syntax
                 ConfigBase.logger.error(
@@ -688,19 +685,23 @@ class ConfigBase(URLBase):
         # Define what a valid line should look like.
         # The tags group allows an optional leading "N:" priority prefix so
         # that entries like "2:endpoint=ntfy://..." are parsed correctly.
+        # Each line is stripped first, and tag lists are words separated by
+        # spaces or tabs; letting whitespace match in more than one place is
+        # very slow on long runs of spaces.
         valid_line_re = re.compile(
-            r"^\s*(?P<line>([;#]+(?P<comment>.*))|"
-            r"(\s*(?P<tags>[a-z0-9, \t_:-]+)\s*=|=)?\s*"
-            r"((?P<url>[a-z0-9]{1,32}://.*)|(?P<assign>[a-z0-9, \t_-]+))|"
-            r"include\s+(?P<config>.+))?\s*$",
+            r"^(?P<line>([;#]+(?P<comment>.*))|"
+            r"((?P<tags>[a-z0-9,_:-]+([ \t]+[a-z0-9,_:-]+)*)\s*=|=)?\s*"
+            r"((?P<url>[a-z0-9]{1,32}://.*)|"
+            r"(?P<assign>[a-z0-9,_-]+([ \t]+[a-z0-9,_-]+)*))|"
+            r"include\s+(?P<config>.+))?$",
             re.I,
         )
 
         try:
             # split our content up to read line by line
-            content = re.split(r"\r*\n", content)
+            content = [line.rstrip("\r") for line in content.split("\n")]
 
-        except TypeError:
+        except (AttributeError, TypeError):
             # content was not expected string type
             ConfigBase.logger.error(
                 "Invalid Apprise TEXT based configuration specified."
@@ -708,7 +709,7 @@ class ConfigBase(URLBase):
             return ([], [])
 
         for line, entry in enumerate(content, start=1):
-            result = valid_line_re.match(entry)
+            result = valid_line_re.match(entry.strip())
             if not result:
                 # Invalid syntax
                 ConfigBase.logger.error(
@@ -815,10 +816,10 @@ class ConfigBase(URLBase):
             )
 
         #
-        # Normalize Tag Groups
-        # - Expand Groups of Groups so that they don't exist
+        # Tag Groups
+        # - Find which groups (and groups of groups) each service is in
         #
-        ConfigBase.__normalize_tag_groups(group_tags)
+        groups_for = ConfigBase.__tag_group_lookup(group_tags)
 
         #
         # URL Processing
@@ -830,13 +831,11 @@ class ConfigBase(URLBase):
             #
             # Apply our tag groups if they're defined
             #
-            for group, tags in group_tags.items():
-                # Detect if anything assigned to this tag also maps back to a
-                # group.  If so we want to add the group to our list
-                if next(
-                    (True for tag in results["tag"] if tag in tags), False
-                ):
-                    results["tag"].add(group)
+            found = groups_for(results["tag"])
+            if found is None:
+                # Too many group memberships; refuse the configuration
+                return ([], [])
+            results["tag"] |= found
 
             try:
                 # Attempt to create an instance of our plugin using the
@@ -912,12 +911,40 @@ class ConfigBase(URLBase):
 
         except (
             AttributeError,
+            # PyYAML runs out of stack on very deeply nested lists or maps
+            RecursionError,
             yaml.parser.ParserError,
             yaml.error.MarkedYAMLError,
         ) as e:
             # Invalid content
             ConfigBase.logger.error("Invalid Apprise YAML data specified.")
             ConfigBase.logger.debug(f"YAML Exception:{os.linesep}{e}")
+            return ([], [])
+
+        # Aliases (*name) let a few lines describe a huge, deep or looping
+        # structure; refuse those before anything walks through them
+        measured = expanded_size(result)
+        if measured is None:
+            ConfigBase.logger.error(
+                "Looping structure found in Apprise YAML configuration."
+            )
+            return ([], [])
+
+        size, depth = measured
+        if size > YAML_EXPANDED_MAX:
+            ConfigBase.logger.error(
+                "Apprise YAML configuration expands to more than %d values"
+                " once its aliases are followed.",
+                YAML_EXPANDED_MAX,
+            )
+            return ([], [])
+
+        if depth > YAML_DEPTH_MAX:
+            ConfigBase.logger.error(
+                "Apprise YAML configuration is nested more than %d levels"
+                " deep once its aliases are followed.",
+                YAML_DEPTH_MAX,
+            )
             return ([], [])
 
         # The host decides whether this configuration may use templates.
@@ -1702,10 +1729,10 @@ class ConfigBase(URLBase):
                 )
 
         #
-        # Normalize Tag Groups
-        # - Expand Groups of Groups so that they don't exist
+        # Tag Groups
+        # - Find which groups (and groups of groups) each service is in
         #
-        ConfigBase.__normalize_tag_groups(group_tags)
+        groups_for = ConfigBase.__tag_group_lookup(group_tags)
 
         #
         # URL Processing
@@ -1717,13 +1744,11 @@ class ConfigBase(URLBase):
             #
             # Apply our tag groups if they're defined
             #
-            for group, tags in group_tags.items():
-                # Detect if anything assigned to this tag also maps back to a
-                # group.  If so we want to add the group to our list
-                if next(
-                    (True for tag in results["tag"] if tag in tags), False
-                ):
-                    results["tag"].add(group)
+            found = groups_for(results["tag"])
+            if found is None:
+                # Too many group memberships; refuse the configuration
+                return ([], [])
+            results["tag"] |= found
 
             if placeholders:
                 needed = placeholders.used(results)

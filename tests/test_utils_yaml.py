@@ -33,6 +33,7 @@ from apprise.utils.parse import QSD_FULL_MODE_KEYS
 from apprise.utils.template import TemplatePlaceholderMap, TemplateSchema
 from apprise.utils.yaml import (
     dropped_template,
+    expanded_size,
     template_in_schema,
     template_references,
     templated_tag,
@@ -131,3 +132,31 @@ def test_yaml_templated_tag_handles_encoded_and_global_values():
     assert not templated_tag({"qsd": None, "tag": {"${OTHER}"}}, mapping)
     assert not templated_tag([], mapping)
     assert not templated_tag({"tag": set()}, None)
+
+
+def test_yaml_expanded_size():
+    """Count expanded values and depth while rejecting loops."""
+    assert expanded_size("text") == (1, 0)
+    assert expanded_size(None) == (1, 0)
+    assert expanded_size([]) == (1, 1)
+    # Every list or mapping counts as one, plus whatever it holds
+    assert expanded_size({"a": ["b", "c"], "d": ("e",), "f": {"g"}}) == (8, 2)
+
+    # Each level repeats the one below it twice
+    shared = ["x"]
+    for _ in range(80):
+        shared = [shared, shared]
+
+    assert expanded_size({"tag": shared}) == (3 * 2**80, 82)
+
+    # Siblings that share one list are not mistaken for a loop
+    common = ["y"]
+    assert expanded_size([common, {"to": common}, [common]]) == (9, 3)
+
+    loop = []
+    loop.append(loop)
+    assert expanded_size({"tag": loop}) is None
+
+    looping_map = {}
+    looping_map["self"] = [looping_map]
+    assert expanded_size(looping_map) is None

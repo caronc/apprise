@@ -243,7 +243,7 @@ def test_apprise_template_bad_entry_isolated():
 
 
 def test_apprise_template_rejects_yaml_loop(logging_enabled, caplog):
-    """A recursive YAML value rejects its entry without escaping an error."""
+    """A recursive YAML value rejects the whole configuration."""
     with caplog.at_level(logging.ERROR):
         services = parse(
             "template:\n  - t\n"
@@ -252,7 +252,7 @@ def test_apprise_template_rejects_yaml_loop(logging_enabled, caplog):
             "  - json://localhost/\n"
         )
 
-    assert len(services) == 1
+    assert len(services) == 0
     assert "Looping structure" in caplog.text
 
 

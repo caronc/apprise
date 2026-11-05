@@ -883,6 +883,32 @@ def test_parse_url_path_no_redos():
     assert elapsed < 5.0
 
 
+def test_parse_url_whitespace_no_redos():
+    "utils: parse_url() stays fast on long runs of whitespace"
+
+    start = time.time()
+    # Exercise whitespace around each URL component.
+    assert utils.parse.parse_url(" " * 5000 + "json://h/?a\n!") is None
+    assert utils.parse.parse_url("json://h/?a=" + " " * 50000 + "\n!") is None
+    assert utils.parse.parse_url("json://" + " " * 50000 + "\n?") is None
+    elapsed = time.time() - start
+
+    # The generous limit allows slower CI while catching nonlinear behavior.
+    assert elapsed < 5.0
+
+    # Surrounding whitespace is still ignored
+    result = utils.parse.parse_url("  \t json://host/path?to=a \r\n")
+    assert result["schema"] == "json"
+    assert result["host"] == "host"
+    assert result["fullpath"] == "/path"
+    assert result["qsd"] == {"to": "a"}
+
+    # A trailing ? with nothing after it is unparseable, with or without
+    # trailing whitespace
+    assert utils.parse.parse_url("json://host/?") is None
+    assert utils.parse.parse_url("json://host/? ") is None
+
+
 def test_parse_url_simple():
     "utils: parse_url() testing"
 
@@ -2780,6 +2806,52 @@ def test_parse_list():
             ".mp4",
         ]
     )
+
+
+def test_parse_helpers_nested_lists():
+    """Nested input is walked without recursion and loops are skipped."""
+    parse = utils.parse
+
+    # Nesting far deeper than Python's recursion limit
+    deep = ["a@example.com"]
+    for _ in range(sys.getrecursionlimit() * 5):
+        deep = [deep]
+
+    assert parse.parse_list(deep) == ["a@example.com"]
+    assert parse.parse_emails(deep) == ["a@example.com"]
+
+    # A list that contains itself gives the same result as its flat form
+    loop = ["b@example.com", "+15551234567", "DF1ABC", "light.on"]
+    flat = list(loop)
+    loop.append(loop)
+
+    for fn in (
+        parse.parse_list,
+        parse.parse_emails,
+        parse.parse_urls,
+        parse.parse_phone_no,
+        parse.parse_call_sign,
+        parse.parse_domain_service_targets,
+    ):
+        assert fn(loop) == fn(flat)
+
+    # A list that appears more than once keeps all of its values
+    shared = ["c"]
+    assert parse.parse_list([shared, shared], sort=False) == ["c", "c"]
+    assert parse.parse_list([loop, loop], sort=False) == (
+        parse.parse_list(flat + flat, sort=False)
+    )
+
+    # Order is kept when sorting is turned off
+    assert parse.parse_list(["c", ("a", ["b"])], "d", sort=False) == [
+        "c",
+        "a",
+        "b",
+        "d",
+    ]
+
+    # Only top-level values are cast; non-strings inside a list are skipped
+    assert parse.parse_list(1, [2, "x"], cast=str) == ["1", "x"]
 
 
 def test_import_module(tmpdir):

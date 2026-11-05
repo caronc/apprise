@@ -31,6 +31,8 @@ from inspect import cleandoc
 # Disable logging for a cleaner testing output
 import logging
 import sys
+import time
+import tracemalloc
 from typing import Any
 from unittest.mock import Mock
 
@@ -74,6 +76,8 @@ def requests_remote_config(mocker: MockerFixture) -> Mock:
         resp.status_code = requests.codes.ok
         resp.url = url
         resp._content = body.encode("utf-8")  # type: ignore[attr-defined]
+        # The body is already in memory, so streaming hands it back
+        resp._content_consumed = True  # type: ignore[attr-defined]
         resp.encoding = "utf-8"
         return resp
 
@@ -2845,3 +2849,247 @@ urls:
 """)
 
     assert len(result) == 1
+
+
+def test_yaml_alias_bomb_is_refused():
+    """Aliases that expand into a huge structure are refused quickly."""
+    lines = ["version: 1", "_bomb:", "  a0: &a0 [x@example.com]"]
+    for i in range(1, 40):
+        lines.append(f"  a{i}: &a{i} [*a{i - 1}, *a{i - 1}]")
+
+    for entry in (
+        # A global tag
+        ["tag: *a39", "urls: [json://localhost]"],
+        # A plugin setting
+        ["urls:", "  - mailto://user:pass@example.com:", "    - to: *a39"],
+        # A value that is turned into text
+        ["urls:", "  - json://localhost:", "    - +X-Header: *a39"],
+    ):
+        result, config = ConfigBase.config_parse_yaml("\n".join(lines + entry))
+        assert result == []
+        assert config == []
+
+
+@pytest.mark.parametrize(
+    "content",
+    (
+        "tag: &a [*a]\nurls: [json://localhost]",
+        "groups:\n  g: &a [*a]\nurls: [json://localhost]",
+        "urls:\n  - mailto://user:pass@example.com:\n"
+        "    - to: &a [x@example.com, *a]",
+    ),
+)
+def test_yaml_looping_alias_is_refused(content):
+    """An alias that points back at itself is refused without crashing."""
+    result, config = ConfigBase.config_parse_yaml(f"version: 1\n{content}")
+    assert result == []
+    assert config == []
+
+
+def test_yaml_deep_nesting_is_refused():
+    """Nesting deeper than PyYAML can handle is refused without crashing."""
+    depth = sys.getrecursionlimit() * 3
+    result, config = ConfigBase.config_parse_yaml(
+        "version: 1\ntag: {}x{}\nurls: [json://localhost]".format(
+            "[" * depth, "]" * depth
+        )
+    )
+    assert result == []
+    assert config == []
+
+
+def test_yaml_shared_alias_still_loads():
+    """A list shared between several entries through an alias still works."""
+    result, _ = ConfigBase.config_parse_yaml("""
+version: 1
+people: &people [a@example.com, b@example.com]
+urls:
+  - mailto://user:pass@example.com:
+    - to: *people
+  - mailto://user:pass@example.net:
+    - to: *people
+      tag: *people
+""")
+
+    assert len(result) == 2
+    assert result[0].targets == result[1].targets
+    assert len(result[0].targets) == 2
+    assert result[1].tags == {"a@example.com", "b@example.com"}
+
+
+def test_yaml_alias_depth_is_refused():
+    """Aliases placed inside each other can not stack up deep nesting."""
+    lines = ["version: 1", "chain:", "  - &a0 x"]
+    for i in range(1, 31):
+        lines.append(
+            "  - &a{} {}*a{}{}".format(i, "[" * 100, i - 1, "]" * 100)
+        )
+    lines += ["urls:", "  - json://localhost:", "    - to: *a30"]
+
+    result, config = ConfigBase.config_parse_yaml("\n".join(lines))
+    assert result == []
+    assert config == []
+
+    # Ordinary nesting well inside the limit still loads
+    result, _ = ConfigBase.config_parse_yaml(
+        "version: 1\nurls:\n  - json://localhost:\n"
+        "    - to: [[[[[a@example.com]]]]]\n"
+    )
+    assert len(result) == 1
+
+
+@pytest.mark.parametrize(
+    "content,detected",
+    (
+        (" " * 131000 + "!", None),
+        ("a" + " " * 131000 + "!", None),
+        ("a" + " " * 131000 + "=!", None),
+        ("a=" + " " * 131000 + "!", None),
+        # Read as one blank line
+        ("\r" * 131000, ConfigFormat.TEXT),
+    ),
+)
+def test_config_text_whitespace_performance(content, detected):
+    """Detecting and reading a TEXT config stays fast on long space runs."""
+    start = time.time()
+    assert ConfigBase.detect_config_format(content) == detected
+    result, config = ConfigBase.config_parse_text(content)
+    elapsed = time.time() - start
+
+    assert result == []
+    assert config == []
+    # The generous limit allows slower CI while catching nonlinear behavior.
+    assert elapsed < 5.0
+
+
+def test_config_text_whitespace_handling():
+    """Whitespace around and inside TEXT lines is handled as before."""
+    # Windows and stray carriage-return line endings
+    content = (
+        "  # comment \r\n"
+        "\t a  b , c=json://localhost \r\r\n"
+        "d=e  f\r\n"
+        "   json://localhost/path   "
+    )
+    assert ConfigBase.detect_config_format(content) == ConfigFormat.TEXT
+    result, config = ConfigBase.config_parse_text(content)
+    assert config == []
+    assert len(result) == 2
+    assert result[0].tags == {"a", "b", "c"}
+    assert result[1].tags == set()
+
+    # A line that only assigns a URL is TEXT too
+    assert (
+        ConfigBase.detect_config_format("=json://localhost")
+        == ConfigFormat.TEXT
+    )
+
+    # Nothing after the equal sign is a bad line, with or without
+    # trailing spaces
+    for line in ("group =", "group = ", "group =\t"):
+        result, config = ConfigBase.config_parse_text(
+            f"{line}\njson://localhost"
+        )
+        assert result == []
+        assert config == []
+
+
+def test_config_group_chain():
+    """A long chain of groups is expanded without running out of stack."""
+    chain = "\n".join(f"g{i}=g{i + 1}" for i in range(2000))
+    result, _ = ConfigBase.config_parse_text(
+        f"{chain}\ng2000=t\nt=json://localhost"
+    )
+    assert len(result) == 1
+    assert {"g0", "g1000", "g2000"} <= result[0].tags
+
+    chain = "\n".join(f"  - g{i}: g{i + 1}" for i in range(2000))
+    result, _ = ConfigBase.config_parse_yaml(
+        f"groups:\n{chain}\n  - g2000: t\n"
+        "urls:\n  - json://localhost:\n    - tag: t\n"
+    )
+    assert len(result) == 1
+    assert {"g0", "g1000", "g2000"} <= result[0].tags
+
+    # Ordinary nesting keeps working
+    result, _ = ConfigBase.config_parse_text(
+        "a=b\nb=c\nc=t\nt=json://localhost"
+    )
+    assert len(result) == 1
+    assert {"a", "b", "c", "t"} <= result[0].tags
+
+    # Each group in a long chain with its own tag must not store a copy of
+    # every tag below it; that took over 1GB for 7,000 groups
+    chain = "\n".join(f"g{i}=t{i},g{i + 1}" for i in range(5000))
+    tracemalloc.start()
+    try:
+        result, _ = ConfigBase.config_parse_text(
+            f"{chain}\ng5000=t5000\nt5000=json://localhost"
+        )
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+
+    assert {"g0", "g4999", "g5000"} <= result[0].tags
+    # About 50MB normally; storing copies needs several hundred
+    assert peak < 256 * 1024 * 1024
+
+
+def test_config_group_membership_limit(monkeypatch):
+    """Too many group memberships across all services refuses the config."""
+    # Three groups that all list tag t, and a service per tag line
+    groups = "a=t\nb=t\nc=t\n"
+    monkeypatch.setattr(ConfigBase, "max_group_memberships", 9)
+
+    def yaml_config(count):
+        # The same three groups with count services, as YAML
+        entries = "".join(
+            f"  - json://localhost/{i}:\n    - tag: t\n" for i in range(count)
+        )
+        return f"groups:\n  a: t\n  b: t\n  c: t\nurls:\n{entries}"
+
+    # Three services joining three groups each is 9; that is allowed
+    services = "".join(f"t=json://localhost/{i}\n" for i in range(3))
+    result, _ = ConfigBase.config_parse_text(groups + services)
+    assert len(result) == 3
+    assert all({"a", "b", "c"} <= service.tags for service in result)
+
+    result, _ = ConfigBase.config_parse_yaml(yaml_config(3))
+    assert len(result) == 3
+
+    # A fourth service makes 12, so nothing is loaded
+    services += "t=json://localhost/3\n"
+    result, config = ConfigBase.config_parse_text(groups + services)
+    assert result == []
+    assert config == []
+
+    result, config = ConfigBase.config_parse_yaml(yaml_config(4))
+    assert result == []
+    assert config == []
+
+
+def test_config_group_cycles():
+    """Every group in a loop reaches every service in that loop."""
+    # A ring of groups; each includes the next and has its own service
+    names = ["red", "blue", "green", "gold", "pink", "gray"]
+    lines = [
+        f"{name}=t{i},{names[(i + 1) % len(names)]}"
+        for i, name in enumerate(names)
+    ]
+    lines += [f"t{i}=json://localhost/{i}" for i in range(len(names))]
+
+    result, _ = ConfigBase.config_parse_text("\n".join(lines))
+    assert len(result) == len(names)
+    for service in result:
+        assert set(names) <= service.tags
+
+    # A group outside the loop that includes it reaches all of it too, while
+    # the loop does not reach back out to it
+    result, _ = ConfigBase.config_parse_text(
+        "\n".join(lines) + "\nall=red\nlone=t9\nt9=json://localhost/9"
+    )
+    for service in result:
+        if service.url(privacy=True).startswith("json://localhost/9"):
+            assert service.tags == {"t9", "lone"}
+        else:
+            assert {"all", *names} <= service.tags
