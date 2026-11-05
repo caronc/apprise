@@ -29,9 +29,12 @@
 # API: https://github.com/Finb/bark-server/blob/master/docs/API_V2.md#python
 # Parameters: https://github.com/Finb/Bark/blob/master/docs/params.md
 #
+from __future__ import annotations
+
 import base64
 import json
 import secrets
+from typing import Any, Optional, Union
 
 import requests
 
@@ -270,8 +273,8 @@ class NotifyBark(NotifyBase):
             "archive": {
                 "name": _("Archive"),
                 "type": "bool",
-                # Bark archives by default; when unset, the app setting
-                # decides and nothing is sent
+                # Bark archives by default.  When unset, nothing is sent
+                # and the app setting decides.
                 "default": True,
             },
             "ttl": {
@@ -303,27 +306,27 @@ class NotifyBark(NotifyBase):
 
     def __init__(
         self,
-        targets=None,
-        include_image=True,
-        sound=None,
-        category=None,
-        group=None,
-        level=None,
-        click=None,
-        badge=None,
-        volume=None,
-        icon=None,
-        call=None,
-        subtitle=None,
-        copy=None,
-        action=None,
-        archive=None,
-        ttl=None,
-        notification_id=None,
-        delete=None,
-        encryption_key=None,
-        **kwargs,
-    ):
+        targets: Optional[Union[str, list[str]]] = None,
+        include_image: bool = True,
+        sound: Optional[str] = None,
+        category: Optional[str] = None,
+        group: Optional[str] = None,
+        level: Optional[str] = None,
+        click: Optional[str] = None,
+        badge: Optional[Union[int, str]] = None,
+        volume: Optional[Union[int, str]] = None,
+        icon: Optional[str] = None,
+        call: Optional[Union[bool, str]] = None,
+        subtitle: Optional[str] = None,
+        copy: Optional[str] = None,
+        action: Optional[str] = None,
+        archive: Optional[Union[bool, str]] = None,
+        ttl: Optional[Union[int, str]] = None,
+        notification_id: Optional[str] = None,
+        delete: Optional[Union[bool, str]] = None,
+        encryption_key: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize Notify Bark Object."""
         super().__init__(**kwargs)
 
@@ -420,7 +423,7 @@ class NotifyBark(NotifyBase):
                 "The specified Bark action (%s) is not valid", action
             )
 
-        # Archive; None leaves it to the setting of the Bark app
+        # Archive.  None leaves it to the setting of the Bark app.
         self.archive = None if archive is None else parse_bool(archive)
 
         # How long an archived notification is kept, in seconds
@@ -509,7 +512,13 @@ class NotifyBark(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform Bark Notification."""
 
         # error tracking (used for function return)
@@ -545,7 +554,7 @@ class NotifyBark(NotifyBase):
         #     "copy": "123456",
         #     "action": "alert",
         #     "isArchive": "1",
-        #     "ttl": 3600,
+        #     "ttl": "3600",
         #     "id": "build-42",
         #     "delete": "1"
         # }
@@ -610,8 +619,8 @@ class NotifyBark(NotifyBase):
             payload["ttl"] = str(self.ttl)
 
         # The server reads these to address the notification on the device,
-        # so they are never only encrypted; Bark requires the id to be a
-        # string
+        # so they are never only encrypted.  Bark requires the id to be a
+        # string.
         routing = {}
         if self.notification_id:
             routing["id"] = self.notification_id
@@ -796,7 +805,7 @@ class NotifyBark(NotifyBase):
             self.encryption_key,
         )
 
-    def url(self, privacy=False, *args, **kwargs):
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
@@ -907,7 +916,7 @@ class NotifyBark(NotifyBase):
         return len(self.targets)
 
     @staticmethod
-    def parse_url(url):
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
 

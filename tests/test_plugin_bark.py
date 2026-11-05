@@ -449,11 +449,11 @@ def test_plugin_bark_extra_parameters(mock_post):
 
 
 @mock.patch("requests.post")
-def test_plugin_bark_encrypted_keeps_id_and_delete_in_clear(
-    mock_post, monkeypatch
-):
+def test_plugin_bark_encrypted_routing(mock_post, monkeypatch):
     """NotifyBark() leaves the id and delete flag outside the ciphertext."""
-    pytest.importorskip("cryptography.hazmat.primitives.ciphers.aead")
+    aesgcm = pytest.importorskip(
+        "cryptography.hazmat.primitives.ciphers.aead"
+    ).AESGCM
     monkeypatch.setattr(
         bark_module.secrets, "token_urlsafe", lambda length: "abcdefghijkl"
     )
@@ -472,6 +472,17 @@ def test_plugin_bark_encrypted_keeps_id_and_delete_in_clear(
     assert set(payload) == {"device_key", "ciphertext", "iv", "id", "delete"}
     assert payload["id"] == "build-42"
     assert payload["delete"] == "1"
+
+    # The app files the decrypted notification by the id inside it
+    plaintext = json.loads(
+        aesgcm(("k" * 16).encode("ascii")).decrypt(
+            payload["iv"].encode("ascii"),
+            base64.b64decode(payload["ciphertext"]),
+            None,
+        )
+    )
+    assert plaintext["id"] == "build-42"
+    assert "delete" not in plaintext
 
 
 @pytest.mark.parametrize(
