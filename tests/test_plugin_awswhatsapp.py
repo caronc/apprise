@@ -492,6 +492,22 @@ def test_upload_once_for_multiple_recipients(media_sdk):
     media_sdk[2].upload_fileobj.assert_called_once()
 
 
+def test_custom_staging_prefix(media_sdk):
+    obj = plugin(bucket="example-staging", prefix="/media/tests/")
+    restored = NotifyAWSWhatsApp(**NotifyAWSWhatsApp.parse_url(obj.url()))
+    assert restored.prefix == "media/tests/"
+    assert restored.send("", attach=[attachment()])
+    key = media_sdk[2].upload_fileobj.call_args.args[2]
+    assert key.startswith("media/tests/")
+    assert media_sdk[2].delete_object.call_args.kwargs["Key"] == key
+
+
+@pytest.mark.parametrize("prefix", ["", "/", "bad\nkey", "a" * 992, None])
+def test_invalid_staging_prefix(prefix):
+    with pytest.raises(AppriseImproperlyConfigured):
+        plugin(prefix=prefix)
+
+
 @pytest.mark.parametrize(
     "failure_at", ["upload", "presign", "import", "no-id", "read"]
 )

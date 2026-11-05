@@ -149,6 +149,11 @@ class NotifyAWSWhatsApp(NotifyBase):
                 "name": _("S3 Bucket"),
                 "type": "string",
             },
+            "prefix": {
+                "name": _("Path Prefix"),
+                "type": "string",
+                "default": "apprise/",
+            },
             "lang": {
                 "name": _("Language"),
                 "type": "string",
@@ -183,6 +188,7 @@ class NotifyAWSWhatsApp(NotifyBase):
         meta_api_version="v23.0",
         template_mapping=None,
         bucket=None,
+        prefix="apprise/",
         **kwargs,
     ):
         """Validate settings without credential discovery or network access."""
@@ -223,6 +229,14 @@ class NotifyAWSWhatsApp(NotifyBase):
         ):
             raise AppriseImproperlyConfigured("Invalid S3 staging bucket.")
         self.bucket = bucket
+        if (
+            not isinstance(prefix, str)
+            or not prefix.strip("/")
+            or re.search(r"[\x00-\x1f\x7f]", prefix)
+            or len(prefix.strip("/").encode("utf-8")) > 991
+        ):
+            raise AppriseImproperlyConfigured("Invalid S3 staging prefix.")
+        self.prefix = prefix.strip("/") + "/"
         self.language = language
         self.meta_api_version = meta_api_version
         self.template_mapping = dict(template_mapping or {})
@@ -464,7 +478,7 @@ class NotifyAWSWhatsApp(NotifyBase):
 
     def _upload_media(self, client, s3, attachment):
         """Stage a private S3 object, import it to WhatsApp and remove it."""
-        key = f"apprise/{uuid4().hex}"
+        key = f"{self.prefix}{uuid4().hex}"
         try:
             with attachment.open() as stream:
                 s3.upload_fileobj(
@@ -545,6 +559,8 @@ class NotifyAWSWhatsApp(NotifyBase):
             params["template"] = self.template
         if self.bucket:
             params["bucket"] = self.bucket
+        if self.prefix != "apprise/":
+            params["prefix"] = self.prefix
         if self.session_token:
             params["token"] = (
                 self.pprint(
@@ -601,6 +617,7 @@ class NotifyAWSWhatsApp(NotifyBase):
             ("lang", "language"),
             ("version", "meta_api_version"),
             ("bucket", "bucket"),
+            ("prefix", "prefix"),
         ):
             if query in results["qsd"]:
                 results[name] = results["qsd"][query]
