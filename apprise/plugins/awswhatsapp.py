@@ -229,25 +229,34 @@ class NotifyAWSWhatsApp(NotifyBase):
         self.components = {}
         for key, value in self.template_mapping.items():
             if key in ("body", "type"):
-                if not re.fullmatch(r"[1-9][0-9]*", str(value)):
+                if not re.fullmatch(r"[1-9][0-9]*|[a-z_]+", str(value)):
                     raise AppriseImproperlyConfigured(
-                        "Invalid template index."
+                        "Invalid template parameter."
                     )
-                index, content = int(value), key
+                index = int(value) if str(value).isdigit() else str(value)
+                content = key
             elif re.fullmatch(r"[1-9][0-9]*", str(key)):
                 index, content = int(key), str(value)
+            elif re.fullmatch(r"[a-z_]+", str(key)):
+                index, content = str(key), str(value)
             else:
                 raise AppriseImproperlyConfigured("Invalid template mapping.")
             if index in self.components:
                 raise AppriseImproperlyConfigured("Duplicate template index.")
             self.components[index] = (key in ("body", "type"), content)
-        if self.components and (
+        indices = list(self.components)
+        positional = all(isinstance(index, int) for index in indices)
+        named = all(isinstance(index, str) for index in indices)
+        if indices and (
             not template
-            or sorted(self.components)
-            != list(range(1, len(self.components) + 1))
+            or not (positional or named)
+            or (
+                positional
+                and sorted(indices) != list(range(1, len(indices) + 1))
+            )
         ):
             raise AppriseImproperlyConfigured(
-                "Template mappings require a template and consecutive indices."
+                "Use consecutive positions or named parameters in a template."
             )
 
         self.targets = []
@@ -371,7 +380,7 @@ class NotifyAWSWhatsApp(NotifyBase):
                     continue
                 payload = {
                     "messaging_product": "whatsapp",
-                    "to": target.lstrip("+"),
+                    "to": target,
                     "type": "template" if self.template else "text",
                 }
                 if self.template:
@@ -387,11 +396,16 @@ class NotifyAWSWhatsApp(NotifyBase):
                                 "parameters": [
                                     {
                                         "type": "text",
+                                        **(
+                                            {"parameter_name": index}
+                                            if isinstance(index, str)
+                                            else {}
+                                        ),
                                         "text": values[value]
                                         if mapped
                                         else value,
                                     }
-                                    for _, (mapped, value) in sorted(
+                                    for index, (mapped, value) in sorted(
                                         self.components.items()
                                     )
                                 ],
@@ -430,7 +444,7 @@ class NotifyAWSWhatsApp(NotifyBase):
                             client,
                             {
                                 "messaging_product": "whatsapp",
-                                "to": target.lstrip("+"),
+                                "to": target,
                                 "type": kind,
                                 kind: content,
                             },
@@ -508,6 +522,9 @@ class NotifyAWSWhatsApp(NotifyBase):
         if not response.get("messageId"):
             self.logger.warning("AWS WhatsApp returned no message ID.")
             return False
+        self.logger.info(
+            "AWS WhatsApp accepted message %s.", response["messageId"]
+        )
         return True
 
     @property

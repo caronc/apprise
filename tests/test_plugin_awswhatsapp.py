@@ -68,7 +68,7 @@ def test_text_and_default_credentials(sdk):
     assert request["metaApiVersion"] == "v23.0"
     assert isinstance(request["message"], bytes)
     payload = json.loads(request["message"])
-    assert payload["to"] == NUMBER.lstrip("+")
+    assert payload["to"] == NUMBER
     assert payload["type"] == "text"
     assert "Alert" in payload["text"]["body"]
     assert "Olá" in payload["text"]["body"]
@@ -137,6 +137,61 @@ def test_template_mapping_and_numeric_order(sdk):
     }
 
 
+def test_named_template_parameters(sdk):
+    mapping = {
+        "nome": "Joao Silva",
+        "recurso": "Sala A",
+        "data": "05/11/2026",
+        "horario": "09:00",
+        "protocolo": "TESTE",
+    }
+    obj = plugin(
+        template="lembrete_agendamento",
+        language="pt_BR",
+        template_mapping=mapping,
+    )
+    restored = NotifyAWSWhatsApp(**NotifyAWSWhatsApp.parse_url(obj.url()))
+    assert restored.send("unused")
+    payload = json.loads(
+        sdk[1].send_whatsapp_message.call_args.kwargs["message"]
+    )
+    assert payload["template"]["components"][0]["parameters"] == [
+        {"type": "text", "parameter_name": key, "text": value}
+        for key, value in sorted(mapping.items())
+    ]
+
+
+def test_named_dynamic_body_and_type(sdk):
+    assert plugin(
+        template="alert",
+        template_mapping={
+            "body": "mensagem",
+            "type": "tipo",
+        },
+    ).send("Details", notify_type=NotifyType.WARNING)
+    payload = json.loads(
+        sdk[1].send_whatsapp_message.call_args.kwargs["message"]
+    )
+    assert payload["template"]["components"][0]["parameters"] == [
+        {"type": "text", "parameter_name": "mensagem", "text": "Details"},
+        {"type": "text", "parameter_name": "tipo", "text": "warning"},
+    ]
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        {"1": "positional", "nome": "named"},
+        {"body": "nome", "nome": "duplicate"},
+        {"body": "bad-name"},
+    ],
+)
+def test_invalid_named_mappings(mapping, sdk):
+    with pytest.raises(AppriseImproperlyConfigured):
+        plugin(template="alert", template_mapping=mapping)
+    sdk[0].assert_not_called()
+
+
 def test_template_without_parameters(sdk):
     """Static approved templates do not gain unintended body parameters."""
     assert plugin(template="hello_world").send("ignored")
@@ -165,7 +220,7 @@ def test_template_without_parameters(sdk):
         {"template_mapping": {"body": "1"}},
         {"template": "alert", "template_mapping": {"body": "0"}},
         {"template": "alert", "template_mapping": {"3": "gap"}},
-        {"template": "alert", "template_mapping": {"bad": "value"}},
+        {"template": "alert", "template_mapping": {"bad-name": "value"}},
         {"template": "alert", "template_mapping": {"body": "1", "1": "dup"}},
     ],
 )
@@ -233,7 +288,7 @@ def test_failed_recipient_is_retried_without_resending_success(sdk, failure):
         json.loads(call.kwargs["message"])["to"]
         for call in sdk[1].send_whatsapp_message.call_args_list
     ]
-    assert targets == ["15555550123", "15555550124", "15555550124"]
+    assert targets == ["+15555550123", "+15555550124", "+15555550124"]
 
 
 def test_client_initialization_failure(sdk):
@@ -335,6 +390,7 @@ def test_media_types_and_private_staging(media_sdk, mimetype):
     )
     kind = MEDIA_TYPES[mimetype][0]
     assert payload["type"] == kind
+    assert payload["to"] == NUMBER
     assert payload[kind]["id"] == "media123"
     if kind == "document":
         assert payload[kind]["filename"] == "report.pdf"
@@ -587,7 +643,7 @@ def test_botocore_contract_and_wire_serialization():
     expected_message = json.dumps(
         {
             "messaging_product": "whatsapp",
-            "to": "15555550123",
+            "to": "+15555550123",
             "type": "text",
             "text": {"body": "Olá"},
         },
