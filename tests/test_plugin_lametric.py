@@ -27,11 +27,13 @@
 
 # Disable logging for a cleaner testing output
 import logging
+from unittest import mock
 
 from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise import Apprise
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.lametric import NotifyLametric
 
@@ -331,3 +333,28 @@ def test_plugin_lametric_edge_cases():
     # Initializes the plugin with an invalid Client Secret
     with pytest.raises(AppriseImproperlyConfigured):
         NotifyLametric(client_id="valid", secret=None, mode="cloud")
+
+
+@mock.patch("requests.post")
+def test_plugin_lametric_cloud_access_token(mock_post):
+    """NotifyLametric() Cloud mode sends the app access token."""
+
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    token = "{}==".format("A" * 88)
+    obj = Apprise.instantiate(
+        "lametrics://{}@com.lametric.941c51dff3135bd87aa72db9d855dd50/"
+        "?mode=cloud".format(token)
+    )
+    assert isinstance(obj, NotifyLametric)
+    assert obj.notify(body="body")
+    assert mock_post.call_count == 1
+    assert (
+        mock_post.call_args[0][0]
+        == "https://developer.lametric.com/api/v1/dev/widget/update/"
+        "com.lametric.941c51dff3135bd87aa72db9d855dd50/1"
+    )
+    assert mock_post.call_args[1]["headers"]["X-Access-Token"] == token
+    assert mock_post.call_args[1]["auth"] is None

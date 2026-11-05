@@ -681,7 +681,7 @@ class NotifyLametric(NotifyBase):
         # Update header entries
         headers.update(
             {
-                "X-Access-Token": self.lametric_apikey,
+                "X-Access-Token": self.lametric_app_access_token,
             }
         )
 
