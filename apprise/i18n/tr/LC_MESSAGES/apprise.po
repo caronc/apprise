@@ -398,6 +398,18 @@ msgstr "Simge adresi"
 msgid "Call"
 msgstr "Arama"
 
+#: apprise/plugins/bark.py:262
+msgid "Copy Content"
+msgstr "Kopyalanacak içerik"
+
+#: apprise/plugins/bark.py:271
+msgid "Archive"
+msgstr "Arşivle"
+
+#: apprise/plugins/bark.py:288
+msgid "Delete Notification"
+msgstr "Bildirimi sil"
+
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"
 msgstr "Şifreleme anahtarı"

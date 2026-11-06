@@ -399,6 +399,18 @@ msgstr "URL значка"
 msgid "Call"
 msgstr "Звонок"
 
+#: apprise/plugins/bark.py:262
+msgid "Copy Content"
+msgstr "Копируемое содержимое"
+
+#: apprise/plugins/bark.py:271
+msgid "Archive"
+msgstr "Архивировать"
+
+#: apprise/plugins/bark.py:288
+msgid "Delete Notification"
+msgstr "Удалить уведомление"
+
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"
 msgstr "Ключ шифрования"

@@ -398,6 +398,18 @@ msgstr "URL ของไอคอน"
 msgid "Call"
 msgstr "การโทร"
 
+#: apprise/plugins/bark.py:262
+msgid "Copy Content"
+msgstr "เนื้อหาที่จะคัดลอก"
+
+#: apprise/plugins/bark.py:271
+msgid "Archive"
+msgstr "เก็บถาวร"
+
+#: apprise/plugins/bark.py:288
+msgid "Delete Notification"
+msgstr "ลบการแจ้งเตือน"
+
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"
 msgstr "คีย์เข้ารหัส"

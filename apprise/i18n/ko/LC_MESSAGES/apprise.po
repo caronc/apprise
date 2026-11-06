@@ -398,6 +398,18 @@ msgstr "아이콘 URL"
 msgid "Call"
 msgstr "통화"
 
+#: apprise/plugins/bark.py:262
+msgid "Copy Content"
+msgstr "복사할 내용"
+
+#: apprise/plugins/bark.py:271
+msgid "Archive"
+msgstr "보관"
+
+#: apprise/plugins/bark.py:288
+msgid "Delete Notification"
+msgstr "알림 삭제"
+
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"
 msgstr "암호화 키"

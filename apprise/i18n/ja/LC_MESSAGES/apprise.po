@@ -398,6 +398,18 @@ msgstr "アイコンの URL"
 msgid "Call"
 msgstr "通話"
 
+#: apprise/plugins/bark.py:262
+msgid "Copy Content"
+msgstr "コピーする内容"
+
+#: apprise/plugins/bark.py:271
+msgid "Archive"
+msgstr "アーカイブ"
+
+#: apprise/plugins/bark.py:288
+msgid "Delete Notification"
+msgstr "通知を削除"
+
 #: apprise/plugins/bark.py:240 apprise/plugins/pushover.py:448
 msgid "Encryption Key"
 msgstr "暗号化キー"

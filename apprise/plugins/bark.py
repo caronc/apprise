@@ -27,10 +27,14 @@
 
 #
 # API: https://github.com/Finb/bark-server/blob/master/docs/API_V2.md#python
+# Parameters: https://github.com/Finb/Bark/blob/master/docs/params.md
 #
+from __future__ import annotations
+
 import base64
 import json
 import secrets
+from typing import Any, Optional, Union
 
 import requests
 
@@ -104,6 +108,23 @@ BARK_LEVELS = (
     NotifyBarkLevel.TIME_SENSITIVE,
     NotifyBarkLevel.PASSIVE,
     NotifyBarkLevel.CRITICAL,
+)
+
+
+# Supported Action Entries
+class NotifyBarkAction:
+    """Defines the Bark tap action options."""
+
+    # Opens a popup to copy or share the notification
+    ALERT = "alert"
+
+    # Only opens the app
+    NONE = "none"
+
+
+BARK_ACTIONS = (
+    NotifyBarkAction.ALERT,
+    NotifyBarkAction.NONE,
 )
 
 BARK_AES_KEY_LENGTHS = frozenset({16, 24, 32})
@@ -236,6 +257,41 @@ class NotifyBark(NotifyBase):
                 "type": "bool",
                 "default": False,
             },
+            "subtitle": {
+                "name": _("Subtitle"),
+                "type": "string",
+            },
+            "copy": {
+                "name": _("Copy Content"),
+                "type": "string",
+            },
+            "action": {
+                "name": _("Action"),
+                "type": "choice:string",
+                "values": BARK_ACTIONS,
+            },
+            "archive": {
+                "name": _("Archive"),
+                "type": "bool",
+                # Bark archives by default.  When unset, nothing is sent
+                # and the app setting decides.
+                "default": True,
+            },
+            "ttl": {
+                "name": _("Time To Live"),
+                "type": "int",
+                "min": 1,
+            },
+            "id": {
+                "name": _("Notification ID"),
+                "type": "string",
+                "map_to": "notification_id",
+            },
+            "delete": {
+                "name": _("Delete Notification"),
+                "type": "bool",
+                "default": False,
+            },
             "key": {
                 "name": _("Encryption Key"),
                 "type": "string",
@@ -250,20 +306,27 @@ class NotifyBark(NotifyBase):
 
     def __init__(
         self,
-        targets=None,
-        include_image=True,
-        sound=None,
-        category=None,
-        group=None,
-        level=None,
-        click=None,
-        badge=None,
-        volume=None,
-        icon=None,
-        call=None,
-        encryption_key=None,
-        **kwargs,
-    ):
+        targets: Optional[Union[str, list[str]]] = None,
+        include_image: bool = True,
+        sound: Optional[str] = None,
+        category: Optional[str] = None,
+        group: Optional[str] = None,
+        level: Optional[str] = None,
+        click: Optional[str] = None,
+        badge: Optional[Union[int, str]] = None,
+        volume: Optional[Union[int, str]] = None,
+        icon: Optional[str] = None,
+        call: Optional[Union[bool, str]] = None,
+        subtitle: Optional[str] = None,
+        copy: Optional[str] = None,
+        action: Optional[str] = None,
+        archive: Optional[Union[bool, str]] = None,
+        ttl: Optional[Union[int, str]] = None,
+        notification_id: Optional[str] = None,
+        delete: Optional[Union[bool, str]] = None,
+        encryption_key: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize Notify Bark Object."""
         super().__init__(**kwargs)
 
@@ -343,6 +406,56 @@ class NotifyBark(NotifyBase):
         # Call
         self.call = parse_bool(call)
 
+        # Subtitle, shown between the title and the body
+        self.subtitle = subtitle if isinstance(subtitle, str) else None
+
+        # The text copied instead of the body
+        self.copy = copy if isinstance(copy, str) else None
+
+        # Tap action
+        self.action = (
+            None
+            if not action
+            else next((f for f in BARK_ACTIONS if f == action.lower()), None)
+        )
+        if action and not self.action:
+            self.logger.warning(
+                "The specified Bark action (%s) is not valid", action
+            )
+
+        # Archive.  None leaves it to the setting of the Bark app.
+        self.archive = None if archive is None else parse_bool(archive)
+
+        # How long an archived notification is kept, in seconds
+        self.ttl = None
+        if ttl is not None:
+            try:
+                self.ttl = int(ttl)
+                if self.ttl < 1:
+                    raise ValueError()
+
+            except (TypeError, ValueError):
+                self.ttl = None
+                self.logger.warning(
+                    "The specified Bark ttl (%s) is not valid. "
+                    "Must be a positive number of seconds",
+                    ttl,
+                )
+
+        # A notification with the same id replaces the previous one
+        self.notification_id = (
+            notification_id
+            if isinstance(notification_id, str) and notification_id
+            else None
+        )
+
+        # Delete the notification with this id instead of showing one
+        self.delete = parse_bool(delete)
+        if self.delete and not self.notification_id:
+            msg = "A Bark notification can only be deleted by its id."
+            self.logger.warning(msg)
+            raise AppriseImproperlyConfigured(msg)
+
         # Encryption is off unless an encryption key was explicitly given
         self.encryption_key = None
         self._cipher = None
@@ -399,7 +512,13 @@ class NotifyBark(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform Bark Notification."""
 
         # error tracking (used for function return)
@@ -430,7 +549,14 @@ class NotifyBark(NotifyBase):
         #     "level": "active",
         #     "volume": 5,
         #     "call": 1,
-        #     "url": "https://mritd.com"
+        #     "url": "https://mritd.com",
+        #     "subtitle": "subtitle",
+        #     "copy": "123456",
+        #     "action": "alert",
+        #     "isArchive": "1",
+        #     "ttl": "3600",
+        #     "id": "build-42",
+        #     "delete": "1"
         # }
         payload = {
             "title": title if title else self.app_desc,
@@ -476,6 +602,35 @@ class NotifyBark(NotifyBase):
         if self.call:
             payload["call"] = 1
 
+        if self.subtitle:
+            payload["subtitle"] = self.subtitle
+
+        if self.copy:
+            payload["copy"] = self.copy
+
+        if self.action:
+            payload["action"] = self.action
+
+        if self.archive is not None:
+            payload["isArchive"] = "1" if self.archive else "0"
+
+        if self.ttl:
+            # A string, as the server turns large numbers into "1e+06"
+            payload["ttl"] = str(self.ttl)
+
+        # The server reads these to address the notification on the device,
+        # so they are never only encrypted.  Bark requires the id to be a
+        # string.
+        routing = {}
+        if self.notification_id:
+            routing["id"] = self.notification_id
+
+            # The app files the decrypted payload in its history by this id
+            payload["id"] = self.notification_id
+
+        if self.delete:
+            routing["delete"] = "1"
+
         auth = None
         if self.user:
             auth = (self.user, self.password)
@@ -509,6 +664,7 @@ class NotifyBark(NotifyBase):
                         "device_key": target,
                         "ciphertext": ciphertext,
                         "iv": iv,
+                        **routing,
                     }
 
                 except Exception as e:
@@ -523,7 +679,11 @@ class NotifyBark(NotifyBase):
 
             else:
                 # Plaintext payload; just tag on this target's device key
-                request_payload = {"device_key": target, **payload}
+                request_payload = {
+                    "device_key": target,
+                    **payload,
+                    **routing,
+                }
 
             self.logger.debug(
                 "Bark POST URL:"
@@ -645,7 +805,7 @@ class NotifyBark(NotifyBase):
             self.encryption_key,
         )
 
-    def url(self, privacy=False, *args, **kwargs):
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
@@ -679,6 +839,27 @@ class NotifyBark(NotifyBase):
 
         if self.call:
             params["call"] = "yes"
+
+        if self.subtitle:
+            params["subtitle"] = self.subtitle
+
+        if self.copy:
+            params["copy"] = self.copy
+
+        if self.action:
+            params["action"] = self.action
+
+        if self.archive is not None:
+            params["archive"] = "yes" if self.archive else "no"
+
+        if self.ttl:
+            params["ttl"] = str(self.ttl)
+
+        if self.notification_id:
+            params["id"] = self.notification_id
+
+        if self.delete:
+            params["delete"] = "yes"
 
         if self.encryption_key:
             params["key"] = self.pprint(
@@ -735,7 +916,7 @@ class NotifyBark(NotifyBase):
         return len(self.targets)
 
     @staticmethod
-    def parse_url(url):
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
 
@@ -806,6 +987,39 @@ class NotifyBark(NotifyBase):
 
         # Call
         results["call"] = parse_bool(results["qsd"].get("call", False))
+
+        # Subtitle
+        if "subtitle" in results["qsd"] and results["qsd"]["subtitle"]:
+            results["subtitle"] = NotifyBark.unquote(
+                results["qsd"]["subtitle"].strip()
+            )
+
+        # Copy content
+        if "copy" in results["qsd"] and results["qsd"]["copy"]:
+            results["copy"] = NotifyBark.unquote(results["qsd"]["copy"])
+
+        # Action
+        if "action" in results["qsd"] and results["qsd"]["action"]:
+            results["action"] = NotifyBark.unquote(
+                results["qsd"]["action"].strip()
+            )
+
+        # Archive
+        if "archive" in results["qsd"] and results["qsd"]["archive"]:
+            results["archive"] = parse_bool(results["qsd"]["archive"])
+
+        # Archive TTL
+        if "ttl" in results["qsd"] and results["qsd"]["ttl"]:
+            results["ttl"] = NotifyBark.unquote(results["qsd"]["ttl"].strip())
+
+        # Notification ID
+        if "id" in results["qsd"] and results["qsd"]["id"]:
+            results["notification_id"] = NotifyBark.unquote(
+                results["qsd"]["id"].strip()
+            )
+
+        # Delete
+        results["delete"] = parse_bool(results["qsd"].get("delete", False))
 
         # Encryption Key
         if "key" in results["qsd"] and results["qsd"]["key"]:
