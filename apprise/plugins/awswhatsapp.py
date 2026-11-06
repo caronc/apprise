@@ -135,12 +135,6 @@ class NotifyAWSWhatsApp(NotifyBase):
                 "prefix": "+",
                 "map_to": "targets",
             },
-            "target_group": {
-                "name": _("Target Group ID"),
-                "type": "string",
-                "prefix": "#",
-                "map_to": "targets",
-            },
         },
     )
     template_args = dict(
@@ -304,12 +298,10 @@ class NotifyAWSWhatsApp(NotifyBase):
 
         self.targets = []
         for target in parse_phone_no(targets):
-            group = re.fullmatch(r"#?([0-9]{16,})(?:@g\.us)?", target)
-            if group:
-                normalized = "#" + group.group(1)
-                if normalized not in self.targets:
-                    self.targets.append(normalized)
-                continue
+            if target.startswith("#") or target.endswith("@g.us"):
+                raise AppriseImproperlyConfigured(
+                    "WhatsApp group recipients are not supported."
+                )
             number = is_phone_no(target)
             if not number:
                 raise AppriseImproperlyConfigured(
@@ -463,7 +455,7 @@ class NotifyAWSWhatsApp(NotifyBase):
                     continue
                 payload = {
                     "messaging_product": "whatsapp",
-                    **self._target_fields(target),
+                    "to": target,
                     "type": "template" if self.template else "text",
                 }
                 if self.template:
@@ -534,7 +526,7 @@ class NotifyAWSWhatsApp(NotifyBase):
                             client,
                             {
                                 "messaging_product": "whatsapp",
-                                **self._target_fields(target),
+                                "to": target,
                                 "type": kind,
                                 kind: content,
                             },
@@ -551,13 +543,6 @@ class NotifyAWSWhatsApp(NotifyBase):
                 s3.close()
             client.close()
         return not has_error
-
-    @staticmethod
-    def _target_fields(target):
-        """Keep group IDs distinct from E.164 phone-number recipients."""
-        if target.startswith("#"):
-            return {"to": target[1:] + "@g.us", "recipient_type": "group"}
-        return {"to": target}
 
     @staticmethod
     def _validate_components(components, template, mapped_body):

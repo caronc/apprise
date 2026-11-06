@@ -285,20 +285,14 @@ def test_components_require_template():
         plugin(template_components=[text_header()])
 
 
-def test_group_payload_and_roundtrip(sdk):
-    obj = NotifyAWSWhatsApp(
-        region_name="us-east-1",
-        from_phone_id=SENDER,
-        targets=["#123456789012345678", "123456789012345678@g.us"],
-    )
-    assert obj.targets == ["#123456789012345678"]
-    restored = NotifyAWSWhatsApp(**NotifyAWSWhatsApp.parse_url(obj.url()))
-    assert restored.send("group test")
-    payload = json.loads(
-        sdk[1].send_whatsapp_message.call_args.kwargs["message"]
-    )
-    assert payload["to"] == "123456789012345678@g.us"
-    assert payload["recipient_type"] == "group"
+@pytest.mark.parametrize(
+    "target", ["#123456789012345678", "123456789012345678@g.us"]
+)
+def test_group_targets_rejected(target):
+    with pytest.raises(AppriseImproperlyConfigured):
+        NotifyAWSWhatsApp(
+            region_name="us-east-1", from_phone_id=SENDER, targets=[target]
+        )
 
 
 def message_event():
