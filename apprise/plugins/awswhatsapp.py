@@ -27,7 +27,9 @@
 
 """Outbound WhatsApp notifications through AWS End User Messaging Social."""
 
-from json import dumps
+from copy import deepcopy
+from json import dumps, loads
+import math
 import re
 from uuid import uuid4
 
@@ -35,6 +37,7 @@ from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
+from ..utils.awswhatsapp import transcode_attachments
 from ..utils.parse import is_phone_no, parse_phone_no
 from .base import NotifyBase
 
@@ -132,6 +135,12 @@ class NotifyAWSWhatsApp(NotifyBase):
                 "prefix": "+",
                 "map_to": "targets",
             },
+            "target_group": {
+                "name": _("Target Group ID"),
+                "type": "string",
+                "prefix": "#",
+                "map_to": "targets",
+            },
         },
     )
     template_args = dict(
@@ -145,6 +154,17 @@ class NotifyAWSWhatsApp(NotifyBase):
                 "map_to": "session_token",
             },
             "template": {"name": _("Template Name"), "type": "string"},
+            "components": {
+                "name": _("Template Mapping"),
+                "type": "string",
+                "map_to": "template_components",
+            },
+            "transcode": {
+                "name": _("Media Type"),
+                "type": "choice:string",
+                "values": ("none", "image", "audio", "video", "sticker"),
+                "default": "none",
+            },
             "bucket": {
                 "name": _("S3 Bucket"),
                 "type": "string",
@@ -187,8 +207,10 @@ class NotifyAWSWhatsApp(NotifyBase):
         language="en_US",
         meta_api_version="v23.0",
         template_mapping=None,
+        template_components=None,
         bucket=None,
         prefix="apprise/",
+        transcode="none",
         **kwargs,
     ):
         """Validate settings without credential discovery or network access."""
@@ -273,8 +295,21 @@ class NotifyAWSWhatsApp(NotifyBase):
                 "Use consecutive positions or named parameters in a template."
             )
 
+        self.template_components = self._validate_components(
+            template_components, template, bool(self.components)
+        )
+        if transcode not in ("none", "image", "audio", "video", "sticker"):
+            raise AppriseImproperlyConfigured("Invalid transcoding profile.")
+        self.transcode = transcode
+
         self.targets = []
         for target in parse_phone_no(targets):
+            group = re.fullmatch(r"#?([0-9]{16,})(?:@g\.us)?", target)
+            if group:
+                normalized = "#" + group.group(1)
+                if normalized not in self.targets:
+                    self.targets.append(normalized)
+                continue
             number = is_phone_no(target)
             if not number:
                 raise AppriseImproperlyConfigured(
@@ -292,12 +327,46 @@ class NotifyAWSWhatsApp(NotifyBase):
         attach=None,
         **kwargs,
     ):
+        """Optionally convert media before validating and sending it."""
+        if not self.enabled or not self.targets:
+            return False
+        if self.transcode == "none" or not attach:
+            return self._send(body, title, notify_type, attach, **kwargs)
+        try:
+            with transcode_attachments(attach, self.transcode) as converted:
+                return self._send(
+                    body, title, notify_type, converted, **kwargs
+                )
+        except (OSError, ValueError) as error:
+            self.logger.warning(
+                "AWS WhatsApp media conversion failed: %s",
+                type(error).__name__,
+            )
+            return False
+
+    def _send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
         """Send each recipient separately and preserve partial successes."""
         if not self.targets or not self.enabled:
             return False
         if self.template and kwargs.get("total", 1) > 1:
             self.logger.warning(
                 "WhatsApp templates require one message piece."
+            )
+            return False
+
+        if attach and any(
+            component["type"] == "header"
+            for component in self.template_components
+        ):
+            self.logger.warning(
+                "Use an attachment header or an explicit header, not both."
             )
             return False
 
@@ -394,7 +463,7 @@ class NotifyAWSWhatsApp(NotifyBase):
                     continue
                 payload = {
                     "messaging_product": "whatsapp",
-                    "to": target,
+                    **self._target_fields(target),
                     "type": "template" if self.template else "text",
                 }
                 if self.template:
@@ -402,29 +471,36 @@ class NotifyAWSWhatsApp(NotifyBase):
                         "name": self.template,
                         "language": {"code": self.language},
                     }
+                    if self.template_components:
+                        template["components"] = self._render_components(
+                            self.template_components,
+                            {"$body": body, "$type": notify_type.value},
+                        )
                     if self.components:
                         values = {"body": body, "type": notify_type.value}
-                        template["components"] = [
-                            {
-                                "type": "body",
-                                "parameters": [
-                                    {
-                                        "type": "text",
-                                        **(
-                                            {"parameter_name": index}
-                                            if isinstance(index, str)
-                                            else {}
-                                        ),
-                                        "text": values[value]
-                                        if mapped
-                                        else value,
-                                    }
-                                    for index, (mapped, value) in sorted(
-                                        self.components.items()
-                                    )
-                                ],
-                            }
-                        ]
+                        template.setdefault("components", []).extend(
+                            [
+                                {
+                                    "type": "body",
+                                    "parameters": [
+                                        {
+                                            "type": "text",
+                                            **(
+                                                {"parameter_name": index}
+                                                if isinstance(index, str)
+                                                else {}
+                                            ),
+                                            "text": values[value]
+                                            if mapped
+                                            else value,
+                                        }
+                                        for index, (mapped, value) in sorted(
+                                            self.components.items()
+                                        )
+                                    ],
+                                }
+                            ]
+                        )
                     payload["template"] = template
                     if media:
                         kind, content = media[0]
@@ -458,7 +534,7 @@ class NotifyAWSWhatsApp(NotifyBase):
                             client,
                             {
                                 "messaging_product": "whatsapp",
-                                "to": target,
+                                **self._target_fields(target),
                                 "type": kind,
                                 kind: content,
                             },
@@ -475,6 +551,166 @@ class NotifyAWSWhatsApp(NotifyBase):
                 s3.close()
             client.close()
         return not has_error
+
+    @staticmethod
+    def _target_fields(target):
+        """Keep group IDs distinct from E.164 phone-number recipients."""
+        if target.startswith("#"):
+            return {"to": target[1:] + "@g.us", "recipient_type": "group"}
+        return {"to": target}
+
+    @staticmethod
+    def _validate_components(components, template, mapped_body):
+        """Validate explicit template headers, body parameters and buttons."""
+        if components is None:
+            return []
+        try:
+            if isinstance(components, str):
+                components = loads(components)
+            components = deepcopy(components)
+            serialized = dumps(components, allow_nan=False)
+            if len(serialized.encode("utf-8")) > 65536:
+                raise ValueError("Template components exceed 64 KiB.")
+            if not template or not isinstance(components, list):
+                raise ValueError("Components require a template and a list.")
+            seen = set()
+            for component in components:
+                if not isinstance(component, dict):
+                    raise ValueError("Each component must be an object.")
+                kind = component.get("type")
+                if kind not in ("header", "body", "button"):
+                    raise ValueError("Invalid template component type.")
+                parameters = component.get("parameters")
+                if not isinstance(parameters, list) or not parameters:
+                    raise ValueError("Components require parameters.")
+                key = kind
+                if kind == "button":
+                    index = str(component.get("index", ""))
+                    if not re.fullmatch(r"[0-9]", index):
+                        raise ValueError(
+                            "Button index must be between 0 and 9."
+                        )
+                    component["index"] = index
+                    subtype = component.get("sub_type")
+                    parameter_type = {
+                        "url": "text",
+                        "quick_reply": "payload",
+                        "copy_code": "coupon_code",
+                        "flow": "action",
+                    }.get(subtype)
+                    if not parameter_type or len(parameters) != 1:
+                        raise ValueError(
+                            "Invalid button subtype or parameters."
+                        )
+                    if parameters[0].get("type") != parameter_type:
+                        raise ValueError("Button parameter type mismatch.")
+                    key = (kind, index)
+                if key in seen or (kind == "body" and mapped_body):
+                    raise ValueError("Duplicate template component.")
+                seen.add(key)
+                if kind == "header" and len(parameters) != 1:
+                    raise ValueError(
+                        "A header requires exactly one parameter."
+                    )
+                for parameter in parameters:
+                    if not isinstance(parameter, dict):
+                        raise ValueError("Parameters must be objects.")
+                    ptype = parameter.get("type")
+                    if ptype in ("text", "payload", "coupon_code"):
+                        if (
+                            not isinstance(parameter.get(ptype), str)
+                            or not parameter[ptype]
+                        ):
+                            raise ValueError(
+                                "Text parameters must be nonempty strings."
+                            )
+                        if kind in ("header", "body") and ptype != "text":
+                            raise ValueError("Invalid header parameter type.")
+                    elif ptype == "location" and kind == "header":
+                        location = parameter.get("location", {})
+                        for name, limit in (
+                            ("latitude", 90),
+                            ("longitude", 180),
+                        ):
+                            value = location.get(name)
+                            if (
+                                isinstance(value, bool)
+                                or not math.isfinite(float(value))
+                                or abs(float(value)) > limit
+                            ):
+                                raise ValueError(
+                                    "Invalid location coordinates."
+                                )
+                        if not all(
+                            isinstance(location.get(name), str)
+                            and location[name]
+                            for name in ("name", "address")
+                        ):
+                            raise ValueError(
+                                "Location requires a name and address."
+                            )
+                    elif (
+                        ptype in ("image", "video", "document")
+                        and kind == "header"
+                    ):
+                        media = parameter.get(ptype)
+                        if (
+                            not isinstance(media, dict)
+                            or len(set(media) & {"id", "link"}) != 1
+                        ):
+                            raise ValueError(
+                                "Media requires one ID or HTTPS link."
+                            )
+                        field = "id" if "id" in media else "link"
+                        if (
+                            not isinstance(media[field], str)
+                            or not media[field]
+                        ):
+                            raise ValueError("Invalid header media reference.")
+                        if field == "link" and not media[field].startswith(
+                            "https://"
+                        ):
+                            raise ValueError(
+                                "Header media links require HTTPS."
+                            )
+                    elif ptype == "action" and kind == "button":
+                        if not isinstance(parameter.get("action"), dict):
+                            raise ValueError("Flow action must be an object.")
+                    else:
+                        raise ValueError(
+                            "Unsupported template parameter type."
+                        )
+            return deepcopy(components)
+        except (
+            ValueError,
+            TypeError,
+            AttributeError,
+            RecursionError,
+        ) as error:
+            raise AppriseImproperlyConfigured(
+                "Invalid WhatsApp template components."
+            ) from error
+
+    @staticmethod
+    def _render_components(value, mappings):
+        """Resolve exact dynamic text values without interpreting syntax."""
+        if isinstance(value, str):
+            return (
+                value[1:]
+                if value.startswith("$$")
+                else mappings.get(value, value)
+            )
+        if isinstance(value, list):
+            return [
+                NotifyAWSWhatsApp._render_components(item, mappings)
+                for item in value
+            ]
+        if isinstance(value, dict):
+            return {
+                key: NotifyAWSWhatsApp._render_components(item, mappings)
+                for key, item in value.items()
+            }
+        return value
 
     def _upload_media(self, client, s3, attachment):
         """Stage a private S3 object, import it to WhatsApp and remove it."""
@@ -557,6 +793,12 @@ class NotifyAWSWhatsApp(NotifyBase):
         params.update(lang=self.language, version=self.meta_api_version)
         if self.template:
             params["template"] = self.template
+        if self.template_components:
+            params["components"] = (
+                "****" if privacy else dumps(self.template_components)
+            )
+        if self.transcode != "none":
+            params["transcode"] = self.transcode
         if self.bucket:
             params["bucket"] = self.bucket
         if self.prefix != "apprise/":
@@ -618,6 +860,8 @@ class NotifyAWSWhatsApp(NotifyBase):
             ("version", "meta_api_version"),
             ("bucket", "bucket"),
             ("prefix", "prefix"),
+            ("components", "template_components"),
+            ("transcode", "transcode"),
         ):
             if query in results["qsd"]:
                 results[name] = results["qsd"][query]
