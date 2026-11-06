@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+from json import loads
 import logging
 import os
 from unittest import mock
@@ -312,3 +313,49 @@ def test_plugin_resend_attachments(mock_post, mock_get):
             )
             is False
         )
+
+
+@mock.patch("requests.post")
+def test_plugin_resend_cc_names_with_spaces(mock_post, caplog):
+    """NotifyResend() keeps names with spaces and commas through URLs."""
+    logging.disable(logging.NOTSET)
+    caplog.set_level(logging.WARNING, logger="apprise")
+
+    request = mock.Mock()
+    request.status_code = requests.codes.ok
+    request.content = b""
+    mock_post.return_value = request
+
+    obj = Apprise.instantiate(
+        "resend://abcd:user@example.com/to@example.com"
+        "?cc=Chris%20Smith%20%3Ccc%40example.com%3E,"
+        "%22Smith%2C%20Chris%22%20%3Ccc2%40example.com%3E"
+        "&bcc=Jane%20Roe%20%3Cbcc%40example.com%3E"
+        "&reply=%22Support%2C%20Team%22%20%3Creply%40example.com%3E"
+    )
+    assert isinstance(obj, NotifyResend)
+    assert obj.cc == {"cc@example.com", "cc2@example.com"}
+    assert obj.bcc == {"bcc@example.com"}
+    assert obj.names["cc@example.com"] == "Chris Smith"
+    assert obj.names["cc2@example.com"] == "Smith, Chris"
+    assert obj.names["reply@example.com"] == "Support, Team"
+
+    # The CC/reply names and BCC address survive a round trip through url()
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyResend)
+    assert obj2.cc == obj.cc
+    assert obj2.bcc == {"bcc@example.com"}
+    assert obj2.names["cc@example.com"] == "Chris Smith"
+    assert obj2.names["cc2@example.com"] == "Smith, Chris"
+    assert obj2.names["reply@example.com"] == "Support, Team"
+
+    assert obj2.notify(body="body", title="title") is True
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args[1]["data"])
+    assert set(payload["cc"]) == {
+        "Chris Smith <cc@example.com>",
+        '"Smith, Chris" <cc2@example.com>',
+    }
+    assert payload["bcc"] == ["bcc@example.com"]
+    assert payload["reply_to"] == ['"Support, Team" <reply@example.com>']
+    assert not any("Dropped invalid" in message for message in caplog.messages)
