@@ -343,10 +343,8 @@ class NotifyGroundmail(NotifyBase):
                 [
                     formataddr(
                         (self.names.get(e, False), e),
-                        # Swap comma for its escaped url code (if
-                        # detected) since we use it as a delimiter
                         charset="utf-8",
-                    ).replace(",", "%2C")
+                    )
                     for e in self.cc
                 ]
             )
@@ -361,10 +359,8 @@ class NotifyGroundmail(NotifyBase):
                 [
                     formataddr(
                         (self.names.get(e, False), e),
-                        # Swap comma for its escaped url code (if
-                        # detected) since we use it as a delimiter
                         charset="utf-8",
-                    ).replace(",", "%2C")
+                    )
                     for e in self.reply_to
                 ]
             )
@@ -710,11 +706,11 @@ class NotifyGroundmail(NotifyBase):
 
         # Handle Carbon Copy Addresses
         if "cc" in results["qsd"] and len(results["qsd"]["cc"]):
-            results["cc"] = NotifyGroundmail.parse_list(results["qsd"]["cc"])
+            results["cc"] = results["qsd"]["cc"]
 
         # Handle Blind Carbon Copy Addresses
         if "bcc" in results["qsd"] and len(results["qsd"]["bcc"]):
-            results["bcc"] = NotifyGroundmail.parse_list(results["qsd"]["bcc"])
+            results["bcc"] = results["qsd"]["bcc"]
 
         # Handle Reply To Addresses
         if "reply" in results["qsd"] and len(results["qsd"]["reply"]):

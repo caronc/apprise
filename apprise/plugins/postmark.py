@@ -313,7 +313,7 @@ class NotifyPostmark(NotifyBase):
                     formataddr(
                         (self.names.get(e, False), e),
                         charset="utf-8",
-                    ).replace(",", "%2C")
+                    )
                     for e in self.cc
                 ]
             )
@@ -329,7 +329,7 @@ class NotifyPostmark(NotifyBase):
                     formataddr(
                         (self.names.get(e, False), e),
                         charset="utf-8",
-                    ).replace(",", "%2C")
+                    )
                     for e in self.reply_to
                 ]
             )
@@ -638,11 +638,11 @@ class NotifyPostmark(NotifyBase):
 
         # Handle Carbon Copy Addresses
         if "cc" in results["qsd"] and results["qsd"]["cc"]:
-            results["cc"] = NotifyPostmark.parse_list(results["qsd"]["cc"])
+            results["cc"] = results["qsd"]["cc"]
 
         # Handle Blind Carbon Copy Addresses
         if "bcc" in results["qsd"] and results["qsd"]["bcc"]:
-            results["bcc"] = NotifyPostmark.parse_list(results["qsd"]["bcc"])
+            results["bcc"] = results["qsd"]["bcc"]
 
         # Handle Reply-To Addresses
         if "reply" in results["qsd"] and results["qsd"]["reply"]:
