@@ -2350,3 +2350,7 @@ msgstr "Pseudonyme MUC"
 #: apprise/plugins/xmpp/base.py:177
 msgid "SCRAM-PLUS Channel Binding"
 msgstr "Liaison de canal SCRAM-PLUS"
+
+#: apprise/plugins/awswhatsapp.py:149
+msgid "S3 Bucket"
+msgstr "Compartiment S3"

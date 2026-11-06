@@ -63,6 +63,7 @@ keywords = [
     "Apprise API",
     "Automated Packet Reporting System",
     "AWS",
+    "AWS End User Messaging Social",
     "Bark",
     "Better Stack",
     "Blink(1)",
@@ -271,6 +272,8 @@ dev = [
 # Defines all Python libraries for Apprise to work with
 # all plugins
 all-plugins = [
+    # Provides awswhatsapp:// support and AWS credential discovery
+    "boto3 >= 1.35.50",
     # Used in many applications requiring cryptography
     # such as fcm:// and much more
     "cryptography",

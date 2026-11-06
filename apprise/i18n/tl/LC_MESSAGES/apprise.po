@@ -2350,3 +2350,7 @@ msgstr "Palayaw sa MUC"
 #: apprise/plugins/xmpp/base.py:177
 msgid "SCRAM-PLUS Channel Binding"
 msgstr "Pag-ugnay ng channel na SCRAM-PLUS"
+
+#: apprise/plugins/awswhatsapp.py:149
+msgid "S3 Bucket"
+msgstr "Bucket ng S3"
