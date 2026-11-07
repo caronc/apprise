@@ -33,6 +33,7 @@
 #
 
 from json import dumps, loads
+from typing import Any, Optional
 
 import requests
 
@@ -64,25 +65,17 @@ class NotifyFeishu(NotifyBase):
     # Define object templates
     templates = ("{schema}://{token}",)
 
-    # The title is not used
-    title_maxlen = 0
-
     # Limit is documented to be 20K message sizes.  This number safely
     # allows padding around that size.
     body_maxlen = 19985
 
-    # Feishu caps a webhook request body at 20 KB, measured in bytes while
-    # our body_maxlen above counts characters; a CJK body runs into the
-    # byte cap long before it runs into the character one.  Both message
-    # types are trimmed against this budget.
-    max_payload_bytes = 19000
-
-    # A plain text message has no formatting at all, so Markdown is only
-    # honoured once we send an interactive card instead.
+    # A text message cannot show any formatting, so Markdown is sent as an
+    # interactive card instead.  Plain text stays the default.
     notify_format = (NotifyFormat.TEXT, NotifyFormat.MARKDOWN)
 
-    # The title area of a card comfortably fits this much
-    card_title_maxlen = 100
+    # The title is joined to the body in one text field, so both share
+    # the same limit.  A card shows the title in its own header instead.
+    overflow_amalgamate_title = True
 
     # Card header colours, keyed by the notification type
     card_colors = {
@@ -130,103 +123,16 @@ class NotifyFeishu(NotifyBase):
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
 
-        # A card carries its own title area, so let a title through when the
-        # caller asked for Markdown.  Plain text keeps amalgamating the title
-        # into the body (title_maxlen = 0) exactly as it always has.
-        if self.resolve_format() == NotifyFormat.MARKDOWN:
-            self.title_maxlen = self.card_title_maxlen
-
         return
-
-    @staticmethod
-    def _serialize(payload):
-        """Serialize a payload exactly as it is sent on the wire.
-
-        ``ensure_ascii`` stays off so the byte budget measured here matches
-        the bytes Feishu receives; escaping every CJK character to ``\\uXXXX``
-        would roughly double the request size for nothing.
-        """
-        return dumps(payload, ensure_ascii=False).encode("utf-8")
-
-    @staticmethod
-    def _slice_bytes(text, budget):
-        """Truncate text to at most budget UTF-8 bytes."""
-        if budget <= 0:
-            return ""
-
-        return text.encode("utf-8")[:budget].decode("utf-8", "ignore")
-
-    def card_payload(self, body, title, notify_type):
-        """Build the interactive card used to render a Markdown body.
-
-        Feishu only renders Markdown inside a card (the lark_md element); a
-        plain text message would show the raw markup instead.
-        """
-        return {
-            "msg_type": "interactive",
-            "card": {
-                "config": {"wide_screen_mode": True},
-                "header": {
-                    "title": {
-                        "tag": "plain_text",
-                        "content": (title or self.app_desc)[
-                            : self.card_title_maxlen
-                        ],
-                    },
-                    "template": self.card_colors.get(
-                        notify_type, self.card_colors[NotifyType.INFO]
-                    ),
-                },
-                "elements": [
-                    {
-                        "tag": "div",
-                        "text": {"tag": "lark_md", "content": body},
-                    },
-                ],
-            },
-        }
-
-    def _compose(self, body, title, notify_type, card):
-        """Compose the request payload for either message type."""
-        return (
-            self.card_payload(body, title, notify_type)
-            if card
-            else {
-                "msg_type": "text",
-                "content": {
-                    "text": body,
-                },
-            }
-        )
-
-    def _payload(self, body, title, notify_type, card):
-        """Compose a payload that stays within Feishu's byte budget."""
-        payload = self._compose(body, title, notify_type, card)
-
-        # Feishu rejects a request body larger than 20 KB with code 9499.
-        # Trim by bytes instead of characters: a CJK body reaches the byte
-        # cap long before it reaches body_maxlen.
-        while len(self._serialize(payload)) > self.max_payload_bytes:
-            overflow = len(self._serialize(payload)) - self.max_payload_bytes
-            body = self._slice_bytes(
-                body, len(body.encode("utf-8")) - overflow - 4
-            )
-            if not body:
-                # Nothing left to trim; stop instead of looping forever.
-                return self._compose("", title, notify_type, card)
-
-            payload = self._compose(f"{body}\u2026", title, notify_type, card)
-
-        return payload
 
     def send(
         self,
-        body,
-        title="",
-        notify_type=NotifyType.INFO,
-        body_format=None,
-        **kwargs,
-    ):
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        body_format: Optional[NotifyFormat] = None,
+        **kwargs: Any,
+    ) -> bool:
         """Send our notification."""
 
         # prepare our headers
@@ -236,8 +142,37 @@ class NotifyFeishu(NotifyBase):
         }
 
         # Our Message
-        payload = self._payload(
-            body, title, notify_type, body_format == NotifyFormat.MARKDOWN
+        payload = (
+            {
+                # Feishu only renders Markdown inside an interactive card
+                "msg_type": "interactive",
+                "card": {
+                    "config": {"wide_screen_mode": True},
+                    "header": {
+                        "title": {
+                            "tag": "plain_text",
+                            "content": title or self.app_desc,
+                        },
+                        # The header colour follows the notification type
+                        "template": self.card_colors.get(
+                            notify_type, self.card_colors[NotifyType.INFO]
+                        ),
+                    },
+                    "elements": [
+                        {
+                            "tag": "div",
+                            "text": {"tag": "lark_md", "content": body},
+                        },
+                    ],
+                },
+            }
+            if body_format == NotifyFormat.MARKDOWN
+            else {
+                "msg_type": "text",
+                "content": {
+                    "text": f"{title}\r\n{body}" if title else body,
+                },
+            }
         )
 
         self.logger.debug(
@@ -252,7 +187,9 @@ class NotifyFeishu(NotifyBase):
         try:
             r = requests.post(
                 self.notify_url.format(token=self.token),
-                data=self._serialize(payload),
+                # Send UTF-8 as is; \uXXXX escapes double the size of CJK
+                # text, and Feishu limits the request body size.
+                data=dumps(payload, ensure_ascii=False).encode("utf-8"),
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
@@ -298,17 +235,20 @@ class NotifyFeishu(NotifyBase):
                 # Feishu answers a refused payload with HTTP 200 and a
                 # non-zero code, so the response body needs inspecting too.
                 try:
-                    response = loads(r.content)
+                    content = loads(r.content)
 
-                except (TypeError, ValueError):
-                    response = None
+                except (AttributeError, TypeError, ValueError):
+                    # Not JSON; the HTTP status is all we have to go on
+                    content = {}
 
-                if isinstance(response, dict) and response.get("code", 0):
+                if isinstance(content, dict) and content.get("code"):
                     self.logger.warning(
                         "Feishu rejected our notification: code=%s msg=%s",
-                        response.get("code"),
-                        response.get("msg"),
+                        content.get("code"),
+                        content.get("msg"),
                     )
+
+                    # Return; we're done
                     return False
 
                 self.logger.info("Sent Feishu notification.")
