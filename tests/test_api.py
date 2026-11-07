@@ -1999,8 +1999,11 @@ def test_apprise_asset(tmpdir):
         == "http://localhost/default/info-256x256.test"
     )
 
-    a = AppriseAsset(plugin_paths=("/tmp",))
-    assert a.plugin_paths == ("/tmp",)
+    # Use an empty folder of our own; the plugin loader imports (and runs)
+    # every .py file it finds in the paths it is given
+    plugin_path = str(tmpdir.mkdir("plugins"))
+    a = AppriseAsset(plugin_paths=(plugin_path,))
+    assert a.plugin_paths == (plugin_path,)
 
 
 def test_apprise_disabled_plugins():
