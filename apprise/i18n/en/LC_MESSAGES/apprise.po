@@ -2349,6 +2349,6 @@ msgstr "MUC Nickname"
 msgid "SCRAM-PLUS Channel Binding"
 msgstr "SCRAM-PLUS Channel Binding"
 
-#: apprise/plugins/awswhatsapp.py:149
+#: apprise/plugins/awswhatsapp.py:214
 msgid "S3 Bucket"
 msgstr "S3 Bucket"

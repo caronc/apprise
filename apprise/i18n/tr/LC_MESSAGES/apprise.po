@@ -2351,6 +2351,6 @@ msgstr "MUC takma adı"
 msgid "SCRAM-PLUS Channel Binding"
 msgstr "SCRAM-PLUS kanal bağlama"
 
-#: apprise/plugins/awswhatsapp.py:149
+#: apprise/plugins/awswhatsapp.py:214
 msgid "S3 Bucket"
 msgstr "S3 kovası"

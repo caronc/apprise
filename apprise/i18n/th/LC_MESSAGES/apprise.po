@@ -2350,6 +2350,6 @@ msgstr "ชื่อเล่นใน MUC"
 msgid "SCRAM-PLUS Channel Binding"
 msgstr "การผูกช่องทางแบบ SCRAM-PLUS"
 
-#: apprise/plugins/awswhatsapp.py:149
+#: apprise/plugins/awswhatsapp.py:214
 msgid "S3 Bucket"
 msgstr "บัคเก็ต S3"

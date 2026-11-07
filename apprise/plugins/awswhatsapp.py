@@ -25,163 +25,205 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""Outbound WhatsApp notifications through AWS End User Messaging Social."""
+# API Source:
+#   https://docs.aws.amazon.com/social-messaging/latest/APIReference/
+#
+# WhatsApp through AWS End User Messaging Social.  AWS relays the same
+# message Meta's WhatsApp Cloud API accepts (see whatsapp.py).
+#
+# 1. In the AWS End User Messaging Social console, link your WhatsApp
+#    Business Account and register a sender phone number.
+# 2. Copy the sender's phone number ID; it looks like:
+#       phone-number-id-01234567890123456789012345678901
+#    This is NOT your actual phone number.
+# 3. Create an Access Key ID and Secret Access Key for an IAM user that is
+#    allowed to call social-messaging:SendWhatsAppMessage.
+# 4. To send attachments, provide a private S3 bucket (in the same account
+#    and region) with ?bucket=.  Files are staged under apprise/ in it
+#    while WhatsApp imports them, then removed.  This also requires the
+#    social-messaging:PostWhatsAppMessageMedia permission along with
+#    s3:PutObject, s3:GetObject and s3:DeleteObject on apprise/*.
+#
+# Your Apprise URL should be assembled as:
+#   awswhatsapp://{access_key_id}/{secret_access_key}/{region}/
+#       {from_phone_id}/{to_phone}
 
-from copy import deepcopy
+from base64 import b64encode
+from datetime import datetime, timezone
+from hashlib import sha256
+import hmac
 from json import dumps, loads
-import math
 import re
+from typing import Any, Optional
+from urllib.parse import quote
 from uuid import uuid4
 
+import requests
+
+from ..attachment.base import AttachBase
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.awswhatsapp import transcode_attachments
-from ..utils.parse import is_phone_no, parse_phone_no
+from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
 from .base import NotifyBase
 
-try:
-    import boto3
-    from boto3.exceptions import Boto3Error
-    from botocore.config import Config
-    from botocore.exceptions import BotoCoreError, ClientError
+# Our Region Identifier
+# support us-gov-west-1 syntax as well
+IS_REGION = re.compile(
+    r"^\s*(?P<country>[a-z]{2})-(?P<area>[a-z-]+?)-(?P<no>[0-9]+)\s*$", re.I
+)
 
-    AWS_WHATSAPP_SUPPORT_ENABLED = True
-except ImportError:
-    AWS_WHATSAPP_SUPPORT_ENABLED = False
-
-
-# AWS/WhatsApp limits, in bytes. MIME validation happens before any uploads.
-MEDIA_TYPES = {
-    "image/jpeg": ("image", 5 * 1024**2),
-    "image/png": ("image", 5 * 1024**2),
-    "image/webp": ("sticker", 100 * 1024),
-    **dict.fromkeys(
-        ("audio/aac", "audio/amr", "audio/mpeg", "audio/mp4", "audio/ogg"),
-        ("audio", 16 * 1024**2),
-    ),
-    **dict.fromkeys(
-        ("video/mp4", "video/3gp", "video/3gpp"),
-        ("video", 16 * 1024**2),
-    ),
-    **dict.fromkeys(
-        (
-            "text/plain",
-            "application/pdf",
-            "application/msword",
-            "application/vnd.ms-excel",
-            "application/vnd.ms-powerpoint",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        ),
-        ("document", 100 * 1024**2),
-    ),
+# Extend HTTP Error Messages
+AWS_HTTP_ERROR_MAP = {
+    403: "Unauthorized - Invalid Access/Secret Key Combination.",
 }
 
 
 class NotifyAWSWhatsApp(NotifyBase):
-    """Send text or approved templates using SendWhatsAppMessage."""
+    """A wrapper for AWS End User Messaging Social (WhatsApp)"""
 
-    enabled = AWS_WHATSAPP_SUPPORT_ENABLED
-    requirements = {"packages_required": "boto3 >= 1.35.50"}
+    # The default descriptive name associated with the Notification
     service_name = "AWS End User Messaging Social (WhatsApp)"
-    service_url = "https://aws.amazon.com/end-user-messaging/"
-    secure_protocol = "awswhatsapp"
-    setup_url = "https://appriseit.com/services/aws-whatsapp/"
-    title_maxlen = 0
-    body_maxlen = 1024
-    attachment_support = True
-    request_rate_per_sec = 0.2
 
+    # The services URL
+    service_url = "https://aws.amazon.com/end-user-messaging/"
+
+    # The default secure protocol
+    secure_protocol = "awswhatsapp"
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = "https://appriseit.com/services/awswhatsapp/"
+
+    # Support attachments (staged in the S3 ?bucket=)
+    attachment_support = True
+
+    # Allow 300 requests per minute.
+    # 60/300 = 0.2
+    request_rate_per_sec = 0.20
+
+    # The Meta API version AWS relays our messages with; bump this when Meta
+    # deprecates the current one.
+    meta_api_version = "v23.0"
+
+    # The maximum length of the body
+    body_maxlen = 1024
+
+    # A title can not be used for WhatsApp Messages.  Setting this to zero
+    # will cause any title (if defined) to get placed into the message body.
+    title_maxlen = 0
+
+    # Define object templates
     templates = (
-        "{schema}://{region}/{from_phone_id}/{targets}",
-        "{schema}://{access_key_id}:{secret_access_key}@"
-        "{region}/{from_phone_id}/{targets}",
+        # With session token (for temporary/IAM credentials)
+        "{schema}://{token}@{access_key_id}/{secret_access_key}"
+        "/{region}/{from_phone_id}/{targets}",
+        # Without session token (standard long-term credentials)
+        "{schema}://{access_key_id}/{secret_access_key}"
+        "/{region}/{from_phone_id}/{targets}",
     )
+
+    # Define our template tokens
     template_tokens = dict(
         NotifyBase.template_tokens,
         **{
-            "region": {
-                "name": _("Region"),
+            "token": {
+                # Session token for temporary/IAM credentials (optional)
+                "name": _("Session Token"),
                 "type": "string",
-                "required": True,
-                "map_to": "region_name",
+                "private": True,
+                "map_to": "session_token",
             },
             "access_key_id": {
                 "name": _("Access Key ID"),
                 "type": "string",
                 "private": True,
+                "required": True,
             },
             "secret_access_key": {
                 "name": _("Secret Access Key"),
                 "type": "string",
                 "private": True,
+                "required": True,
+            },
+            "region": {
+                "name": _("Region"),
+                "type": "string",
+                "regex": (r"^[a-z]{2}-[a-z-]+?-[0-9]+$", "i"),
+                "required": True,
+                "map_to": "region_name",
             },
             "from_phone_id": {
                 "name": _("From Phone ID"),
                 "type": "string",
-                "required": True,
-            },
-            "targets": {
-                "name": _("Targets"),
-                "type": "list:string",
+                "regex": (r"^phone-number-id-[a-z0-9]+$", "i"),
                 "required": True,
             },
             "target_phone": {
                 "name": _("Target Phone No"),
                 "type": "string",
                 "prefix": "+",
+                "regex": (r"^[0-9\s)(+-]+$", "i"),
                 "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+                "required": True,
             },
         },
     )
+
+    # Define our template arguments
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {"alias_of": "targets"},
+            "to": {
+                "alias_of": "targets",
+            },
             "token": {
-                "name": _("Session Token"),
-                "type": "string",
-                "private": True,
-                "map_to": "session_token",
+                # ?token= kwarg mirrors the {token} URL path entry
+                "alias_of": "token",
             },
-            "template": {"name": _("Template Name"), "type": "string"},
-            "components": {
-                "name": _("Template Mapping"),
-                "type": "string",
-                "map_to": "template_components",
+            "access": {
+                "alias_of": "access_key_id",
             },
-            "transcode": {
-                "name": _("Media Type"),
-                "type": "choice:string",
-                "values": ("none", "image", "audio", "video", "sticker"),
-                "default": "none",
+            "key": {
+                # Intuitive alias for access_key_id
+                "alias_of": "access_key_id",
             },
-            "bucket": {
-                "name": _("S3 Bucket"),
-                "type": "string",
+            "secret": {
+                "alias_of": "secret_access_key",
             },
-            "prefix": {
-                "name": _("Path Prefix"),
+            "region": {
+                "alias_of": "region",
+            },
+            "template": {
+                "name": _("Template Name"),
                 "type": "string",
-                "default": "apprise/",
+                "regex": (r"^[^\s]+$", "i"),
             },
             "lang": {
                 "name": _("Language"),
                 "type": "string",
                 "default": "en_US",
+                "regex": (r"^[^0-9\s]+$", "i"),
                 "map_to": "language",
             },
-            "version": {
-                "name": _("API Version"),
+            "bucket": {
+                "name": _("S3 Bucket"),
                 "type": "string",
-                "default": "v23.0",
-                "map_to": "meta_api_version",
+                "regex": (r"^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$", "i"),
             },
         },
     )
+
+    # Our supported mappings and component keys
+    component_key_re = re.compile(
+        r"(?P<key>((?P<id>[1-9][0-9]*)|(?P<map>body|type)))", re.IGNORECASE
+    )
+
+    # Define any kwargs we're using
     template_kwargs = {
         "template_mapping": {
             "name": _("Template Mapping"),
@@ -191,671 +233,844 @@ class NotifyAWSWhatsApp(NotifyBase):
 
     def __init__(
         self,
-        region_name,
-        from_phone_id,
-        targets=None,
-        access_key_id=None,
-        secret_access_key=None,
-        session_token=None,
-        template=None,
-        language="en_US",
-        meta_api_version="v23.0",
-        template_mapping=None,
-        template_components=None,
-        bucket=None,
-        prefix="apprise/",
-        transcode="none",
-        **kwargs,
-    ):
-        """Validate settings without credential discovery or network access."""
+        access_key_id: str,
+        secret_access_key: str,
+        region_name: str,
+        from_phone_id: str,
+        targets: Optional[Any] = None,
+        session_token: Optional[str] = None,
+        template: Optional[str] = None,
+        language: Optional[str] = None,
+        template_mapping: Optional[dict[str, str]] = None,
+        bucket: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize Notify AWS WhatsApp Object."""
         super().__init__(**kwargs)
-        for value, pattern, label in (
-            (region_name, r"[a-z]{2}(?:-[a-z]+)+-\d+", "region"),
-            (from_phone_id, r"phone-number-id-[a-zA-Z0-9]+", "sender ID"),
-            (language, r"[a-z]{2,3}(?:_[A-Z]{2})?", "language"),
-            (meta_api_version, r"v\d+\.\d+", "API version"),
-        ):
-            if not isinstance(value, str) or not re.fullmatch(pattern, value):
-                raise AppriseImproperlyConfigured(
-                    f"An invalid AWS WhatsApp {label} was specified."
-                )
-        if bool(access_key_id) != bool(secret_access_key) or (
-            session_token and not access_key_id
-        ):
-            raise AppriseImproperlyConfigured(
-                "AWS explicit credentials require both access and secret keys."
-            )
-        if template is not None and (
-            not isinstance(template, str)
-            or not re.fullmatch(r"[a-z0-9_]+", template)
-        ):
-            raise AppriseImproperlyConfigured(
-                "Invalid WhatsApp template name."
-            )
 
-        self.region_name = region_name
-        self.from_phone_id = from_phone_id
-        self.access_key_id = access_key_id or None
-        self.secret_access_key = secret_access_key or None
-        self.session_token = session_token or None
-        self.template = template
-        if bucket is not None and (
-            not isinstance(bucket, str)
-            or not re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", bucket)
-        ):
-            raise AppriseImproperlyConfigured("Invalid S3 staging bucket.")
-        self.bucket = bucket
-        if (
-            not isinstance(prefix, str)
-            or not prefix.strip("/")
-            or re.search(r"[\x00-\x1f\x7f]", prefix)
-            or len(prefix.strip("/").encode("utf-8")) > 991
-        ):
-            raise AppriseImproperlyConfigured("Invalid S3 staging prefix.")
-        self.prefix = prefix.strip("/") + "/"
-        self.language = language
-        self.meta_api_version = meta_api_version
-        self.template_mapping = dict(template_mapping or {})
-        self.components = {}
-        for key, value in self.template_mapping.items():
-            if key in ("body", "type"):
-                if not re.fullmatch(r"[1-9][0-9]*|[a-z_]+", str(value)):
-                    raise AppriseImproperlyConfigured(
-                        "Invalid template parameter."
-                    )
-                index = int(value) if str(value).isdigit() else str(value)
-                content = key
-            elif re.fullmatch(r"[1-9][0-9]*", str(key)):
-                index, content = int(key), str(value)
-            elif re.fullmatch(r"[a-z_]+", str(key)):
-                index, content = str(key), str(value)
-            else:
-                raise AppriseImproperlyConfigured("Invalid template mapping.")
-            if index in self.components:
-                raise AppriseImproperlyConfigured("Duplicate template index.")
-            self.components[index] = (key in ("body", "type"), content)
-        indices = list(self.components)
-        positional = all(isinstance(index, int) for index in indices)
-        named = all(isinstance(index, str) for index in indices)
-        if indices and (
-            not template
-            or not (positional or named)
-            or (
-                positional
-                and sorted(indices) != list(range(1, len(indices) + 1))
-            )
-        ):
-            raise AppriseImproperlyConfigured(
-                "Use consecutive positions or named parameters in a template."
-            )
+        # Store optional session token for temporary/IAM credentials
+        self.aws_session_token = session_token if session_token else None
 
-        self.template_components = self._validate_components(
-            template_components, template, bool(self.components)
+        # Store our AWS API Access Key
+        self.aws_access_key_id = validate_regex(access_key_id)
+        if not self.aws_access_key_id:
+            msg = "An invalid AWS Access Key ID was specified."
+            self.logger.warning(msg)
+            raise AppriseImproperlyConfigured(msg)
+
+        # Store our AWS API Secret Access key
+        self.aws_secret_access_key = validate_regex(secret_access_key)
+        if not self.aws_secret_access_key:
+            msg = "An invalid AWS Secret Access Key was specified."
+            self.logger.warning(msg)
+            raise AppriseImproperlyConfigured(msg)
+
+        # Acquire our AWS Region Name:
+        # eg. us-east-1, cn-north-1, us-west-2, ...
+        self.aws_region_name = validate_regex(
+            region_name, *self.template_tokens["region"]["regex"]
         )
-        if transcode not in ("none", "image", "audio", "video", "sticker"):
-            raise AppriseImproperlyConfigured("Invalid transcoding profile.")
-        self.transcode = transcode
+        if not self.aws_region_name:
+            msg = f"An invalid AWS Region ({region_name}) was specified."
+            self.logger.warning(msg)
+            raise AppriseImproperlyConfigured(msg)
 
+        # Acquire our sender (phone number) ID
+        self.from_phone_id = validate_regex(
+            from_phone_id, *self.template_tokens["from_phone_id"]["regex"]
+        )
+        if not self.from_phone_id:
+            msg = (
+                "An invalid AWS WhatsApp From Phone ID "
+                f"({from_phone_id}) was specified."
+            )
+            self.logger.warning(msg)
+            raise AppriseImproperlyConfigured(msg)
+
+        # The template to associate with the message
+        self.template = None
+        if template:
+            self.template = validate_regex(
+                template, *self.template_args["template"]["regex"]
+            )
+            if not self.template:
+                msg = (
+                    "An invalid AWS WhatsApp Template Name "
+                    f"({template}) was specified."
+                )
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
+        # The Template language Code to use
+        self.language = self.template_args["lang"]["default"]
+        if language:
+            self.language = validate_regex(
+                language, *self.template_args["lang"]["regex"]
+            )
+            if not self.language:
+                msg = (
+                    "An invalid AWS WhatsApp Template Language Code "
+                    f"({language}) was specified."
+                )
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
+        # The private S3 bucket attachments are staged in
+        self.bucket = None
+        if bucket:
+            self.bucket = validate_regex(
+                bucket, *self.template_args["bucket"]["regex"]
+            )
+            if not self.bucket:
+                msg = f"An invalid AWS S3 Bucket ({bucket}) was specified."
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
+        self.template_mapping = {}
+        if template_mapping:
+            # Store our extra payload entries
+            self.template_mapping.update(template_mapping)
+
+        # Validate Mapping and prepare Components
+        self.components = {}
+        for key, val in self.template_mapping.items():
+            matched = self.component_key_re.match(key)
+            if not matched:
+                msg = (
+                    "An invalid AWS WhatsApp Template Component ID "
+                    f"({key}) was specified."
+                )
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
+            if matched.group("id"):
+                #
+                # Manual Component Assigment (by id)
+                #
+                index = matched.group("id")
+                map_to = {
+                    "type": "text",
+                    "text": val,
+                }
+
+            else:  # matched.group('map')
+                map_to = matched.group("map").lower()
+                matched = self.component_key_re.match(val)
+                if not (matched and matched.group("id")):
+                    msg = (
+                        "An invalid AWS WhatsApp Template Component Mapping "
+                        f"(:{key}={val}) was specified."
+                    )
+                    self.logger.warning(msg)
+                    raise AppriseImproperlyConfigured(msg)
+                index = matched.group("id")
+
+            if index in self.components:
+                msg = (
+                    "The AWS WhatsApp Template Component index "
+                    f"({key}) was already assigned."
+                )
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
+            self.components[index] = map_to
+
+        # Our API hosts
+        self.notify_host = (
+            f"social-messaging.{self.aws_region_name}.amazonaws.com"
+        )
+        self.s3_host = f"{self.bucket}.s3.{self.aws_region_name}.amazonaws.com"
+
+        # AWS Authentication Details
+        self.aws_auth_version = "AWS4"
+        self.aws_auth_algorithm = "AWS4-HMAC-SHA256"
+        self.aws_auth_request = "aws4_request"
+
+        # Parse our targets
         self.targets = []
         for target in parse_phone_no(targets):
-            if target.startswith("#") or target.endswith("@g.us"):
-                raise AppriseImproperlyConfigured(
-                    "WhatsApp group recipients are not supported."
+            # Validate targets and drop bad ones:
+            result = is_phone_no(target)
+            if not result:
+                self.logger.warning(
+                    "Dropped invalid AWS WhatsApp target (%s) specified.",
+                    target,
                 )
-            number = is_phone_no(target)
-            if not number:
-                raise AppriseImproperlyConfigured(
-                    "An invalid WhatsApp recipient was specified."
-                )
-            number = "+{}".format(number["full"])
-            if number not in self.targets:
-                self.targets.append(number)
+                continue
+
+            # AWS keeps the leading plus (E.164) on phone numbers
+            self.targets.append("+{}".format(result["full"]))
 
     def send(
         self,
-        body,
-        title="",
-        notify_type=NotifyType.INFO,
-        attach=None,
-        **kwargs,
-    ):
-        """Optionally convert media before validating and sending it."""
-        if not self.enabled or not self.targets:
-            return False
-        if self.transcode == "none" or not attach:
-            return self._send(body, title, notify_type, attach, **kwargs)
-        try:
-            with transcode_attachments(attach, self.transcode) as converted:
-                return self._send(
-                    body, title, notify_type, converted, **kwargs
-                )
-        except (OSError, ValueError) as error:
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        attach: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> bool:
+        """Perform AWS WhatsApp Notification."""
+
+        if not self.targets:
+            # There were no services to notify
             self.logger.warning(
-                "AWS WhatsApp media conversion failed: %s",
-                type(error).__name__,
+                "There were no AWS WhatsApp targets to notify."
             )
             return False
 
-    def _send(
-        self,
-        body,
-        title="",
-        notify_type=NotifyType.INFO,
-        attach=None,
-        **kwargs,
-    ):
-        """Send each recipient separately and preserve partial successes."""
-        if not self.targets or not self.enabled:
-            return False
-        if self.template and kwargs.get("total", 1) > 1:
-            self.logger.warning(
-                "WhatsApp templates require one message piece."
-            )
-            return False
+        # Prepare the messages every target receives
+        messages = []
+        if self.template:
+            #
+            # Send Template
+            #
+            template = {
+                "name": self.template,
+                "language": {"code": self.language},
+            }
 
-        if attach and any(
-            component["type"] == "header"
-            for component in self.template_components
-        ):
-            self.logger.warning(
-                "Use an attachment header or an explicit header, not both."
-            )
-            return False
+            if self.components:
+                # Template parameters are placed in index order
+                values = {"body": body, "type": notify_type.value}
+                template["components"] = [
+                    {
+                        "type": "body",
+                        "parameters": [
+                            (
+                                self.components[key]
+                                if isinstance(self.components[key], dict)
+                                else {
+                                    "type": "text",
+                                    "text": values[self.components[key]],
+                                }
+                            )
+                            for key in sorted(self.components, key=int)
+                        ],
+                    }
+                ]
 
-        attachments = []
+            messages.append({"type": "template", "template": template})
+
+        elif body:
+            #
+            # Send Message
+            #
+            messages.append({"type": "text", "text": {"body": body}})
+
         if attach and self.attachment_support:
             if not self.bucket:
                 self.logger.warning(
-                    "AWS WhatsApp attachments require bucket=."
+                    "AWS WhatsApp attachments require a ?bucket= to be "
+                    "staged in."
                 )
                 return False
 
             for attachment in attach:
+                # Perform some simple error checking
                 if not attachment:
+                    # We could not access the attachment
                     self.logger.warning(
-                        "Could not read AWS WhatsApp attachment."
+                        "Could not access AWS WhatsApp attachment %s.",
+                        attachment.url(privacy=True),
                     )
                     return False
-                kind, limit = MEDIA_TYPES.get(attachment.mimetype, (None, 0))
-                if not kind or not 0 < len(attachment) <= limit:
-                    self.logger.warning(
-                        "Unsupported AWS WhatsApp attachment type or size."
-                    )
+
+                media_id = self._upload(attachment)
+                if not media_id:
+                    # The failure was already logged
                     return False
-                attachments.append((attachment, kind))
-            if self.template and (
-                len(attachments) != 1
-                or attachments[0][1] not in ("image", "video", "document")
-            ):
+
+                # Images, audio and video are sent as such; anything else
+                # is sent as a document (which keeps its file name)
+                kind = attachment.mimetype.split("/")[0]
+                content = {"id": media_id}
+                if kind not in ("image", "audio", "video"):
+                    kind = "document"
+                    content["filename"] = attachment.name or "attachment.dat"
+
+                # Each attachment is sent as its own message
+                messages.append({"type": kind, kind: content})
+
+        # error tracking (used for function return)
+        has_error = False
+
+        for target in self.targets:
+            for no, message in enumerate(messages):
+                # Skip a message this target already accepted so a retry
+                # does not deliver it twice.
+                if self.is_delivered((target, no)):
+                    continue
+
+                # AWS takes the WhatsApp message as base64 encoded JSON
+                content = dumps(
+                    {"messaging_product": "whatsapp", "to": target, **message}
+                )
+                payload = {
+                    "originationPhoneNumberId": self.from_phone_id,
+                    "metaApiVersion": self.meta_api_version,
+                    "message": b64encode(content.encode("utf-8")).decode(),
+                }
+
+                status, _ = self._post("/v1/whatsapp/send", payload, target)
+                if not status:
+                    # Mark our failure
+                    has_error = True
+                    continue
+
+                self.logger.info(
+                    "Sent AWS WhatsApp notification to %s.", target
+                )
+
+                # Delivered; a retry can safely skip this message.
+                self.mark_delivered((target, no))
+
+        return not has_error
+
+    def _upload(self, attachment: AttachBase) -> Optional[str]:
+        """Stage an attachment in S3, have WhatsApp import it, then remove
+        it from S3 again.
+
+        Returns the WhatsApp media ID, or None if the upload failed.
+        """
+
+        # Every upload is given its own name
+        key = f"apprise/{uuid4().hex}"
+
+        if not self._s3(key, attachment):
+            # The failure was already logged
+            return None
+
+        try:
+            # Have WhatsApp import the file we just staged
+            status, response = self._post(
+                "/v1/whatsapp/media",
+                {
+                    "originationPhoneNumberId": self.from_phone_id,
+                    "sourceS3File": {"bucketName": self.bucket, "key": key},
+                },
+                attachment.name,
+            )
+
+            media_id = response.get("mediaId") if status else None
+            if status and not media_id:
                 self.logger.warning(
-                    "A media template requires one image, video or document."
+                    "AWS WhatsApp did not return a media ID for %s.",
+                    attachment.name,
+                )
+
+            return media_id
+
+        finally:
+            # WhatsApp keeps its own copy; remove the one we staged
+            self._s3(key)
+
+    def _s3(self, key: str, attachment: Optional[AttachBase] = None) -> bool:
+        """Upload an attachment to our S3 bucket, or delete the object when
+        no attachment is provided."""
+
+        # Prepare our URL
+        uri = "/{}".format(quote(key))
+        url = f"https://{self.s3_host}{uri}"
+
+        headers = {
+            "User-Agent": self.app_id,
+            # Our file is streamed, so it is not hashed into the signature
+            # (S3 allows this over https)
+            "X-Amz-Content-Sha256": "UNSIGNED-PAYLOAD",
+        }
+
+        handle = None
+        try:
+            if attachment:
+                # Open our attachment
+                handle = attachment.open()
+                headers["Content-Type"] = attachment.mimetype
+
+            # Prepare our AWS Headers
+            headers = self.aws_prepare_request(
+                "PUT" if attachment else "DELETE",
+                self.s3_host,
+                uri,
+                "s3",
+                "UNSIGNED-PAYLOAD",
+                headers,
+            )
+
+            self.logger.debug(
+                "AWS S3 URL: %s (cert_verify=%r)",
+                url,
+                self.verify_certificate,
+            )
+
+            r = (requests.put if attachment else requests.delete)(
+                url,
+                data=handle,
+                headers=headers,
+                verify=self.verify_certificate,
+                timeout=self.request_timeout,
+                allow_redirects=self.redirects,
+            )
+
+            if r.status_code not in (
+                requests.codes.ok,
+                requests.codes.no_content,
+            ):
+                # We had a problem
+                status_str = NotifyAWSWhatsApp.http_response_code_lookup(
+                    r.status_code, AWS_HTTP_ERROR_MAP
+                )
+
+                self.logger.warning(
+                    "Failed to %s AWS S3 object %s: %s%serror=%d.",
+                    "upload" if attachment else "remove",
+                    key,
+                    status_str,
+                    ", " if status_str else "",
+                    r.status_code,
+                )
+
+                self.logger.debug(
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
                 )
                 return False
 
-        if not (body or self.template or attachments):
-            return False
-
-        credentials = {}
-        if self.access_key_id:
-            credentials = {
-                "aws_access_key_id": self.access_key_id,
-                "aws_secret_access_key": self.secret_access_key,
-                "aws_session_token": self.session_token,
-            }
-        try:
-            session = boto3.Session(**credentials)
-            config = Config(
-                connect_timeout=self.socket_connect_timeout,
-                read_timeout=self.socket_read_timeout,
-                # No idempotency token: retrying an ambiguous timeout can
-                # deliver the same notification twice.
-                retries={"total_max_attempts": 1, "mode": "standard"},
-            )
-            client = session.client(
-                "socialmessaging",
-                region_name=self.region_name,
-                verify=self.verify_certificate,
-                config=config,
-            )
-        except (BotoCoreError, ClientError):
-            self.logger.warning("Could not initialize AWS WhatsApp client.")
-            return False
-
-        has_error = False
-        s3 = None
-        try:
-            media = []
-            for index, (attachment, kind) in enumerate(attachments):
-                media_id = self.recall(("media", index), per_message=True)
-                if not media_id:
-                    if s3 is None:
-                        try:
-                            s3 = session.client(
-                                "s3",
-                                region_name=self.region_name,
-                                verify=self.verify_certificate,
-                                config=config,
-                            )
-                        except (BotoCoreError, ClientError):
-                            self.logger.warning(
-                                "Could not initialize S3 client."
-                            )
-                            return False
-                    media_id = self._upload_media(client, s3, attachment)
-                    if not media_id:
-                        return False
-                    self.remember(("media", index), media_id, per_message=True)
-                content = {"id": media_id}
-                if kind == "document":
-                    content["filename"] = attachment.name
-                media.append((kind, content))
-
-            for target in self.targets:
-                if self.is_delivered(target):
-                    continue
-                payload = {
-                    "messaging_product": "whatsapp",
-                    "to": target,
-                    "type": "template" if self.template else "text",
-                }
-                if self.template:
-                    template = {
-                        "name": self.template,
-                        "language": {"code": self.language},
-                    }
-                    if self.template_components:
-                        template["components"] = self._render_components(
-                            self.template_components,
-                            {"$body": body, "$type": notify_type.value},
-                        )
-                    if self.components:
-                        values = {"body": body, "type": notify_type.value}
-                        template.setdefault("components", []).extend(
-                            [
-                                {
-                                    "type": "body",
-                                    "parameters": [
-                                        {
-                                            "type": "text",
-                                            **(
-                                                {"parameter_name": index}
-                                                if isinstance(index, str)
-                                                else {}
-                                            ),
-                                            "text": values[value]
-                                            if mapped
-                                            else value,
-                                        }
-                                        for index, (mapped, value) in sorted(
-                                            self.components.items()
-                                        )
-                                    ],
-                                }
-                            ]
-                        )
-                    payload["template"] = template
-                    if media:
-                        kind, content = media[0]
-                        # Filenames belong to document messages, not headers.
-                        template.setdefault("components", []).append(
-                            {
-                                "type": "header",
-                                "parameters": [
-                                    {
-                                        "type": kind,
-                                        kind: {"id": content["id"]},
-                                    }
-                                ],
-                            }
-                        )
-                else:
-                    payload["text"] = {"body": body}
-                delivered = True
-                body_key = ("body", target)
-                if (self.template or body) and not self.is_delivered(body_key):
-                    if self._send_payload(client, payload):
-                        self.mark_delivered(body_key)
-                    else:
-                        delivered = False
-                if not self.template:
-                    for index, (kind, content) in enumerate(media):
-                        key = ("attachment", target, index)
-                        if self.is_delivered(key, per_message=True):
-                            continue
-                        if self._send_payload(
-                            client,
-                            {
-                                "messaging_product": "whatsapp",
-                                "to": target,
-                                "type": kind,
-                                kind: content,
-                            },
-                        ):
-                            self.mark_delivered(key, per_message=True)
-                        else:
-                            delivered = False
-                if delivered:
-                    self.mark_delivered(target)
-                else:
-                    has_error = True
-        finally:
-            if s3 is not None:
-                s3.close()
-            client.close()
-        return not has_error
-
-    @staticmethod
-    def _validate_components(components, template, mapped_body):
-        """Validate explicit template headers, body parameters and buttons."""
-        if components is None:
-            return []
-        try:
-            if isinstance(components, str):
-                components = loads(components)
-            components = deepcopy(components)
-            serialized = dumps(components, allow_nan=False)
-            if len(serialized.encode("utf-8")) > 65536:
-                raise ValueError("Template components exceed 64 KiB.")
-            if not template or not isinstance(components, list):
-                raise ValueError("Components require a template and a list.")
-            seen = set()
-            for component in components:
-                if not isinstance(component, dict):
-                    raise ValueError("Each component must be an object.")
-                kind = component.get("type")
-                if kind not in ("header", "body", "button"):
-                    raise ValueError("Invalid template component type.")
-                parameters = component.get("parameters")
-                if not isinstance(parameters, list) or not parameters:
-                    raise ValueError("Components require parameters.")
-                key = kind
-                if kind == "button":
-                    index = str(component.get("index", ""))
-                    if not re.fullmatch(r"[0-9]", index):
-                        raise ValueError(
-                            "Button index must be between 0 and 9."
-                        )
-                    component["index"] = index
-                    subtype = component.get("sub_type")
-                    parameter_type = {
-                        "url": "text",
-                        "quick_reply": "payload",
-                        "copy_code": "coupon_code",
-                        "flow": "action",
-                    }.get(subtype)
-                    if not parameter_type or len(parameters) != 1:
-                        raise ValueError(
-                            "Invalid button subtype or parameters."
-                        )
-                    if parameters[0].get("type") != parameter_type:
-                        raise ValueError("Button parameter type mismatch.")
-                    key = (kind, index)
-                if key in seen or (kind == "body" and mapped_body):
-                    raise ValueError("Duplicate template component.")
-                seen.add(key)
-                if kind == "header" and len(parameters) != 1:
-                    raise ValueError(
-                        "A header requires exactly one parameter."
-                    )
-                for parameter in parameters:
-                    if not isinstance(parameter, dict):
-                        raise ValueError("Parameters must be objects.")
-                    ptype = parameter.get("type")
-                    if ptype in ("text", "payload", "coupon_code"):
-                        if (
-                            not isinstance(parameter.get(ptype), str)
-                            or not parameter[ptype]
-                        ):
-                            raise ValueError(
-                                "Text parameters must be nonempty strings."
-                            )
-                        if kind in ("header", "body") and ptype != "text":
-                            raise ValueError("Invalid header parameter type.")
-                    elif ptype == "location" and kind == "header":
-                        location = parameter.get("location", {})
-                        for name, limit in (
-                            ("latitude", 90),
-                            ("longitude", 180),
-                        ):
-                            value = location.get(name)
-                            if (
-                                isinstance(value, bool)
-                                or not math.isfinite(float(value))
-                                or abs(float(value)) > limit
-                            ):
-                                raise ValueError(
-                                    "Invalid location coordinates."
-                                )
-                        if not all(
-                            isinstance(location.get(name), str)
-                            and location[name]
-                            for name in ("name", "address")
-                        ):
-                            raise ValueError(
-                                "Location requires a name and address."
-                            )
-                    elif (
-                        ptype in ("image", "video", "document")
-                        and kind == "header"
-                    ):
-                        media = parameter.get(ptype)
-                        if (
-                            not isinstance(media, dict)
-                            or len(set(media) & {"id", "link"}) != 1
-                        ):
-                            raise ValueError(
-                                "Media requires one ID or HTTPS link."
-                            )
-                        field = "id" if "id" in media else "link"
-                        if (
-                            not isinstance(media[field], str)
-                            or not media[field]
-                        ):
-                            raise ValueError("Invalid header media reference.")
-                        if field == "link" and not media[field].startswith(
-                            "https://"
-                        ):
-                            raise ValueError(
-                                "Header media links require HTTPS."
-                            )
-                    elif ptype == "action" and kind == "button":
-                        if not isinstance(parameter.get("action"), dict):
-                            raise ValueError("Flow action must be an object.")
-                    else:
-                        raise ValueError(
-                            "Unsupported template parameter type."
-                        )
-            return deepcopy(components)
-        except (
-            ValueError,
-            TypeError,
-            AttributeError,
-            RecursionError,
-        ) as error:
-            raise AppriseImproperlyConfigured(
-                "Invalid WhatsApp template components."
-            ) from error
-
-    @staticmethod
-    def _render_components(value, mappings):
-        """Resolve exact dynamic text values without interpreting syntax."""
-        if isinstance(value, str):
-            return (
-                value[1:]
-                if value.startswith("$$")
-                else mappings.get(value, value)
-            )
-        if isinstance(value, list):
-            return [
-                NotifyAWSWhatsApp._render_components(item, mappings)
-                for item in value
-            ]
-        if isinstance(value, dict):
-            return {
-                key: NotifyAWSWhatsApp._render_components(item, mappings)
-                for key, item in value.items()
-            }
-        return value
-
-    def _upload_media(self, client, s3, attachment):
-        """Stage a private S3 object, import it to WhatsApp and remove it."""
-        key = f"{self.prefix}{uuid4().hex}"
-        try:
-            with attachment.open() as stream:
-                s3.upload_fileobj(
-                    stream,
-                    self.bucket,
-                    key,
-                    ExtraArgs={"ContentType": attachment.mimetype},
-                )
-            url = s3.generate_presigned_url(
-                "get_object",
-                Params={"Bucket": self.bucket, "Key": key},
-                ExpiresIn=300,
-            )
-            self.throttle()
-            response = client.post_whatsapp_message_media(
-                originationPhoneNumberId=self.from_phone_id,
-                sourceS3PresignedUrl={
-                    "url": url,
-                    "headers": {"Content-Type": attachment.mimetype},
-                },
-            )
-            media_id = response.get("mediaId")
-            if media_id:
-                return media_id
-            self.logger.warning("AWS WhatsApp returned no media ID.")
-        except (Boto3Error, BotoCoreError, ClientError, OSError):
-            self.logger.warning("AWS WhatsApp media upload failed.")
-        finally:
-            try:
-                s3.delete_object(Bucket=self.bucket, Key=key)
-            except (BotoCoreError, ClientError):
-                self.logger.warning(
-                    "Could not remove temporary AWS WhatsApp S3 object."
-                )
-        return None
-
-    def _send_payload(self, client, payload):
-        """Return whether AWS accepted one text, template or media message."""
-        self.throttle()
-        try:
-            response = client.send_whatsapp_message(
-                originationPhoneNumberId=self.from_phone_id,
-                metaApiVersion=self.meta_api_version,
-                message=dumps(payload, ensure_ascii=False).encode("utf-8"),
-            )
-        except ClientError as error:
+        except requests.RequestException as e:
             self.logger.warning(
-                "AWS WhatsApp request failed: %s.",
-                error.response.get("Error", {}).get("Code", "Unknown"),
+                "A Connection error occurred with AWS S3 object %s.", key
             )
+            self.logger.debug("Socket Exception: %s", str(e))
             return False
-        except BotoCoreError:
-            self.logger.warning("AWS WhatsApp connection failed.")
+
+        except OSError as e:
+            self.logger.warning(
+                "An I/O error occurred while reading %s.", attachment.name
+            )
+            self.logger.debug("I/O Exception: %s", str(e))
             return False
-        if not response.get("messageId"):
-            self.logger.warning("AWS WhatsApp returned no message ID.")
-            return False
-        self.logger.info(
-            "AWS WhatsApp accepted message %s.", response["messageId"]
-        )
+
+        finally:
+            # Close our file handle (if one was opened)
+            if handle:
+                handle.close()
+
         return True
 
-    @property
-    def url_identifier(self):
-        """Identify the AWS account, region and sender."""
-        return (
-            self.secure_protocol,
-            self.region_name,
-            self.from_phone_id,
-            self.access_key_id,
+    def _post(
+        self, uri: str, payload: dict[str, Any], to: str
+    ) -> tuple[bool, dict[str, Any]]:
+        """Wrapper to request.post() to manage it's response better and make
+        the send() function cleaner and easier to maintain.
+
+        This function returns a (status, response) tuple.
+        """
+
+        # Always call throttle before any remote server i/o is made; for AWS
+        # time plays a huge factor in the headers being sent with the payload.
+        # So for AWS requests we must throttle before they're generated and
+        # not directly before the i/o call like other notification services
+        # do.
+        self.throttle()
+
+        # Prepare our payload and URL
+        payload = dumps(payload)
+        url = f"https://{self.notify_host}{uri}"
+
+        # Prepare our AWS Headers based on our payload
+        headers = self.aws_prepare_request(
+            "POST",
+            self.notify_host,
+            uri,
+            "social-messaging",
+            sha256(payload.encode("utf-8")).hexdigest(),
+            {
+                "User-Agent": self.app_id,
+                "Content-Type": "application/json",
+            },
         )
 
-    def url(self, privacy=False, *args, **kwargs):
-        """Serialize settings, optionally masking credentials."""
-        params = self.url_parameters(privacy=privacy, *args, **kwargs)
-        params.update(lang=self.language, version=self.meta_api_version)
-        if self.template:
-            params["template"] = self.template
-        if self.template_components:
-            params["components"] = (
-                "****" if privacy else dumps(self.template_components)
+        self.logger.debug(
+            "AWS WhatsApp POST URL: %s (cert_verify=%r)",
+            url,
+            self.verify_certificate,
+        )
+        self.logger.debug("AWS WhatsApp Payload (%d bytes)", len(payload))
+
+        try:
+            r = requests.post(
+                url,
+                data=payload,
+                headers=headers,
+                verify=self.verify_certificate,
+                timeout=self.request_timeout,
+                allow_redirects=self.redirects,
             )
-        if self.transcode != "none":
-            params["transcode"] = self.transcode
-        if self.bucket:
-            params["bucket"] = self.bucket
-        if self.prefix != "apprise/":
-            params["prefix"] = self.prefix
-        if self.session_token:
-            params["token"] = (
-                self.pprint(
-                    self.session_token,
-                    privacy,
-                    mode=PrivacyMode.Secret,
-                    safe="",
+
+            try:
+                content = loads(r.content)
+
+            except (AttributeError, TypeError, ValueError):
+                # ValueError = r.content is Unparsable
+                # TypeError = r.content is None
+                # AttributeError = r is None
+                content = {}
+
+            if r.status_code != requests.codes.ok:
+                # We had a problem
+                status_str = NotifyAWSWhatsApp.http_response_code_lookup(
+                    r.status_code, AWS_HTTP_ERROR_MAP
                 )
-                if privacy
-                else self.session_token
+
+                self.logger.warning(
+                    "Failed to send AWS WhatsApp notification to %s: "
+                    "%s%serror=%d.",
+                    to,
+                    status_str,
+                    ", " if status_str else "",
+                    r.status_code,
+                )
+
+                self.logger.debug(
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
+                return (False, {})
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                "A Connection error occurred sending AWS WhatsApp "
+                "notification to %s.",
+                to,
             )
+            self.logger.debug("Socket Exception: %s", str(e))
+            return (False, {})
+
+        return (True, content if isinstance(content, dict) else {})
+
+    def aws_prepare_request(
+        self,
+        method: str,
+        host: str,
+        uri: str,
+        service: str,
+        payload_hash: str,
+        headers: dict[str, str],
+    ) -> dict[str, str]:
+        """Takes the headers we intend to send and returns them signed using
+        AWS Signature Version 4.
+
+        The payload_hash is the sha256 hex digest of the payload being sent.
+        """
+
+        # Get a reference time (used for header construction)
+        reference = datetime.now(timezone.utc)
+
+        # Amazon Date Format
+        amzdate = reference.strftime("%Y%m%dT%H%M%SZ")
+        headers["X-Amz-Date"] = amzdate
+
+        # Include our session token for temporary credentials
+        if self.aws_session_token:
+            headers["X-Amz-Security-Token"] = self.aws_session_token
+
+        # Credential Scope
+        scope = "{date}/{region}/{service}/{request}".format(
+            date=reference.strftime("%Y%m%d"),
+            region=self.aws_region_name,
+            service=service,
+            request=self.aws_auth_request,
+        )
+
+        # Similar to headers; but a subset.  keys must be lowercase and
+        # sorted alphabetically
+        signed_headers = dict(
+            sorted(
+                [("host", host)]
+                + [
+                    (k.lower(), v)
+                    for k, v in headers.items()
+                    if k.lower() == "content-type"
+                    or k.lower().startswith("x-amz-")
+                ]
+            )
+        )
+
+        #
+        # Build Canonical Request Object
+        #
+        canonical_request = "\n".join(
+            [
+                # Method
+                method,
+                # URL
+                uri,
+                # Query String (none set)
+                "",
+                # Header Content (must include \n at end!)
+                # All entries except characters in amazon date must be
+                # lowercase
+                "\n".join([f"{k}:{v}" for k, v in signed_headers.items()])
+                + "\n",
+                # Header Entries (in same order identified above)
+                ";".join(signed_headers.keys()),
+                # Payload
+                payload_hash,
+            ]
+        )
+
+        # Prepare Unsigned Signature
+        to_sign = "\n".join(
+            [
+                self.aws_auth_algorithm,
+                amzdate,
+                scope,
+                sha256(canonical_request.encode("utf-8")).hexdigest(),
+            ]
+        )
+
+        # Our Authorization header
+        headers["Authorization"] = ", ".join(
+            [
+                (
+                    f"{self.aws_auth_algorithm} "
+                    f"Credential={self.aws_access_key_id}/{scope}"
+                ),
+                "SignedHeaders={signed_headers}".format(
+                    signed_headers=";".join(signed_headers.keys()),
+                ),
+                "Signature={}".format(
+                    self.aws_auth_signature(to_sign, reference, service)
+                ),
+            ]
+        )
+
+        return headers
+
+    def aws_auth_signature(
+        self, to_sign: str, reference: datetime, service: str
+    ) -> str:
+        """Generates a AWS v4 signature based on provided payload which should
+        be in the form of a string."""
+
+        def _sign(key: bytes, msg: str, to_hex: bool = False) -> Any:
+            """Perform AWS Signing."""
+            if to_hex:
+                return hmac.new(key, msg.encode("utf-8"), sha256).hexdigest()
+            return hmac.new(key, msg.encode("utf-8"), sha256).digest()
+
+        date = _sign(
+            (self.aws_auth_version + self.aws_secret_access_key).encode(
+                "utf-8"
+            ),
+            reference.strftime("%Y%m%d"),
+        )
+
+        region = _sign(date, self.aws_region_name)
+        signed_service = _sign(region, service)
+        signed = _sign(signed_service, self.aws_auth_request)
+        return _sign(signed, to_sign, to_hex=True)
+
+    @property
+    def url_identifier(self) -> tuple[str, ...]:
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
+        """
+        return (
+            self.secure_protocol,
+            self.aws_access_key_id,
+            self.aws_secret_access_key,
+            self.aws_region_name,
+            self.from_phone_id,
+        )
+
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
+        """Returns the URL built dynamically based on specified arguments."""
+
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+
+        if self.template:
+            # Add our template and its language to our URL
+            params["template"] = self.template
+            params["lang"] = self.language
+
+        if self.bucket:
+            # Our attachment staging bucket
+            params["bucket"] = self.bucket
+
+        # Payload body extras prefixed with a ':' sign
+        # Append our payload extras into our parameters
         params.update({f":{k}": v for k, v in self.template_mapping.items()})
-        auth = ""
-        if self.access_key_id:
-            auth = "{}:{}@".format(
-                self.pprint(self.access_key_id, privacy, safe=""),
-                self.pprint(
-                    self.secret_access_key,
+
+        # Prepare session token prefix when using temporary credentials;
+        # + and = are RFC 3986 sub-delimiters safe in the userinfo position
+        # and look nicer unencoded; / must stay encoded (%2F) because an
+        # unencoded slash terminates the URL authority and breaks parsing
+        token_prefix = (
+            "{token}@".format(
+                token=self.pprint(self.aws_session_token, privacy, safe="+="),
+            )
+            if self.aws_session_token
+            else ""
+        )
+
+        return (
+            "{schema}://{token_prefix}{key_id}/{key_secret}/{region}"
+            "/{from_id}/{targets}/?{params}".format(
+                schema=self.secure_protocol,
+                token_prefix=token_prefix,
+                key_id=self.pprint(self.aws_access_key_id, privacy, safe=""),
+                key_secret=self.pprint(
+                    self.aws_secret_access_key,
                     privacy,
                     mode=PrivacyMode.Secret,
                     safe="",
                 ),
+                region=NotifyAWSWhatsApp.quote(self.aws_region_name, safe=""),
+                from_id=NotifyAWSWhatsApp.quote(self.from_phone_id, safe=""),
+                targets="/".join(
+                    [NotifyAWSWhatsApp.quote(x) for x in self.targets]
+                ),
+                params=NotifyAWSWhatsApp.urlencode(params),
             )
-        return "{schema}://{auth}{region}/{sender}/{targets}/?{params}".format(
-            schema=self.secure_protocol,
-            auth=auth,
-            region=self.region_name,
-            sender=self.from_phone_id,
-            targets="/".join(self.quote(x, safe="") for x in self.targets),
-            params=self.urlencode(params),
         )
 
-    def __len__(self):
-        """Return the recipient count."""
-        return len(self.targets) or 1
+    def __len__(self) -> int:
+        """Returns the number of targets associated with this notification."""
+        targets = len(self.targets)
+        return targets if targets > 0 else 1
 
     @staticmethod
-    def parse_url(url):
-        """Parse region, sender, recipients and optional AWS credentials."""
-        results = NotifyBase.parse_url(url)
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
+            # We're done early as we couldn't load the results
             return results
-        parts = NotifyAWSWhatsApp.split_path(results["fullpath"])
-        results["region_name"] = results["host"]
-        results["from_phone_id"] = parts.pop(0) if parts else ""
-        results["targets"] = parts
-        results["access_key_id"] = NotifyAWSWhatsApp.unquote(results["user"])
-        results["secret_access_key"] = NotifyAWSWhatsApp.unquote(
-            results["password"]
-        )
-        for query, name in (
-            ("token", "session_token"),
-            ("template", "template"),
-            ("lang", "language"),
-            ("version", "meta_api_version"),
-            ("bucket", "bucket"),
-            ("prefix", "prefix"),
-            ("components", "template_components"),
-            ("transcode", "transcode"),
-        ):
-            if query in results["qsd"]:
-                results[name] = results["qsd"][query]
-        if results["qsd"].get("to"):
-            results["targets"] += parse_phone_no(results["qsd"]["to"])
-        results["template_mapping"] = results["qsd:"]
-        return results
 
-    @staticmethod
-    def runtime_deps():
-        """Expose the optional SDK packages to the plugin manager."""
-        return ("boto3", "botocore", "s3transfer", "jmespath")
+        # The AWS Access Key ID is stored in the hostname
+        access_key_id = NotifyAWSWhatsApp.unquote(results["host"])
+
+        # Our AWS Access Key Secret contains slashes in it which unfortunately
+        # means it is of variable length after the hostname.  Since we require
+        # that the user provides the region code, we intentionally use this
+        # as our delimiter to detect where our Secret is.
+        secret_access_key = None
+        region_name = None
+
+        # We need to iterate over each entry in the fullpath and find our
+        # region. Once we get there we stop and build our secret from our
+        # accumulated data.
+        secret_access_key_parts = []
+
+        # Start with a list of entries to work with
+        entries = NotifyAWSWhatsApp.split_path(results["fullpath"])
+
+        # Section 1: Get Region and Access Secret
+        index = 0
+        for i, entry in enumerate(entries):
+            # Are we at the region yet?
+            result = IS_REGION.match(entry)
+            if result:
+                # We found our Region; Rebuild our access key secret based on
+                # all entries we found prior to this:
+                secret_access_key = "/".join(secret_access_key_parts)
+
+                # Ensure region is nicely formatted
+                region_name = "{country}-{area}-{no}".format(
+                    country=result.group("country").lower(),
+                    area=result.group("area").lower(),
+                    no=result.group("no"),
+                )
+
+                # Track our index as we'll use this to grab the remaining
+                # content in the next Section
+                index = i + 1
+
+                # We're done with Section 1
+                break
+
+            # Store our secret parts
+            secret_access_key_parts.append(entry)
+
+        # Section 2: Our From Phone ID directly follows our region and our
+        # Recipients are basically all remaining entries
+        results["from_phone_id"] = None
+        results["targets"] = []
+        if index:
+            results["from_phone_id"] = (
+                entries[index] if index < len(entries) else None
+            )
+            results["targets"] = entries[index + 1 :]
+
+        # Support the 'to' variable so that we can support targets this way
+        # too. The 'to' makes it easier to use yaml configuration
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyAWSWhatsApp.parse_phone_no(
+                results["qsd"]["to"]
+            )
+
+        # Handle secret_access_key over-ride
+        if "secret" in results["qsd"] and len(results["qsd"]["secret"]):
+            results["secret_access_key"] = NotifyAWSWhatsApp.unquote(
+                results["qsd"]["secret"]
+            )
+        else:
+            results["secret_access_key"] = secret_access_key
+
+        # Handle access key id override; ?key= is the preferred alias,
+        # ?access= is also supported
+        if "key" in results["qsd"] and len(results["qsd"]["key"]):
+            results["access_key_id"] = NotifyAWSWhatsApp.unquote(
+                results["qsd"]["key"]
+            )
+        elif "access" in results["qsd"] and len(results["qsd"]["access"]):
+            results["access_key_id"] = NotifyAWSWhatsApp.unquote(
+                results["qsd"]["access"]
+            )
+        else:
+            results["access_key_id"] = access_key_id
+
+        # Handle region name id over-ride
+        if "region" in results["qsd"] and len(results["qsd"]["region"]):
+            results["region_name"] = NotifyAWSWhatsApp.unquote(
+                results["qsd"]["region"]
+            )
+        else:
+            results["region_name"] = region_name
+
+        # Session token: userinfo position ({token}@{host}) takes first pass;
+        # ?token= kwarg overrides it when both appear
+        results["session_token"] = None
+        if results.get("user"):
+            results["session_token"] = NotifyAWSWhatsApp.unquote(
+                results["user"]
+            )
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
+            results["session_token"] = NotifyAWSWhatsApp.unquote(
+                results["qsd"]["token"]
+            )
+
+        # Template
+        if "template" in results["qsd"] and len(results["qsd"]["template"]):
+            results["template"] = NotifyAWSWhatsApp.unquote(
+                results["qsd"]["template"]
+            )
+
+        # Template Language
+        if "lang" in results["qsd"] and len(results["qsd"]["lang"]):
+            results["language"] = NotifyAWSWhatsApp.unquote(
+                results["qsd"]["lang"]
+            )
+
+        # Attachment staging bucket
+        if "bucket" in results["qsd"] and len(results["qsd"]["bucket"]):
+            results["bucket"] = NotifyAWSWhatsApp.unquote(
+                results["qsd"]["bucket"]
+            )
+
+        # Store our template mapping
+        results["template_mapping"] = results["qsd:"]
+
+        return results

@@ -2351,6 +2351,6 @@ msgstr "Palayaw sa MUC"
 msgid "SCRAM-PLUS Channel Binding"
 msgstr "Pag-ugnay ng channel na SCRAM-PLUS"
 
-#: apprise/plugins/awswhatsapp.py:149
+#: apprise/plugins/awswhatsapp.py:214
 msgid "S3 Bucket"
 msgstr "Bucket ng S3"

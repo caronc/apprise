@@ -2350,6 +2350,6 @@ msgstr "Apodo de MUC"
 msgid "SCRAM-PLUS Channel Binding"
 msgstr "Vinculación de canal SCRAM-PLUS"
 
-#: apprise/plugins/awswhatsapp.py:149
+#: apprise/plugins/awswhatsapp.py:214
 msgid "S3 Bucket"
 msgstr "Bucket de S3"
