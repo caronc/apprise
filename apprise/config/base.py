@@ -1404,18 +1404,8 @@ class ConfigBase(URLBase):
                 }
                 if placeholders:
                     # Template YAML values, but keep setting names literal.
-                    try:
-                        sibling_tokens = placeholders.encode_obj(
-                            sibling_tokens
-                        )
-                        tokens = placeholders.encode_obj(tokens)
-
-                    except AppriseTemplateError as e:
-                        ConfigBase.logger.error(
-                            "Could not prepare template values for entry"
-                            " #{}. {}".format(no + 1, e)
-                        )
-                        continue
+                    sibling_tokens = placeholders.encode_obj(sibling_tokens)
+                    tokens = placeholders.encode_obj(tokens)
 
                 results_ = plugins.url_to_dict(
                     url_, secure_logging=asset.secure_logging

@@ -26,6 +26,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+from email.utils import getaddresses
+from json import loads
 import logging
 import os
 from unittest import mock
@@ -589,3 +591,50 @@ def test_plugin_postmark_url_parsing(mock_post):
         targets=["other@example.com"],
     )
     assert obj1.url_identifier == obj2.url_identifier
+
+
+@mock.patch("requests.post")
+def test_plugin_postmark_cc_names_with_spaces(mock_post, caplog):
+    """NotifyPostmark() keeps names with spaces and commas through URLs."""
+    logging.disable(logging.NOTSET)
+    caplog.set_level(logging.WARNING, logger="apprise")
+
+    request = mock.Mock()
+    request.status_code = requests.codes.ok
+    request.content = b""
+    mock_post.return_value = request
+
+    obj = Apprise.instantiate(
+        "postmark://abcd:user@example.com/to@example.com"
+        "?cc=Chris%20Smith%20%3Ccc%40example.com%3E,"
+        "%22Smith%2C%20Chris%22%20%3Ccc2%40example.com%3E"
+        "&bcc=Jane%20Roe%20%3Cbcc%40example.com%3E"
+        "&reply=%22Support%2C%20Team%22%20%3Creply%40example.com%3E"
+    )
+    assert isinstance(obj, NotifyPostmark)
+    assert obj.cc == {"cc@example.com", "cc2@example.com"}
+    assert obj.bcc == {"bcc@example.com"}
+    assert obj.names["cc@example.com"] == "Chris Smith"
+    assert obj.names["cc2@example.com"] == "Smith, Chris"
+    assert obj.names["reply@example.com"] == "Support, Team"
+
+    # The CC/reply names and BCC address survive a round trip through url()
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyPostmark)
+    assert obj2.cc == obj.cc
+    assert obj2.bcc == {"bcc@example.com"}
+    assert obj2.names["cc@example.com"] == "Chris Smith"
+    assert obj2.names["cc2@example.com"] == "Smith, Chris"
+    assert obj2.names["reply@example.com"] == "Support, Team"
+
+    assert obj2.notify(body="body", title="title") is True
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args[1]["data"])
+    assert set(getaddresses([payload["Cc"]])) == {
+        ("Chris Smith", "cc@example.com"),
+        ("Smith, Chris", "cc2@example.com"),
+    }
+    assert '"Smith, Chris" <cc2@example.com>' in payload["Cc"]
+    assert payload["Bcc"] == "bcc@example.com"
+    assert payload["ReplyTo"] == '"Support, Team" <reply@example.com>'
+    assert not any("Dropped invalid" in message for message in caplog.messages)

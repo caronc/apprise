@@ -33,10 +33,8 @@ import re
 from string import punctuation
 from typing import Optional
 
-from markdown import Markdown
-
 from ..common import NotifyFormat
-from ..compat.markdown33 import escape_placeholders_as_html
+from ..logger import logger
 from ..url import URLBase
 from .html import HTMLConverter, HTMLMarkdownConverter
 
@@ -75,6 +73,21 @@ def markdown_to_html(
 
     ``extensions`` replaces the default Python-Markdown extensions.
     """
+
+    try:
+        # Python-Markdown is only loaded once Markdown is rendered as HTML.
+        from markdown import Markdown
+
+        from ..compat.markdown33 import escape_placeholders_as_html
+
+    except ImportError:
+        # Only possible when Python-Markdown was removed from the install.
+        # The Markdown is still delivered, shown as plain text.
+        logger.warning(
+            "Markdown was sent as plain text because the Python-Markdown"
+            " package is not installed."
+        )
+        return text_to_html(content)
 
     # Use the notification defaults unless the caller picks its own.
     md = Markdown(
