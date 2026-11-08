@@ -57,7 +57,10 @@
 # The API reference used to build this plugin was documented here:
 #  https://zulipchat.com/api/send-message
 #
+from __future__ import annotations
+
 import re
+from typing import Any
 
 import requests
 
@@ -238,7 +241,13 @@ class NotifyZulip(NotifyBase):
             # No streams identified, use default
             self.targets.append(self.default_notification_stream)
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform Zulip Notification."""
 
         headers = {
@@ -257,7 +266,10 @@ class NotifyZulip(NotifyBase):
 
         # prepare JSON Object
         payload = {
-            "subject": title,
+            # Channel (stream) messages are rejected without a topic, so
+            # fall back to our app description when no title was given.
+            # Direct messages ignore the topic.
+            "topic": title if title else self.app_desc,
             "content": body,
         }
 
