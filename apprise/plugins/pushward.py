@@ -50,7 +50,7 @@ import requests
 from ..common import NotifyImageSize, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import validate_regex
+from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
 
 # Extend HTTP Error Messages
@@ -185,6 +185,51 @@ class NotifyPushWard(NotifyBase):
                 "min": 0.0,
                 "max": 1.0,
             },
+            "ack": {
+                "name": _("Acknowledge"),
+                "type": "bool",
+                "default": False,
+            },
+            # Seconds between repeats; only sent with ack
+            "repeat": {
+                "name": _("Repeat Interval"),
+                "type": "int",
+                "min": 30,
+                "max": 3600,
+                "default": 60,
+            },
+            # Seconds before repeating gives up; only sent with ack
+            "expire": {
+                "name": _("Expire"),
+                "type": "int",
+                "min": 60,
+                "max": 10800,
+                "default": 3600,
+            },
+            "url": {
+                "name": _("URL"),
+                "type": "string",
+                "map_to": "supplemental_url",
+            },
+            "subtitle": {
+                "name": _("Subtitle"),
+                "type": "string",
+            },
+            "thread": {
+                "name": _("Thread ID"),
+                "type": "string",
+                "map_to": "thread_id",
+            },
+            "collapse": {
+                "name": _("Collapse ID"),
+                "type": "string",
+                "map_to": "collapse_id",
+            },
+            # Up to 3 snooze durations, in minutes
+            "snooze": {
+                "name": _("Snooze"),
+                "type": "list:int",
+            },
         },
     )
 
@@ -197,6 +242,14 @@ class NotifyPushWard(NotifyBase):
         warning=None,
         failure=None,
         volume=None,
+        ack=None,
+        repeat=None,
+        expire=None,
+        supplemental_url=None,
+        subtitle=None,
+        thread_id=None,
+        collapse_id=None,
+        snooze=None,
         **kwargs,
     ):
         """Initialize PushWard Object."""
@@ -260,6 +313,103 @@ class NotifyPushWard(NotifyBase):
         else:
             self.volume = None
 
+        # Require the notification to be acknowledged
+        self.ack = (
+            self.template_args["ack"]["default"]
+            if ack is None
+            else parse_bool(ack)
+        )
+
+        # Acquire our repeat interval; int() alone would truncate a float
+        self.repeat = self.template_args["repeat"]["default"]
+        if repeat is not None:
+            try:
+                self.repeat = int(str(repeat))
+
+            except (ValueError, TypeError):
+                msg = f"An invalid PushWard repeat ({repeat}) was specified."
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg) from None
+
+            if self.repeat < 30 or self.repeat > 3600:
+                msg = f"An invalid PushWard repeat ({repeat}) was specified."
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
+        # Acquire our expiry
+        self.expire = self.template_args["expire"]["default"]
+        if expire is not None:
+            try:
+                self.expire = int(str(expire))
+
+            except (ValueError, TypeError):
+                msg = f"An invalid PushWard expire ({expire}) was specified."
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg) from None
+
+            if self.expire < 60 or self.expire > 10800:
+                msg = f"An invalid PushWard expire ({expire}) was specified."
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
+        # The URL opened from the notification
+        self.supplemental_url = (
+            str(supplemental_url) if supplemental_url else None
+        )
+        if self.supplemental_url and len(self.supplemental_url) > 2048:
+            msg = "A PushWard url cannot exceed 2048 characters."
+            self.logger.warning(msg)
+            raise AppriseImproperlyConfigured(msg)
+
+        self.subtitle = str(subtitle) if subtitle else None
+        if self.subtitle and len(self.subtitle) > 256:
+            msg = "A PushWard subtitle cannot exceed 256 characters."
+            self.logger.warning(msg)
+            raise AppriseImproperlyConfigured(msg)
+
+        self.thread_id = str(thread_id) if thread_id else None
+        if self.thread_id and len(self.thread_id) > 128:
+            msg = "A PushWard thread cannot exceed 128 characters."
+            self.logger.warning(msg)
+            raise AppriseImproperlyConfigured(msg)
+
+        self.collapse_id = str(collapse_id) if collapse_id else None
+        if self.collapse_id and len(self.collapse_id) > 64:
+            msg = "A PushWard collapse cannot exceed 64 characters."
+            self.logger.warning(msg)
+            raise AppriseImproperlyConfigured(msg)
+
+        # Acquire our snooze durations; order is kept and duplicates refused
+        self.snooze = None
+        if snooze is not None:
+            values = (
+                snooze
+                if isinstance(snooze, (list, tuple))
+                else parse_list(str(snooze), sort=False)
+            )
+            try:
+                self.snooze = [int(str(value)) for value in values]
+
+            except (ValueError, TypeError):
+                msg = f"An invalid PushWard snooze ({snooze}) was specified."
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg) from None
+
+            if (
+                not 1 <= len(self.snooze) <= 3
+                or len(set(self.snooze)) != len(self.snooze)
+                or not all(1 <= value <= 1440 for value in self.snooze)
+            ):
+                msg = f"An invalid PushWard snooze ({snooze}) was specified."
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
+        # The server refuses snooze together with acknowledge
+        if self.ack and self.snooze:
+            msg = "A PushWard notification cannot combine ack with snooze."
+            self.logger.warning(msg)
+            raise AppriseImproperlyConfigured(msg)
+
         return
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
@@ -288,6 +438,8 @@ class NotifyPushWard(NotifyBase):
             "title": title,
             "body": body,
             "level": level,
+            "source": "apprise",
+            "source_display_name": self.app_id,
         }
 
         # Reference an icon if one is available
@@ -298,6 +450,28 @@ class NotifyPushWard(NotifyBase):
         # Volume is only applied to critical notifications
         if level == "critical" and self.volume is not None:
             payload["volume"] = self.volume
+
+        # The server refuses acknowledge at the passive level
+        if self.ack and level != "passive":
+            payload["acknowledge"] = {
+                "repeat_seconds": self.repeat,
+                "expire_seconds": self.expire,
+            }
+
+        if self.supplemental_url:
+            payload["url"] = self.supplemental_url
+
+        if self.subtitle:
+            payload["subtitle"] = self.subtitle
+
+        if self.thread_id:
+            payload["thread_id"] = self.thread_id
+
+        if self.collapse_id:
+            payload["collapse_id"] = self.collapse_id
+
+        if self.snooze:
+            payload["snooze"] = self.snooze
 
         self.logger.debug(
             "PushWard POST URL: %s (cert_verify=%s)",
@@ -389,6 +563,30 @@ class NotifyPushWard(NotifyBase):
         if self.volume is not None:
             params["volume"] = str(self.volume)
 
+        if self.ack:
+            params["ack"] = "yes"
+
+        if self.repeat != self.template_args["repeat"]["default"]:
+            params["repeat"] = str(self.repeat)
+
+        if self.expire != self.template_args["expire"]["default"]:
+            params["expire"] = str(self.expire)
+
+        if self.supplemental_url:
+            params["url"] = self.supplemental_url
+
+        if self.subtitle:
+            params["subtitle"] = self.subtitle
+
+        if self.thread_id:
+            params["thread"] = self.thread_id
+
+        if self.collapse_id:
+            params["collapse"] = self.collapse_id
+
+        if self.snooze:
+            params["snooze"] = ",".join(str(value) for value in self.snooze)
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -430,6 +628,45 @@ class NotifyPushWard(NotifyBase):
         if "volume" in results["qsd"] and results["qsd"]["volume"]:
             results["volume"] = NotifyPushWard.unquote(
                 results["qsd"]["volume"]
+            )
+
+        # Allow an acknowledgement to be required
+        if "ack" in results["qsd"] and results["qsd"]["ack"]:
+            results["ack"] = parse_bool(results["qsd"]["ack"])
+
+        if "repeat" in results["qsd"] and results["qsd"]["repeat"]:
+            results["repeat"] = NotifyPushWard.unquote(
+                results["qsd"]["repeat"]
+            )
+
+        if "expire" in results["qsd"] and results["qsd"]["expire"]:
+            results["expire"] = NotifyPushWard.unquote(
+                results["qsd"]["expire"]
+            )
+
+        # Named apart as results["url"] is the Apprise URL.  It is already
+        # decoded, and decoding again would corrupt the link's own escapes
+        if "url" in results["qsd"] and results["qsd"]["url"]:
+            results["supplemental_url"] = results["qsd"]["url"]
+
+        if "subtitle" in results["qsd"] and results["qsd"]["subtitle"]:
+            results["subtitle"] = NotifyPushWard.unquote(
+                results["qsd"]["subtitle"]
+            )
+
+        if "thread" in results["qsd"] and results["qsd"]["thread"]:
+            results["thread_id"] = NotifyPushWard.unquote(
+                results["qsd"]["thread"]
+            )
+
+        if "collapse" in results["qsd"] and results["qsd"]["collapse"]:
+            results["collapse_id"] = NotifyPushWard.unquote(
+                results["qsd"]["collapse"]
+            )
+
+        if "snooze" in results["qsd"] and results["qsd"]["snooze"]:
+            results["snooze"] = NotifyPushWard.unquote(
+                results["qsd"]["snooze"]
             )
 
         return results

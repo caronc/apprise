@@ -119,6 +119,120 @@ apprise_url_tests = (
         },
     ),
     (
+        "pushward://hlk_abc123?ack=yes",
+        {
+            # Acknowledgement with the default repeat and expire
+            "instance": NotifyPushWard,
+            "privacy_url": "pushward://h...3/",
+            "url_matches": r"ack=yes",
+        },
+    ),
+    (
+        "pushward://hlk_abc123?ack=yes&repeat=120&expire=7200",
+        {
+            # Acknowledgement with a custom repeat and expire
+            "instance": NotifyPushWard,
+            "privacy_url": "pushward://h...3/",
+            "url_matches": r"repeat=120.*expire=7200",
+        },
+    ),
+    (
+        "pushward://hlk_abc123?repeat=30&expire=10800",
+        {
+            # repeat and expire are accepted without ack
+            "instance": NotifyPushWard,
+            "privacy_url": "pushward://h...3/",
+        },
+    ),
+    (
+        "pushward://hlk_abc123?ack=no&snooze=15,60",
+        {
+            # snooze only conflicts with an enabled ack
+            "instance": NotifyPushWard,
+            "privacy_url": "pushward://h...3/",
+            "url_matches": r"snooze=15%2C60",
+        },
+    ),
+    (
+        "pushward://hlk_abc123?url=https%3A%2F%2Fexample.com%2Fa&subtitle=Sub"
+        "&thread=t1&collapse=c1",
+        {
+            # All of the optional strings
+            "instance": NotifyPushWard,
+            "privacy_url": "pushward://h...3/",
+            "url_matches": r"url=https.*subtitle=Sub.*thread=t1.*collapse=c1",
+        },
+    ),
+    # repeat must be an integer from 30 to 3600
+    (
+        "pushward://hlk_abc123?repeat=29",
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    (
+        "pushward://hlk_abc123?repeat=3601",
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    (
+        "pushward://hlk_abc123?repeat=abc",
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    # expire must be an integer from 60 to 10800
+    (
+        "pushward://hlk_abc123?expire=59",
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    (
+        "pushward://hlk_abc123?expire=10801",
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    (
+        "pushward://hlk_abc123?expire=abc",
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    # snooze takes 1 to 3 different integers from 1 to 1440
+    (
+        "pushward://hlk_abc123?snooze=0",
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    (
+        "pushward://hlk_abc123?snooze=1441",
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    (
+        "pushward://hlk_abc123?snooze=abc",
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    (
+        "pushward://hlk_abc123?snooze=1,2,3,4",
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    (
+        "pushward://hlk_abc123?snooze=15,15",
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    # The optional strings are limited in length
+    (
+        "pushward://hlk_abc123?subtitle=" + "a" * 257,
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    (
+        "pushward://hlk_abc123?thread=" + "a" * 129,
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    (
+        "pushward://hlk_abc123?collapse=" + "a" * 65,
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    (
+        "pushward://hlk_abc123?url=" + "a" * 2049,
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    # The server refuses snooze together with acknowledge
+    (
+        "pushward://hlk_abc123?ack=yes&snooze=15",
+        {"instance": AppriseImproperlyConfigured},
+    ),
+    (
         "pushward://hlk_abc123",
         {
             "instance": NotifyPushWard,
@@ -212,6 +326,8 @@ def test_plugin_pushward_send(mock_post):
     assert payload["body"] == "body"
     # NotifyType.INFO maps to the "active" level
     assert payload["level"] == "active"
+    assert payload["source"] == "apprise"
+    assert payload["source_display_name"] == "Apprise"
     # An icon is attached (the default asset provides an image mask)
     assert "icon_url" in payload
     # No volume is sent for a non-critical notification
@@ -447,3 +563,287 @@ def test_plugin_pushward_per_type_levels(mock_post):
         is True
     )
     assert loads(mock_post.call_args[1]["data"])["level"] == "passive"
+
+
+@mock.patch("requests.post")
+def test_plugin_pushward_default_payload(mock_post):
+    """NotifyPushWard() sends only its base keys by default."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate("pushward://hlk_abc123")
+    assert bool(obj.notify(title="t", body="b")) is True
+    assert loads(mock_post.call_args[1]["data"]) == {
+        "title": "t",
+        "body": "b",
+        "level": "active",
+        "source": "apprise",
+        "source_display_name": "Apprise",
+        "icon_url": obj.image_url(NotifyType.INFO),
+    }
+
+    # None of the new options are emitted unless they were set
+    for key in (
+        "ack",
+        "repeat",
+        "expire",
+        "url",
+        "subtitle",
+        "thread",
+        "collapse",
+        "snooze",
+    ):
+        assert f"{key}=" not in obj.url()
+
+    obj = Apprise.instantiate(
+        "pushward://hlk_abc123?level=critical&volume=0.8"
+    )
+    assert bool(obj.notify(title="t", body="b")) is True
+    assert loads(mock_post.call_args[1]["data"]) == {
+        "title": "t",
+        "body": "b",
+        "level": "critical",
+        "source": "apprise",
+        "source_display_name": "Apprise",
+        "volume": 0.8,
+        "icon_url": obj.image_url(NotifyType.INFO),
+    }
+
+
+@mock.patch("requests.post")
+def test_plugin_pushward_options(mock_post):
+    """NotifyPushWard() sends each option under its JSON key."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_post.return_value = response
+
+    keys = {"url", "subtitle", "thread_id", "collapse_id", "snooze"}
+    for query, key, expected in (
+        ("url=https%3A%2F%2Fexample.com%2Fa", "url", "https://example.com/a"),
+        ("subtitle=Sub", "subtitle", "Sub"),
+        ("thread=t1", "thread_id", "t1"),
+        ("collapse=c1", "collapse_id", "c1"),
+        ("snooze=15,60", "snooze", [15, 60]),
+        # The order given is kept
+        ("snooze=60,15", "snooze", [60, 15]),
+    ):
+        obj = Apprise.instantiate(f"pushward://hlk_abc123?{query}")
+        assert isinstance(obj, NotifyPushWard)
+        assert bool(obj.notify(title="t", body="b")) is True
+
+        payload = loads(mock_post.call_args[1]["data"])
+        assert payload[key] == expected
+        assert not keys.difference({key}).intersection(payload)
+        assert "acknowledge" not in payload
+
+
+@mock.patch("requests.post")
+def test_plugin_pushward_acknowledge(mock_post):
+    """NotifyPushWard() sends repeat and expire only with ack."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_post.return_value = response
+
+    # Both keys are always sent, with their defaults
+    obj = Apprise.instantiate("pushward://hlk_abc123?ack=yes")
+    assert isinstance(obj, NotifyPushWard)
+    assert bool(obj.notify(title="t", body="b")) is True
+    payload = loads(mock_post.call_args[1]["data"])
+    assert payload["acknowledge"] == {
+        "repeat_seconds": 60,
+        "expire_seconds": 3600,
+    }
+    assert "repeat=" not in obj.url()
+    assert "expire=" not in obj.url()
+
+    # An explicit default is not emitted either
+    obj = Apprise.instantiate(
+        "pushward://hlk_abc123?ack=yes&repeat=60&expire=3600"
+    )
+    assert "repeat=" not in obj.url()
+    assert "expire=" not in obj.url()
+
+    # Custom values
+    obj = Apprise.instantiate(
+        "pushward://hlk_abc123?ack=yes&repeat=120&expire=7200"
+    )
+    assert bool(obj.notify(title="t", body="b")) is True
+    payload = loads(mock_post.call_args[1]["data"])
+    assert payload["acknowledge"] == {
+        "repeat_seconds": 120,
+        "expire_seconds": 7200,
+    }
+
+    # repeat and expire on their own send nothing, but are kept in the URL
+    obj = Apprise.instantiate("pushward://hlk_abc123?repeat=120&expire=7200")
+    assert bool(obj.notify(title="t", body="b")) is True
+    assert "acknowledge" not in loads(mock_post.call_args[1]["data"])
+    assert "repeat=120" in obj.url()
+    assert "expire=7200" in obj.url()
+    assert "ack=" not in obj.url()
+
+    # ack=no is the same as leaving it out
+    obj = Apprise.instantiate("pushward://hlk_abc123?ack=no")
+    assert bool(obj.notify(title="t", body="b")) is True
+    assert "acknowledge" not in loads(mock_post.call_args[1]["data"])
+    assert "ack=" not in obj.url()
+
+
+@mock.patch("requests.post")
+def test_plugin_pushward_acknowledge_passive(mock_post):
+    """NotifyPushWard() drops acknowledge when the level is passive."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_post.return_value = response
+
+    # A forced level applies to every notification type
+    obj = Apprise.instantiate("pushward://hlk_abc123?ack=yes&level=passive")
+    assert bool(obj.notify(title="t", body="b")) is True
+    payload = loads(mock_post.call_args[1]["data"])
+    assert payload["level"] == "passive"
+    assert "acknowledge" not in payload
+
+    # A per-type level only applies to that notification type
+    obj = Apprise.instantiate("pushward://hlk_abc123?ack=yes&info=passive")
+    assert (
+        bool(obj.notify(title="t", body="b", notify_type=NotifyType.INFO))
+        is True
+    )
+    payload = loads(mock_post.call_args[1]["data"])
+    assert payload["level"] == "passive"
+    assert "acknowledge" not in payload
+
+    assert (
+        bool(obj.notify(title="t", body="b", notify_type=NotifyType.WARNING))
+        is True
+    )
+    payload = loads(mock_post.call_args[1]["data"])
+    assert payload["level"] == "time-sensitive"
+    assert payload["acknowledge"] == {
+        "repeat_seconds": 60,
+        "expire_seconds": 3600,
+    }
+
+
+def test_plugin_pushward_option_limits():
+    """NotifyPushWard() accepts the limits of each option."""
+
+    for repeat in (30, 3600):
+        assert NotifyPushWard("hlk_abc123", repeat=repeat).repeat == repeat
+
+    for expire in (60, 10800):
+        assert NotifyPushWard("hlk_abc123", expire=expire).expire == expire
+
+    obj = NotifyPushWard(
+        "hlk_abc123",
+        supplemental_url="a" * 2048,
+        subtitle="a" * 256,
+        thread_id="a" * 128,
+        collapse_id="a" * 64,
+        snooze="1,720,1440",
+    )
+    assert len(obj.supplemental_url) == 2048
+    assert len(obj.subtitle) == 256
+    assert len(obj.thread_id) == 128
+    assert len(obj.collapse_id) == 64
+    assert obj.snooze == [1, 720, 1440]
+
+    # YAML configuration can hand over values that are not strings
+    assert NotifyPushWard("hlk_abc123", snooze=[15, 60]).snooze == [15, 60]
+    assert NotifyPushWard("hlk_abc123", snooze=15).snooze == [15]
+    assert NotifyPushWard("hlk_abc123", subtitle=42).subtitle == "42"
+
+    for snooze in (
+        [],
+        0,
+        "",
+        [None],
+        ["abc"],
+        [15.5],
+        [True, 2],
+        [float("inf")],
+    ):
+        with pytest.raises(AppriseImproperlyConfigured):
+            NotifyPushWard("hlk_abc123", snooze=snooze)
+
+    # Anything but an integer is refused, in range or not
+    for value in (object(), 90.5, float("inf")):
+        for key in ("repeat", "expire"):
+            with pytest.raises(AppriseImproperlyConfigured):
+                NotifyPushWard("hlk_abc123", **{key: value})
+
+
+@mock.patch("requests.post")
+def test_plugin_pushward_options_roundtrip(mock_post):
+    """NotifyPushWard() url() reproduces the payload of each option."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_post.return_value = response
+
+    strings = (
+        "&url=https%3A%2F%2Fexample.com%2Fa%3Fb%3D1%26c%3D2"
+        "&subtitle=Sub%20title&thread=t%2F1&collapse=c%201"
+    )
+    expected = {
+        "url": "https://example.com/a?b=1&c=2",
+        "subtitle": "Sub title",
+        "thread_id": "t/1",
+        "collapse_id": "c 1",
+    }
+
+    for url, extra in (
+        # ack and snooze cannot be combined, so each has its own URL
+        (
+            "pushward://hlk_abc123?ack=yes&repeat=120&expire=7200" + strings,
+            {
+                **expected,
+                "acknowledge": {
+                    "repeat_seconds": 120,
+                    "expire_seconds": 7200,
+                },
+            },
+        ),
+        (
+            "pushward://hlk_abc123?snooze=60,15" + strings,
+            {**expected, "snooze": [60, 15]},
+        ),
+        (
+            "pushward://hlk_abc123?ack=yes&repeat=45&expire=90",
+            {"acknowledge": {"repeat_seconds": 45, "expire_seconds": 90}},
+        ),
+        # An escape inside the link itself survives
+        (
+            "pushward://hlk_abc123?url=https%3A%2F%2Fx.test%2F%3Fq%3Da%2526b",
+            {"url": "https://x.test/?q=a%26b"},
+        ),
+    ):
+        obj = Apprise.instantiate(url)
+        assert isinstance(obj, NotifyPushWard)
+        assert bool(obj.notify(title="t", body="b")) is True
+        payload = loads(mock_post.call_args[1]["data"])
+        assert payload == {
+            "title": "t",
+            "body": "b",
+            "level": "active",
+            "source": "apprise",
+            "source_display_name": "Apprise",
+            "icon_url": obj.image_url(NotifyType.INFO),
+            **extra,
+        }
+
+        obj2 = Apprise.instantiate(obj.url())
+        assert isinstance(obj2, NotifyPushWard)
+        assert obj.url_identifier == obj2.url_identifier
+        assert bool(obj2.notify(title="t", body="b")) is True
+        assert loads(mock_post.call_args[1]["data"]) == payload

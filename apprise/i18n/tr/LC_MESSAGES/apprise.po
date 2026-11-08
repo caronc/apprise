@@ -1680,6 +1680,22 @@ msgstr "Uyarı düzeyi"
 msgid "Failure Level"
 msgstr "Hata düzeyi"
 
+#: apprise/plugins/pushward.py:189
+msgid "Acknowledge"
+msgstr "Onay"
+
+#: apprise/plugins/pushward.py:195
+msgid "Repeat Interval"
+msgstr "Tekrar Aralığı"
+
+#: apprise/plugins/pushward.py:224
+msgid "Collapse ID"
+msgstr "Daraltma kimliği"
+
+#: apprise/plugins/pushward.py:230
+msgid "Snooze"
+msgstr "Ertele"
+
 #: apprise/plugins/pushy.py:80
 msgid "Secret API Key"
 msgstr "Gizli API anahtarı"

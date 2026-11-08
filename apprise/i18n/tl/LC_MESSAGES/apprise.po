@@ -1680,6 +1680,22 @@ msgstr "Antas ng babala"
 msgid "Failure Level"
 msgstr "Antas ng pagpalya"
 
+#: apprise/plugins/pushward.py:189
+msgid "Acknowledge"
+msgstr "Pagkilala"
+
+#: apprise/plugins/pushward.py:195
+msgid "Repeat Interval"
+msgstr "Pagitan ng Pag-uulit"
+
+#: apprise/plugins/pushward.py:224
+msgid "Collapse ID"
+msgstr "ID ng pagsasama"
+
+#: apprise/plugins/pushward.py:230
+msgid "Snooze"
+msgstr "I-snooze"
+
 #: apprise/plugins/pushy.py:80
 msgid "Secret API Key"
 msgstr "Sekretong susi ng API"

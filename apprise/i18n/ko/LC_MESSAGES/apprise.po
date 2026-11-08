@@ -1680,6 +1680,22 @@ msgstr "경고 수준"
 msgid "Failure Level"
 msgstr "실패 수준"
 
+#: apprise/plugins/pushward.py:189
+msgid "Acknowledge"
+msgstr "수신 확인"
+
+#: apprise/plugins/pushward.py:195
+msgid "Repeat Interval"
+msgstr "반복 간격"
+
+#: apprise/plugins/pushward.py:224
+msgid "Collapse ID"
+msgstr "축소 ID"
+
+#: apprise/plugins/pushward.py:230
+msgid "Snooze"
+msgstr "다시 알림"
+
 #: apprise/plugins/pushy.py:80
 msgid "Secret API Key"
 msgstr "비밀 API 키"

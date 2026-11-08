@@ -1680,6 +1680,22 @@ msgstr "चेतावनी स्तर"
 msgid "Failure Level"
 msgstr "विफलता स्तर"
 
+#: apprise/plugins/pushward.py:189
+msgid "Acknowledge"
+msgstr "पावती"
+
+#: apprise/plugins/pushward.py:195
+msgid "Repeat Interval"
+msgstr "दोहराव अंतराल"
+
+#: apprise/plugins/pushward.py:224
+msgid "Collapse ID"
+msgstr "समेटने की आईडी"
+
+#: apprise/plugins/pushward.py:230
+msgid "Snooze"
+msgstr "स्नूज़"
+
 #: apprise/plugins/pushy.py:80
 msgid "Secret API Key"
 msgstr "गुप्त API कुंजी"

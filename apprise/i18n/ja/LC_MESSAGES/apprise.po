@@ -1681,6 +1681,22 @@ msgstr "警告レベル"
 msgid "Failure Level"
 msgstr "失敗レベル"
 
+#: apprise/plugins/pushward.py:189
+msgid "Acknowledge"
+msgstr "確認応答"
+
+#: apprise/plugins/pushward.py:195
+msgid "Repeat Interval"
+msgstr "繰り返し間隔"
+
+#: apprise/plugins/pushward.py:224
+msgid "Collapse ID"
+msgstr "折りたたみの ID"
+
+#: apprise/plugins/pushward.py:230
+msgid "Snooze"
+msgstr "スヌーズ"
+
 #: apprise/plugins/pushy.py:80
 msgid "Secret API Key"
 msgstr "シークレット API キー"

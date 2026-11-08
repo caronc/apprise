@@ -1680,6 +1680,22 @@ msgstr "ระดับคำเตือน"
 msgid "Failure Level"
 msgstr "ระดับความล้มเหลว"
 
+#: apprise/plugins/pushward.py:189
+msgid "Acknowledge"
+msgstr "การตอบรับ"
+
+#: apprise/plugins/pushward.py:195
+msgid "Repeat Interval"
+msgstr "ช่วงเวลาทำซ้ำ"
+
+#: apprise/plugins/pushward.py:224
+msgid "Collapse ID"
+msgstr "รหัสการยุบรวม"
+
+#: apprise/plugins/pushward.py:230
+msgid "Snooze"
+msgstr "เลื่อนเตือน"
+
 #: apprise/plugins/pushy.py:80
 msgid "Secret API Key"
 msgstr "คีย์ API ลับ"
