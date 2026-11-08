@@ -29,6 +29,7 @@ from inspect import cleandoc
 
 # Disable logging for a cleaner testing output
 import logging
+import sys
 from time import process_time
 from timeit import default_timer
 from unittest import mock
@@ -2975,6 +2976,35 @@ def test_conversion_markdown_to_html():
     assert "<td>Content Cell2</td>" in response
     assert "<td>Content Cell3</td>" in response
     assert "<td>Content Cell4</td>" in response
+
+
+def test_conversion_markdown_missing(monkeypatch):
+    """Markdown is sent as escaped text when Python-Markdown is missing."""
+
+    # A None entry in sys.modules makes import markdown raise ImportError.
+    monkeypatch.setitem(sys.modules, "markdown", None)
+
+    with mock.patch("apprise.conversion.format.logger") as mock_logger:
+        response = convert_between(
+            NotifyFormat.MARKDOWN,
+            NotifyFormat.HTML,
+            "# Hi *there* <b>x</b> & y\nline2",
+        )
+
+    # The Markdown is kept as typed, made safe to place inside HTML.
+    assert response == (
+        "#&nbsp;Hi&nbsp;*there*&nbsp;&lt;b&gt;x&lt;/b&gt;"
+        "&nbsp;&amp;&nbsp;y<br/>line2"
+    )
+
+    # The user is told why the Markdown was not rendered.
+    assert mock_logger.warning.call_count == 1
+
+    # Conversions that never needed Python-Markdown still work.
+    assert (
+        convert_between(NotifyFormat.HTML, NotifyFormat.MARKDOWN, "<b>x</b>")
+        == "**x**"
+    )
 
 
 def test_conversion_commonmark_repair_chunk():
