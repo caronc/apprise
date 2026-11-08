@@ -27,6 +27,7 @@
 
 # Disable logging for a cleaner testing output
 import logging
+from unittest import mock
 
 from helpers import AppriseURLTester
 import pytest
@@ -187,3 +188,55 @@ def test_plugin_zulip_edge_cases():
     # Invalid organization
     with pytest.raises(AppriseImproperlyConfigured):
         NotifyZulip(botname="test", organization="#", token=token)
+
+
+@mock.patch("requests.post")
+def test_plugin_zulip_topic(mock_post):
+    """The title is sent as the topic, with a fallback when it is empty."""
+
+    # Prepare a good response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_post.return_value = response
+
+    # A channel (stream) target
+    obj = NotifyZulip(
+        botname="apprise",
+        organization="apprise",
+        token="a" * 32,
+        targets="alerts",
+    )
+
+    # The title becomes the topic
+    assert obj.notify(body="body", title="Backups") is True
+    assert mock_post.call_count == 1
+    payload = mock_post.call_args[1]["data"]
+    assert payload["type"] == "stream"
+    assert payload["to"] == "alerts"
+    assert payload["topic"] == "Backups"
+    assert payload["content"] == "body"
+    assert "subject" not in payload
+
+    # No title falls back to a topic Zulip will accept
+    mock_post.reset_mock()
+    assert obj.notify(body="body") is True
+    assert mock_post.call_count == 1
+    payload = mock_post.call_args[1]["data"]
+    assert payload["topic"] == obj.app_desc
+    assert payload["topic"]
+
+    # Direct messages keep the "private" type so older servers that
+    # predate "direct" still accept them
+    obj = NotifyZulip(
+        botname="apprise",
+        organization="apprise",
+        token="a" * 32,
+        targets="user@example.com",
+    )
+    mock_post.reset_mock()
+    assert obj.notify(body="body") is True
+    assert mock_post.call_count == 1
+    payload = mock_post.call_args[1]["data"]
+    assert payload["type"] == "private"
+    assert payload["to"] == "user@example.com"
