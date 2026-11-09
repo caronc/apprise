@@ -2978,6 +2978,48 @@ def test_conversion_markdown_to_html():
     assert "<td>Content Cell4</td>" in response
 
 
+def test_conversion_markdown_to_html_fenced_code():
+    """conversion: fenced code blocks become preformatted code"""
+
+    response = convert_between(
+        NotifyFormat.MARKDOWN,
+        NotifyFormat.HTML,
+        cleandoc("""
+        Output:
+        ```python
+        if a < b:
+            print("a & b")
+        ```
+        Done
+        """),
+    )
+
+    # The block keeps its line breaks and indentation, the info string
+    # names the language instead of leaking into the code, and the
+    # content is escaped without any <br /> added inside of it
+    assert response == (
+        "<p>Output:</p>\n"
+        '<pre><code class="language-python">if a &lt; b:\n'
+        "    print(&quot;a &amp; b&quot;)\n"
+        "</code></pre>\n"
+        "<p>Done</p>"
+    )
+
+    # Tilde fences are supported too
+    response = convert_between(
+        NotifyFormat.MARKDOWN, NotifyFormat.HTML, "~~~\nline 1\nline 2\n~~~"
+    )
+    assert response == "<pre><code>line 1\nline 2\n</code></pre>"
+
+    # Inline code is left alone
+    assert (
+        convert_between(
+            NotifyFormat.MARKDOWN, NotifyFormat.HTML, "run `ls -l` now"
+        )
+        == "<p>run <code>ls -l</code> now</p>"
+    )
+
+
 def test_conversion_markdown_missing(monkeypatch):
     """Markdown is sent as escaped text when Python-Markdown is missing."""
 
