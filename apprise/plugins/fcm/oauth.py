@@ -321,9 +321,7 @@ class GoogleOAuth:
             # Allow some grace before we expire
             self.__access_token_expiry = expiry - self.clock_skew
 
-        logger.debug(
-            "Access Token successfully acquired: %s", self.__access_token
-        )
+        logger.debug("Access Token successfully acquired")
 
         # Return our token
         return self.__access_token
