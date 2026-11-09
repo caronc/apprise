@@ -135,6 +135,7 @@ The table below identifies the services this tool supports and some example serv
 | [OneBot (QQ)](https://appriseit.com/services/onebot/) | onebot:// or onebots:// | (TCP) 80 or 443 | onebot://hostname:port/UserID<br/>onebot://token@hostname:port/@UserID/#GroupID<br/>onebots://token@hostname:port/@UserID1/@UserID2/#GroupID1/#GroupIDN
 | [OneSignal](https://appriseit.com/services/onesignal/) | onesignal:// | (TCP) 443 | onesignal://AppID@APIKey/PlayerID<br/>onesignal://TemplateID:AppID@APIKey/UserID<br/>onesignal://AppID@APIKey/#IncludeSegment<br/>onesignal://AppID@APIKey/Email
 | [Opsgenie](https://appriseit.com/services/opsgenie/) | opsgenie:// | (TCP) 443 | opsgenie://APIKey<br/>opsgenie://APIKey/UserID<br/>opsgenie://APIKey/#Team<br/>opsgenie://APIKey/\*Schedule<br/>opsgenie://APIKey/^Escalation
+| [OpsiMate](https://appriseit.com/services/opsimate/) | opsimate:// or opsimates:// | (TCP) 80 or 443 | opsimate://ApiToken@hostname<br/>opsimate://ApiToken@hostname:port<br/>opsimates://ApiToken@hostname:port?team=platform<br/>opsimates://ApiToken@hostname:port?resolve=yes
 | [PagerDuty](https://appriseit.com/services/pagerduty/) | pagerduty:// | (TCP) 443 | pagerduty://IntegrationKey@ApiKey<br/>pagerduty://IntegrationKey@ApiKey/Source/Component
 | [PagerTree](https://appriseit.com/services/pagertree/) | pagertree:// | (TCP) 443 | pagertree://integration_id
 | [ParsePlatform](https://appriseit.com/services/parseplatform/) | parsep:// or parseps:// | (TCP) 80 or 443 | parsep://AppID:MasterKey@Hostname<br/>parseps://AppID:MasterKey@Hostname
