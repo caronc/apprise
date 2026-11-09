@@ -178,14 +178,14 @@ apprise_url_tests = (
         },
     ),
     (
-        f"{BASE}/15551234567?template=alerts&:invalid=1",
+        f"{BASE}/15551234567?template=alerts&:invalid-name=1",
         {
             # Invalid template component id
             "instance": AppriseImproperlyConfigured,
         },
     ),
     (
-        f"{BASE}/15551234567?template=alerts&:body=invalid",
+        f"{BASE}/15551234567?template=alerts&:body=invalid-name",
         {
             # Invalid template component mapping
             "instance": AppriseImproperlyConfigured,
@@ -585,3 +585,55 @@ def test_plugin_awswhatsapp_retry_skips_delivered():
     # The failing target was tried on every attempt
     bad = [m for m in messages if m["to"] == "+15559999999"]
     assert len(bad) == 3 * 2
+
+
+@mock.patch("requests.post")
+def test_plugin_awswhatsapp_named_template(mock_post):
+    """Named parameters survive URL parsing and reach the Meta payload."""
+    mock_post.return_value = aws_response()
+    obj = Apprise.instantiate(
+        f"{BASE}/15551234567?template=opt_in_agendamentos_pge&lang=pt_BR"
+        "&:nome=TESTE%20Apprise"
+    )
+    assert isinstance(obj, NotifyAWSWhatsApp)
+    clone = Apprise.instantiate(obj.url())
+    assert clone.notify(body="ignored")
+    assert sent(mock_post)[0]["template"]["components"][0]["parameters"] == [
+        {"type": "text", "text": "TESTE Apprise", "parameter_name": "nome"}
+    ]
+
+
+@mock.patch("requests.post")
+def test_plugin_awswhatsapp_dynamic_named_template(mock_post):
+    mock_post.return_value = aws_response()
+    obj = Apprise.instantiate(
+        f"{BASE}/15551234567?template=alerts&:body=mensagem&:type=tipo&:nome=Test"
+    )
+    assert obj.notify(body="Alert", notify_type=NotifyType.FAILURE)
+    params = sent(mock_post)[0]["template"]["components"][0]["parameters"]
+    assert {p["parameter_name"]: p["text"] for p in params} == {
+        "mensagem": "Alert",
+        "tipo": "failure",
+        "nome": "Test",
+    }
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        {"nome": "Test", "1": "Test"},
+        {"body": "nome", "nome": "Test"},
+        {"nome!": "Test"},
+        {"body": "1trailing"},
+    ],
+)
+def test_plugin_awswhatsapp_invalid_named_mapping(mapping):
+    with pytest.raises(AppriseImproperlyConfigured):
+        NotifyAWSWhatsApp(
+            access_key_id=TEST_ACCESS_KEY_ID,
+            secret_access_key=TEST_ACCESS_KEY_SECRET,
+            region_name=TEST_REGION,
+            from_phone_id=TEST_FROM,
+            template="alerts",
+            template_mapping=mapping,
+        )
