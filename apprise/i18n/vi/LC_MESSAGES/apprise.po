@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apprise 2.2.0\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2026-11-07 22:18-0500\n"
+"POT-Creation-Date: 2026-11-09 09:51+0700\n"
 "PO-Revision-Date: 2026-09-25 12:00-0400\n"
 "Last-Translator: Chris Caron <lead2gold@gmail.com>\n"
 "Language: vi\n"
@@ -99,7 +99,7 @@ msgstr "Tên người dùng ứng dụng"
 #: apprise/plugins/smstunnel.py:122 apprise/plugins/smtp2go.py:119
 #: apprise/plugins/sparkpost.py:170 apprise/plugins/splunk.py:166
 #: apprise/plugins/techuluspush.py:98 apprise/plugins/telesign.py:136
-#: apprise/plugins/telnyx.py:88 apprise/plugins/trigv.py:143
+#: apprise/plugins/telnyx.py:88 apprise/plugins/trigv.py:153
 #: apprise/plugins/twilio.py:197 apprise/plugins/vapid/__init__.py:162
 #: apprise/plugins/vonage.py:81 apprise/plugins/wpush.py:158
 #: apprise/plugins/xmatters.py:135
@@ -153,7 +153,7 @@ msgstr "Điện thoại đích"
 #: apprise/plugins/smsmanager.py:120 apprise/plugins/smstunnel.py:136
 #: apprise/plugins/sns.py:172 apprise/plugins/telegram.py:609
 #: apprise/plugins/telesign.py:150 apprise/plugins/telnyx.py:108
-#: apprise/plugins/threema.py:116 apprise/plugins/trigv.py:156
+#: apprise/plugins/threema.py:116 apprise/plugins/trigv.py:166
 #: apprise/plugins/twilio.py:177 apprise/plugins/twist.py:124
 #: apprise/plugins/twitter.py:194 apprise/plugins/vapid/__init__.py:168
 #: apprise/plugins/voipms.py:109 apprise/plugins/vonage.py:109
@@ -236,7 +236,7 @@ msgstr "Tên máy chủ"
 #: apprise/plugins/rsyslog.py:186 apprise/plugins/signal_api.py:130
 #: apprise/plugins/smpp.py:113 apprise/plugins/smseagle.py:141
 #: apprise/plugins/sogs.py:214 apprise/plugins/synology.py:91
-#: apprise/plugins/trigv.py:164 apprise/plugins/workflows.py:144
+#: apprise/plugins/trigv.py:174 apprise/plugins/workflows.py:144
 #: apprise/plugins/xmpp/base.py:107
 msgid "Port"
 msgstr "Cổng"
@@ -673,7 +673,7 @@ msgstr "Tên bot"
 #: apprise/plugins/mattermost.py:183 apprise/plugins/notifiarr.py:102
 #: apprise/plugins/pushbullet.py:95 apprise/plugins/pushed.py:102
 #: apprise/plugins/rocketchat.py:151 apprise/plugins/slack.py:285
-#: apprise/plugins/trigv.py:151 apprise/plugins/twist.py:113
+#: apprise/plugins/trigv.py:161 apprise/plugins/twist.py:113
 #: apprise/plugins/xmpp/base.py:129
 msgid "Target Channel"
 msgstr "Kênh đích"
@@ -760,7 +760,7 @@ msgstr "Thông báo DBus"
 
 #: apprise/plugins/dbus.py:205 apprise/plugins/glib.py:166
 #: apprise/plugins/gnome.py:142 apprise/plugins/pagertree.py:143
-#: apprise/plugins/trigv.py:190
+#: apprise/plugins/trigv.py:200
 msgid "Urgency"
 msgstr "Mức khẩn cấp"
 
@@ -791,7 +791,7 @@ msgid "Avatar URL"
 msgstr "URL ảnh đại diện"
 
 #: apprise/plugins/discord.py:203 apprise/plugins/fluxer.py:252
-#: apprise/plugins/pushover.py:422 apprise/plugins/trigv.py:181
+#: apprise/plugins/pushover.py:422 apprise/plugins/trigv.py:191
 msgid "URL"
 msgstr "URL"
 
@@ -2081,21 +2081,25 @@ msgstr "ID cổng kết nối"
 msgid "Target Threema ID"
 msgstr "ID Threema đích"
 
-#: apprise/plugins/trigv.py:160
+#: apprise/plugins/trigv.py:170
 msgid "API Hostname"
 msgstr "Tên máy chủ API"
 
-#: apprise/plugins/trigv.py:186
+#: apprise/plugins/trigv.py:196
 msgid "Image URL"
 msgstr "URL hình ảnh"
 
-#: apprise/plugins/trigv.py:196
+#: apprise/plugins/trigv.py:206
 msgid "Event type"
 msgstr "Loại sự kiện"
 
-#: apprise/plugins/trigv.py:200
+#: apprise/plugins/trigv.py:210
 msgid "Priority (Pushover compatibility)"
 msgstr "Độ ưu tiên (tương thích Pushover)"
+
+#: apprise/plugins/trigv.py:214
+msgid "Idempotency Key"
+msgstr "Khóa idempotency"
 
 #: apprise/plugins/twilio.py:203
 msgid "Notification Method: sms or call"
