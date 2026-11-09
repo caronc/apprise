@@ -30,10 +30,11 @@
 
 import json
 import re
+from typing import Any, Optional
 
 import requests
 
-from ..common import NotifyType
+from ..common import NotifyFormat, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
@@ -61,6 +62,18 @@ class NotifyLark(NotifyBase):
     # Limit is documented to be 20K message sizes.  This number safely
     # allows padding around that size.
     body_maxlen = 19985
+
+    # A text message cannot show any formatting, so Markdown is sent as an
+    # interactive card instead.  Plain text stays the default.
+    notify_format = (NotifyFormat.TEXT, NotifyFormat.MARKDOWN)
+
+    # Card header colours, keyed by the notification type
+    card_colors = {
+        NotifyType.INFO: "blue",
+        NotifyType.SUCCESS: "green",
+        NotifyType.WARNING: "orange",
+        NotifyType.FAILURE: "red",
+    }
 
     # The title is joined to the body in one text field, so both share
     # the same limit.
@@ -110,38 +123,89 @@ class NotifyLark(NotifyBase):
             f"?{NotifyLark.urlencode(params)}"
         )
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
-        """Returns all of the identifiers that make this URL unique from
-        another similar one.
-
-        Targets or end points should never be identified here.
-        """
-        self.throttle()
-
-        payload = {
-            "msg_type": "text",
-            "content": {"text": f"{title}\n{body}" if title else body},
-        }
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        body_format: Optional[NotifyFormat] = None,
+        **kwargs: Any,
+    ) -> bool:
+        """Send our notification."""
 
         headers = {
             "User-Agent": self.app_id,
             "Content-Type": "application/json",
         }
 
+        # Prepare our payload
+        payload = (
+            {
+                # Lark only renders Markdown inside an interactive card
+                "msg_type": "interactive",
+                "card": {
+                    "config": {"wide_screen_mode": True},
+                    "header": {
+                        "title": {
+                            "tag": "plain_text",
+                            "content": title or self.app_desc,
+                        },
+                        # The header colour follows the notification type
+                        "template": self.card_colors.get(
+                            notify_type, self.card_colors[NotifyType.INFO]
+                        ),
+                    },
+                    "elements": [
+                        {
+                            "tag": "div",
+                            "text": {"tag": "lark_md", "content": body},
+                        },
+                    ],
+                },
+            }
+            if body_format == NotifyFormat.MARKDOWN
+            else {
+                "msg_type": "text",
+                "content": {"text": f"{title}\n{body}" if title else body},
+            }
+        )
+
         # Always call throttle before any remote server i/o is made
         self.throttle()
+
         try:
             r = requests.post(
                 self.webhook_url,
                 headers=headers,
-                data=json.dumps(payload),
+                # Send UTF-8 as is; \uXXXX escapes double the size of CJK
+                # text, and Lark limits the request body size.
+                data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
                 allow_redirects=self.redirects,
             )
             if r.status_code != requests.codes.ok:
                 self.logger.warning(
-                    "Lark notification failed: %d - %s", r.status_code, r.text
+                    "Lark notification failed: %d - %s",
+                    r.status_code,
+                    (r.content or b"")[:2000],
+                )
+                return False
+
+            # Lark answers a refused payload with HTTP 200 and a non-zero
+            # code, so the response body needs inspecting too.
+            try:
+                content = json.loads(r.content)
+
+            except (AttributeError, TypeError, ValueError):
+                # Not JSON; the HTTP status is all we have to go on
+                content = {}
+
+            if isinstance(content, dict) and content.get("code"):
+                self.logger.warning(
+                    "Lark rejected our notification: code=%s msg=%s",
+                    content.get("code"),
+                    content.get("msg"),
                 )
                 return False
 

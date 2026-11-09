@@ -32,11 +32,12 @@
 #    https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot
 #
 
-from json import dumps
+from json import dumps, loads
+from typing import Any, Optional
 
 import requests
 
-from ..common import NotifyType
+from ..common import NotifyFormat, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
@@ -64,12 +65,25 @@ class NotifyFeishu(NotifyBase):
     # Define object templates
     templates = ("{schema}://{token}",)
 
-    # The title is not used
-    title_maxlen = 0
-
     # Limit is documented to be 20K message sizes.  This number safely
     # allows padding around that size.
     body_maxlen = 19985
+
+    # A text message cannot show any formatting, so Markdown is sent as an
+    # interactive card instead.  Plain text stays the default.
+    notify_format = (NotifyFormat.TEXT, NotifyFormat.MARKDOWN)
+
+    # The title is joined to the body in one text field, so both share
+    # the same limit.  A card shows the title in its own header instead.
+    overflow_amalgamate_title = True
+
+    # Card header colours, keyed by the notification type
+    card_colors = {
+        NotifyType.INFO: "blue",
+        NotifyType.SUCCESS: "green",
+        NotifyType.WARNING: "orange",
+        NotifyType.FAILURE: "red",
+    }
 
     # Define our tokens; these are the minimum tokens required required to
     # be passed into this function (as arguments). The syntax appends any
@@ -111,7 +125,14 @@ class NotifyFeishu(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        body_format: Optional[NotifyFormat] = None,
+        **kwargs: Any,
+    ) -> bool:
         """Send our notification."""
 
         # prepare our headers
@@ -121,12 +142,38 @@ class NotifyFeishu(NotifyBase):
         }
 
         # Our Message
-        payload = {
-            "msg_type": "text",
-            "content": {
-                "text": body,
-            },
-        }
+        payload = (
+            {
+                # Feishu only renders Markdown inside an interactive card
+                "msg_type": "interactive",
+                "card": {
+                    "config": {"wide_screen_mode": True},
+                    "header": {
+                        "title": {
+                            "tag": "plain_text",
+                            "content": title or self.app_desc,
+                        },
+                        # The header colour follows the notification type
+                        "template": self.card_colors.get(
+                            notify_type, self.card_colors[NotifyType.INFO]
+                        ),
+                    },
+                    "elements": [
+                        {
+                            "tag": "div",
+                            "text": {"tag": "lark_md", "content": body},
+                        },
+                    ],
+                },
+            }
+            if body_format == NotifyFormat.MARKDOWN
+            else {
+                "msg_type": "text",
+                "content": {
+                    "text": f"{title}\r\n{body}" if title else body,
+                },
+            }
+        )
 
         self.logger.debug(
             "Feishu GET URL:"
@@ -140,7 +187,9 @@ class NotifyFeishu(NotifyBase):
         try:
             r = requests.post(
                 self.notify_url.format(token=self.token),
-                data=dumps(payload).encode("utf-8"),
+                # Send UTF-8 as is; \uXXXX escapes double the size of CJK
+                # text, and Feishu limits the request body size.
+                data=dumps(payload, ensure_ascii=False).encode("utf-8"),
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
@@ -157,7 +206,7 @@ class NotifyFeishu(NotifyBase):
             #   "msg": "success"
             # }
 
-            # Invalid (non 200 response):
+            # Invalid (HTTP 200, but the payload was refused):
             # {
             #   "code": 9499,
             #   "msg": "Bad Request",
@@ -183,6 +232,25 @@ class NotifyFeishu(NotifyBase):
                 return False
 
             else:
+                # Feishu answers a refused payload with HTTP 200 and a
+                # non-zero code, so the response body needs inspecting too.
+                try:
+                    content = loads(r.content)
+
+                except (AttributeError, TypeError, ValueError):
+                    # Not JSON; the HTTP status is all we have to go on
+                    content = {}
+
+                if isinstance(content, dict) and content.get("code"):
+                    self.logger.warning(
+                        "Feishu rejected our notification: code=%s msg=%s",
+                        content.get("code"),
+                        content.get("msg"),
+                    )
+
+                    # Return; we're done
+                    return False
+
                 self.logger.info("Sent Feishu notification.")
 
         except requests.RequestException as e:
