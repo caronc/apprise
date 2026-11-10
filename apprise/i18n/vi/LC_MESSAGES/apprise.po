@@ -1680,6 +1680,22 @@ msgstr "Mức cảnh báo"
 msgid "Failure Level"
 msgstr "Mức lỗi"
 
+#: apprise/plugins/pushward.py:189
+msgid "Acknowledge"
+msgstr "Xác nhận"
+
+#: apprise/plugins/pushward.py:195
+msgid "Repeat Interval"
+msgstr "Khoảng lặp lại"
+
+#: apprise/plugins/pushward.py:224
+msgid "Collapse ID"
+msgstr "ID thu gọn"
+
+#: apprise/plugins/pushward.py:230
+msgid "Snooze"
+msgstr "Báo lại"
+
 #: apprise/plugins/pushy.py:80
 msgid "Secret API Key"
 msgstr "Khóa API bí mật"

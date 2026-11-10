@@ -1680,6 +1680,22 @@ msgstr "警告级别"
 msgid "Failure Level"
 msgstr "失败级别"
 
+#: apprise/plugins/pushward.py:189
+msgid "Acknowledge"
+msgstr "确认"
+
+#: apprise/plugins/pushward.py:195
+msgid "Repeat Interval"
+msgstr "重复间隔"
+
+#: apprise/plugins/pushward.py:224
+msgid "Collapse ID"
+msgstr "折叠 ID"
+
+#: apprise/plugins/pushward.py:230
+msgid "Snooze"
+msgstr "稍后提醒"
+
 #: apprise/plugins/pushy.py:80
 msgid "Secret API Key"
 msgstr "私密 API 密钥"

@@ -1680,6 +1680,22 @@ msgstr "Tingkat peringatan"
 msgid "Failure Level"
 msgstr "Tingkat kegagalan"
 
+#: apprise/plugins/pushward.py:189
+msgid "Acknowledge"
+msgstr "Konfirmasi"
+
+#: apprise/plugins/pushward.py:195
+msgid "Repeat Interval"
+msgstr "Interval Pengulangan"
+
+#: apprise/plugins/pushward.py:224
+msgid "Collapse ID"
+msgstr "ID Penggabungan"
+
+#: apprise/plugins/pushward.py:230
+msgid "Snooze"
+msgstr "Tunda"
+
 #: apprise/plugins/pushy.py:80
 msgid "Secret API Key"
 msgstr "Kunci API rahasia"

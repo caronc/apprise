@@ -1680,6 +1680,22 @@ msgstr "Warnstufe"
 msgid "Failure Level"
 msgstr "Fehlerstufe"
 
+#: apprise/plugins/pushward.py:189
+msgid "Acknowledge"
+msgstr "Bestätigung"
+
+#: apprise/plugins/pushward.py:195
+msgid "Repeat Interval"
+msgstr "Wiederholungsintervall"
+
+#: apprise/plugins/pushward.py:224
+msgid "Collapse ID"
+msgstr "Zusammenfassungs-Kennung"
+
+#: apprise/plugins/pushward.py:230
+msgid "Snooze"
+msgstr "Schlummern"
+
 #: apprise/plugins/pushy.py:80
 msgid "Secret API Key"
 msgstr "Geheimer API-Schlüssel"

@@ -1681,6 +1681,22 @@ msgstr "Уровень предупреждения"
 msgid "Failure Level"
 msgstr "Уровень сбоя"
 
+#: apprise/plugins/pushward.py:189
+msgid "Acknowledge"
+msgstr "Подтверждение"
+
+#: apprise/plugins/pushward.py:195
+msgid "Repeat Interval"
+msgstr "Интервал повтора"
+
+#: apprise/plugins/pushward.py:224
+msgid "Collapse ID"
+msgstr "ID объединения"
+
+#: apprise/plugins/pushward.py:230
+msgid "Snooze"
+msgstr "Отложить"
+
 #: apprise/plugins/pushy.py:80
 msgid "Secret API Key"
 msgstr "Секретный ключ API"
