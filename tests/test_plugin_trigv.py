@@ -25,8 +25,10 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from json import loads
 import logging
 from unittest import mock
+from uuid import UUID
 
 from helpers import AppriseURLTester
 import pytest
@@ -156,7 +158,9 @@ def test_plugin_trigv_general(mock_post):
     """NotifyTrigv() General Checks."""
 
     response = mock.Mock()
-    response.content = b'{"event":{"public_id":"evt_test","status":"queued"}}'
+    response.content = (
+        b'{"event":{"public_id":"01JXXXXXXXXXXXXXXXXXXXXXXX","status":"sent"}}'
+    )
     response.status_code = requests.codes.accepted
     mock_post.return_value = response
 
@@ -176,7 +180,7 @@ def test_plugin_trigv_general(mock_post):
 
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0] == (
-        "https://api.trigv.com/api/v1/events"
+        "https://api.trigv.com/v1/events"
     )
 
     headers = mock_post.call_args_list[0][1]["headers"]
@@ -191,6 +195,8 @@ def test_plugin_trigv_general(mock_post):
     assert payload["description"] == "Backup failed"
     assert payload["level"] == "error"
     assert payload["delivery_urgency"] == "time_sensitive"
+    # Every request carries a generated idempotency key
+    assert UUID(payload["idempotency_key"])
 
 
 @mock.patch("requests.post")
@@ -401,3 +407,112 @@ def test_plugin_trigv_url_roundtrip(mock_post):
     assert obj2.urgency == "time_sensitive"
     assert obj2.event_type == "deploy.completed"
     assert obj2.priority == 2
+
+
+@mock.patch("requests.post")
+def test_plugin_trigv_idempotency_key(mock_post):
+    """NotifyTrigv() gives every channel and notification its own key."""
+
+    response = mock.Mock()
+    response.content = b"{}"
+    response.status_code = requests.codes.accepted
+    mock_post.return_value = response
+
+    aobj = apprise.Apprise()
+    assert aobj.add(f"trigvs://{VALID_API_KEY}/ops/dev")
+
+    # Two notifications sent to two channels
+    assert aobj.notify(title="Disk full", body="first")
+    assert aobj.notify(title="Backup failed", body="second")
+    assert mock_post.call_count == 4
+
+    # Trigv drops any request whose key it has already seen, so no two
+    # requests may share one
+    keys = {
+        loads(call[1]["data"])["idempotency_key"]
+        for call in mock_post.call_args_list
+    }
+    assert len(keys) == 4
+
+
+@mock.patch("requests.post")
+def test_plugin_trigv_retry_reuses_key(mock_post):
+    """NotifyTrigv() resends a failed request with its original key."""
+
+    unavailable = mock.Mock()
+    unavailable.content = b"{}"
+    unavailable.headers = {}
+    unavailable.status_code = requests.codes.service_unavailable
+
+    accepted = mock.Mock()
+    accepted.content = b"{}"
+    accepted.status_code = requests.codes.accepted
+
+    mock_post.side_effect = [unavailable, accepted]
+
+    aobj = apprise.Apprise()
+    assert aobj.add(f"trigvs://{VALID_API_KEY}/ops?retry=1&wait=0")
+    assert aobj.notify(title="Disk full", body="body")
+    assert mock_post.call_count == 2
+
+    # The retry is recognised by Trigv as the same event
+    first, second = (
+        loads(call[1]["data"])["idempotency_key"]
+        for call in mock_post.call_args_list
+    )
+    assert first == second
+
+
+@mock.patch("requests.post")
+def test_plugin_trigv_default_url_is_v1_events(mock_post):
+    """NotifyTrigv() default URL has no /api prefix."""
+
+    assert NotifyTrigv.notify_url == "https://api.trigv.com/v1/events"
+
+    response = mock.Mock()
+    response.status_code = requests.codes.accepted
+    mock_post.return_value = response
+
+    obj = NotifyTrigv(api_key=VALID_API_KEY)
+    assert obj.notify(body="Hello", title="Test") is True
+    assert mock_post.call_args_list[0][0][0] == (
+        "https://api.trigv.com/v1/events"
+    )
+
+
+@pytest.mark.parametrize("status_code", [409, 429, 503])
+@mock.patch("requests.post")
+def test_plugin_trigv_retryable_statuses_fail(mock_post, status_code):
+    """NotifyTrigv() reports 409, 429 and 503 as failures and logs ids."""
+
+    response = mock.Mock()
+    response.status_code = status_code
+    response.content = b'{"message":"nope"}'
+    response.headers = {
+        "X-Request-ID": "01JREQXXXXXXXXXXXXXXXXXXXX",
+        "Retry-After": "7",
+    }
+    mock_post.return_value = response
+
+    obj = NotifyTrigv(api_key=VALID_API_KEY)
+    assert obj.send(body="test", title="title") is False
+    assert mock_post.call_count == 1
+
+
+@mock.patch("requests.post")
+def test_plugin_trigv_skips_delivered_channel(mock_post):
+    """NotifyTrigv() does not re-post to a channel already marked delivered."""
+
+    obj = NotifyTrigv(api_key=VALID_API_KEY, targets=["alerts"])
+    with mock.patch.object(obj, "is_delivered", return_value=True):
+        assert obj.send(body="test", title="title") is True
+    mock_post.assert_not_called()
+
+
+def test_plugin_trigv_http_error_map():
+    """NotifyTrigv() describes the 409 and 503 statuses."""
+
+    from apprise.plugins.trigv import TRIGV_HTTP_ERROR_MAP
+
+    assert 409 in TRIGV_HTTP_ERROR_MAP
+    assert 503 in TRIGV_HTTP_ERROR_MAP

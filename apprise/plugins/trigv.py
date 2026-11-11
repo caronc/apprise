@@ -41,8 +41,11 @@
 #
 # Resources:
 # - https://trigv.com/docs/learn/api-keys
+# - https://trigv.com/docs/api/
 
+from hashlib import sha256
 from json import dumps
+from uuid import uuid4
 
 import requests
 
@@ -67,8 +70,9 @@ VALIDATE_CHANNEL = (
 # Our channel used when none is otherwise specified
 DEFAULT_CHANNEL = "general"
 
-# Our ingest endpoint when no self-hosted hostname is provided
-DEFAULT_NOTIFY_URL = "https://api.trigv.com/api/v1/events"
+# Our ingest endpoint when no self-hosted hostname is provided; a custom
+# hostname keeps posting to /api/v1/events, which Trigv still accepts
+DEFAULT_NOTIFY_URL = "https://api.trigv.com/v1/events"
 
 # Map our Apprise notify types onto the levels Trigv understands
 TRIGV_LEVELS = {
@@ -89,8 +93,10 @@ TRIGV_HTTP_ERROR_MAP = {
     401: "Unauthorized - Invalid API key.",
     403: "Forbidden - Revoked key, missing scope, or inactive workspace.",
     404: "Not found - Channel does not exist.",
+    409: "Conflict - Another request is delivering this event.",
     422: "Validation error - Check payload fields.",
     429: "Rate limit exceeded.",
+    503: "Service unavailable - Push delivery is temporarily unavailable.",
 }
 
 
@@ -329,6 +335,22 @@ class NotifyTrigv(NotifyBase):
             # urgency= is only the Apprise-facing parameter name
             payload["delivery_urgency"] = urgency
 
+            # Identical requests (same channel and content) share a
+            # fingerprint, so each channel and message piece gets its own.
+            fingerprint = sha256(
+                dumps(payload, sort_keys=True).encode("utf-8")
+            ).hexdigest()
+
+            # Reuse the key when retrying a request so Trigv does not
+            # push the same event twice.  A new notification always
+            # gets a new key so it is never mistaken for an old one.
+            idempotency_key = self.recall(fingerprint)
+            if idempotency_key is None:
+                idempotency_key = str(uuid4())
+                self.remember(fingerprint, idempotency_key)
+
+            payload["idempotency_key"] = idempotency_key
+
             self.logger.debug(
                 "Trigv POST URL:"
                 f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
@@ -369,6 +391,19 @@ class NotifyTrigv(NotifyBase):
                     self.logger.debug(
                         "Response Details:\r\n%r", (r.content or b"")[:2000]
                     )
+
+                    # Log the request id (quote it to Trigv support) and,
+                    # for 409/429/503, how long the server asked us to wait
+                    request_id = r.headers.get("X-Request-ID")
+                    if request_id:
+                        self.logger.debug("Trigv X-Request-ID: %s", request_id)
+
+                    retry_after = r.headers.get("Retry-After")
+                    if retry_after:
+                        self.logger.debug(
+                            "Trigv asked to retry after %s second(s).",
+                            retry_after,
+                        )
 
                     # Mark our failure and move onto the next channel
                     has_error = True
