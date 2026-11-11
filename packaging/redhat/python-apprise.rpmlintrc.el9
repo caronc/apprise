@@ -4,6 +4,7 @@ from Config import *
 addFilter('spelling-error.*ntfy')
 addFilter('spelling-error.*ilert')
 addFilter('spelling-error.*xMatters')
+addFilter('spelling-error.*OpsiMate')
 addFilter('spelling-error.*Cliq')
 addFilter('spelling-error.*Zoho')
 addFilter('spelling-error.*httpSMS')
