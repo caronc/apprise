@@ -41,8 +41,26 @@ import requests
 from ..common import ContentLocation
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
+from ..utils.http import SocketTracker, track_sockets
 from ..utils.parse import URL_ENCODED_PATH_SAFE_CHARS
 from .base import AttachBase
+
+
+class AppriseWatchdogCutoff:
+    """Handle download cut off once time is up."""
+
+    __slots__ = ("connections", "expired", "response")
+
+    def __init__(self) -> None:
+        """Start with no reply and no connections yet."""
+        # Set once the time is up
+        self.expired = threading.Event()
+
+        # The reply, once its headers have arrived
+        self.response: Optional[requests.Response] = None
+
+        # Connections an Apprise policy session opened for this download
+        self.connections = SocketTracker()
 
 
 class AttachHTTP(AttachBase):
@@ -191,6 +209,24 @@ class AttachHTTP(AttachBase):
                         f" {timeout:g}s"
                     )
 
+            # Cut the download off once its time is up, at any point. A
+            # server can trickle in a few bytes at a time and never trip the
+            # read timeout, so the time check cannot wait for data to arrive.
+            cutoff = AppriseWatchdogCutoff()
+            watchdog = (
+                threading.Timer(
+                    max(0.0, started + timeout - time.monotonic()),
+                    self._expire,
+                    (cutoff,),
+                )
+                if timeout
+                else None
+            )
+            if watchdog:
+                # A watchdog never keeps the program from exiting
+                watchdog.daemon = True
+                watchdog.start()
+
             try:
                 # Use the caller's transport when it needs destination policy.
                 http_get = (
@@ -198,18 +234,30 @@ class AttachHTTP(AttachBase):
                     if self.http_session is not None
                     else requests.get
                 )
-                with http_get(
-                    url,
-                    headers=headers,
-                    auth=auth,
-                    params=self.qsd,
-                    verify=self.verify_certificate,
-                    timeout=request_timeout,
-                    allow_redirects=self.redirects,
-                    stream=True,
-                    # Checked as each response, redirects included, arrives
-                    hooks={"response": out_of_time},
-                ) as r:
+                # Connections an Apprise policy session opens are collected,
+                # so the watchdog can reach them before any reply arrives.
+                with (
+                    track_sockets(cutoff.connections),
+                    http_get(
+                        url,
+                        headers=headers,
+                        auth=auth,
+                        params=self.qsd,
+                        verify=self.verify_certificate,
+                        timeout=request_timeout,
+                        allow_redirects=self.redirects,
+                        stream=True,
+                        # Checked as each response, redirects included, arrives
+                        hooks={"response": out_of_time},
+                    ) as r,
+                ):
+                    # The watchdog can now reach the connection the file
+                    # arrives on, whatever opened it
+                    cutoff.response = r
+                    if cutoff.expired.is_set():
+                        # Time ran out just as the reply arrived
+                        raise requests.Timeout()
+
                     # Handle Errors
                     r.raise_for_status()
 
@@ -268,62 +316,36 @@ class AttachHTTP(AttachBase):
                     # Track all bytes written to disk
                     bytes_written = 0
 
-                    # Cut the download off once its time is up. A server
-                    # can trickle in a few bytes at a time and never trip
-                    # the read timeout, so the time check cannot wait for
-                    # the next chunk to arrive.
-                    expired = threading.Event()
-                    watchdog = (
-                        threading.Timer(
-                            max(0.0, started + timeout - time.monotonic()),
-                            self._expire,
-                            (r, expired),
-                        )
-                        if timeout
-                        else None
-                    )
-                    if watchdog:
-                        # A watchdog never keeps the program from exiting
-                        watchdog.daemon = True
-                        watchdog.start()
+                    # If we get here, we can now safely write our content to
+                    # disk
+                    for chunk in r.iter_content(chunk_size=chunk_size):
+                        # filter out keep-alive chunks
+                        if chunk:
+                            # Enforce the limit while streaming because the
+                            # server may omit or misreport Content-Length.
+                            if (
+                                self.max_file_size > 0
+                                and bytes_written + len(chunk)
+                                > self.max_file_size
+                            ):
+                                # The downloaded content is too large.
+                                self.logger.error(
+                                    "HTTP response exceeds allowable"
+                                    " maximum file length"
+                                    f" ({int(self.max_file_size / 1024)}"
+                                    f"KB): {self.url(privacy=True)}"
+                                )
 
-                    try:
-                        # If we get here, we can now safely write our content
-                        # to disk
-                        for chunk in r.iter_content(chunk_size=chunk_size):
-                            # filter out keep-alive chunks
-                            if chunk:
-                                # Enforce the limit while streaming because
-                                # the server may omit or misreport
-                                # Content-Length.
-                                if (
-                                    self.max_file_size > 0
-                                    and bytes_written + len(chunk)
-                                    > self.max_file_size
-                                ):
-                                    # The downloaded content is too large.
-                                    self.logger.error(
-                                        "HTTP response exceeds allowable"
-                                        " maximum file length"
-                                        f" ({int(self.max_file_size / 1024)}"
-                                        f"KB): {self.url(privacy=True)}"
-                                    )
+                                # Invalidate any variables previously set
+                                self.invalidate()
 
-                                    # Invalidate any variables previously set
-                                    self.invalidate()
+                                # Return False (signifying a failure)
+                                return False
 
-                                    # Return False (signifying a failure)
-                                    return False
+                            self._temp_file.write(chunk)
+                            bytes_written = self._temp_file.tell()
 
-                                self._temp_file.write(chunk)
-                                bytes_written = self._temp_file.tell()
-
-                    finally:
-                        if watchdog:
-                            # The download is over; the watchdog is not needed
-                            watchdog.cancel()
-
-                    if expired.is_set():
+                    if cutoff.expired.is_set():
                         # Cut off part way through, so what we have is
                         # incomplete
                         self.logger.error(
@@ -347,10 +369,19 @@ class AttachHTTP(AttachBase):
                         self.detected_name = os.path.basename(self.fullpath)
 
             except requests.RequestException as e:
-                self.logger.error(
-                    "A Connection error occurred retrieving HTTP "
-                    f"configuration from {self.host}."
-                )
+                if cutoff.expired.is_set():
+                    # The watchdog cut the connection off
+                    self.logger.error(
+                        "HTTP attachment download took longer than"
+                        f" {timeout:g}s: {self.url(privacy=True)}"
+                    )
+
+                else:
+                    self.logger.error(
+                        "A Connection error occurred retrieving HTTP "
+                        f"configuration from {self.host}."
+                    )
+
                 self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Invalidate any variables previously set
@@ -377,34 +408,45 @@ class AttachHTTP(AttachBase):
                 # Return False (signifying a failure)
                 return False
 
+            finally:
+                if watchdog:
+                    # The download is over; the watchdog is not needed
+                    watchdog.cancel()
+
         # Return our success
         return True
 
     @staticmethod
-    def _expire(response: requests.Response, expired: threading.Event) -> None:
+    def _expire(cutoff: AppriseWatchdogCutoff) -> None:
         """Cut off a download that ran out of time.
 
-        Shutting the connection down ends a read still waiting on the server,
+        Shutting a connection down ends a read still waiting on the server,
         which closing the response from another thread cannot do safely.
         """
         # Let the download know why it ended
-        expired.set()
+        cutoff.expired.set()
 
-        # The socket is not part of the public API, so look for it with care
-        sock = getattr(
+        # The reply's own connection; it is not part of the public API, so
+        # look for it with care
+        reply = getattr(
             getattr(
-                getattr(getattr(response, "raw", None), "_fp", None),
+                getattr(getattr(cutoff.response, "raw", None), "_fp", None),
                 "fp",
                 None,
             ),
             "raw",
             None,
         )
-        sock = getattr(sock, "_sock", None)
-        if sock is not None:
-            # The connection may already be gone
+        reply = getattr(reply, "_sock", None)
+
+        # The reply's connection; the connection may already be gone
+        if reply is not None:
             with contextlib.suppress(OSError):
-                sock.shutdown(socket.SHUT_RDWR)
+                reply.shutdown(socket.SHUT_RDWR)
+
+        # Every connection opened for this download, whether a reply has
+        # arrived on it yet or not, and any opened from now on
+        cutoff.connections.cut_off()
 
     def invalidate(self):
         """Close our temporary file."""

@@ -49,8 +49,11 @@ from apprise.utils import http
 from apprise.utils.http import (
     HTTPPolicy,
     HTTPPolicySession,
+    SocketTracker,
+    _open_sockets,
     is_public_ip_address,
     is_secure_http_url,
+    track_sockets,
 )
 
 
@@ -612,6 +615,74 @@ def test_session_connects_through_policy_adapter():
         server.shutdown()
         thread.join()
         server.server_close()
+
+
+def test_track_sockets_collects_policy_connections():
+    """Connections are collected only while a download tracks them."""
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def log_message(self, _format, *args):
+            # Keep the test server quiet.
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+    url = f"http://127.0.0.1:{server.server_port}/"
+    policy = HTTPPolicy(address_filter=lambda _address: True)
+    try:
+        # This test permits loopback only to exercise the transport locally.
+        tracker = SocketTracker()
+        with track_sockets(tracker), HTTPPolicySession(policy) as session:
+            assert session.get(url, timeout=2).content == b"ok"
+
+        assert len(tracker.sockets) == 1
+
+        # Nothing is collected once tracking ends, even after an error
+        with pytest.raises(RuntimeError), track_sockets(tracker):
+            raise RuntimeError("boom")
+
+        assert _open_sockets.get() is None
+        with HTTPPolicySession(policy) as session:
+            assert session.get(url, timeout=2).content == b"ok"
+
+        assert len(tracker.sockets) == 1
+
+        # A tracked download inside another restores the outer one after
+        outer, inner = SocketTracker(), SocketTracker()
+        with track_sockets(outer):
+            with track_sockets(inner):
+                assert _open_sockets.get() is inner
+
+            assert _open_sockets.get() is outer
+
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()
+
+
+def test_socket_tracker_cut_off():
+    """Cutting off ends every connection, including ones added after."""
+    tracker = SocketTracker()
+    early = mock.Mock()
+    tracker.add(early)
+    early.shutdown.assert_not_called()
+
+    # One already closed is left alone
+    early.shutdown.side_effect = OSError("closed")
+    tracker.cut_off()
+    early.shutdown.assert_called_once()
+
+    late = mock.Mock()
+    tracker.add(late)
+    late.shutdown.assert_called_once()
+    assert tracker.sockets == [early, late]
 
 
 def test_policy_connects_with_urllib3_future_option():

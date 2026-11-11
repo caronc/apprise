@@ -55,15 +55,20 @@ Apprise supports (the 1.26 series, which RHEL and Rocky Linux ship) as well
 as the current one before accepting a change here.
 """
 
+from collections.abc import Iterator
 from concurrent.futures import (
     ThreadPoolExecutor,
     TimeoutError as FutureTimeoutError,
 )
+import contextlib
+from contextlib import contextmanager
+import contextvars
 import ipaddress
 import socket
 from socket import timeout as SocketTimeout
 import sys
 import threading
+from typing import Optional
 from urllib.parse import urlsplit
 
 import requests
@@ -89,6 +94,13 @@ _DNS_POOL = ThreadPoolExecutor(
     thread_name_prefix="apprise-http-resolve",
 )
 _DNS_SLOTS = threading.BoundedSemaphore(16)
+
+# The connections opened by a policy session for the download in progress,
+# so a watchdog can shut them down at any point; see track_sockets(). Left
+# unset, nothing is collected.
+_open_sockets: contextvars.ContextVar[Optional["SocketTracker"]] = (
+    contextvars.ContextVar("apprise_open_sockets", default=None)
+)
 
 # RFC 6598 shared space is neither private nor generally Internet-routable.
 _CGN_SHARED_V4 = ipaddress.ip_network("100.64.0.0/10")
@@ -472,7 +484,76 @@ class _PolicyConnectionMixin:
             ) from exc
 
         sys.audit("http.client.connect", self, self.host, self.port)
+
+        # Let a download in progress cut this connection off later
+        tracker = _open_sockets.get()
+        if tracker is not None:
+            tracker.add(sock)
+
         return sock
+
+
+def _shut_down(sock: socket.socket) -> None:
+    """End a connection, waking any read still waiting on it."""
+    # The connection may already be gone
+    with contextlib.suppress(OSError):
+        sock.shutdown(socket.SHUT_RDWR)
+
+
+class SocketTracker:
+    """The connections opened for one download, so they can be cut off.
+
+    Once cut off, a connection opened afterwards is shut down straight away,
+    so one made just as time runs out cannot slip through.
+    """
+
+    __slots__ = ("_lock", "cut", "sockets")
+
+    def __init__(self) -> None:
+        """Start with no connections."""
+        # The download's thread adds while the watchdog's thread cuts off
+        self._lock = threading.Lock()
+
+        # Every connection opened so far
+        self.sockets: list[socket.socket] = []
+
+        # Set once the download is cut off
+        self.cut = False
+
+    def add(self, sock: socket.socket) -> None:
+        """Keep a new connection, or end it if the download is already over."""
+        with self._lock:
+            self.sockets.append(sock)
+            if not self.cut:
+                return
+
+        # Too late: time ran out while this one was being opened
+        _shut_down(sock)
+
+    def cut_off(self) -> None:
+        """End every connection, now and any opened later."""
+        with self._lock:
+            self.cut = True
+            sockets = list(self.sockets)
+
+        for sock in sockets:
+            _shut_down(sock)
+
+
+@contextmanager
+def track_sockets(tracker: SocketTracker) -> Iterator[None]:
+    """Collect the connections a policy session opens meanwhile.
+
+    - ``tracker``: each connection opened in this thread is added to it.
+    - Only HTTPPolicySession connections are collected; other transports
+      open theirs out of reach.
+    """
+    token = _open_sockets.set(tracker)
+    try:
+        yield
+
+    finally:
+        _open_sockets.reset(token)
 
 
 def _policy_pool_classes(policy):
