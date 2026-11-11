@@ -745,6 +745,23 @@ def test_plugin_fcm_keyfile_parse_default(mock_post):
 @pytest.mark.skipif(
     "cryptography" not in sys.modules, reason="Requires cryptography"
 )
+def test_plugin_fcm_token_not_logged(mock_post, caplog):
+    """GoogleOAuth() never writes the access token to the debug log."""
+    logging.disable(logging.NOTSET)
+    caplog.set_level(logging.DEBUG, logger="apprise")
+
+    oauth = GoogleOAuth()
+    assert oauth.load(FCM_KEYFILE) is True
+    assert oauth.access_token == "ya29.c.abcd"
+
+    # The success message is still logged, just without the token
+    assert "Access Token successfully acquired" in caplog.text
+    assert "ya29.c.abcd" not in caplog.text
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
 def test_plugin_fcm_keyfile_parse_no_expiry(mock_post):
     """Test case without `expires_in` entry."""
 
