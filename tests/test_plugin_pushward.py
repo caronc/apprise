@@ -958,9 +958,7 @@ def test_plugin_pushward_e2ee_key_forms():
 
 
 @mock.patch("requests.post")
-def test_plugin_pushward_e2ee_fails_closed_without_cryptography(
-    mock_post, monkeypatch
-):
+def test_plugin_pushward_e2ee_no_cryptography(mock_post, monkeypatch):
     """NotifyPushWard() never downgrades requested encryption to plaintext."""
     mock_post.return_value = mock.Mock(
         status_code=requests.codes.ok, content=b""
@@ -1273,7 +1271,7 @@ def test_plugin_pushward_e2ee_too_long(mock_post):
 
 
 @mock.patch("requests.post")
-def test_plugin_pushward_e2ee_failure_prevents_network_io(mock_post):
+def test_plugin_pushward_e2ee_seal_error(mock_post):
     """NotifyPushWard() fails closed when sealing raises."""
     pytest.importorskip("cryptography")
     obj = NotifyPushWard("hlk_abc123", encryption_key=E2EE_KEY)

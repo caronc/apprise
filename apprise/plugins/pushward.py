@@ -138,7 +138,7 @@ class NotifyPushWard(NotifyBase):
     # The default descriptive name associated with the Notification
     service_name = "PushWard"
 
-    # Only needed for encryption; plaintext notifications work without it
+    # Only needed for encryption.  Plaintext notifications work without it.
     requirements = {
         "packages_recommended": "cryptography",
     }
@@ -281,7 +281,8 @@ class NotifyPushWard(NotifyBase):
                 "private": True,
                 "map_to": "encryption_key",
             },
-            # On whenever a key is present; no sends plaintext despite the key
+            # On whenever a key is present.  Set to no to send plaintext
+            # even though a key is set.
             "e2ee": {
                 "name": _("E2EE"),
                 "type": "bool",
@@ -474,8 +475,8 @@ class NotifyPushWard(NotifyBase):
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
 
-        # Acquire our encryption key; whitespace and case do not matter. A
-        # blank key is refused, as reading it as no key would send plaintext
+        # Acquire our encryption key.  Whitespace and case do not matter.
+        # A blank key is refused so that it can never mean plaintext.
         self.encryption_key = None
         if encryption_key is not None:
             key = "".join(str(encryption_key).split()).lower()
@@ -496,8 +497,8 @@ class NotifyPushWard(NotifyBase):
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
 
-        # Fail closed; never fall back to sending plaintext when the
-        # caller asked for encryption but the library isn't available
+        # Fail closed.  Never fall back to sending plaintext when the
+        # caller asked for encryption but the library isn't available.
         if self.encryption_key and self.e2ee and not PUSHWARD_E2EE_SUPPORT:
             msg = (
                 "PushWard encryption requires the 'cryptography' package. "
@@ -576,14 +577,15 @@ class NotifyPushWard(NotifyBase):
         if self.snooze:
             payload["snooze"] = self.snooze
 
-        # Everything else stays readable; the server needs it to deliver
+        # Seal the title, subtitle, body and url when encryption is on.
+        # Everything else stays readable because the server needs it.
         encrypt = bool(self.encryption_key and self.e2ee)
         if encrypt:
             try:
                 envelope = self._encrypt_payload(payload)
 
             except Exception as e:
-                # Fail closed; never fall back to sending plaintext
+                # Fail closed.  Never fall back to sending plaintext.
                 self.logger.warning("Failed to encrypt PushWard notification.")
                 self.logger.debug(
                     "PushWard encryption failed with %s.", type(e).__name__
@@ -605,6 +607,7 @@ class NotifyPushWard(NotifyBase):
             self.verify_certificate,
         )
         if not encrypt:
+            # A sealed payload is never logged
             self.logger.debug("PushWard Payload: %s", str(payload))
 
         # Always call throttle before any remote server i/o is made
@@ -664,8 +667,8 @@ class NotifyPushWard(NotifyBase):
     def _encrypt_payload(self, payload: dict[str, Any]) -> str:
         """Move the notification text out of payload into a pw1 envelope."""
 
-        # The server refuses any of these beside an envelope; the app reads
-        # them from the JSON in this order
+        # The server refuses any of these beside an envelope.  The app reads
+        # them from the JSON in this order.
         fields = {
             field: payload.pop(field)
             for field in ("title", "subtitle", "body", "url")
@@ -676,6 +679,7 @@ class NotifyPushWard(NotifyBase):
         if not (fields["title"] and fields["body"]):
             raise ValueError("A title and a body are required")
 
+        # Compact UTF-8 JSON is what the app expects to find inside
         plaintext = dumps(
             fields,
             ensure_ascii=False,
@@ -688,11 +692,12 @@ class NotifyPushWard(NotifyBase):
         if len(padded) <= PUSHWARD_PLAINTEXT_MAXLEN:
             plaintext = padded
 
+        # Derive the key id the app shows and the AES key from our key
         key = bytes.fromhex(self.encryption_key)
         kid = pushward_hkdf(key, b"pushward/e2e/v1/kid", 4).hex()
         cipher = AESGCM(pushward_hkdf(key, b"pushward/e2e/v1/enc", 32))
 
-        # A fresh nonce for every send; the tag also covers the key id
+        # A fresh nonce for every send.  The tag also covers the key id.
         nonce = urandom(12)
         sealed = cipher.encrypt(nonce, plaintext, f"pw1.{kid}".encode("ascii"))
 
@@ -873,12 +878,14 @@ class NotifyPushWard(NotifyBase):
                 results["qsd"]["key"]
             )
 
+        # Allow encryption to be turned off even though a key is set
         if "e2ee" in results["qsd"] and results["qsd"]["e2ee"]:
             results["e2ee"] = NotifyPushWard.unquote(results["qsd"]["e2ee"])
 
         return results
 
     @staticmethod
-    def runtime_deps():
+    def runtime_deps() -> tuple[str, ...]:
         """Return optional runtime dependency package names."""
+        # Only encryption needs it
         return ("cryptography",)
