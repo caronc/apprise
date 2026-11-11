@@ -605,9 +605,11 @@ def test_plugin_awswhatsapp_named_template(mock_post):
 
 @mock.patch("requests.post")
 def test_plugin_awswhatsapp_dynamic_named_template(mock_post):
+    """The message body and type can fill named parameters."""
     mock_post.return_value = aws_response()
     obj = Apprise.instantiate(
-        f"{BASE}/15551234567?template=alerts&:body=mensagem&:type=tipo&:nome=Test"
+        f"{BASE}/15551234567?template=alerts"
+        "&:body=mensagem&:type=tipo&:nome=Test"
     )
     assert obj.notify(body="Alert", notify_type=NotifyType.FAILURE)
     params = sent(mock_post)[0]["template"]["components"][0]["parameters"]
@@ -625,9 +627,11 @@ def test_plugin_awswhatsapp_dynamic_named_template(mock_post):
         {"body": "nome", "nome": "Test"},
         {"nome!": "Test"},
         {"body": "1trailing"},
+        {"nome\n": "Test"},
     ],
 )
 def test_plugin_awswhatsapp_invalid_named_mapping(mapping):
+    """Mixed, duplicate or malformed template mappings are rejected."""
     with pytest.raises(AppriseImproperlyConfigured):
         NotifyAWSWhatsApp(
             access_key_id=TEST_ACCESS_KEY_ID,

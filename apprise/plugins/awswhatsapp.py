@@ -218,6 +218,9 @@ class NotifyAWSWhatsApp(NotifyBase):
         },
     )
 
+    # A template component is either a position (1, 2, ...) or a name
+    component_key_re = re.compile(r"[1-9][0-9]*|[a-z_][a-z0-9_]*")
+
     # Define any kwargs we're using
     template_kwargs = {
         "template_mapping": {
@@ -326,39 +329,50 @@ class NotifyAWSWhatsApp(NotifyBase):
             # Store our extra payload entries
             self.template_mapping.update(template_mapping)
 
-        # Named and positional templates use different Meta parameter formats.
+        # Validate Mapping and prepare Components
         self.components = {}
-        formats = set()
         for key, val in self.template_mapping.items():
             if key.lower() in ("body", "type"):
+                # The message body (or type) fills the component named
+                # by our value
                 index = val
                 map_to = key.lower()
+
             else:
+                # Manual Component Assignment (by position or name)
                 index = key
                 map_to = {"type": "text", "text": val}
 
-            if re.fullmatch(r"[1-9][0-9]*", index):
-                formats.add("positional")
-            elif re.fullmatch(r"[a-z_][a-z0-9_]*", index):
-                formats.add("named")
-            else:
-                raise AppriseImproperlyConfigured(
+            if not self.component_key_re.fullmatch(index):
+                msg = (
                     "An invalid AWS WhatsApp Template Component ID "
-                    "was specified."
+                    f"({index}) was specified."
                 )
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
             if index in self.components:
-                raise AppriseImproperlyConfigured(
+                msg = (
                     "The AWS WhatsApp Template Component index "
-                    "was already assigned."
+                    f"({index}) was already assigned."
                 )
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
             self.components[index] = map_to
 
-        if len(formats) > 1:
-            raise AppriseImproperlyConfigured(
-                "Named and positional WhatsApp template parameters "
+        # A template uses either named or positional parameters, never both
+        positional = sum(index.isdigit() for index in self.components)
+        if 0 < positional < len(self.components):
+            msg = (
+                "Named and positional AWS WhatsApp Template Components "
                 "cannot be mixed."
             )
-        self.named_components = "named" in formats
+            self.logger.warning(msg)
+            raise AppriseImproperlyConfigured(msg)
+
+        # Named templates must identify every value by its name
+        self.named_components = bool(self.components) and not positional
 
         # Our API hosts
         self.notify_host = (
@@ -417,37 +431,27 @@ class NotifyAWSWhatsApp(NotifyBase):
             if self.components:
                 # Template parameters are placed in index order
                 values = {"body": body, "type": notify_type.value}
+                parameters = []
+                for key in sorted(
+                    self.components,
+                    key=None if self.named_components else int,
+                ):
+                    # A literal value, or our message body (or type)
+                    component = self.components[key]
+                    parameter = (
+                        dict(component)
+                        if isinstance(component, dict)
+                        else {"type": "text", "text": values[component]}
+                    )
+
+                    if self.named_components:
+                        # Named templates identify each value by its name
+                        parameter["parameter_name"] = key
+
+                    parameters.append(parameter)
+
                 template["components"] = [
-                    {
-                        "type": "body",
-                        "parameters": [
-                            (
-                                {
-                                    **(
-                                        self.components[key]
-                                        if isinstance(
-                                            self.components[key], dict
-                                        )
-                                        else {
-                                            "type": "text",
-                                            "text": values[
-                                                self.components[key]
-                                            ],
-                                        }
-                                    ),
-                                    **(
-                                        {"parameter_name": key}
-                                        if self.named_components
-                                        else {}
-                                    ),
-                                }
-                            )
-                            for key in sorted(
-                                self.components,
-                                key=None if self.named_components else int,
-                            )
-                        ],
-                    }
+                    {"type": "body", "parameters": parameters}
                 ]
 
             messages.append({"type": "template", "template": template})
