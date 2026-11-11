@@ -25,8 +25,10 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from json import loads
 import logging
 from unittest import mock
+from uuid import UUID
 
 from helpers import AppriseURLTester
 import pytest
@@ -120,12 +122,6 @@ apprise_url_tests = (
         },
     ),
     (
-        f"trigvs://{VALID_API_KEY}/?idempotency_key={'x' * 256}",
-        {
-            "instance": AppriseImproperlyConfigured,
-        },
-    ),
-    (
         f"trigvs://{VALID_API_KEY}",
         {
             "instance": NotifyTrigv,
@@ -199,7 +195,8 @@ def test_plugin_trigv_general(mock_post):
     assert payload["description"] == "Backup failed"
     assert payload["level"] == "error"
     assert payload["delivery_urgency"] == "time_sensitive"
-    assert "idempotency_key" not in payload
+    # Every request carries a generated idempotency key
+    assert UUID(payload["idempotency_key"])
 
 
 @mock.patch("requests.post")
@@ -412,59 +409,58 @@ def test_plugin_trigv_url_roundtrip(mock_post):
     assert obj2.priority == 2
 
 
-def test_plugin_trigv_idempotency_key_validation():
-    """NotifyTrigv() validates idempotency_key length and type."""
-
-    obj = NotifyTrigv(api_key=VALID_API_KEY, idempotency_key="  my-key  ")
-    assert obj.idempotency_key == "my-key"
-
-    obj = NotifyTrigv(api_key=VALID_API_KEY, idempotency_key="   ")
-    assert obj.idempotency_key is None
-
-    with pytest.raises(AppriseImproperlyConfigured):
-        NotifyTrigv(
-            api_key=VALID_API_KEY,
-            idempotency_key="x" * 256,
-        )
-
-    with pytest.raises(AppriseImproperlyConfigured):
-        NotifyTrigv(api_key=VALID_API_KEY, idempotency_key=12345)
-
-
 @mock.patch("requests.post")
-def test_plugin_trigv_idempotency_key_send(mock_post):
-    """NotifyTrigv() sends idempotency_key in the JSON body when set."""
+def test_plugin_trigv_idempotency_key(mock_post):
+    """NotifyTrigv() gives every channel and notification its own key."""
 
     response = mock.Mock()
+    response.content = b"{}"
     response.status_code = requests.codes.accepted
     mock_post.return_value = response
 
-    obj = NotifyTrigv(api_key=VALID_API_KEY, idempotency_key="evt-42")
-    assert obj.send(body="test", title="title") is True
+    aobj = apprise.Apprise()
+    assert aobj.add(f"trigvs://{VALID_API_KEY}/ops/dev")
 
-    import json
+    # Two notifications sent to two channels
+    assert aobj.notify(title="Disk full", body="first")
+    assert aobj.notify(title="Backup failed", body="second")
+    assert mock_post.call_count == 4
 
-    payload = json.loads(mock_post.call_args_list[0][1]["data"])
-    assert payload["idempotency_key"] == "evt-42"
+    # Trigv drops any request whose key it has already seen, so no two
+    # requests may share one
+    keys = {
+        loads(call[1]["data"])["idempotency_key"]
+        for call in mock_post.call_args_list
+    }
+    assert len(keys) == 4
 
 
 @mock.patch("requests.post")
-def test_plugin_trigv_idempotency_key_url_roundtrip(mock_post):
-    """NotifyTrigv() round-trips idempotency_key in url()."""
+def test_plugin_trigv_retry_reuses_key(mock_post):
+    """NotifyTrigv() resends a failed request with its original key."""
 
-    mock_post.return_value = mock.Mock()
-    mock_post.return_value.status_code = requests.codes.accepted
+    unavailable = mock.Mock()
+    unavailable.content = b"{}"
+    unavailable.headers = {}
+    unavailable.status_code = requests.codes.service_unavailable
 
-    obj = NotifyTrigv(
-        api_key=VALID_API_KEY,
-        idempotency_key="dedup-1",
+    accepted = mock.Mock()
+    accepted.content = b"{}"
+    accepted.status_code = requests.codes.accepted
+
+    mock_post.side_effect = [unavailable, accepted]
+
+    aobj = apprise.Apprise()
+    assert aobj.add(f"trigvs://{VALID_API_KEY}/ops?retry=1&wait=0")
+    assert aobj.notify(title="Disk full", body="body")
+    assert mock_post.call_count == 2
+
+    # The retry is recognised by Trigv as the same event
+    first, second = (
+        loads(call[1]["data"])["idempotency_key"]
+        for call in mock_post.call_args_list
     )
-    generated = obj.url()
-    assert "idempotency_key=dedup-1" in generated
-
-    parsed = NotifyTrigv.parse_url(generated)
-    obj2 = NotifyTrigv(**parsed)
-    assert obj2.idempotency_key == "dedup-1"
+    assert first == second
 
 
 @mock.patch("requests.post")

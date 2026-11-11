@@ -39,14 +39,13 @@
 #  with a slash:
 #     trigvs://{api_key}/{channel1}/{channel2}
 #
-#  Optional query parameters (e.g. ?idempotency_key=...) are documented
-#  on the NotifyTrigv template_args.
-#
 # Resources:
 # - https://trigv.com/docs/learn/api-keys
 # - https://trigv.com/docs/api/
 
+from hashlib import sha256
 from json import dumps
+from uuid import uuid4
 
 import requests
 
@@ -88,9 +87,6 @@ TRIGV_URGENCIES = (
     "standard",
     "time_sensitive",
 )
-
-# Trigv API idempotency key (optional ingest field)
-IDEMPOTENCY_KEY_MAXLEN = 255
 
 # Extend HTTP Error Messages
 TRIGV_HTTP_ERROR_MAP = {
@@ -210,10 +206,6 @@ class NotifyTrigv(NotifyBase):
                 "name": _("Priority (Pushover compatibility)"),
                 "type": "int",
             },
-            "idempotency_key": {
-                "name": _("Idempotency Key"),
-                "type": "string",
-            },
         },
     )
 
@@ -226,7 +218,6 @@ class NotifyTrigv(NotifyBase):
         urgency=None,
         event_type=None,
         priority=None,
-        idempotency_key=None,
         **kwargs,
     ):
         """Initialize Trigv Object."""
@@ -282,27 +273,6 @@ class NotifyTrigv(NotifyBase):
             msg = f"An invalid Trigv urgency ({urgency}) was specified."
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
-
-        self.idempotency_key = None
-        if idempotency_key is not None:
-            if not isinstance(idempotency_key, str):
-                msg = (
-                    f"An invalid Trigv idempotency key ({idempotency_key!r}) "
-                    "was specified."
-                )
-                self.logger.warning(msg)
-                raise AppriseImproperlyConfigured(msg)
-
-            idempotency_key = idempotency_key.strip()
-            if idempotency_key:
-                if len(idempotency_key) > IDEMPOTENCY_KEY_MAXLEN:
-                    msg = (
-                        f"An invalid Trigv idempotency key "
-                        f"({idempotency_key!r}) was specified."
-                    )
-                    self.logger.warning(msg)
-                    raise AppriseImproperlyConfigured(msg)
-                self.idempotency_key = idempotency_key
 
         # A custom hostname (e.g. a local/self-hosted ingest gateway)
         # overrides our default api.trigv.com endpoint; a port can be
@@ -361,12 +331,25 @@ class NotifyTrigv(NotifyBase):
             if self.event_type:
                 payload["event_type"] = self.event_type
 
-            if self.idempotency_key:
-                payload["idempotency_key"] = self.idempotency_key
-
             # Trigv's own API field is delivery_urgency; our shorter
             # urgency= is only the Apprise-facing parameter name
             payload["delivery_urgency"] = urgency
+
+            # Identical requests (same channel and content) share a
+            # fingerprint, so each channel and message piece gets its own.
+            fingerprint = sha256(
+                dumps(payload, sort_keys=True).encode("utf-8")
+            ).hexdigest()
+
+            # Reuse the key when retrying a request so Trigv does not
+            # push the same event twice.  A new notification always
+            # gets a new key so it is never mistaken for an old one.
+            idempotency_key = self.recall(fingerprint)
+            if idempotency_key is None:
+                idempotency_key = str(uuid4())
+                self.remember(fingerprint, idempotency_key)
+
+            payload["idempotency_key"] = idempotency_key
 
             self.logger.debug(
                 "Trigv POST URL:"
@@ -411,7 +394,16 @@ class NotifyTrigv(NotifyBase):
 
                     # Log the request id (quote it to Trigv support) and,
                     # for 409/429/503, how long the server asked us to wait
-                    self._log_response_headers(r)
+                    request_id = r.headers.get("X-Request-ID")
+                    if request_id:
+                        self.logger.debug("Trigv X-Request-ID: %s", request_id)
+
+                    retry_after = r.headers.get("Retry-After")
+                    if retry_after:
+                        self.logger.debug(
+                            "Trigv asked to retry after %s second(s).",
+                            retry_after,
+                        )
 
                     # Mark our failure and move onto the next channel
                     has_error = True
@@ -433,19 +425,6 @@ class NotifyTrigv(NotifyBase):
             self.mark_delivered(channel)
 
         return not has_error
-
-    def _log_response_headers(self, response):
-        """Log X-Request-ID and Retry-After from a failed response."""
-
-        request_id = response.headers.get("X-Request-ID")
-        if isinstance(request_id, str) and request_id:
-            self.logger.warning(f"Trigv X-Request-ID: {request_id}")
-
-        retry_after = response.headers.get("Retry-After")
-        if isinstance(retry_after, str) and retry_after:
-            self.logger.warning(
-                f"Trigv asked us to retry after {retry_after} second(s)."
-            )
 
     def _resolve_urgency(self, notify_type):
         """Map explicit urgency, Pushover-style priority, or defaults."""
@@ -504,9 +483,6 @@ class NotifyTrigv(NotifyBase):
 
         if self.priority is not None:
             params["priority"] = self.priority
-
-        if self.idempotency_key:
-            params["idempotency_key"] = self.idempotency_key
 
         # Extend our parameters with the ones on our parent class
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -582,10 +558,5 @@ class NotifyTrigv(NotifyBase):
 
         if "priority" in qsd and len(qsd["priority"]):
             results["priority"] = qsd["priority"]
-
-        if "idempotency_key" in qsd and len(qsd["idempotency_key"]):
-            results["idempotency_key"] = NotifyTrigv.unquote(
-                qsd["idempotency_key"]
-            )
 
         return results
