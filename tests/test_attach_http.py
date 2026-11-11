@@ -26,18 +26,28 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+import contextlib
 import errno
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import logging
 import mimetypes
 from os.path import dirname, getsize, join
 import re
+import threading
+import time
 from typing import ClassVar
 from unittest import mock
 
 import pytest
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotificationManager, exception
+from apprise import (
+    Apprise,
+    AppriseAsset,
+    AppriseAttachment,
+    NotificationManager,
+    exception,
+)
 from apprise.attachment.http import AttachHTTP
 from apprise.common import ContentLocation
 from apprise.plugins import NotifyBase
@@ -696,3 +706,146 @@ def test_attach_http_preserves_storage_error(mock_get, mock_temp_file):
 
     assert attachment.download() is False
     assert attachment.download_error is storage_error
+
+
+def test_attach_http_trickle():
+    """A server that trickles its file in is cut off once time is up."""
+    stop = threading.Event()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+
+            # One byte at a time, never long enough apart to trip the
+            # read timeout
+            with contextlib.suppress(OSError):
+                while not stop.is_set():
+                    self.wfile.write(b"x")
+                    self.wfile.flush()
+                    time.sleep(0.1)
+
+        def log_message(self, _format, *args):
+            # Keep the test server quiet.
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+    try:
+        results = AttachHTTP.parse_url(
+            f"http://127.0.0.1:{server.server_port}/file.txt"
+        )
+        results["asset"] = AppriseAsset(service_timeout=0.5)
+        attachment = AttachHTTP(**results)
+
+        started = time.monotonic()
+        assert attachment.download() is False
+
+        # Without the limit this would never end; allow a slow machine
+        assert time.monotonic() - started < 5.0
+        assert attachment.path is None
+
+    finally:
+        stop.set()
+        server.shutdown()
+        thread.join()
+        server.server_close()
+
+
+@mock.patch("requests.get")
+def test_attach_http_time_limit(mock_get):
+    """The download time limit can be turned off, and copes without a
+    socket to shut down."""
+
+    class SlowResponse(SizedResponse):
+        def iter_content(self, chunk_size=1024):
+            # Long enough for the watchdog to fire part way through
+            time.sleep(0.5)
+            yield from super().iter_content(chunk_size)
+
+    mock_get.return_value = SlowResponse()
+    results = AttachHTTP.parse_url("http://localhost/file.txt")
+
+    # This response has no socket, but the download still fails
+    results["asset"] = AppriseAsset(service_timeout=0.1)
+    assert AttachHTTP(**results).download() is False
+
+    # 0 turns the limit off
+    results["asset"] = AppriseAsset(service_timeout=0)
+    attachment = AttachHTTP(**results)
+    assert attachment.download() is True
+    assert len(attachment) == len(SizedResponse.payload)
+
+    # A socket that is already closed is left alone
+    sock = mock.Mock()
+    sock.shutdown.side_effect = OSError("closed")
+    response = mock.Mock()
+    response.raw._fp.fp.raw._sock = sock
+    expired = threading.Event()
+    AttachHTTP._expire(response, expired)
+    assert expired.is_set()
+    sock.shutdown.assert_called_once()
+
+
+def test_attach_http_slow_answer():
+    """Waits for headers and redirects stay within the time limit."""
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            # The URL's own query (such as rto=) is passed along; ignore it
+            path = self.path.split("?")[0]
+            if path == "/silent":
+                # Say nothing for longer than the time allowed
+                time.sleep(1.0)
+
+            elif path.startswith("/hop/") and path != "/hop/0":
+                # Redirect to the next hop after a short pause
+                time.sleep(0.15)
+                self.send_response(302)
+                self.send_header("Location", f"/hop/{int(path[5:]) - 1}")
+                self.end_headers()
+                return
+
+            with contextlib.suppress(OSError):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"ok")
+
+        def log_message(self, _format, *args):
+            # Keep the test server quiet.
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+
+    def attachment(path, service_timeout):
+        results = AttachHTTP.parse_url(
+            f"http://127.0.0.1:{server.server_port}{path}?rto=30"
+        )
+        results["asset"] = AppriseAsset(service_timeout=service_timeout)
+        return AttachHTTP(**results)
+
+    try:
+        # A server that keeps quiet is not waited on past the limit, even
+        # with a long read timeout in the URL
+        started = time.monotonic()
+        assert attachment("/silent", 0.2).download() is False
+        assert time.monotonic() - started < 0.9
+
+        # A long chain of slow redirects is stopped once time is up
+        started = time.monotonic()
+        assert attachment("/hop/20", 0.5).download() is False
+        assert time.monotonic() - started < 2.5
+
+        # Without a limit, redirects are followed to the end
+        download = attachment("/hop/2", 0)
+        assert download.download() is True
+        assert len(download) == 2
+
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()
+

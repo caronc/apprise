@@ -30,8 +30,10 @@ from __future__ import annotations
 import contextlib
 import os
 import re
+import socket
 from tempfile import NamedTemporaryFile
 import threading
+import time
 from typing import Any, Optional
 
 import requests
@@ -60,9 +62,6 @@ class AttachHTTP(AttachBase):
 
     # Web based requests are remote/external to our current location
     location = ContentLocation.HOSTED
-
-    # thread safe loading
-    _lock = threading.Lock()
 
     def __init__(
         self,
@@ -100,6 +99,10 @@ class AttachHTTP(AttachBase):
 
         # Preserve storage failures for callers that need a detailed error.
         self.download_error = None
+
+        # thread safe loading; each attachment has its own lock so a slow
+        # download never holds up the download of another attachment
+        self._lock = threading.Lock()
 
         # Our Query String Dictionary; we use this to track arguments
         # specified that aren't otherwise part of this class
@@ -142,6 +145,11 @@ class AttachHTTP(AttachBase):
         # Where our request object will temporarily live.
         r = None
 
+        # A download may run no longer than one service may take, counted
+        # from here; 0 means no limit
+        timeout = self.asset._service_timeout
+        started = time.monotonic()
+
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
@@ -163,6 +171,26 @@ class AttachHTTP(AttachBase):
                 f" {url} (cert_verify={self.verify_certificate!r})"
             )
 
+            # Never wait longer than the time left, whether connecting or for
+            # the server to answer; a tiny minimum keeps requests from
+            # refusing the value once time has run out
+            request_timeout = self.request_timeout
+            if timeout:
+                left = max(started + timeout - time.monotonic(), 0.001)
+                request_timeout = tuple(
+                    min(value, left) for value in request_timeout
+                )
+
+            def out_of_time(
+                response: requests.Response, *args: Any, **kwargs: Any
+            ) -> None:
+                """Stop once time is up, even part way through redirects."""
+                if timeout and time.monotonic() > started + timeout:
+                    raise requests.Timeout(
+                        "HTTP attachment download took longer than"
+                        f" {timeout:g}s"
+                    )
+
             try:
                 # Use the caller's transport when it needs destination policy.
                 http_get = (
@@ -176,9 +204,11 @@ class AttachHTTP(AttachBase):
                     auth=auth,
                     params=self.qsd,
                     verify=self.verify_certificate,
-                    timeout=self.request_timeout,
+                    timeout=request_timeout,
                     allow_redirects=self.redirects,
                     stream=True,
+                    # Checked as each response, redirects included, arrives
+                    hooks={"response": out_of_time},
                 ) as r:
                     # Handle Errors
                     r.raise_for_status()
@@ -238,34 +268,74 @@ class AttachHTTP(AttachBase):
                     # Track all bytes written to disk
                     bytes_written = 0
 
-                    # If we get here, we can now safely write our content to
-                    # disk
-                    for chunk in r.iter_content(chunk_size=chunk_size):
-                        # filter out keep-alive chunks
-                        if chunk:
-                            # Enforce the limit while streaming because the
-                            # server may omit or misreport Content-Length.
-                            if (
-                                self.max_file_size > 0
-                                and bytes_written + len(chunk)
-                                > self.max_file_size
-                            ):
-                                # The downloaded content is too large.
-                                self.logger.error(
-                                    "HTTP response exceeds allowable"
-                                    " maximum file length"
-                                    f" ({int(self.max_file_size / 1024)}"
-                                    f"KB): {self.url(privacy=True)}"
-                                )
+                    # Cut the download off once its time is up. A server
+                    # can trickle in a few bytes at a time and never trip
+                    # the read timeout, so the time check cannot wait for
+                    # the next chunk to arrive.
+                    expired = threading.Event()
+                    watchdog = (
+                        threading.Timer(
+                            max(0.0, started + timeout - time.monotonic()),
+                            self._expire,
+                            (r, expired),
+                        )
+                        if timeout
+                        else None
+                    )
+                    if watchdog:
+                        # A watchdog never keeps the program from exiting
+                        watchdog.daemon = True
+                        watchdog.start()
 
-                                # Invalidate any variables previously set
-                                self.invalidate()
+                    try:
+                        # If we get here, we can now safely write our content
+                        # to disk
+                        for chunk in r.iter_content(chunk_size=chunk_size):
+                            # filter out keep-alive chunks
+                            if chunk:
+                                # Enforce the limit while streaming because
+                                # the server may omit or misreport
+                                # Content-Length.
+                                if (
+                                    self.max_file_size > 0
+                                    and bytes_written + len(chunk)
+                                    > self.max_file_size
+                                ):
+                                    # The downloaded content is too large.
+                                    self.logger.error(
+                                        "HTTP response exceeds allowable"
+                                        " maximum file length"
+                                        f" ({int(self.max_file_size / 1024)}"
+                                        f"KB): {self.url(privacy=True)}"
+                                    )
 
-                                # Return False (signifying a failure)
-                                return False
+                                    # Invalidate any variables previously set
+                                    self.invalidate()
 
-                            self._temp_file.write(chunk)
-                            bytes_written = self._temp_file.tell()
+                                    # Return False (signifying a failure)
+                                    return False
+
+                                self._temp_file.write(chunk)
+                                bytes_written = self._temp_file.tell()
+
+                    finally:
+                        if watchdog:
+                            # The download is over; the watchdog is not needed
+                            watchdog.cancel()
+
+                    if expired.is_set():
+                        # Cut off part way through, so what we have is
+                        # incomplete
+                        self.logger.error(
+                            "HTTP attachment download took longer than"
+                            f" {timeout:g}s: {self.url(privacy=True)}"
+                        )
+
+                        # Invalidate any variables previously set
+                        self.invalidate()
+
+                        # Return False (signifying a failure)
+                        return False
 
                     # Ensure our content is flushed to disk for post-processing
                     self._temp_file.flush()
@@ -309,6 +379,32 @@ class AttachHTTP(AttachBase):
 
         # Return our success
         return True
+
+    @staticmethod
+    def _expire(response: requests.Response, expired: threading.Event) -> None:
+        """Cut off a download that ran out of time.
+
+        Shutting the connection down ends a read still waiting on the server,
+        which closing the response from another thread cannot do safely.
+        """
+        # Let the download know why it ended
+        expired.set()
+
+        # The socket is not part of the public API, so look for it with care
+        sock = getattr(
+            getattr(
+                getattr(getattr(response, "raw", None), "_fp", None),
+                "fp",
+                None,
+            ),
+            "raw",
+            None,
+        )
+        sock = getattr(sock, "_sock", None)
+        if sock is not None:
+            # The connection may already be gone
+            with contextlib.suppress(OSError):
+                sock.shutdown(socket.SHUT_RDWR)
 
     def invalidate(self):
         """Close our temporary file."""

@@ -527,6 +527,12 @@ def apprise_test(do_notify):
     assert plugin.socket_connect_timeout == URLBase.socket_connect_timeout
     assert plugin.socket_read_timeout == URLBase.socket_read_timeout
 
+    # Timeouts must be finite and above zero; anything else keeps the default
+    for value in ("0", "-1", "nan", "inf"):
+        plugin = a.instantiate(f"good://localhost?rto={value}&cto={value}")
+        assert plugin.socket_connect_timeout == URLBase.socket_connect_timeout
+        assert plugin.socket_read_timeout == URLBase.socket_read_timeout
+
     # Reset our object
     a.clear()
     assert len(a) == 0
