@@ -59,8 +59,9 @@ def convert_between(from_format, to_format, content):
     return convert(content) if convert else content
 
 
-# Notification-friendly line-break and table extensions.
+# Notification-friendly line-break, table and fenced code extensions.
 _MARKDOWN_EXTENSIONS = (
+    "markdown.extensions.fenced_code",
     "markdown.extensions.nl2br",
     "markdown.extensions.tables",
 )
