@@ -1351,6 +1351,41 @@ def test_plugin_discord_template_content(mock_post, tmpdir):
     assert posted["content"] == "hello"
 
 
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-8-sig"])
+@mock.patch("requests.post")
+def test_plugin_discord_template_utf8(mock_post, encoding, tmpdir):
+    """NotifyDiscord() reads a UTF-8 template whatever the locale encoding."""
+
+    mock_post.return_value = mock.Mock(
+        status_code=requests.codes.ok,
+        content=b"",
+        headers={},
+    )
+
+    # Non-ASCII text, with and without a byte order mark
+    template = tmpdir.join("discord.json")
+    template.write_binary(
+        '{"content": "Łukasz ✨ {{app_body}}"}'.encode(encoding)
+    )
+
+    obj = Apprise.instantiate(
+        "discord://{}/{}/".format("A" * 24, "B" * 64)
+        + "?template={}".format(str(template))
+    )
+    assert isinstance(obj, NotifyDiscord)
+    assert (
+        bool(
+            obj.notify(
+                body="hello", title="world", notify_type=NotifyType.INFO
+            )
+        )
+        is True
+    )
+
+    posted = loads(mock_post.call_args_list[0][1]["data"])
+    assert posted["content"] == "Łukasz ✨ hello"
+
+
 @mock.patch("requests.post")
 def test_plugin_discord_template_embeds(mock_post, tmpdir):
     """NotifyDiscord() template with 'embeds' field."""

@@ -471,6 +471,62 @@ def test_plugin_workflows_templating_basic_success(
     assert blocks["body"] == "body"
 
 
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-8-sig"])
+def test_plugin_workflows_templating_utf8(
+    request_mock, workflows_url, encoding, tmpdir
+):
+    """
+    NotifyWorkflows() Templating - a UTF-8 template is read as UTF-8
+    whatever the locale encoding, with or without a byte order mark.
+    """
+
+    template = tmpdir.join("simple.json")
+    template.write_binary(
+        cleandoc("""
+    {
+      "type": "message",
+      "attachments": [{
+        "contentType": "application/vnd.microsoft.card.adaptive",
+        "contentUrl": null,
+        "content": {
+          "$schema":
+            "http://adaptivecards.io/schemas/adaptive-card.json",
+          "type": "AdaptiveCard",
+          "version": "1.4",
+          "body": [
+            {
+              "type": "TextBlock",
+              "id": "body",
+              "text": "Łukasz ✨ {{app_body}}"
+            }
+          ]
+        }
+      }]
+    }
+    """).encode(encoding)
+    )
+
+    obj = Apprise.instantiate(
+        "{url}/?template={template}".format(
+            url=workflows_url,
+            template=str(template),
+        )
+    )
+
+    assert isinstance(obj, NotifyWorkflows)
+    assert (
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
+        is True
+    )
+
+    posted_json = json.loads(request_mock.call_args_list[0][1]["data"])
+    content = posted_json["attachments"][0]["content"]
+    blocks = {b["id"]: b["text"] for b in content["body"] if "id" in b}
+    assert blocks["body"] == "Łukasz ✨ body"
+
+
 def test_plugin_workflows_templating_invalid_json(
     request_mock, workflows_url, tmpdir
 ):
