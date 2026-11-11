@@ -1003,7 +1003,7 @@ class NotifyOffice365(NotifyBase):
 
         if self.token and self.token_expiry > datetime.now():
             # If we're already authenticated and our token is still valid
-            self.logger.debug(f"Already authenticate with token {self.token}")
+            self.logger.debug("Already authenticated with an unexpired token")
             return True
 
         # If we reach here, we've either expired, or we need to authenticate

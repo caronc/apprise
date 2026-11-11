@@ -562,6 +562,47 @@ def test_plugin_office365_authentication(mock_get, mock_post):
     assert obj.authenticate() is False
 
 
+@mock.patch("requests.post")
+def test_plugin_office365_token_not_logged(mock_post, caplog):
+    """NotifyOffice365() never writes the access token to the debug log."""
+    # This module turns logging off at import time, so turn it back on
+    # and record everything Apprise writes, debug lines included.
+    logging.disable(logging.NOTSET)
+    caplog.set_level(logging.DEBUG, logger="apprise")
+
+    # Answer every POST with a good login reply that carries a token we
+    # can search for later.  The same reply also works as a successful
+    # answer to the e-mail sends that follow.
+    response = mock.Mock()
+    response.content = dumps(
+        {
+            "token_type": "Bearer",
+            "expires_in": 6000,
+            "access_token": "abcd1234secret",
+        }
+    )
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        "azure://user@example.net/ff-gg-hh-ii-jj/aa-bb-cc-dd-ee/"
+        "abcd/1234/abcd@ajd@/test/target@example.com"
+    )
+    assert isinstance(obj, NotifyOffice365)
+
+    # The first send logs in and fetches a token.  The second reuses
+    # the cached token, which runs the "already authenticated" path.
+    assert bool(obj.notify(title="title", body="test")) is True
+    assert bool(obj.notify(title="title", body="test")) is True
+
+    # Make sure the log was really captured, so the check below cannot
+    # pass just because nothing was recorded.
+    assert caplog.records
+
+    # The token must not appear anywhere in the debug output
+    assert "abcd1234secret" not in caplog.text
+
+
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")

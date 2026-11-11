@@ -745,6 +745,35 @@ def test_plugin_fcm_keyfile_parse_default(mock_post):
 @pytest.mark.skipif(
     "cryptography" not in sys.modules, reason="Requires cryptography"
 )
+def test_plugin_fcm_token_not_logged(mock_post, caplog):
+    """NotifyFCM() never writes the access token to the debug log."""
+    # This module turns logging off at import time, so turn it back on
+    # and record everything Apprise writes, debug lines included.
+    logging.disable(logging.NOTSET)
+    caplog.set_level(logging.DEBUG, logger="apprise")
+
+    # The mock_post fixture answers every POST with a good OAuth reply
+    # whose access token is "ya29.c.abcd".  That same reply also works
+    # as a successful answer to the FCM message sends that follow.
+    obj = Apprise.instantiate(
+        f"fcm://mock-project-id/device/#topic/?keyfile={FCM_KEYFILE}"
+    )
+
+    # The first send fetches a token and the second reuses it
+    assert bool(obj.notify("test")) is True
+    assert bool(obj.notify("test")) is True
+
+    # Make sure the log was really captured, so the check below cannot
+    # pass just because nothing was recorded.
+    assert caplog.records
+
+    # The token must not appear anywhere in the debug output
+    assert "ya29.c.abcd" not in caplog.text
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
 def test_plugin_fcm_keyfile_parse_no_expiry(mock_post):
     """Test case without `expires_in` entry."""
 
