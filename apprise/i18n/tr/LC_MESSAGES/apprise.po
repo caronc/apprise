@@ -2410,3 +2410,7 @@ msgstr "MUC takma adı"
 #: apprise/plugins/xmpp/base.py:177
 msgid "SCRAM-PLUS Channel Binding"
 msgstr "SCRAM-PLUS kanal bağlama"
+
+#: apprise/plugins/awswhatsapp.py:214
+msgid "S3 Bucket"
+msgstr "S3 kovası"
