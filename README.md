@@ -103,6 +103,7 @@ The table below identifies the services this tool supports and some example serv
 | [IFTTT](https://appriseit.com/services/ifttt/) | ifttt://    | (TCP) 443    | ifttt://webhooksID/Event<br />ifttt://webhooksID/Event1/Event2/EventN<br/>ifttt://webhooksID/Event1/?+Key=Value<br/>ifttt://webhooksID/Event1/?-Key=value1
 | [ilert](https://appriseit.com/services/ilert/) | ilert://  | (TCP) 443 | ilert://IntegrationKey<br />ilert://IntegrationKey?priority=high<br />ilert://IntegrationKey?action=resolve&dedup=key
 | [incident.io](https://appriseit.com/services/incidentio/) | incidentio://  | (TCP) 443 | incidentio://source_id/token<br />incidentio://source_id/token?action=resolve&dedup=key
+| [Instagram](https://appriseit.com/services/instagram/) | instagram://  | (TCP) 443 | instagram://AccessToken/UserID<br />instagram://AccessToken/UserID1/UserID2/UserIDN
 | [IRC](https://appriseit.com/services/irc/) | irc:// or ircs://   | (TCP) 6667 or 6697 | ircs://user:pass@irc.server/@user<br /> ircs://user:pass@irc.server/#channel?join=true&mode=nickserv<br/>ircs://user:pass@znc.server/@user1/@user2/@user3/#channel1
 | [Jellyfin](https://appriseit.com/services/jellyfin/)  | jellyfin:// or jellyfins:// | (TCP) 8096 | jellyfin://user@hostname/<br />jellyfins://user:password@hostname
 | [Jira](https://appriseit.com/services/jira/) | jira:// | (TCP) 443 | jira://APIKey<br/>jira://APIKey/@UserID<br/>jira://APIKey/#Team<br/>jira://APIKey/\*Schedule<br/>jira://APIKey/^Escalation
