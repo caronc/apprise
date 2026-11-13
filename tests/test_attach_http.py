@@ -31,6 +31,7 @@ import errno
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import logging
 import mimetypes
+import os
 from os.path import dirname, getsize, join
 import re
 import socket
@@ -49,9 +50,10 @@ from apprise import (
     NotificationManager,
     exception,
 )
-from apprise.attachment.http import AppriseWatchdogCutoff, AttachHTTP
+from apprise.attachment.http import AttachHTTP
 from apprise.common import ContentLocation
 from apprise.plugins import NotifyBase
+from apprise.utils import http as http_utils
 from apprise.utils.http import HTTPPolicy, HTTPPolicySession
 
 logging.disable(logging.CRITICAL)
@@ -140,7 +142,7 @@ def test_attach_http_query_string_dictionary():
 
 
 @mock.patch("requests.request")
-@mock.patch("requests.get")
+@mock.patch("requests.Session.get")
 def test_attach_http(mock_get, mock_request):
     """
     API: AttachHTTP() object
@@ -630,7 +632,7 @@ class SizedResponse:
         return
 
 
-@mock.patch("requests.get")
+@mock.patch("requests.Session.get")
 def test_attach_http_download_dir(mock_get, tmpdir):
     """AttachHTTP writes downloads into the requested directory."""
 
@@ -653,7 +655,7 @@ def test_attach_http_download_dir(mock_get, tmpdir):
     assert dirname(attachment.path) != download_dir
 
 
-@mock.patch("requests.get")
+@mock.patch("requests.Session.get")
 def test_attach_http_size_limit(mock_get):
     """AttachHTTP never writes more than max_file_size bytes."""
 
@@ -695,7 +697,7 @@ def test_attach_http_size_limit(mock_get):
 
 
 @mock.patch("apprise.attachment.http.NamedTemporaryFile")
-@mock.patch("requests.get")
+@mock.patch("requests.Session.get")
 def test_attach_http_preserves_storage_error(mock_get, mock_temp_file):
     """Callers can inspect a download failure caused by local storage."""
 
@@ -755,10 +757,10 @@ def test_attach_http_trickle():
         server.server_close()
 
 
-@mock.patch("requests.get")
+@mock.patch("requests.Session.get")
 def test_attach_http_time_limit(mock_get):
-    """The download time limit can be turned off, and copes without a
-    socket to shut down."""
+    """The download time limit can be turned off, and still stops a
+    transport it cannot cut off between chunks."""
 
     class SlowResponse(SizedResponse):
         def iter_content(self, chunk_size=1024):
@@ -770,9 +772,12 @@ def test_attach_http_time_limit(mock_get):
     mock_get.return_value = SlowResponse()
     results = AttachHTTP.parse_url("http://localhost/file.txt")
 
-    # This response has no socket, but the download still fails
+    # This response has no connection to cut off, but the download still
+    # fails
     results["asset"] = AppriseAsset(service_timeout=0.1)
-    assert AttachHTTP(**results).download() is False
+    attachment = AttachHTTP(**results)
+    assert attachment.download() is False
+    assert attachment.path is None
 
     # 0 turns the limit off
     results["asset"] = AppriseAsset(service_timeout=0)
@@ -780,26 +785,8 @@ def test_attach_http_time_limit(mock_get):
     assert attachment.download() is True
     assert len(attachment) == len(SizedResponse.payload)
 
-    # Every connection is shut down, and one already closed is left alone
-    sock = mock.Mock()
-    sock.shutdown.side_effect = OSError("closed")
-    opened = mock.Mock()
-    cutoff = AppriseWatchdogCutoff()
-    cutoff.response = mock.Mock()
-    cutoff.response.raw._fp.fp.raw._sock = sock
-    cutoff.connections.add(opened)
-    AttachHTTP._expire(cutoff)
-    assert cutoff.expired.is_set()
-    sock.shutdown.assert_called_once()
-    opened.shutdown.assert_called_once()
 
-    # A connection opened just after time ran out is ended straight away
-    late = mock.Mock()
-    cutoff.connections.add(late)
-    late.shutdown.assert_called_once()
-
-
-@mock.patch("requests.get")
+@mock.patch("requests.Session.get")
 def test_attach_http_late_reply(mock_get):
     """A reply that arrives just after time ran out is not used."""
 
@@ -817,47 +804,225 @@ def test_attach_http_late_reply(mock_get):
     assert attachment.path is None
 
 
-def test_attach_http_trickled_headers():
-    """A policy session cuts off a server that trickles its headers."""
-    stop = threading.Event()
+def _keepalive_server(stop, accepted):
+    """Start a keep-alive server on 127.0.0.1 and return its listener.
 
-    def serve(listener):
-        conn, _ = listener.accept()
-        with conn, contextlib.suppress(OSError):
-            conn.recv(4096)
-            # One header byte at a time, never tripping the read timeout
-            for byte in b"HTTP/1.1 200 OK\r\nX-Slow: " + b"y" * 1000:
-                if stop.is_set():
-                    break
-
-                conn.sendall(bytes([byte]))
-                time.sleep(0.05)
-
+    - ``/fast`` answers straight away.
+    - ``/steady`` sends 30 bytes over 1.5 seconds.
+    - ``/redirect`` sends the client to ``/slow`` on ``localhost``.
+    - Anything else trickles its headers in far slower than any limit.
+    - Each connection accepted is added to ``accepted``.
+    """
     listener = socket.socket()
     listener.bind(("127.0.0.1", 0))
-    listener.listen(1)
-    thread = threading.Thread(target=serve, args=(listener,))
-    thread.start()
-    try:
-        results = AttachHTTP.parse_url(
-            f"http://127.0.0.1:{listener.getsockname()[1]}/file.txt"
-        )
+    listener.listen(8)
+    port = listener.getsockname()[1]
+
+    def handle(conn):
+        with conn, contextlib.suppress(OSError):
+            while not stop.is_set():
+                request = conn.recv(4096)
+                if not request:
+                    return
+
+                path = request.split(b" ")[1]
+                if path == b"/fast":
+                    conn.sendall(
+                        b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"
+                    )
+
+                elif path == b"/steady":
+                    conn.sendall(
+                        b"HTTP/1.1 200 OK\r\nContent-Length: 30\r\n\r\n"
+                    )
+                    for _ in range(30):
+                        conn.sendall(b"x")
+                        time.sleep(0.05)
+
+                elif path == b"/redirect":
+                    conn.sendall(
+                        b"HTTP/1.1 302 Found\r\nContent-Length: 0\r\n"
+                        b"Location: http://localhost:"
+                        + str(port).encode()
+                        + b"/slow\r\n\r\n"
+                    )
+
+                else:
+                    # One header byte at a time, never tripping the read
+                    # timeout.  It would take over 8 minutes.
+                    for byte in b"HTTP/1.1 200 OK\r\nX-Slow: " + b"y" * 10000:
+                        if stop.is_set():
+                            return
+
+                        conn.sendall(bytes([byte]))
+                        time.sleep(0.05)
+
+    def serve():
+        while True:
+            try:
+                conn, _ = listener.accept()
+
+            except OSError:
+                # The listener was closed because the test is over
+                return
+
+            accepted.append(conn)
+            threading.Thread(target=handle, args=(conn,), daemon=True).start()
+
+    threading.Thread(target=serve, daemon=True).start()
+    return listener
+
+
+def test_attach_http_trickled_headers():
+    """Every transport cuts off a server that trickles its headers."""
+    stop = threading.Event()
+    accepted = []
+    listener = _keepalive_server(stop, accepted)
+    port = listener.getsockname()[1]
+
+    def download(session=None):
+        results = AttachHTTP.parse_url(f"http://127.0.0.1:{port}/slow")
         results["asset"] = AppriseAsset(service_timeout=0.5)
-        # This test permits loopback only to exercise the transport locally.
-        results["http_session"] = HTTPPolicySession(
-            HTTPPolicy(address_filter=lambda _address: True)
-        )
-        attachment = AttachHTTP(**results)
+        if session is not None:
+            results["http_session"] = session
 
         started = time.monotonic()
-        assert attachment.download() is False
+        assert AttachHTTP(**results).download() is False
 
-        # Without the watchdog this would take nearly a minute
+        # Ten times the limit, so a slow machine still passes
         assert time.monotonic() - started < 5.0
+
+    try:
+        # Requests' own transport
+        download()
+
+        # This test permits loopback only to exercise the transport locally.
+        session = HTTPPolicySession(
+            HTTPPolicy(address_filter=lambda _address: True)
+        )
+
+        # A connection the policy session opens for the download
+        download(session)
+
+        # A connection kept open from an earlier request
+        assert session.get(f"http://127.0.0.1:{port}/fast").content == b"ok"
+        before = len(accepted)
+        download(session)
+        assert len(accepted) == before
 
     finally:
         stop.set()
+        listener.close()
+
+
+def test_attach_http_trickled_proxy():
+    """A proxy that trickles its answer is cut off as well."""
+    stop = threading.Event()
+    accepted = []
+    listener = _keepalive_server(stop, accepted)
+    proxy = f"http://127.0.0.1:{listener.getsockname()[1]}"
+
+    # Only our proxy, whatever the machine running the tests has set
+    environ = {
+        key: value
+        for key, value in os.environ.items()
+        if key.lower()
+        not in ("http_proxy", "https_proxy", "all_proxy", "no_proxy")
+    }
+    environ.update(http_proxy=proxy, https_proxy=proxy)
+
+    try:
+        with mock.patch.dict(os.environ, environ, clear=True):
+            # A plain request, and one asking the proxy for a tunnel
+            for url in (
+                "http://apprise.invalid/slow",
+                "https://apprise.invalid/slow",
+            ):
+                results = AttachHTTP.parse_url(url)
+                results["asset"] = AppriseAsset(service_timeout=0.5)
+
+                started = time.monotonic()
+                assert AttachHTTP(**results).download() is False
+
+                # Ten times the limit, so a slow machine still passes
+                assert time.monotonic() - started < 5.0
+
+        # Both went to the proxy
+        assert len(accepted) == 2
+
+    finally:
+        stop.set()
+        listener.close()
+
+
+def test_attach_http_without_watchdog():
+    """A download that cannot be timed is not attempted."""
+    results = AttachHTTP.parse_url("http://localhost/file.txt")
+    attachment = AttachHTTP(**results)
+    with (
+        mock.patch.object(http_utils, "_WATCHDOG", http_utils._Watchdog()),
+        mock.patch("threading.Thread.start", side_effect=RuntimeError),
+        mock.patch("requests.Session.get") as mock_get,
+    ):
+        assert attachment.download() is False
+
+    assert attachment.path is None
+    mock_get.assert_not_called()
+
+
+def test_attach_http_runtime_error():
+    """Other errors are not mistaken for a missing time limit."""
+    results = AttachHTTP.parse_url("http://localhost/file.txt")
+    with (
+        mock.patch("requests.Session.get", side_effect=RuntimeError),
+        pytest.raises(RuntimeError),
+    ):
+        AttachHTTP(**results).download()
+
+
+def test_attach_http_shared_session():
+    """Running out of time never cuts off another download's connection."""
+    stop = threading.Event()
+    accepted = []
+    listener = _keepalive_server(stop, accepted)
+    port = listener.getsockname()[1]
+
+    # This test permits loopback only to exercise the transport locally.
+    session = HTTPPolicySession(
+        HTTPPolicy(address_filter=lambda _address: True)
+    )
+
+    def attachment(host, path, service_timeout):
+        results = AttachHTTP.parse_url(f"http://{host}:{port}{path}")
+        results["asset"] = AppriseAsset(service_timeout=service_timeout)
+        results["http_session"] = session
+        return AttachHTTP(**results)
+
+    try:
+        # The first download is redirected away from 127.0.0.1, and its
+        # connection there goes back to the shared pool
+        first = attachment("127.0.0.1", "/redirect", 0.5)
+        result = {}
+        thread = threading.Thread(
+            target=lambda: result.update(first=first.download())
+        )
+        thread.start()
+        time.sleep(0.15)
+
+        # The second download takes that connection over, and is still
+        # receiving when the first one runs out of time
+        second = attachment("127.0.0.1", "/steady", 30)
+        assert second.download() is True
         thread.join()
+
+        assert result["first"] is False
+        assert len(second) == 30
+
+        # One connection to 127.0.0.1, shared, and one to localhost
+        assert len(accepted) == 2
+
+    finally:
+        stop.set()
         listener.close()
 
 
@@ -926,7 +1091,7 @@ def test_attach_http_slow_answer():
         server.server_close()
 
 
-@mock.patch("requests.get")
+@mock.patch("requests.Session.get")
 def test_attach_http_separate_locks(mock_get):
     """One attachment's download never waits on another's."""
     mock_get.return_value = SizedResponse()

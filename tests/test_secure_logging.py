@@ -73,7 +73,7 @@ def unreachable():
     """Makes any attempt to fetch a remote file fail."""
 
     with mock.patch(
-        "requests.get", side_effect=requests.RequestException("nope")
+        "requests.Session.get", side_effect=requests.RequestException("nope")
     ):
         yield
 

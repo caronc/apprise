@@ -27,9 +27,9 @@
 
 from datetime import datetime
 import hashlib
-import math
 import re
 import sys
+import threading
 import time
 from urllib.parse import quote as _quote, unquote as _unquote
 from xml.sax.saxutils import escape as sax_escape
@@ -290,12 +290,13 @@ class URLBase:
         if not isinstance(self.fullpath, str) or not self.fullpath:
             self.fullpath = "/"
 
-        # Store our Timeout Variables; each must be a finite number of
-        # seconds above zero, otherwise the default is kept
+        # Store our Timeout Variables; each must be a number of seconds
+        # above zero that this platform can wait for, otherwise the default
+        # is kept
         if "rto" in kwargs:
             try:
                 rto = float(kwargs.get("rto"))
-                if not math.isfinite(rto) or rto <= 0:
+                if not 0 < rto <= threading.TIMEOUT_MAX:
                     raise ValueError()
 
                 self.socket_read_timeout = rto
@@ -309,7 +310,7 @@ class URLBase:
         if "cto" in kwargs:
             try:
                 cto = float(kwargs.get("cto"))
-                if not math.isfinite(cto) or cto <= 0:
+                if not 0 < cto <= threading.TIMEOUT_MAX:
                     raise ValueError()
 
                 self.socket_connect_timeout = cto

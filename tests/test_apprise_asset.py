@@ -29,6 +29,7 @@
 from datetime import timezone, tzinfo
 import logging
 import sys
+import threading
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -156,6 +157,15 @@ def test_service_timeout():
     # accidental side effect of its comparison semantics.
     with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(service_timeout=float("nan"))
+
+    # A finite value longer than this platform can wait for fails every
+    # notification the same way inf does, so it is rejected too.
+    with pytest.raises(AppriseImproperlyConfigured):
+        AppriseAsset(service_timeout=1e308)
+
+    # The longest wait this platform supports is still accepted
+    asset = AppriseAsset(service_timeout=threading.TIMEOUT_MAX)
+    assert asset._service_timeout == threading.TIMEOUT_MAX
 
     # The private field cannot bypass the validated public argument.
     with pytest.raises(AppriseImproperlyConfigured):

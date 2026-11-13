@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 import logging
-import math
+import threading
 import time
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
@@ -259,9 +259,13 @@ def validate_timeout(value: Union[int, float]) -> float:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         raise AppriseImproperlyConfigured("timeout must be an int or float.")
 
-    # Reject negative or infinite values; zero means no call-wide limit.
-    if not math.isfinite(value) or value < 0:
-        raise AppriseImproperlyConfigured("timeout must be >= 0 and finite.")
+    # Reject negative values and any wait longer than this platform
+    # supports.  Zero means no call-wide limit.
+    if not 0 <= value <= threading.TIMEOUT_MAX:
+        raise AppriseImproperlyConfigured(
+            "timeout must be between 0 and"
+            f" {threading.TIMEOUT_MAX:.0f} seconds."
+        )
 
     return float(value)
 

@@ -3805,6 +3805,13 @@ class TestServiceTimeout:
         with pytest.raises(ValueError):
             a.notify(body="test", timeout=float("nan"))
 
+    def test_notify_oversized_timeout_raises(self):
+        """notify() rejects a timeout longer than the platform can wait."""
+        a = Apprise()
+        a.add("json://localhost")
+        with pytest.raises(ValueError):
+            a.notify(body="test", timeout=threading.TIMEOUT_MAX * 2)
+
     def test_async_notify_infinite_timeout_raises(self):
         """async_notify(timeout=inf) is rejected for the same reason as
         notify(timeout=inf)."""
