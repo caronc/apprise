@@ -77,6 +77,10 @@ RESPONSES = {
             "data": {"url": "https://cdn.example/x", "id": "1"},
         }
     },
+    "notifly": {
+        "status": 201,
+        "body": {"data": {"acknowledged": True, "status": "processed"}},
+    },
     "octopush": {"status": 201},
     "smseagle": {"body": {"result": {"status": "ok"}}},
     "pushplus": {"body": {"code": 200}},
@@ -161,6 +165,7 @@ TRACKED = {
     "nextcloud": "ncloud://user@localhost?to=user1,user2",
     "nextcloudtalk": "nctalk://user:pass@localhost/room1",
     "notifiarr": "notifiarr://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/#1001",
+    "notifly": "notifly://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/workflow/subscriber1",
     "ntfy": "ntfy://localhost/topic0001/topic9999",
     "octopush": (
         "octopush://sender:user@myaccount.com/apikey/1111111111/"
