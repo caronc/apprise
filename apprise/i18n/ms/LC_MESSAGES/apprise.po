@@ -2453,3 +2453,15 @@ msgstr "Nama panggilan MUC"
 #: apprise/plugins/xmpp/base.py:177
 msgid "SCRAM-PLUS Channel Binding"
 msgstr "Pengikatan saluran SCRAM-PLUS"
+
+#: apprise/plugins/notifly.py:127
+msgid "Workflow"
+msgstr "Aliran Kerja"
+
+#: apprise/plugins/notifly.py:132
+msgid "Subscriber ID"
+msgstr "ID Pelanggan"
+
+#: apprise/plugins/notifly.py:137
+msgid "Subscribers"
+msgstr "Pelanggan"

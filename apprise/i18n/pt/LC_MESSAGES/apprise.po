@@ -2452,3 +2452,15 @@ msgstr "Alcunha MUC"
 #: apprise/plugins/xmpp/base.py:177
 msgid "SCRAM-PLUS Channel Binding"
 msgstr "Vinculação de canal SCRAM-PLUS"
+
+#: apprise/plugins/notifly.py:127
+msgid "Workflow"
+msgstr "Fluxo de trabalho"
+
+#: apprise/plugins/notifly.py:132
+msgid "Subscriber ID"
+msgstr "ID do assinante"
+
+#: apprise/plugins/notifly.py:137
+msgid "Subscribers"
+msgstr "Assinantes"

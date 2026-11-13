@@ -2453,3 +2453,15 @@ msgstr "Псевдоним MUC"
 #: apprise/plugins/xmpp/base.py:177
 msgid "SCRAM-PLUS Channel Binding"
 msgstr "Привязка канала SCRAM-PLUS"
+
+#: apprise/plugins/notifly.py:127
+msgid "Workflow"
+msgstr "Рабочий процесс"
+
+#: apprise/plugins/notifly.py:132
+msgid "Subscriber ID"
+msgstr "ID подписчика"
+
+#: apprise/plugins/notifly.py:137
+msgid "Subscribers"
+msgstr "Подписчики"
