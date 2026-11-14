@@ -46,23 +46,40 @@
 #   Group topic -- one notification per topic:
 #     pushplus://{token}/{topic}
 #     pushplus://{token}/{topic1}/{topic2}
+#     pushplus://{token}/#{topic}
+#
+#   Friend / user notification (via 'to' parameter):
+#     pushplus://{token}/@{friend_token}
+#     pushplus://{token}/@{friend1}/@{friend2}
 #
 #   Select a delivery channel (mode= and channel= are synonyms):
 #     pushplus://{token}?channel=mail
 #     pushplus://{token}?mode=cp
+#     pushplus://{token}?channel=app
+#     pushplus://{token}?channel=wechat,mail
 #
-#   Topic + delivery channel:
-#     pushplus://{token}/{topic}?channel=mail
-#
-#   Webhook channel with a named endpoint -- two equivalent forms:
+#   Channel configuration parameter (e.g. webhook code):
+#     pushplus://{token}?channel=webhook&option={webhook_code}
 #     pushplus://{token}?channel=webhook&name={webhook_name}
 #     pushplus://{webhook_name}@{token}
+#
+#   Message template override:
+#     pushplus://{token}?template=markdown
+#     pushplus://{token}?template=json
+#
+#   Callback URL and Timestamp:
+#     pushplus://{token}?callbackUrl=https://example.com/callback
+#     pushplus://{token}?timestamp=1700000000000
 #
 #   When the schema://{name}@{token} form is used and no explicit channel=
 #   is given, the webhook channel is implied automatically.
 #
-#   Native PushPlus API URL (also accepted by parse_native_url):
+#   Native PushPlus API URLs (also accepted by parse_native_url):
 #     https://www.pushplus.plus/send?token={token}
+#     https://www.pushplus.plus/send/{token}
+#     https://api.pushplus.plus/send?token={token}
+#     https://api.pushplus.plus/send/{token}
+#     https://www.pushplus.plus/batchSend?token={token}
 #
 # Schema alias for WeCom users:
 #   wecom://{token}    -- identical to pushplus://{token}?channel=cp
@@ -71,7 +88,11 @@
 # intermediary), use the wechat:// plugin instead.
 #
 # API References:
+#   https://www.pushplus.plus/doc/
 #   https://www.pushplus.plus/doc/guide/api.html
+#   https://www.pushplus.plus/doc/guide/channel.html
+#   https://www.pushplus.plus/doc/guide/batch.html
+#   https://www.pushplus.plus/doc/guide/friend.html
 #   https://www.pushplus.plus/doc/guide/group.html
 
 import json
@@ -87,17 +108,24 @@ from ..utils.parse import parse_list, validate_regex
 from .base import NotifyBase
 
 # PushPlus application-level response codes.
-# The HTTP status is always 200; the real result lives in the JSON body.
-# Reference: https://www.pushplus.plus/doc/guide/api.html
+# Reference: https://www.pushplus.plus/doc/
 PUSHPLUS_RESPONSE_CODES = {
     200: "Request succeeded.",
-    900: "System exception.",
-    903: "Sending failed.",
-    905: "Request parameter error.",
+    302: "Not logged in.",
+    401: "Request unauthorized.",
+    403: "Request IP not authorized.",
+    500: "System exception.",
+    600: "Data exception.",
+    805: "Unauthorized view.",
+    888: "Insufficient points.",
+    900: "User account restricted or rate limit reached.",
+    903: "Invalid user token.",
+    905: "Account not real-name verified.",
     907: "Token does not exist.",
     908: "User is blocked.",
     909: "Content requires review before sending.",
     912: "No available service package.",
+    999: "Server validation error.",
 }
 
 # Map Apprise's standard notify_format values to the PushPlus template
@@ -121,11 +149,26 @@ class PushPlusChannel:
     Apprise URL, e.g. pushplus://{token}?channel=mail.
     """
 
-    # Deliver via WeChat (PushPlus default)
+    # Deliver via WeChat service account (PushPlus default)
     WECHAT = "wechat"
+
+    # Deliver via official Pushplus mobile App (Android, HarmonyOS, iOS)
+    APP = "app"
+
+    # Deliver via browser extension or desktop application
+    EXTENSION = "extension"
 
     # Deliver via a configured webhook endpoint
     WEBHOOK = "webhook"
+
+    # Deliver via WeChat ClawBot
+    CLAWBOT = "clawbot"
+
+    # Deliver via China Mobile ClawBot (SMS)
+    CMCC = "cmcc"
+
+    # Deliver via QQ Bot
+    QQ = "qq"
 
     # Deliver via WeCom (WeChat Work / Enterprise WeChat).
     # The API value "cp" is PushPlus's internal identifier for this channel.
@@ -138,14 +181,23 @@ class PushPlusChannel:
     # Deliver via SMS
     SMS = "sms"
 
+    # Deliver via voice call
+    VOICE = "voice"
+
 
 # All valid PushPlus delivery channels (these are the API values)
 PUSHPLUS_CHANNELS = (
     PushPlusChannel.WECHAT,
+    PushPlusChannel.APP,
+    PushPlusChannel.EXTENSION,
     PushPlusChannel.WEBHOOK,
+    PushPlusChannel.CLAWBOT,
+    PushPlusChannel.CMCC,
+    PushPlusChannel.QQ,
     PushPlusChannel.WECOM,
     PushPlusChannel.MAIL,
     PushPlusChannel.SMS,
+    PushPlusChannel.VOICE,
 )
 
 # The PushPlus default delivery channel (WeChat)
@@ -189,17 +241,17 @@ class NotifyPushplus(NotifyBase):
     # Maximum body length documented by PushPlus
     body_maxlen = 20000
 
-    # Title is capped at a safe limit (not explicitly documented by PushPlus)
-    title_maxlen = 200
+    # Title length limit documented by PushPlus
+    title_maxlen = 100
 
     # Default to HTML since PushPlus renders HTML by default
     notify_format = NotifyFormat.HTML
 
     # Define object URL templates
     templates = (
-        # No topics: personal notification with optional ?channel= override
+        # No targets: personal notification with optional ?channel= override
         "{schema}://{token}",
-        # Topics in path: one API call per topic
+        # Targets in path: group topics and/or @friends
         "{schema}://{token}/{targets}",
     )
 
@@ -215,9 +267,9 @@ class NotifyPushplus(NotifyBase):
                 # PushPlus tokens are 32-64 alphanumeric/underscore/dash chars
                 "regex": (r"^[a-z0-9_-]{32,64}$", "i"),
             },
-            # Group topics go directly in the URL path with no prefix
+            # Targets: group topics and/or @friends
             "targets": {
-                "name": _("Group Topics"),
+                "name": _("Targets"),
                 "type": "list:string",
             },
         },
@@ -231,7 +283,7 @@ class NotifyPushplus(NotifyBase):
             "token": {
                 "alias_of": "token",
             },
-            # ?to= is the standard Apprise alias for targets (topics)
+            # ?to= is the standard Apprise alias for targets
             "to": {
                 "alias_of": "targets",
             },
@@ -251,19 +303,54 @@ class NotifyPushplus(NotifyBase):
             "topic": {
                 "alias_of": "targets",
             },
-            # Webhook endpoint name; only meaningful when channel=webhook.
-            # The URL parameter is ?name= but the __init__ kwarg is webhook=
-            # to avoid shadowing URLBase.name.
-            "name": {
-                "name": _("Webhook Name"),
+            # Channel configuration parameter (e.g. webhook code)
+            "option": {
+                "name": _("Channel Option"),
                 "type": "string",
-                "map_to": "webhook",
+            },
+            # webhook and name are backward-compatible aliases for option
+            "webhook": {
+                "alias_of": "option",
+            },
+            "name": {
+                "alias_of": "option",
+            },
+            # Message template (html, txt, markdown, json, etc.)
+            "template": {
+                "name": _("Message Template"),
+                "type": "string",
+            },
+            # Callback URL
+            "callback_url": {
+                "name": _("Callback URL"),
+                "type": "string",
+                "map_to": "callback_url",
+            },
+            "callbackurl": {
+                "alias_of": "callback_url",
+            },
+            "callbackUrl": {
+                "alias_of": "callback_url",
+            },
+            # Timestamp
+            "timestamp": {
+                "name": _("Timestamp"),
+                "type": "int",
             },
         },
     )
 
     def __init__(
-        self, token, targets=None, channel=None, webhook=None, **kwargs
+        self,
+        token,
+        targets=None,
+        channel=None,
+        webhook=None,
+        option=None,
+        template=None,
+        callback_url=None,
+        timestamp=None,
+        **kwargs,
     ):
         """Initialize Pushplus Object."""
         super().__init__(**kwargs)
@@ -284,210 +371,273 @@ class NotifyPushplus(NotifyBase):
         schema_channel = PUSHPLUS_SCHEMA_MAP.get((self.schema or "").lower())
 
         # Determine the active delivery channel:
-        #   1. Explicit channel= / mode= argument (already resolved by
-        #      the caller since mode is an alias_of channel in template_args)
-        #   2. Schema-implied channel (wechat:// or wecom://)
-        #   3. Default (WeChat)
         if channel:
-            # Normalise the 'wecom' friendly alias to the API value 'cp'
-            if channel.lower() == "wecom":
-                channel = PushPlusChannel.WECOM
-            self.channel = next(
-                (c for c in PUSHPLUS_CHANNELS if c == channel.lower()),
-                None,
-            )
-            if not self.channel:
-                msg = "The Pushplus channel ({}) is not valid.".format(channel)
-                self.logger.warning(msg)
-                raise AppriseImproperlyConfigured(msg)
+            channels_split = [
+                "cp" if c.strip().lower() == "wecom" else c.strip().lower()
+                for c in channel.split(",")
+                if c.strip()
+            ]
+            for ch in channels_split:
+                if ch not in PUSHPLUS_CHANNELS:
+                    msg = "The Pushplus channel ({}) is not valid.".format(ch)
+                    self.logger.warning(msg)
+                    raise AppriseImproperlyConfigured(msg)
+            self.channel = ",".join(channels_split)
 
         elif schema_channel:
-            # Schema-implied channel (wechat:// or wecom://)
             self.channel = schema_channel
 
         else:
-            # Default to WeChat
             self.channel = PUSHPLUS_CHANNEL_DEFAULT
 
         # Resolved group topics -- one API call is made per topic
         self.topics = []
 
+        # Resolved friend tokens / user accounts (for to= parameter)
+        self.friends = []
+
         # Preserve unrecognised targets for round-trip fidelity in url()
         self.invalid_targets = []
 
-        # Parse each target from the list -- only plain topics are valid here
+        # Parse each target from the list:
+        # - Starts with '@': friend token or user ID (recipient `to`)
+        # - Starts with '#': group topic
+        # - Plain alphanumeric string: group topic (backward-compatible)
         for target in parse_list(targets):
-            result = IS_TOPIC.match(target)
-            if result:
-                self.topics.append(result.group("topic"))
-                continue
+            if target.startswith("@"):
+                user = target[1:].strip()
+                if user and IS_TOPIC.match(user):
+                    self.friends.append(user)
+                    continue
+
+            elif target.startswith("#"):
+                topic = target[1:].strip()
+                if topic and IS_TOPIC.match(topic):
+                    self.topics.append(topic)
+                    continue
+
+            else:
+                result = IS_TOPIC.match(target)
+                if result:
+                    self.topics.append(result.group("topic"))
+                    continue
 
             # Unrecognised entry -- log and preserve
-            self.logger.warning("Dropped invalid Pushplus topic: %s", target)
+            self.logger.warning("Dropped invalid Pushplus target: %s", target)
             self.invalid_targets.append(target)
 
-        # Store the webhook name; only meaningful when channel=webhook.
-        # Kept as self.webhook (not self.name) to avoid shadowing URLBase.name.
-        # Arrives via the ?name= URL parameter (mapped to webhook= by map_to).
-        self.webhook = (
-            webhook if isinstance(webhook, str) and webhook else None
+        # Channel configuration option (priority: option > webhook)
+        if isinstance(option, str) and option.strip():
+            self.option = option.strip()
+        elif isinstance(webhook, str) and webhook.strip():
+            self.option = webhook.strip()
+        else:
+            self.option = None
+
+        # Backward compatibility: self.webhook mirrors self.option
+        self.webhook = self.option
+
+        # Optional message template override
+        self.template = (
+            template.strip()
+            if isinstance(template, str) and template.strip()
+            else None
         )
 
+        # Optional callback URL
+        self.callback_url = (
+            callback_url.strip()
+            if isinstance(callback_url, str) and callback_url.strip()
+            else None
+        )
+
+        # Optional timestamp
+        self.timestamp = None
+        if timestamp is not None:
+            try:
+                self.timestamp = int(timestamp)
+            except (ValueError, TypeError):
+                self.logger.warning(
+                    "Dropped invalid Pushplus timestamp: %s", timestamp
+                )
+
         return
+
+    def _post_payload(self, url, payload, headers):
+        """Helper to post a payload to Pushplus."""
+        self.logger.debug(
+            "PushPlus POST URL: %s (cert_verify=%r)",
+            url,
+            self.verify_certificate,
+        )
+        self.logger.debug("PushPlus Payload: %r", payload)
+
+        self.throttle()
+
+        try:
+            r = requests.post(
+                url,
+                headers=headers,
+                data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                verify=self.verify_certificate,
+                timeout=self.request_timeout,
+                allow_redirects=self.redirects,
+            )
+
+            if r.status_code != requests.codes.ok:
+                status_str = NotifyPushplus.http_response_code_lookup(
+                    r.status_code
+                )
+                self.logger.warning(
+                    "Failed to send PushPlus notification: "
+                    "{}{}error={}.".format(
+                        status_str,
+                        ", " if status_str else "",
+                        r.status_code,
+                    )
+                )
+                self.logger.debug(
+                    "Response Details:\r\n%r",
+                    (r.content or b"")[:2000],
+                )
+                return False
+
+            try:
+                content = json.loads(r.content)
+            except (AttributeError, TypeError, ValueError):
+                content = {}
+                self.logger.debug(
+                    "Failed to parse PushPlus JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
+
+            api_code = content.get("code") if content else None
+            if api_code != 200:
+                error_str = PUSHPLUS_RESPONSE_CODES.get(
+                    api_code,
+                    (
+                        content.get("msg", "Unknown error")
+                        if content
+                        else "Unknown error"
+                    ),
+                )
+                self.logger.warning(
+                    "Failed to send PushPlus notification: "
+                    "code={}: {}.".format(api_code, error_str)
+                )
+                self.logger.debug(
+                    "Response Details:\r\n%r",
+                    content if content else (r.content or b"")[:2000],
+                )
+                return False
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                "A Connection error occurred sending PushPlus notification."
+            )
+            self.logger.debug("Socket Exception: %s", str(e))
+            return False
+
+        return True
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform PushPlus Notification."""
 
-        # Prepare our headers
         headers = {
             "User-Agent": self.app_id,
             "Content-Type": "application/json",
         }
 
-        # Derive the PushPlus rendering template from Apprise's standard
-        # notify_format.  This is a server-side rendering hint only; the
-        # content payload does not change.
-        pp_template = PUSHPLUS_FORMAT_MAP.get(
-            self.notify_format, PUSHPLUS_FORMAT_DEFAULT
+        # Template selection: explicit override or derived from notify_format
+        if self.template:
+            pp_template = self.template
+        else:
+            pp_template = PUSHPLUS_FORMAT_MAP.get(
+                self.notify_format, PUSHPLUS_FORMAT_DEFAULT
+            )
+
+        # Batch send URL if multiple channels are comma-separated
+        endpoint = (
+            "https://www.pushplus.plus/batchSend"
+            if "," in self.channel
+            else self.notify_url
         )
 
-        # When no topics are configured, fall back to a single personal send
-        # by iterating over a list containing None as the sole entry.
-        topics_to_notify = self.topics if self.topics else [None]
+        base_payload = {
+            "token": self.token,
+            "title": title if title else body,
+            "content": body,
+            "template": pp_template,
+            "channel": self.channel,
+        }
 
-        # Track whether any individual send failed
+        if self.option:
+            base_payload["option"] = self.option
+            # If channel is webhook, also set webhook for compat
+            if self.channel == PushPlusChannel.WEBHOOK:
+                base_payload["webhook"] = self.option
+
+        if self.callback_url:
+            base_payload["callbackUrl"] = self.callback_url
+
+        if self.timestamp is not None:
+            base_payload["timestamp"] = self.timestamp
+
         has_error = False
 
-        for topic in topics_to_notify:
-            # Skip a target that already accepted this message so
-            # a retry does not deliver it twice.
-            if self.is_delivered(topic):
-                continue
+        # 1. Group topics
+        if self.topics:
+            for topic in self.topics:
+                if self.is_delivered(topic):
+                    continue
 
-            # Build the payload for this particular topic
-            payload = {
-                # Authentication token
-                "token": self.token,
-                # Fall back to the body when no title is provided
-                "title": title if title else body,
-                # Notification body content
-                "content": body,
-                # Rendering template derived from notify_format
-                "template": pp_template,
-                # Delivery channel
-                "channel": self.channel,
-            }
-
-            # Add the group topic when sending to a specific group
-            if topic:
+                payload = dict(base_payload)
                 payload["topic"] = topic
 
-            # Add the webhook name when the webhook channel is selected
-            if self.channel == PushPlusChannel.WEBHOOK and self.webhook:
-                payload["webhook"] = self.webhook
-
-            # Debug logging so the caller can inspect what will be sent
-            self.logger.debug(
-                "PushPlus POST URL: %s (cert_verify=%r)",
-                self.notify_url,
-                self.verify_certificate,
-            )
-            self.logger.debug("PushPlus Payload: %r", payload)
-
-            # Always throttle before each remote server I/O call
-            self.throttle()
-
-            try:
-                r = requests.post(
-                    self.notify_url,
-                    headers=headers,
-                    # Encode explicitly for non-ASCII (e.g. Chinese) chars
-                    data=json.dumps(payload, ensure_ascii=False).encode(
-                        "utf-8"
-                    ),
-                    verify=self.verify_certificate,
-                    timeout=self.request_timeout,
-                    allow_redirects=self.redirects,
-                )
-
-                if r.status_code != requests.codes.ok:
-                    # HTTP-level failure -- log it and move on
-                    status_str = NotifyPushplus.http_response_code_lookup(
-                        r.status_code
-                    )
-                    self.logger.warning(
-                        "Failed to send PushPlus notification: "
-                        "{}{}error={}.".format(
-                            status_str,
-                            ", " if status_str else "",
-                            r.status_code,
-                        )
-                    )
-                    self.logger.debug(
-                        "Response Details:\r\n%r",
-                        (r.content or b"")[:2000],
-                    )
-                    # Mark our failure and continue with the next topic
+                if not self._post_payload(endpoint, payload, headers):
                     has_error = True
                     continue
 
-                # PushPlus always returns HTTP 200; the real result is in
-                # the JSON body where code == 200 means success.
-                try:
-                    content = json.loads(r.content)
-                except (AttributeError, TypeError, ValueError):
-                    # ValueError = r.content is unparsable
-                    # TypeError  = r.content is None
-                    # AttributeError = r is None
-                    content = {}
-                    self.logger.debug(
-                        "Failed to parse PushPlus JSON response; body: %r",
-                        (r.content or b"")[:2000],
-                    )
+                self.logger.info(
+                    "Sent PushPlus notification to topic %s.", topic
+                )
+                self.mark_delivered(topic)
 
-                # Check the application-level status code
-                api_code = content.get("code") if content else None
-                if api_code != 200:
-                    # Application-level failure
-                    error_str = PUSHPLUS_RESPONSE_CODES.get(
-                        api_code,
-                        # Fall back to the msg field, then a generic string
-                        (
-                            content.get("msg", "Unknown error")
-                            if content
-                            else "Unknown error"
-                        ),
-                    )
-                    self.logger.warning(
-                        "Failed to send PushPlus notification: "
-                        "code={}: {}.".format(api_code, error_str)
-                    )
-                    self.logger.debug(
-                        "Response Details:\r\n%r",
-                        content if content else (r.content or b"")[:2000],
-                    )
-                    # Mark our failure and continue with the next topic
+        # 2. Friend recipients
+        if self.friends:
+            batch_size = 10
+            for i in range(0, len(self.friends), batch_size):
+                batch = self.friends[i : i + batch_size]
+                batch_str = ",".join(batch)
+                batch_key = f"@{batch_str}"
+
+                if self.is_delivered(batch_key):
+                    continue
+
+                payload = dict(base_payload)
+                payload["to"] = batch_str
+
+                if not self._post_payload(endpoint, payload, headers):
                     has_error = True
                     continue
 
-            except requests.RequestException as e:
-                self.logger.warning(
-                    "A Connection error occurred sending"
-                    " PushPlus notification."
+                self.logger.info(
+                    "Sent PushPlus notification to friend(s) %s.", batch_str
                 )
-                self.logger.debug("Socket Exception: %s", str(e))
-                # Mark our failure and continue with the next topic
+                self.mark_delivered(batch_key)
+
+        # 3. Personal notification (no topics and no friends)
+        if (
+            not self.topics
+            and not self.friends
+            and not self.is_delivered(None)
+        ):
+            payload = dict(base_payload)
+            if not self._post_payload(endpoint, payload, headers):
                 has_error = True
-                continue
-
-            # Notification delivered for this topic
-            self.logger.info(
-                "Sent PushPlus notification%s.",
-                " to topic {}".format(topic) if topic else "",
-            )
-
-            # Delivered; a retry can safely skip this target.
-            self.mark_delivered(topic)
+            else:
+                self.logger.info("Sent PushPlus notification.")
+                self.mark_delivered(None)
 
         return not has_error
 
@@ -504,11 +654,11 @@ class NotifyPushplus(NotifyBase):
     def url(self, privacy=False, *args, **kwargs):
         """Returns the URL built dynamically based on specified arguments."""
 
-        # When channel=webhook with a named endpoint, use the compact
+        # When channel=webhook with a named endpoint / option, use the compact
         # {name}@pushplus://{token} form.  Both ?channel=webhook and ?name=
         # are implied by the user@ prefix and omitted from the query string.
         webhook_prefix = (
-            self.channel == PushPlusChannel.WEBHOOK and self.webhook
+            self.channel == PushPlusChannel.WEBHOOK and self.option
         )
 
         # Start with an empty params dict
@@ -521,11 +671,31 @@ class NotifyPushplus(NotifyBase):
         if not webhook_prefix and self.channel != PUSHPLUS_CHANNEL_DEFAULT:
             params["channel"] = self.channel
 
+        # If channel option is present and not using the webhook user@ prefix
+        if not webhook_prefix and self.option:
+            params["option"] = self.option
+
+        # Explicit template override
+        if self.template:
+            params["template"] = self.template
+
+        # Callback URL
+        if self.callback_url:
+            params["callbackUrl"] = self.callback_url
+
+        # Timestamp
+        if self.timestamp is not None:
+            params["timestamp"] = str(self.timestamp)
+
         # Merge in standard Apprise URL parameters (verify, format, etc.)
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        # Build the targets path from group topics and any invalid entries
-        targets = list(self.topics) + list(self.invalid_targets)
+        # Build targets path from topics, @friends, and invalid entries
+        targets = (
+            list(self.topics)
+            + [f"@{f}" for f in self.friends]
+            + list(self.invalid_targets)
+        )
 
         # Masked token for the URL
         token_str = self.pprint(
@@ -539,14 +709,14 @@ class NotifyPushplus(NotifyBase):
         # user@ position (schema://name@token) -- channel=webhook and ?name=
         # are both implied by the user@ presence and omitted from params.
         if webhook_prefix:
-            name_str = NotifyPushplus.quote(self.webhook, safe="")
+            name_str = NotifyPushplus.quote(self.option, safe="")
             if targets:
                 return "{schema}://{name}@{token}/{targets}/?{params}".format(
                     schema=self.secure_protocol[0],
                     name=name_str,
                     token=token_str,
                     targets="/".join(
-                        NotifyPushplus.quote(t, safe="") for t in targets
+                        NotifyPushplus.quote(t, safe="@#") for t in targets
                     ),
                     params=NotifyPushplus.urlencode(params),
                 )
@@ -558,17 +728,17 @@ class NotifyPushplus(NotifyBase):
             )
 
         if targets:
-            # One or more topics: include them in the URL path
+            # One or more targets: include them in the URL path
             return "{schema}://{token}/{targets}/?{params}".format(
                 schema=self.secure_protocol[0],
                 token=token_str,
                 targets="/".join(
-                    NotifyPushplus.quote(t, safe="") for t in targets
+                    NotifyPushplus.quote(t, safe="@#") for t in targets
                 ),
                 params=NotifyPushplus.urlencode(params),
             )
 
-        # No topics -- simple personal notification URL
+        # No targets -- simple personal notification URL
         return "{schema}://{token}/?{params}".format(
             schema=self.secure_protocol[0],
             token=token_str,
@@ -592,7 +762,7 @@ class NotifyPushplus(NotifyBase):
             # Token is the URL host
             results["token"] = NotifyPushplus.unquote(results["host"])
 
-        # Collect group topics from the URL path
+        # Collect targets from the URL path
         results["targets"] = NotifyPushplus.split_path(results["fullpath"])
 
         # ?to= appends additional targets (comma/space delimited supported)
@@ -616,21 +786,55 @@ class NotifyPushplus(NotifyBase):
                 results["qsd"]["channel"]
             )
 
-        # Extract the webhook name -- users specify it as ?name= in the URL.
-        # We store it internally as 'webhook' to avoid shadowing URLBase.name.
-        if "name" in results["qsd"] and results["qsd"]["name"]:
-            results["webhook"] = NotifyPushplus.unquote(results["qsd"]["name"])
+        # Extract channel configuration option / webhook name:
+        if "option" in results["qsd"] and results["qsd"]["option"]:
+            opt = NotifyPushplus.unquote(results["qsd"]["option"])
+            results["option"] = opt
+            results["webhook"] = opt
+        elif "webhook" in results["qsd"] and results["qsd"]["webhook"]:
+            opt = NotifyPushplus.unquote(results["qsd"]["webhook"])
+            results["option"] = opt
+            results["webhook"] = opt
+        elif "name" in results["qsd"] and results["qsd"]["name"]:
+            opt = NotifyPushplus.unquote(results["qsd"]["name"])
+            results["option"] = opt
+            results["webhook"] = opt
 
         # Support the {webhook_name}@pushplus://{token} short form.
         # When user@ is present, it identifies the webhook endpoint name.
         # If no channel was explicitly given, webhook is the implied channel.
         if results.get("user"):
-            # Use user@ as the webhook name when ?name= was not also supplied
             if "webhook" not in results:
-                results["webhook"] = NotifyPushplus.unquote(results["user"])
+                opt = NotifyPushplus.unquote(results["user"])
+                results["webhook"] = opt
+                results["option"] = opt
             # Imply webhook channel when no explicit channel was specified
             if "channel" not in results:
                 results["channel"] = PushPlusChannel.WEBHOOK
+
+        # Message template
+        if "template" in results["qsd"] and results["qsd"]["template"]:
+            results["template"] = NotifyPushplus.unquote(
+                results["qsd"]["template"]
+            )
+
+        # Callback URL (note that qsd keys are lowercased by NotifyBase)
+        if "callbackurl" in results["qsd"] and results["qsd"]["callbackurl"]:
+            results["callback_url"] = NotifyPushplus.unquote(
+                results["qsd"]["callbackurl"]
+            )
+        elif (
+            "callback_url" in results["qsd"] and results["qsd"]["callback_url"]
+        ):
+            results["callback_url"] = NotifyPushplus.unquote(
+                results["qsd"]["callback_url"]
+            )
+
+        # Timestamp
+        if "timestamp" in results["qsd"] and results["qsd"]["timestamp"]:
+            results["timestamp"] = NotifyPushplus.unquote(
+                results["qsd"]["timestamp"]
+            )
 
         return results
 
@@ -638,29 +842,39 @@ class NotifyPushplus(NotifyBase):
     def parse_native_url(url):
         """Support native PushPlus API URLs of the form:
         https://www.pushplus.plus/send?token=TOKEN[&other_params]
+        https://api.pushplus.plus/send/{token}[?other_params]
+        https://www.pushplus.plus/batchSend?token=TOKEN[&other_params]
         """
         result = re.match(
-            r"^https?://www\.pushplus\.plus/send"
+            r"^https?://(?:www\.|api\.)?pushplus\.plus/(?:send|batchSend)"
+            r"(?:/(?P<path_token>[a-z0-9_-]{32,64}))?"
             r"(?:\?(?P<params>[^#]+))?$",
             url,
             re.I,
         )
         if result:
             params = result.group("params") or ""
-            # The token must be present as a query parameter
-            tok = re.search(
-                r"(?:(?:^|&))token=(?P<token>[a-z0-9_-]+)",
-                params,
-                re.I,
-            )
-            if tok:
-                # Re-build as an Apprise URL.  Preserve all existing params
-                # so that topic, channel, and name all round-trip correctly.
+            path_token = result.group("path_token")
+
+            if path_token:
+                tok_val = path_token
+            else:
+                tok = re.search(
+                    r"(?:(?:^|&))token=(?P<token>[a-z0-9_-]+)",
+                    params,
+                    re.I,
+                )
+                tok_val = tok.group("token") if tok else None
+
+            if tok_val:
+                # Re-build as an Apprise URL. Preserve all existing params
+                # so that topic, channel, and option all round-trip correctly.
+                query_str = f"?{params}" if params else ""
                 return NotifyPushplus.parse_url(
-                    "{schema}://{token}/?{params}".format(
+                    "{schema}://{token}/{query}".format(
                         schema=NotifyPushplus.secure_protocol[0],
-                        token=tok.group("token"),
-                        params=params,
+                        token=tok_val,
+                        query=query_str,
                     )
                 )
         return None
