@@ -46,6 +46,7 @@ from apprise import (
     PersistentStoreMode,
 )
 from apprise.common import OverflowMode
+from apprise.fields import fields_to_url
 
 logging.disable(logging.CRITICAL)
 
@@ -154,6 +155,9 @@ class AppriseURLTester:
 
         # Our regular expression
         url_matches = meta.get("url_matches")
+
+        # Whether the URL's fields should turn back into the same URL
+        fields_round_trip = meta.get("fields_round_trip", True)
 
         # Detect our storage path (used to set persistent storage
         # mode
@@ -320,6 +324,24 @@ class AppriseURLTester:
                     f"url() of {obj.url()} produced target miscount "
                     f"{len(obj)} != {len(obj_cmp)}"
                 )
+
+            # The URL split into its fields assembles the same URL again,
+            # whenever the plugin reads its own URL back unchanged
+            if fields_round_trip and obj_cmp.url() == obj.url():
+                fields = obj.url_fields()
+                built = fields_to_url(fields)
+                obj_fields = Apprise.instantiate(built) if built else None
+                if not isinstance(obj_fields, NotifyBase) or (
+                    obj_fields.url_fields() != fields
+                    or obj_fields.url() != obj.url()
+                ):
+                    raise AssertionError(
+                        f"URL: {url} was split into the fields {fields},"
+                        f" which were put back together as {built}. That"
+                        " URL does not load as the same service. Check"
+                        " that the plugin's templates and template_tokens"
+                        " describe the URL its url() writes."
+                    )
 
             # Tidy our object
             del obj_cmp

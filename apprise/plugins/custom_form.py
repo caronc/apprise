@@ -128,6 +128,7 @@ class NotifyForm(NotifyBase):
         "{schema}://{user}@{host}:{port}",
         "{schema}://{user}:{password}@{host}",
         "{schema}://{user}:{password}@{host}:{port}",
+        "{schema}://{user}:{password}@{host}:{port}{path}",
     )
 
     # Define our tokens; these are the minimum tokens required required to
@@ -155,6 +156,12 @@ class NotifyForm(NotifyBase):
                 "name": _("Password"),
                 "type": "string",
                 "private": True,
+            },
+            "path": {
+                "name": _("Path"),
+                "type": "string",
+                "map_to": "fullpath",
+                "default": "/",
             },
         },
     )

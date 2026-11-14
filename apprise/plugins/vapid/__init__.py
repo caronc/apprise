@@ -160,7 +160,7 @@ class NotifyVapid(NotifyBase):
         **{
             "subscriber": {
                 "name": _("API Key"),
-                "type": "string",
+                "type": "email",
                 "private": True,
                 "required": True,
             },

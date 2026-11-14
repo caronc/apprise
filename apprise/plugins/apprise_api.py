@@ -114,6 +114,7 @@ class NotifyAppriseAPI(NotifyBase):
         "{schema}://{user}@{host}:{port}/{token}",
         "{schema}://{user}:{password}@{host}/{token}",
         "{schema}://{user}:{password}@{host}:{port}/{token}",
+        "{schema}://{user}:{password}@{host}:{port}{path}{token}",
     )
 
     # Define our tokens; these are the minimum tokens required required to
@@ -141,6 +142,12 @@ class NotifyAppriseAPI(NotifyBase):
                 "name": _("Password"),
                 "type": "string",
                 "private": True,
+            },
+            "path": {
+                "name": _("Path"),
+                "type": "string",
+                "map_to": "fullpath",
+                "default": "/",
             },
             "token": {
                 "name": _("Token"),

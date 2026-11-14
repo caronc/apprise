@@ -2899,6 +2899,7 @@ def test_apprise_details_email_token_types():
         ("NotifySendPulse", "target_email"),
         ("NotifySlack", "target_email"),
         ("NotifyTwist", "email"),
+        ("NotifyVapid", "subscriber"),
         ("NotifyVoipms", "email"),
         ("NotifyZulip", "target_user"),
     }
@@ -2933,6 +2934,61 @@ def test_apprise_details_email_token_types():
                     " add it there (after confirming this field's own"
                     " url() actually needs it, per this test's docstring)."
                 )
+
+
+def test_apprise_details_templates_keep_the_at_sign_before_the_path():
+    """An @ in a URL template separates the login from the host.
+
+    Anything after the first / is the path, where an @ is just text.
+    """
+    for plugin in N_MGR.plugins():
+        for template in plugin.templates:
+            rest = template.split("://", 1)[-1]
+            path = rest[len(rest.split("/", 1)[0]) :].split("?", 1)[0]
+            assert "@" not in path, (
+                f"{plugin.__name__} has the template {template!r} with an"
+                " @ after the path begins. An @ may only separate the"
+                " login from the host, before the first /."
+            )
+
+
+def test_apprise_details_every_token_can_be_written():
+    """Every token can be written into a URL.
+
+    A token is written through a template placeholder, through another
+    token that sets the same value (map_to), or in the query string under
+    an alias of it (alias_of), which is the same item by another name.
+    Otherwise a URL builder has nowhere to put it.
+    """
+    template_token_re = re.compile(r"\{([^}]+)\}")
+    for plugin in N_MGR.plugins():
+        info = plugins.details(plugin)
+        tokens, args = info["tokens"], info["args"]
+
+        # The values each template placeholder or argument sets
+        written = set()
+        for template in info["templates"]:
+            for name in template_token_re.findall(template):
+                written.add(tokens.get(name, {}).get("map_to", name))
+
+        for meta in args.values():
+            aliases = meta.get("alias_of", ())
+            for alias in (aliases,) if isinstance(aliases, str) else aliases:
+                written.add(tokens.get(alias, {}).get("map_to", alias))
+
+            if "map_to" in meta:
+                written.add(meta["map_to"])
+
+        for name, meta in tokens.items():
+            if name == "schema" or "alias_of" in meta:
+                continue
+
+            assert meta["map_to"] in written, (
+                f"{plugin.__name__}.template_tokens[{name!r}] can't be"
+                " written into a URL. Use it in a template, give it the"
+                " map_to of a token a template uses, or add an alias_of"
+                " argument for it."
+            )
 
 
 def test_apprise_send_format_handlers_match_notify_format():

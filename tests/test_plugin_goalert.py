@@ -68,6 +68,8 @@ apprise_url_tests = (
             "instance": NotifyGoAlert,
             "notify_response": False,
             "privacy_url": "goalerts://localhost/?action=map&to=invalid",
+            # An invalid key read back from a path is part of the path
+            "fields_round_trip": False,
         },
     ),
     (

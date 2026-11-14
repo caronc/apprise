@@ -216,6 +216,10 @@ class NotifySlack(NotifyBase):
         # Bot
         "{schema}://{access_token}/",
         "{schema}://{access_token}/{targets}",
+        "{schema}://{botname}@{access_token}/",
+        "{schema}://{botname}@{access_token}/{targets}",
+        # Workflow
+        "{schema}://{workflow_path}/",
     )
 
     # Define our template tokens
