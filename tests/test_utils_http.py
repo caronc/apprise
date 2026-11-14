@@ -1000,6 +1000,7 @@ def test_connection_tracker_tls():
     """A TLS connection is ended without touching its TLS state."""
     left, right = socket.socketpair()
     context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     tls = context.wrap_socket(
         left, server_hostname="localhost", do_handshake_on_connect=False
     )
