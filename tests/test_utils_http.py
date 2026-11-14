@@ -41,6 +41,7 @@ from http.client import HTTPResponse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import socket
 import ssl
+import sys
 import threading
 import time
 from unittest import mock
@@ -657,6 +658,10 @@ def test_connection_being_opened_can_be_cut_off():
                 connection.sock.close()
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows only wakes the read when data arrives or it times out",
+)
 @pytest.mark.parametrize(
     "make_session, proxied",
     (
