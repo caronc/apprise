@@ -1657,6 +1657,14 @@ msgstr "チャンネル"
 msgid "Webhook Name"
 msgstr "Webhook の名前"
 
+#: apprise/plugins/pushplus.py:348
+msgid "Channel Option"
+msgstr "チャネルオプション"
+
+#: apprise/plugins/pushplus.py:371
+msgid "Callback URL"
+msgstr "コールバック URL"
+
 #: apprise/plugins/pushsafer.py:364
 msgid "Private Key"
 msgstr "秘密鍵"

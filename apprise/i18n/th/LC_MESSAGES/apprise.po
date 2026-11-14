@@ -1656,6 +1656,14 @@ msgstr "ช่อง"
 msgid "Webhook Name"
 msgstr "ชื่อของ webhook"
 
+#: apprise/plugins/pushplus.py:348
+msgid "Channel Option"
+msgstr "ตัวเลือกช่องทาง"
+
+#: apprise/plugins/pushplus.py:371
+msgid "Callback URL"
+msgstr "URL สำหรับการเรียกกลับ"
+
 #: apprise/plugins/pushsafer.py:364
 msgid "Private Key"
 msgstr "คีย์ส่วนตัว"

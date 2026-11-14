@@ -1657,6 +1657,14 @@ msgstr "Kanał"
 msgid "Webhook Name"
 msgstr "Nazwa webhooka"
 
+#: apprise/plugins/pushplus.py:348
+msgid "Channel Option"
+msgstr "Opcja kanału"
+
+#: apprise/plugins/pushplus.py:371
+msgid "Callback URL"
+msgstr "Adres URL wywołania zwrotnego"
+
 #: apprise/plugins/pushsafer.py:364
 msgid "Private Key"
 msgstr "Klucz prywatny"
