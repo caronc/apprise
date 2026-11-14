@@ -37,7 +37,13 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise, AppriseConfig, NotifyFormat, NotifyType
+from apprise import (
+    Apprise,
+    AppriseAsset,
+    AppriseConfig,
+    NotifyFormat,
+    NotifyType,
+)
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.workflows import NotifyWorkflows
 
@@ -476,8 +482,7 @@ def test_plugin_workflows_templating_utf8(
     request_mock, workflows_url, encoding, tmpdir
 ):
     """
-    NotifyWorkflows() Templating - a UTF-8 template is read as UTF-8
-    whatever the locale encoding, with or without a byte order mark.
+    NotifyWorkflows() Templating - UTF-8 template under any locale.
     """
 
     template = tmpdir.join("simple.json")
@@ -525,6 +530,85 @@ def test_plugin_workflows_templating_utf8(
     content = posted_json["attachments"][0]["content"]
     blocks = {b["id"]: b["text"] for b in content["body"] if "id" in b}
     assert blocks["body"] == "Łukasz ✨ body"
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "not-a-codec"])
+def test_plugin_workflows_templating_not_utf8(
+    request_mock, workflows_url, encoding, tmpdir
+):
+    """
+    NotifyWorkflows() Templating - template that cannot be decoded.
+    """
+
+    # Latin-1 bytes are not valid UTF-8, and an unknown codec
+    # cannot read anything at all
+    template = tmpdir.join("simple.json")
+    template.write_binary(
+        '{"type": "message", "text": "café {{app_body}}"}'.encode("latin-1")
+    )
+
+    obj = Apprise.instantiate(
+        "{url}/?template={template}".format(
+            url=workflows_url,
+            template=str(template),
+        ),
+        asset=AppriseAsset(encoding=encoding),
+    )
+    assert isinstance(obj, NotifyWorkflows)
+    assert bool(obj.notify(body="body", title="title")) is False
+
+    # Nothing was sent
+    assert request_mock.call_count == 0
+
+
+def test_plugin_workflows_templating_asset_encoding(
+    request_mock, workflows_url, tmpdir
+):
+    """
+    NotifyWorkflows() Templating - template in the asset encoding.
+    """
+
+    # A Korean template saved in a legacy Windows code page
+    template = tmpdir.join("simple.json")
+    template.write_binary(
+        cleandoc("""
+    {
+      "type": "message",
+      "attachments": [{
+        "contentType": "application/vnd.microsoft.card.adaptive",
+        "contentUrl": null,
+        "content": {
+          "$schema":
+            "http://adaptivecards.io/schemas/adaptive-card.json",
+          "type": "AdaptiveCard",
+          "version": "1.4",
+          "body": [
+            {
+              "type": "TextBlock",
+              "id": "body",
+              "text": "안녕하세요 {{app_body}}"
+            }
+          ]
+        }
+      }]
+    }
+    """).encode("cp949")
+    )
+
+    obj = Apprise.instantiate(
+        "{url}/?template={template}".format(
+            url=workflows_url,
+            template=str(template),
+        ),
+        asset=AppriseAsset(encoding="cp949"),
+    )
+    assert isinstance(obj, NotifyWorkflows)
+    assert bool(obj.notify(body="body", title="title")) is True
+
+    posted_json = json.loads(request_mock.call_args_list[0][1]["data"])
+    content = posted_json["attachments"][0]["content"]
+    blocks = {b["id"]: b["text"] for b in content["body"] if "id" in b}
+    assert blocks["body"] == "안녕하세요 body"
 
 
 def test_plugin_workflows_templating_invalid_json(

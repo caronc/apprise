@@ -38,7 +38,13 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
+from apprise import (
+    Apprise,
+    AppriseAsset,
+    AppriseAttachment,
+    NotifyFormat,
+    NotifyType,
+)
 from apprise.conversion import MAX_LINK_DEPTH
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.base import _delivery_memo, _delivery_tracker
@@ -1689,6 +1695,61 @@ def test_plugin_slack_template_utf8(mock_request, encoding, tmpdir):
     blocks = posted["attachments"][0]["blocks"]
     section = next(b for b in blocks if b.get("type") == "section")
     assert section["text"]["text"] == "Łukasz ✨ hello"
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "not-a-codec"])
+@mock.patch("requests.request")
+def test_plugin_slack_template_not_utf8(mock_request, encoding, tmpdir):
+    """NotifySlack() fails cleanly on a template it cannot decode."""
+
+    # Latin-1 bytes are not valid UTF-8, and an unknown codec
+    # cannot read anything at all
+    template = tmpdir.join("blocks.json")
+    template.write_binary(
+        '{"blocks": [{"type": "section", "text": '
+        '{"type": "mrkdwn", "text": "café {{app_body}}"}}]}'.encode("latin-1")
+    )
+
+    obj = Apprise.instantiate(
+        "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
+        "?blocks=yes&template={}".format(str(template)),
+        asset=AppriseAsset(encoding=encoding),
+    )
+    assert isinstance(obj, NotifySlack)
+    assert bool(obj.notify(body="hello", title="world")) is False
+
+    # Nothing was sent
+    assert mock_request.call_count == 0
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_template_asset_encoding(mock_request, tmpdir):
+    """NotifySlack() reads a template in the asset encoding."""
+    mock_request.return_value = mock.Mock(
+        content=b"ok", status_code=requests.codes.ok
+    )
+
+    # A Korean template saved in a legacy Windows code page
+    template = tmpdir.join("blocks.json")
+    template.write_binary(
+        (
+            '{"blocks": [{"type": "section", "text": '
+            '{"type": "mrkdwn", "text": "안녕하세요 {{app_body}}"}}]}'
+        ).encode("cp949")
+    )
+
+    obj = Apprise.instantiate(
+        "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
+        "?blocks=yes&template={}".format(str(template)),
+        asset=AppriseAsset(encoding="cp949"),
+    )
+    assert isinstance(obj, NotifySlack)
+    assert bool(obj.notify(body="hello", title="world")) is True
+
+    posted = loads(mock_request.call_args_list[0][1]["data"])
+    blocks = posted["attachments"][0]["blocks"]
+    section = next(b for b in blocks if b.get("type") == "section")
+    assert section["text"]["text"] == "안녕하세요 hello"
 
 
 @mock.patch("requests.request")
