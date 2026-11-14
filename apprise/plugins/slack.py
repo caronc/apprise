@@ -877,7 +877,7 @@ class NotifySlack(NotifyBase):
         }
 
         try:
-            with open(template.path) as fp:
+            with open(template.path, encoding="utf-8-sig") as fp:
                 content = apply_template(fp.read(), **safe_tokens)
 
         except OSError:

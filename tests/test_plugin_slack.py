@@ -1642,6 +1642,55 @@ def test_plugin_slack_template_blocks(mock_request, tmpdir):
     assert section["text"]["text"] == "hello"
 
 
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-8-sig"])
+@mock.patch("requests.request")
+def test_plugin_slack_template_utf8(mock_request, encoding, tmpdir):
+    """NotifySlack() reads a UTF-8 template whatever the locale encoding."""
+    mock_request.return_value = mock.Mock(
+        **{
+            "content": b"ok",
+            "status_code": requests.codes.ok,
+        }
+    )
+
+    # Non-ASCII text, with and without a byte order mark
+    template = tmpdir.join("blocks.json")
+    template.write_binary(
+        cleandoc("""
+        {
+          "blocks": [
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "Łukasz ✨ {{app_body}}"
+              }
+            }
+          ]
+        }
+        """).encode(encoding)
+    )
+
+    obj = Apprise.instantiate(
+        "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
+        "?blocks=yes&template={}".format(str(template))
+    )
+    assert isinstance(obj, NotifySlack)
+    assert (
+        bool(
+            obj.notify(
+                body="hello", title="world", notify_type=NotifyType.INFO
+            )
+        )
+        is True
+    )
+
+    posted = loads(mock_request.call_args_list[0][1]["data"])
+    blocks = posted["attachments"][0]["blocks"]
+    section = next(b for b in blocks if b.get("type") == "section")
+    assert section["text"]["text"] == "Łukasz ✨ hello"
+
+
 @mock.patch("requests.request")
 def test_plugin_slack_template_blocks_implied(mock_request, tmpdir):
     """NotifySlack() - template= alone implies blocks=yes."""

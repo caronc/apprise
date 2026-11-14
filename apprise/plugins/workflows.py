@@ -474,7 +474,7 @@ class NotifyWorkflows(NotifyBase):
         }
 
         try:
-            with open(template.path) as fp:
+            with open(template.path, encoding="utf-8-sig") as fp:
                 content = json.loads(apply_template(fp.read(), **safe_tokens))
 
         except OSError:
