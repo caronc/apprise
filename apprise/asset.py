@@ -27,9 +27,9 @@
 
 from collections.abc import Sequence
 from datetime import datetime, tzinfo
-import math
 from os.path import abspath, dirname, isfile, join
 import re
+import threading
 from typing import Any, Optional, Union
 from uuid import uuid4
 
@@ -405,11 +405,13 @@ class AppriseAsset:
                     "AppriseAsset service_timeout must be an int or float."
                 )
 
-            if not math.isfinite(service_timeout) or service_timeout < 0:
-                # Use 0 for no timeout; infinity is unsafe on some platforms.
+            if not 0 <= service_timeout <= threading.TIMEOUT_MAX:
+                # Use 0 for no timeout.  Infinity, or any wait longer than
+                # this platform supports, fails every notification.
                 raise AppriseImproperlyConfigured(
-                    "AppriseAsset service_timeout must be >= 0 and "
-                    "finite (0 disables the timeout entirely)."
+                    "AppriseAsset service_timeout must be between 0 and "
+                    f"{threading.TIMEOUT_MAX:.0f} seconds (0 disables the "
+                    "timeout entirely)."
                 )
 
             self._service_timeout = float(service_timeout)

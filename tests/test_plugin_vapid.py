@@ -1364,7 +1364,7 @@ def test_plugin_vapid_bad_subfile_source(tmpdir):
 
     # A remote source that cannot be fetched. The download is mocked so the
     # test does not depend on anything outside this machine.
-    with mock.patch("requests.get") as mock_get:
+    with mock.patch("requests.Session.get") as mock_get:
         mock_get.return_value.status_code = (
             requests.codes.internal_server_error
         )
@@ -1709,7 +1709,7 @@ def test_plugin_vapid_remote_subfile(tmpdir):
     smgr = WebPushSubscriptionManager()
 
     # Stand in for the download an AppriseAttachment would perform
-    with mock.patch("requests.get") as mock_get:
+    with mock.patch("requests.Session.get") as mock_get:
         mock_get.return_value.status_code = requests.codes.ok
         mock_get.return_value.headers = {"Content-Length": len(payload)}
         mock_get.return_value.iter_content.return_value = iter([payload])

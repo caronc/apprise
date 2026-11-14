@@ -32,6 +32,7 @@ import os
 import re
 from tempfile import NamedTemporaryFile
 import threading
+import time
 from typing import Any, Optional
 
 import requests
@@ -39,6 +40,12 @@ import requests
 from ..common import ContentLocation
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
+from ..utils.http import (
+    ConnectionTracker,
+    WatchdogUnavailableError,
+    track_connections,
+    tracked_session,
+)
 from ..utils.parse import URL_ENCODED_PATH_SAFE_CHARS
 from .base import AttachBase
 
@@ -60,9 +67,6 @@ class AttachHTTP(AttachBase):
 
     # Web based requests are remote/external to our current location
     location = ContentLocation.HOSTED
-
-    # thread safe loading
-    _lock = threading.Lock()
 
     def __init__(
         self,
@@ -89,7 +93,10 @@ class AttachHTTP(AttachBase):
             # Store our extra headers
             self.headers.update(headers)
 
-        # Applications may provide a policy-aware Requests session.
+        # Applications may provide a policy-aware Requests session. The
+        # download time limit can cut off an HTTPPolicySession part way
+        # through.  Any other session is only checked between chunks, so
+        # a server slow to send its headers can still hold it up.
         self.http_session = http_session
 
         # Applications may store downloads outside the system temp directory.
@@ -100,6 +107,10 @@ class AttachHTTP(AttachBase):
 
         # Preserve storage failures for callers that need a detailed error.
         self.download_error = None
+
+        # thread safe loading; each attachment has its own lock so a slow
+        # download never holds up the download of another attachment
+        self._lock = threading.Lock()
 
         # Our Query String Dictionary; we use this to track arguments
         # specified that aren't otherwise part of this class
@@ -142,6 +153,11 @@ class AttachHTTP(AttachBase):
         # Where our request object will temporarily live.
         r = None
 
+        # A download may run no longer than one service may take, counted
+        # from here; 0 means no limit
+        timeout = self.asset._service_timeout
+        started = time.monotonic()
+
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
@@ -163,23 +179,51 @@ class AttachHTTP(AttachBase):
                 f" {url} (cert_verify={self.verify_certificate!r})"
             )
 
-            try:
-                # Use the caller's transport when it needs destination policy.
-                http_get = (
-                    self.http_session.get
-                    if self.http_session is not None
-                    else requests.get
+            # Never wait longer than the time left, whether connecting or for
+            # the server to answer; a tiny minimum keeps requests from
+            # refusing the value once time has run out
+            request_timeout = self.request_timeout
+            if timeout:
+                left = max(started + timeout - time.monotonic(), 0.001)
+                request_timeout = tuple(
+                    min(value, left) for value in request_timeout
                 )
-                with http_get(
-                    url,
-                    headers=headers,
-                    auth=auth,
-                    params=self.qsd,
-                    verify=self.verify_certificate,
-                    timeout=self.request_timeout,
-                    allow_redirects=self.redirects,
-                    stream=True,
-                ) as r:
+
+            # Use the caller's transport when it needs destination policy.
+            # Otherwise use Requests' own, with connections the time limit
+            # can reach.
+            session = (
+                self.http_session
+                if self.http_session is not None
+                else tracked_session()
+            )
+
+            # Cut the download off once its time is up, at any point, and
+            # through every redirect. A server can trickle in a few bytes at
+            # a time and never trip the read timeout, so the time check
+            # cannot wait for data to arrive.
+            limit = ConnectionTracker()
+
+            try:
+                with (
+                    track_connections(
+                        limit, started + timeout if timeout else None
+                    ),
+                    session.get(
+                        url,
+                        headers=headers,
+                        auth=auth,
+                        params=self.qsd,
+                        verify=self.verify_certificate,
+                        timeout=request_timeout,
+                        allow_redirects=self.redirects,
+                        stream=True,
+                    ) as r,
+                ):
+                    if limit.expired:
+                        # Time ran out just as the reply arrived
+                        raise requests.Timeout()
+
                     # Handle Errors
                     r.raise_for_status()
 
@@ -241,6 +285,11 @@ class AttachHTTP(AttachBase):
                     # If we get here, we can now safely write our content to
                     # disk
                     for chunk in r.iter_content(chunk_size=chunk_size):
+                        if limit.expired:
+                            # Time is up.  This also stops a session the
+                            # time limit could not cut off.
+                            break
+
                         # filter out keep-alive chunks
                         if chunk:
                             # Enforce the limit while streaming because the
@@ -267,6 +316,20 @@ class AttachHTTP(AttachBase):
                             self._temp_file.write(chunk)
                             bytes_written = self._temp_file.tell()
 
+                    if limit.expired:
+                        # Cut off part way through, so what we have is
+                        # incomplete
+                        self.logger.error(
+                            "HTTP attachment download took longer than"
+                            f" {timeout:g}s: {self.url(privacy=True)}"
+                        )
+
+                        # Invalidate any variables previously set
+                        self.invalidate()
+
+                        # Return False (signifying a failure)
+                        return False
+
                     # Ensure our content is flushed to disk for post-processing
                     self._temp_file.flush()
 
@@ -277,11 +340,35 @@ class AttachHTTP(AttachBase):
                         self.detected_name = os.path.basename(self.fullpath)
 
             except requests.RequestException as e:
-                self.logger.error(
-                    "A Connection error occurred retrieving HTTP "
-                    f"configuration from {self.host}."
-                )
+                if limit.expired:
+                    # The time limit cut the connection off
+                    self.logger.error(
+                        "HTTP attachment download took longer than"
+                        f" {timeout:g}s: {self.url(privacy=True)}"
+                    )
+
+                else:
+                    self.logger.error(
+                        "A Connection error occurred retrieving HTTP "
+                        f"configuration from {self.host}."
+                    )
+
                 self.logger.debug(f"Socket Exception: {e!s}")
+
+                # Invalidate any variables previously set
+                self.invalidate()
+
+                # Return False (signifying a failure)
+                return False
+
+            except WatchdogUnavailableError as e:
+                # No thread could be started to keep the time limit, so the
+                # download is not attempted without one
+                self.logger.error(
+                    "Could not start the time limit for HTTP attachment: %s",
+                    self.url(privacy=True),
+                )
+                self.logger.debug("Thread Exception: %s", str(e))
 
                 # Invalidate any variables previously set
                 self.invalidate()
@@ -306,6 +393,11 @@ class AttachHTTP(AttachBase):
 
                 # Return False (signifying a failure)
                 return False
+
+            finally:
+                if session is not self.http_session:
+                    # Close our own session, but leave the caller's open
+                    session.close()
 
         # Return our success
         return True

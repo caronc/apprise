@@ -42,8 +42,10 @@ connection and pool classes and hooks two protected details.
 - ``_new_conn()`` is overridden to open our own pinned socket.
 - ``_dns_host`` is read rather than ``host``, because it is the name urllib3
   itself resolves; ``host`` may have been normalized by then.
+- ``_put_conn()`` is extended to learn when a download is done with a
+  connection, so its time limit never cuts one another download now uses.
 
-Both have been present unchanged through urllib3 1.26 and 2.x. What is
+All three have been present unchanged through urllib3 1.26 and 2.x. What is
 deliberately avoided is *importing* underscore-prefixed names out of
 urllib3, since those do move between releases and several are missing from
 1.26 altogether; ``_DEFAULT_TIMEOUT`` below is defined locally for exactly
@@ -55,15 +57,23 @@ Apprise supports (the 1.26 series, which RHEL and Rocky Linux ship) as well
 as the current one before accepting a change here.
 """
 
+from collections.abc import Iterator
 from concurrent.futures import (
     ThreadPoolExecutor,
     TimeoutError as FutureTimeoutError,
 )
+import contextlib
+from contextlib import contextmanager
+import contextvars
+import heapq
 import ipaddress
+import itertools
 import socket
 from socket import timeout as SocketTimeout
 import sys
 import threading
+import time
+from typing import Any, Optional
 from urllib.parse import urlsplit
 
 import requests
@@ -89,6 +99,12 @@ _DNS_POOL = ThreadPoolExecutor(
     thread_name_prefix="apprise-http-resolve",
 )
 _DNS_SLOTS = threading.BoundedSemaphore(16)
+
+# The download in progress, so the connections it uses can be cut off at
+# any point by track_connections(). Left unset, nothing is tracked.
+_active_tracker: contextvars.ContextVar[Optional["ConnectionTracker"]] = (
+    contextvars.ContextVar("apprise_connection_tracker", default=None)
+)
 
 # RFC 6598 shared space is neither private nor generally Internet-routable.
 _CGN_SHARED_V4 = ipaddress.ip_network("100.64.0.0/10")
@@ -475,25 +491,473 @@ class _PolicyConnectionMixin:
         return sock
 
 
+def _shut_down(conn: Any) -> None:
+    """End a connection, waking any read still waiting on it."""
+    # A connection still being opened has no socket to end yet
+    sock = getattr(conn, "apprise_sock", None)
+
+    # Wrappers such as PyOpenSSL's, or TLS sent inside a TLS tunnel, keep
+    # the socket they wrap as .socket
+    for _ in range(3):
+        if isinstance(sock, socket.socket):
+            break
+
+        sock = getattr(sock, "socket", None)
+
+    else:
+        # Nothing here we know how to end
+        return
+
+    # Best effort, since the connection may already be gone
+    with contextlib.suppress(Exception):
+        # The plain socket call is used so a TLS socket's own shutdown()
+        # does not reset TLS state the download's thread is still reading
+        socket.socket.shutdown(sock, socket.SHUT_RDWR)
+
+
+class ConnectionTracker:
+    """The connections one download is using, so they can be cut off.
+
+    Once cut off, a connection the download uses afterwards is ended
+    straight away, so one opened just as time runs out cannot slip through.
+    """
+
+    __slots__ = ("_lock", "connections", "expired", "finished")
+
+    def __init__(self) -> None:
+        """Start with no connections."""
+        # The download's thread adds and releases while the watchdog cuts off
+        self._lock = threading.Lock()
+
+        # The connections the download is using right now
+        self.connections: set[Any] = set()
+
+        # Set once time ran out, and once the download is over
+        self.expired = False
+        self.finished = False
+
+    def add(self, conn: Any) -> None:
+        """Track a connection the download is about to use."""
+        with self._lock:
+            if not self.expired:
+                conn.apprise_tracker = self
+                self.connections.add(conn)
+                return
+
+        # Too late: time ran out, so end it before it is used
+        _shut_down(conn)
+
+    def release(self, conn: Any) -> None:
+        """Stop tracking a connection that goes back to its pool."""
+        # Waits for a cut off in progress, so a connection is always ended
+        # before another download can take it from the pool
+        with self._lock:
+            conn.apprise_tracker = None
+            self.connections.discard(conn)
+
+    def cut_off(self) -> None:
+        """End every connection in use, and any the download uses later."""
+        with self._lock:
+            if self.finished:
+                # The download ended before its time was up
+                return
+
+            self.expired = True
+
+            # Ended while holding the lock, so none can go back to its pool
+            # and on to another download part way through
+            for conn in self.connections:
+                _shut_down(conn)
+
+    def finish(self) -> None:
+        """Mark the download over, so a late cut off changes nothing."""
+        with self._lock:
+            self.finished = True
+
+            # Forget anything left behind, such as a connection closed
+            # after an error instead of going back to its pool
+            for conn in self.connections:
+                conn.apprise_tracker = None
+
+            self.connections.clear()
+
+
+class WatchdogUnavailableError(RuntimeError):
+    """No thread could be started to keep a download's time limit."""
+
+
+class _Watchdog:
+    """One thread that cuts off each tracked download once its time is up."""
+
+    def __init__(self) -> None:
+        """Start with nothing to watch and no thread yet."""
+        # Guards the schedule, and wakes the thread whenever it changes
+        self._wake = threading.Condition()
+
+        # Downloads waiting on their deadline, soonest first. A tie is
+        # settled by the order added, so trackers are never compared.
+        self._due: list[tuple[float, int, ConnectionTracker]] = []
+        self._order = itertools.count()
+
+        # Downloads over since the schedule was last tidied up
+        self._stale = 0
+
+        # Started on first use, and again if it is ever gone (after a fork)
+        self._thread: Optional[threading.Thread] = None
+
+    def watch(self, tracker: ConnectionTracker, deadline: float) -> None:
+        """Cut off ``tracker`` once ``time.monotonic()`` passes ``deadline``.
+
+        Raises WatchdogUnavailableError if no thread can be started to
+        watch it, so a download never runs without its time limit.
+        """
+        with self._wake:
+            if self._thread is None or not self._thread.is_alive():
+                # Started before the download is added, so a failure leaves
+                # nothing behind
+                thread = threading.Thread(
+                    target=self._run, name="apprise-http-watchdog", daemon=True
+                )
+                try:
+                    thread.start()
+
+                except RuntimeError as exc:
+                    raise WatchdogUnavailableError(
+                        "No thread could be started to keep the time limit"
+                    ) from exc
+
+                self._thread = thread
+
+            # Add the download, and wake the thread if it is now the soonest
+            heapq.heappush(self._due, (deadline, next(self._order), tracker))
+            self._wake.notify()
+
+    def forget(self) -> None:
+        """Note that one of the downloads being watched is over."""
+        with self._wake:
+            self._stale += 1
+
+            # Tidied up only once most of the schedule is downloads already
+            # over, so each one costs little however many run at once
+            if self._stale * 2 > len(self._due):
+                self._due = [
+                    entry for entry in self._due if not entry[2].finished
+                ]
+                heapq.heapify(self._due)
+                self._stale = 0
+
+    def _run(self) -> None:
+        """Cut off each download in turn as its time runs out."""
+        while True:
+            with self._wake:
+                # Sleep until the soonest deadline, or until one is added
+                while not self._due or self._due[0][0] > time.monotonic():
+                    self._wake.wait(
+                        self._due[0][0] - time.monotonic()
+                        if self._due
+                        else None
+                    )
+
+                tracker = heapq.heappop(self._due)[2]
+
+            # Cut off outside the schedule lock so new downloads never wait.
+            # One odd connection must never stop the thread, or every other
+            # download would lose its time limit with it.
+            with contextlib.suppress(Exception):
+                tracker.cut_off()
+
+
+# Shared by every download, so each one does not need its own thread
+_WATCHDOG = _Watchdog()
+
+
+@contextmanager
+def track_connections(
+    tracker: ConnectionTracker, deadline: Optional[float] = None
+) -> Iterator[None]:
+    """Track the connections used meanwhile, and cut them off in time.
+
+    - ``tracker``: each connection used in this thread is added to it.
+    - ``deadline``: a ``time.monotonic()`` value to cut them off at, or
+      ``None`` for no limit.
+    - Raises WatchdogUnavailableError if no thread can be started to keep
+      the time.
+    - Only tracked_session() and HTTPPolicySession connections can be
+      reached; other transports keep theirs out of reach.
+    """
+    token = _active_tracker.set(tracker)
+    try:
+        if deadline is not None:
+            # Cut the download off once its time is up
+            _WATCHDOG.watch(tracker, deadline)
+
+        yield
+
+    finally:
+        _active_tracker.reset(token)
+
+        # The download is over, so a late cut off must not touch connections
+        # that have since gone back to their pool
+        tracker.finish()
+
+        if deadline is not None:
+            # Nothing is left to cut off
+            _WATCHDOG.forget()
+
+
+def _track(conn: Any) -> None:
+    """Add a connection to the download in progress, if one is tracked."""
+    # Nothing is tracked outside track_connections()
+    tracker = _active_tracker.get()
+    if tracker is not None:
+        tracker.add(conn)
+
+
+class _TrackedConnectionMixin:
+    """Let the download using a connection cut it off at any time."""
+
+    # The tracker of the download using this connection right now
+    apprise_tracker: Optional[ConnectionTracker] = None
+
+    # The socket a cut off ends, kept because a reply that closes the
+    # connection when done takes the socket over and empties sock
+    apprise_sock: Optional[socket.socket] = None
+
+    # The socket being opened, until connect() is done with it
+    apprise_opening: Optional[socket.socket] = None
+
+    def _new_conn(self) -> socket.socket:
+        """Open the socket, and let the download reach it straight away."""
+        sock = super()._new_conn()
+
+        # A copy of the socket is what gets cut off while connecting.
+        # Setting up TLS moves the socket into a new TLS socket that only
+        # shows up once its handshake is done, but the copy still reaches
+        # the same connection, so a server that stalls the handshake (or a
+        # proxy slow to open a tunnel) can be cut off too.
+        copy = sock
+        if isinstance(sock, socket.socket):
+            # Without a copy (such as when out of file descriptors), the
+            # socket itself still covers a proxy that is slow to answer
+            with contextlib.suppress(OSError):
+                copy = sock.dup()
+
+        self.apprise_opening = sock
+        self.apprise_sock = copy
+        _track(self)
+        return sock
+
+    def connect(self) -> None:
+        """Open the connection, then let the download reach it."""
+        try:
+            super().connect()
+
+        except BaseException:
+            # A connection that failed to open never reaches a pool, and
+            # some urllib3 releases leave its socket open (such as a proxy
+            # tunnel cut off part way), so close it now
+            self._opened(None)
+            raise
+
+        # Kept once opened, so for HTTPS this is the TLS socket
+        self._opened(self.sock)
+
+        # Added again after opening, so time that ran out while the TLS
+        # socket was being set up (or just as the copy was closed) still
+        # ends it
+        _track(self)
+
+    def _opened(self, sock: Optional[socket.socket]) -> None:
+        """Swap the copy used while connecting for the finished socket.
+
+        - ``sock``: the connection's socket, or ``None`` if it failed to
+          open, in which case the socket being opened is closed too.
+        """
+        copy, opening = self.apprise_sock, self.apprise_opening
+
+        # Swapped first, so a cut off from now on reaches the new socket
+        self.apprise_sock, self.apprise_opening = sock, None
+
+        closing = [copy] if copy is not opening else []
+        if sock is None:
+            closing.append(opening)
+
+        for old in closing:
+            if old is not None:
+                with contextlib.suppress(Exception):
+                    old.close()
+
+    def _tunnel(self) -> None:
+        """Open a tunnel through a proxy, closing its reply if that fails."""
+        # Python 3.11 and older leave the proxy's reply open when reading it
+        # fails (such as when cut off), and that reply keeps the socket open
+        # after connect() closes it, so each reply made here is noted
+        replies: list[Any] = []
+        make = self.response_class
+
+        def reply(*args: Any, **kwargs: Any) -> Any:
+            response = make(*args, **kwargs)
+            replies.append(response)
+            return response
+
+        self.response_class = reply
+        try:
+            super()._tunnel()
+
+        except Exception:
+            for response in replies:
+                with contextlib.suppress(Exception):
+                    response.close()
+
+            raise
+
+        finally:
+            # The request itself reads its reply the usual way
+            self.response_class = make
+
+    def request(self, *args: Any, **kwargs: Any) -> Any:
+        """Send a request, new connection or reused, as a tracked one."""
+        # Added first, so a wait for the reply can be cut off
+        _track(self)
+        return super().request(*args, **kwargs)
+
+
+class _TrackedPoolMixin:
+    """Stop tracking a connection once it goes back to its pool."""
+
+    def _put_conn(self, conn: Any) -> None:
+        """Release a connection from its download before pooling it."""
+        # urllib3 passes None in place of a connection it already closed
+        tracker = getattr(conn, "apprise_tracker", None)
+        if tracker is not None:
+            tracker.release(conn)
+
+        super()._put_conn(conn)
+
+
+class _TrackedHTTPConnection(_TrackedConnectionMixin, HTTPConnection):
+    """An HTTP connection a download can cut off."""
+
+
+class _TrackedHTTPSConnection(_TrackedConnectionMixin, HTTPSConnection):
+    """An HTTPS connection a download can cut off."""
+
+
+class _TrackedHTTPConnectionPool(_TrackedPoolMixin, HTTPConnectionPool):
+    """Use connections a download can cut off for HTTP."""
+
+    ConnectionCls = _TrackedHTTPConnection
+
+
+class _TrackedHTTPSConnectionPool(_TrackedPoolMixin, HTTPSConnectionPool):
+    """Use connections a download can cut off for HTTPS."""
+
+    ConnectionCls = _TrackedHTTPSConnection
+
+
+# The pool a download can cut off, for each kind of pool urllib3 uses
+_TRACKED_POOLS: dict[type, type] = {
+    HTTPConnectionPool: _TrackedHTTPConnectionPool,
+    HTTPSConnectionPool: _TrackedHTTPSConnectionPool,
+}
+
+
+def _tracked_pool(pool_cls: type) -> type:
+    """Return a pool like ``pool_cls`` whose connections can be cut off."""
+    if issubclass(pool_cls, _TrackedPoolMixin):
+        # Already one
+        return pool_cls
+
+    tracked = _TRACKED_POOLS.get(pool_cls)
+    if tracked is None:
+        # Made the first time a new kind of pool is seen, such as the ones
+        # a SOCKS proxy uses
+        connection_cls = type(
+            pool_cls.ConnectionCls.__name__,
+            (_TrackedConnectionMixin, pool_cls.ConnectionCls),
+            {},
+        )
+        tracked = type(
+            pool_cls.__name__,
+            (_TrackedPoolMixin, pool_cls),
+            {"ConnectionCls": connection_cls},
+        )
+        _TRACKED_POOLS[pool_cls] = tracked
+
+    return tracked
+
+
+def _track_pools(manager: PoolManager) -> None:
+    """Make every pool ``manager`` creates from now on a tracked one."""
+    manager.pool_classes_by_scheme = {
+        scheme: _tracked_pool(pool_cls)
+        for scheme, pool_cls in manager.pool_classes_by_scheme.items()
+    }
+
+
+class _TrackedHTTPAdapter(HTTPAdapter):
+    """Install connection pools a download can cut off into Requests."""
+
+    def init_poolmanager(
+        self,
+        connections: int,
+        maxsize: int,
+        block: bool = False,
+        **pool_kwargs: Any,
+    ) -> None:
+        """Create the normal manager, then replace its pool classes."""
+        super().init_poolmanager(
+            connections, maxsize, block=block, **pool_kwargs
+        )
+        _track_pools(self.poolmanager)
+
+    def proxy_manager_for(self, proxy: str, **proxy_kwargs: Any) -> Any:
+        """Create the normal proxy manager, then replace its pool classes."""
+        manager = super().proxy_manager_for(proxy, **proxy_kwargs)
+
+        # Requests keeps one manager per proxy, so this mostly finds the
+        # pools already replaced
+        _track_pools(manager)
+        return manager
+
+
+def tracked_session() -> requests.Session:
+    """Return a plain Requests session that track_connections() can reach.
+
+    Connections through a proxy are tracked too.
+    """
+    # Behaves like requests.get() otherwise, proxies and all
+    session = requests.Session()
+    adapter = _TrackedHTTPAdapter()
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
 def _policy_pool_classes(policy):
     """Build connection pools bound to one request policy."""
 
-    class PolicyHTTPConnection(_PolicyConnectionMixin, HTTPConnection):
+    # The tracking comes first, so it wraps the socket the policy opens
+    class PolicyHTTPConnection(
+        _TrackedConnectionMixin, _PolicyConnectionMixin, HTTPConnection
+    ):
         pass
 
-    class PolicyHTTPSConnection(_PolicyConnectionMixin, HTTPSConnection):
+    class PolicyHTTPSConnection(
+        _TrackedConnectionMixin, _PolicyConnectionMixin, HTTPSConnection
+    ):
         pass
 
     # Class attributes avoid leaking policy objects into urllib3 pool keys.
     PolicyHTTPConnection.policy = policy
     PolicyHTTPSConnection.policy = policy
 
-    class PolicyHTTPConnectionPool(HTTPConnectionPool):
+    class PolicyHTTPConnectionPool(_TrackedHTTPConnectionPool):
         """Use a policy-aware connection class for HTTP."""
 
         ConnectionCls = PolicyHTTPConnection
 
-    class PolicyHTTPSConnectionPool(HTTPSConnectionPool):
+    class PolicyHTTPSConnectionPool(_TrackedHTTPSConnectionPool):
         """Use a policy-aware connection class for HTTPS."""
 
         ConnectionCls = PolicyHTTPSConnection

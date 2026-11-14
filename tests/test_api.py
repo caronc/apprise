@@ -35,6 +35,7 @@ import logging
 from os.path import dirname, join
 import re
 import sys
+import threading
 from typing import ClassVar
 from unittest import mock
 
@@ -526,6 +527,21 @@ def apprise_test(do_notify):
     assert isinstance(plugin, NotifyBase)
     assert plugin.socket_connect_timeout == URLBase.socket_connect_timeout
     assert plugin.socket_read_timeout == URLBase.socket_read_timeout
+
+    # Timeouts must be above zero and no longer than this platform can wait
+    # for; anything else keeps the default
+    for value in ("0", "-1", "nan", "inf", "1e308"):
+        plugin = a.instantiate(f"good://localhost?rto={value}&cto={value}")
+        assert plugin.socket_connect_timeout == URLBase.socket_connect_timeout
+        assert plugin.socket_read_timeout == URLBase.socket_read_timeout
+
+    # The longest wait this platform supports is still accepted
+    plugin = a.instantiate(
+        f"good://localhost?rto={threading.TIMEOUT_MAX!r}"
+        f"&cto={threading.TIMEOUT_MAX!r}"
+    )
+    assert plugin.socket_connect_timeout == threading.TIMEOUT_MAX
+    assert plugin.socket_read_timeout == threading.TIMEOUT_MAX
 
     # Reset our object
     a.clear()

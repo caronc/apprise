@@ -36,9 +36,14 @@ skipif that needs urllib3-future installed.
 """
 
 from concurrent.futures import TimeoutError as FutureTimeoutError
+import contextlib
+from http.client import HTTPResponse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import socket
+import ssl
+import sys
 import threading
+import time
 from unittest import mock
 
 import pytest
@@ -47,10 +52,14 @@ from urllib3.exceptions import ConnectTimeoutError, NewConnectionError
 
 from apprise.utils import http
 from apprise.utils.http import (
+    ConnectionTracker,
     HTTPPolicy,
     HTTPPolicySession,
+    _active_tracker,
     is_public_ip_address,
     is_secure_http_url,
+    track_connections,
+    tracked_session,
 )
 
 
@@ -551,6 +560,221 @@ def test_policy_connection_returns_socket():
     )
 
 
+def test_failed_connection_closes_its_socket():
+    """A connection that fails to open, such as a tunnel, closes its socket."""
+
+    class Opening:
+        def __init__(self, sock):
+            self.raw = sock
+
+        def _new_conn(self):
+            return self.raw
+
+        def connect(self):
+            # The socket opens, then the tunnel through the proxy fails
+            self._new_conn()
+            raise OSError("tunnel failed")
+
+    class Connection(http._TrackedConnectionMixin, Opening):
+        pass
+
+    left, right = socket.socketpair()
+    try:
+        connection = Connection(left)
+        with pytest.raises(OSError, match="tunnel failed"):
+            connection.connect()
+
+        assert left.fileno() == -1
+        assert connection.apprise_sock is None
+
+        # Nothing opened is fine too
+        connection.raw = None
+        with pytest.raises(OSError, match="tunnel failed"):
+            connection.connect()
+
+    finally:
+        left.close()
+        right.close()
+
+
+def test_connection_being_opened_can_be_cut_off():
+    """A connection can be cut off while TLS takes its socket over.
+
+    - Setting up TLS moves the socket into a new TLS socket, leaving the
+      one opened empty until the handshake is done.
+    - Once open, the copy used meanwhile is closed, whether it worked or not.
+    """
+
+    class Opening:
+        def __init__(self, sock, fail):
+            self.raw = sock
+            self.fail = fail
+            self.sock = None
+
+        def _new_conn(self):
+            return self.raw
+
+        def connect(self):
+            sock = self._new_conn()
+
+            # As TLS does, the socket is taken over by a new one
+            tls = socket.socket(fileno=sock.detach())
+
+            # Time runs out part way through the handshake
+            connection.copy = connection.apprise_sock
+            http._shut_down(connection)
+            if self.fail:
+                tls.close()
+                raise OSError("handshake failed")
+
+            self.sock = tls
+
+    class Connection(http._TrackedConnectionMixin, Opening):
+        copy = None
+
+    for fail in (False, True):
+        left, right = socket.socketpair()
+        try:
+            connection = Connection(left, fail)
+            if fail:
+                with pytest.raises(OSError, match="handshake failed"):
+                    connection.connect()
+
+                assert connection.apprise_sock is None
+
+            else:
+                connection.connect()
+                assert connection.apprise_sock is connection.sock
+
+            # The cut off reached the connection, and the copy is gone
+            assert _ended(right)
+            assert connection.copy is not left
+            assert connection.copy.fileno() == -1
+
+        finally:
+            left.close()
+            right.close()
+            if connection.sock is not None:
+                connection.sock.close()
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows only wakes the read when data arrives or it times out",
+)
+@pytest.mark.parametrize(
+    "make_session, proxied",
+    (
+        (tracked_session, False),
+        (tracked_session, True),
+        # This test permits loopback only to exercise the transport locally.
+        (
+            lambda: HTTPPolicySession(
+                HTTPPolicy(address_filter=lambda _address: True)
+            ),
+            False,
+        ),
+    ),
+    ids=("requests", "proxy", "policy"),
+)
+def test_stalled_tls_handshake_is_cut_off(make_session, proxied):
+    """A server that never answers the TLS handshake is cut off in time."""
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen(4)
+    port = server.getsockname()[1]
+    accepted = []
+    stopping = threading.Event()
+
+    def serve():
+        with contextlib.suppress(OSError):
+            while True:
+                conn, _ = server.accept()
+                accepted.append(conn)
+                if stopping.is_set():
+                    return
+
+                if proxied:
+                    # The proxy opens the tunnel, then nothing answers
+                    conn.recv(4096)
+                    conn.sendall(
+                        b"HTTP/1.1 200 Connection established\r\n\r\n"
+                    )
+
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    proxies = {"https": f"http://127.0.0.1:{port}"} if proxied else None
+    try:
+        with make_session() as session:
+            start = time.monotonic()
+            with (
+                pytest.raises(requests.RequestException),
+                track_connections(ConnectionTracker(), time.monotonic() + 0.3),
+            ):
+                session.get(
+                    f"https://127.0.0.1:{port}/", timeout=10, proxies=proxies
+                )
+
+            # Cut off by the time limit, well before the request's timeout
+            assert time.monotonic() - start < 5
+
+    finally:
+        # One last connection wakes the server so it can stop
+        stopping.set()
+        with contextlib.suppress(OSError):
+            socket.create_connection(("127.0.0.1", port), timeout=5).close()
+
+        thread.join(5)
+        server.close()
+        for conn in accepted:
+            conn.close()
+
+
+def test_failed_tunnel_closes_the_proxy_reply():
+    """A tunnel that fails part way closes the proxy's reply and its hold."""
+
+    class Tunnel:
+        response_class = HTTPResponse
+
+        def __init__(self, sock, fail):
+            self.sock = sock
+            self.fail = fail
+
+        def _tunnel(self):
+            # As Python 3.11 and older do, the reply is left open on failure.
+            # Kept here, the way the error's traceback keeps it in practice.
+            response = self.reply = self.response_class(
+                self.sock, method="CONNECT"
+            )
+            if self.fail:
+                raise OSError("cut off")
+
+            response.close()
+
+    class Connection(http._TrackedConnectionMixin, Tunnel):
+        pass
+
+    for fail in (True, False):
+        left, right = socket.socketpair()
+        try:
+            connection = Connection(left, fail)
+            if fail:
+                with pytest.raises(OSError, match="cut off"):
+                    connection._tunnel()
+
+            else:
+                connection._tunnel()
+
+            # Nothing else holds the socket, so closing it really closes it
+            left.close()
+            assert left.fileno() == -1
+            assert connection.response_class is HTTPResponse
+
+        finally:
+            left.close()
+            right.close()
+
+
 def test_session_validates_every_prepared_request():
     """Each send, including redirect sends, receives a fresh URL check."""
     checked = []
@@ -612,6 +836,342 @@ def test_session_connects_through_policy_adapter():
         server.shutdown()
         thread.join()
         server.server_close()
+
+
+@pytest.mark.parametrize(
+    "make_session",
+    (
+        tracked_session,
+        # This test permits loopback only to exercise the transport locally.
+        lambda: HTTPPolicySession(
+            HTTPPolicy(address_filter=lambda _address: True)
+        ),
+    ),
+    ids=("requests", "policy"),
+)
+def test_track_connections(make_session):
+    """A connection is tracked only while a tracked download uses it."""
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def log_message(self, _format, *args):
+            # Keep the test server quiet.
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+    url = f"http://127.0.0.1:{server.server_port}/"
+    try:
+        tracker = ConnectionTracker()
+        with make_session() as session:
+            with track_connections(tracker):
+                # Tracked while the reply is being read
+                r = session.get(url, timeout=2, stream=True)
+                assert len(tracker.connections) == 1
+                conn = next(iter(tracker.connections))
+                assert conn.apprise_tracker is tracker
+
+                # Released once it goes back to the pool
+                r.close()
+                assert not tracker.connections
+                assert conn.apprise_tracker is None
+
+                # Tracked again when it is reused
+                r = session.get(url, timeout=2, stream=True)
+                assert tracker.connections == {conn}
+                r.close()
+
+            assert tracker.finished
+            assert _active_tracker.get() is None
+
+            # Nothing is tracked outside of track_connections()
+            assert session.get(url, timeout=2).content == b"ok"
+            assert conn.apprise_tracker is None
+
+        # Tracking ends even after an error
+        with pytest.raises(RuntimeError), track_connections(tracker):
+            raise RuntimeError("boom")
+
+        assert _active_tracker.get() is None
+
+        # A tracked download inside another restores the outer one after
+        outer, inner = ConnectionTracker(), ConnectionTracker()
+        with track_connections(outer):
+            with track_connections(inner):
+                assert _active_tracker.get() is inner
+
+            assert _active_tracker.get() is outer
+
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()
+
+
+class _Connection:
+    """A stand-in for a urllib3 connection."""
+
+    def __init__(self, sock):
+        self.apprise_sock = sock
+
+
+def _ended(sock):
+    """Return True once the other end of ``sock`` was shut down.
+
+    The read has a time limit, so a connection that was never ended fails
+    the test instead of hanging it.
+    """
+    sock.settimeout(5.0)
+    return sock.recv(1) == b""
+
+
+def test_connection_tracker_cut_off():
+    """Cutting off ends every connection in use, and any used after."""
+    pairs = [socket.socketpair() for _ in range(3)]
+    try:
+        tracker = ConnectionTracker()
+        used = _Connection(pairs[0][0])
+        released = _Connection(pairs[1][0])
+
+        # One still being opened has no socket yet, and one already closed
+        # is left alone
+        opening = _Connection(None)
+        closed = socket.socket()
+        closed.close()
+        for conn in (used, released, opening):
+            tracker.add(conn)
+
+        tracker.add(_Connection(closed))
+        tracker.release(released)
+        assert released.apprise_tracker is None
+
+        tracker.cut_off()
+        assert tracker.expired
+        assert _ended(pairs[0][1])
+
+        # A released connection belongs to someone else now
+        pairs[1][1].setblocking(False)
+        with pytest.raises(BlockingIOError):
+            pairs[1][1].recv(1)
+
+        # One used after time ran out is ended straight away, untracked
+        late = _Connection(pairs[2][0])
+        tracker.add(late)
+        assert late not in tracker.connections
+        assert _ended(pairs[2][1])
+
+    finally:
+        for pair in pairs:
+            for sock in pair:
+                sock.close()
+
+
+def test_connection_tracker_finish():
+    """A download that is over is never cut off afterwards."""
+    left, right = socket.socketpair()
+    try:
+        tracker = ConnectionTracker()
+        conn = _Connection(left)
+        tracker.add(conn)
+        tracker.finish()
+        assert not tracker.connections
+        assert conn.apprise_tracker is None
+
+        tracker.cut_off()
+        assert not tracker.expired
+        right.setblocking(False)
+        with pytest.raises(BlockingIOError):
+            right.recv(1)
+
+    finally:
+        left.close()
+        right.close()
+
+
+def test_connection_tracker_tls():
+    """A TLS connection is ended without touching its TLS state."""
+    left, right = socket.socketpair()
+    context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    tls = context.wrap_socket(
+        left, server_hostname="localhost", do_handshake_on_connect=False
+    )
+    try:
+        tracker = ConnectionTracker()
+        tracker.add(_Connection(tls))
+        tracker.cut_off()
+        assert _ended(right)
+
+    finally:
+        tls.close()
+        right.close()
+
+
+class _Wrapper:
+    """A socket-like wrapper, such as PyOpenSSL's, around ``sock``."""
+
+    def __init__(self, sock):
+        self.socket = sock
+
+
+def test_connection_tracker_wrapped_socket():
+    """A socket inside a wrapper is ended, and anything unknown is skipped."""
+    pairs = [socket.socketpair() for _ in range(2)]
+    deep = socket.socket()
+    try:
+        tracker = ConnectionTracker()
+
+        # One wrapper, and a wrapper around a wrapper
+        tracker.add(_Connection(_Wrapper(pairs[0][0])))
+        tracker.add(_Connection(_Wrapper(_Wrapper(pairs[1][0]))))
+
+        # Nothing that can be ended, at the end of a wrapper or too deep
+        tracker.add(_Connection(object()))
+        tracker.add(_Connection(_Wrapper(_Wrapper(_Wrapper(deep)))))
+
+        tracker.cut_off()
+        assert tracker.expired
+        assert _ended(pairs[0][1])
+        assert _ended(pairs[1][1])
+
+    finally:
+        deep.close()
+        for pair in pairs:
+            for sock in pair:
+                sock.close()
+
+
+def test_watchdog_survives_errors():
+    """One download failing to be cut off never stops the others."""
+
+    class Broken(ConnectionTracker):
+        def cut_off(self):
+            raise TypeError()
+
+    watchdog = http._Watchdog()
+    tracker = ConnectionTracker()
+    watchdog.watch(Broken(), time.monotonic())
+    watchdog.watch(tracker, time.monotonic() + 0.1)
+
+    until = time.monotonic() + 5.0
+    while not tracker.expired:
+        assert time.monotonic() < until
+        time.sleep(0.01)
+
+    assert watchdog._thread.is_alive()
+
+
+def test_watchdog_order():
+    """The soonest deadline is cut off first, whatever order it came in."""
+    watchdog = http._Watchdog()
+    later, sooner = ConnectionTracker(), ConnectionTracker()
+    try:
+        watchdog.watch(later, time.monotonic() + 60.0)
+        watchdog.watch(sooner, time.monotonic() + 0.1)
+
+        # Fifty times the deadline, so a slow machine still passes
+        until = time.monotonic() + 5.0
+        while not sooner.expired and time.monotonic() < until:
+            time.sleep(0.01)
+
+        assert sooner.expired
+        assert not later.expired
+
+    finally:
+        # Let the thread go idle rather than cut off a tracker later
+        later.finish()
+
+
+def test_watchdog_without_thread():
+    """A watchdog that cannot start a thread refuses the download."""
+    watchdog = http._Watchdog()
+    first, second = ConnectionTracker(), ConnectionTracker()
+    with (
+        mock.patch("threading.Thread.start", side_effect=RuntimeError),
+        pytest.raises(http.WatchdogUnavailableError),
+    ):
+        watchdog.watch(first, time.monotonic())
+
+    # Nothing was left behind
+    assert watchdog._due == []
+
+    # The next download starts it
+    watchdog.watch(second, time.monotonic())
+    until = time.monotonic() + 5.0
+    while not second.expired:
+        assert time.monotonic() < until
+        time.sleep(0.01)
+
+    assert not first.expired
+
+
+def test_watchdog_forgets_finished_downloads():
+    """Downloads that are over are not kept until their deadline."""
+    watchdog = http._Watchdog()
+    running = ConnectionTracker()
+    with mock.patch.object(http, "_WATCHDOG", watchdog):
+        watchdog.watch(running, time.monotonic() + 3600.0)
+
+        # One over is left for now, since tidying up each time would be
+        # slow with many downloads running
+        with track_connections(ConnectionTracker(), time.monotonic() + 3600):
+            pass
+
+        assert len(watchdog._due) == 2
+
+        # Once most of the schedule is over, only what still runs is kept
+        with track_connections(ConnectionTracker(), time.monotonic() + 3600):
+            pass
+
+        assert [entry[2] for entry in watchdog._due] == [running]
+
+        # Without a deadline it is never scheduled at all
+        with track_connections(ConnectionTracker()):
+            assert len(watchdog._due) == 1
+
+    running.finish()
+
+
+def test_tracked_pool():
+    """Any kind of pool, such as a SOCKS proxy's, can be tracked."""
+
+    class Connection(http.HTTPConnection):
+        pass
+
+    class Pool(http.HTTPConnectionPool):
+        ConnectionCls = Connection
+
+    tracked = http._tracked_pool(Pool)
+    assert issubclass(tracked, Pool)
+    assert issubclass(tracked.ConnectionCls, Connection)
+    assert issubclass(tracked.ConnectionCls, http._TrackedConnectionMixin)
+
+    # Made once, and a tracked pool is left as it is
+    assert http._tracked_pool(Pool) is tracked
+    assert http._tracked_pool(tracked) is tracked
+    assert (
+        http._tracked_pool(http.HTTPConnectionPool)
+        is http._TrackedHTTPConnectionPool
+    )
+
+
+def test_tracked_session_proxy():
+    """Connections through a proxy are tracked as well."""
+    adapter = tracked_session().get_adapter("http://")
+    manager = adapter.proxy_manager_for("http://127.0.0.1:3128")
+    for pool_cls in manager.pool_classes_by_scheme.values():
+        assert issubclass(pool_cls, http._TrackedPoolMixin)
+
+    # The same manager is handed back next time, unchanged
+    assert adapter.proxy_manager_for("http://127.0.0.1:3128") is manager
 
 
 def test_policy_connects_with_urllib3_future_option():

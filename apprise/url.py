@@ -29,6 +29,7 @@ from datetime import datetime
 import hashlib
 import re
 import sys
+import threading
 import time
 from urllib.parse import quote as _quote, unquote as _unquote
 from xml.sax.saxutils import escape as sax_escape
@@ -289,10 +290,17 @@ class URLBase:
         if not isinstance(self.fullpath, str) or not self.fullpath:
             self.fullpath = "/"
 
-        # Store our Timeout Variables
+        # Store our Timeout Variables; each must be a number of seconds
+        # above zero that this platform can wait for, otherwise the default
+        # is kept
         if "rto" in kwargs:
             try:
-                self.socket_read_timeout = float(kwargs.get("rto"))
+                rto = float(kwargs.get("rto"))
+                if not 0 < rto <= threading.TIMEOUT_MAX:
+                    raise ValueError()
+
+                self.socket_read_timeout = rto
+
             except (TypeError, ValueError):
                 self.logger.warning(
                     "Invalid socket read timeout (rto)"
@@ -301,7 +309,11 @@ class URLBase:
 
         if "cto" in kwargs:
             try:
-                self.socket_connect_timeout = float(kwargs.get("cto"))
+                cto = float(kwargs.get("cto"))
+                if not 0 < cto <= threading.TIMEOUT_MAX:
+                    raise ValueError()
+
+                self.socket_connect_timeout = cto
 
             except (TypeError, ValueError):
                 self.logger.warning(
