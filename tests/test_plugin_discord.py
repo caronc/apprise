@@ -40,7 +40,13 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
+from apprise import (
+    Apprise,
+    AppriseAsset,
+    AppriseAttachment,
+    NotifyFormat,
+    NotifyType,
+)
 from apprise.common import OverflowMode
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.discord import NotifyDiscord
@@ -1349,6 +1355,88 @@ def test_plugin_discord_template_content(mock_post, tmpdir):
     # Verify the payload sent - content field contains the body
     posted = loads(mock_post.call_args_list[0][1]["data"])
     assert posted["content"] == "hello"
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-8-sig"])
+@mock.patch("requests.post")
+def test_plugin_discord_template_utf8(mock_post, encoding, tmpdir):
+    """NotifyDiscord() reads a UTF-8 template whatever the locale encoding."""
+
+    mock_post.return_value = mock.Mock(
+        status_code=requests.codes.ok,
+        content=b"",
+        headers={},
+    )
+
+    # Non-ASCII text, with and without a byte order mark
+    template = tmpdir.join("discord.json")
+    template.write_binary(
+        '{"content": "Łukasz ✨ {{app_body}}"}'.encode(encoding)
+    )
+
+    obj = Apprise.instantiate(
+        "discord://{}/{}/".format("A" * 24, "B" * 64)
+        + "?template={}".format(str(template))
+    )
+    assert isinstance(obj, NotifyDiscord)
+    assert (
+        bool(
+            obj.notify(
+                body="hello", title="world", notify_type=NotifyType.INFO
+            )
+        )
+        is True
+    )
+
+    posted = loads(mock_post.call_args_list[0][1]["data"])
+    assert posted["content"] == "Łukasz ✨ hello"
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "not-a-codec"])
+@mock.patch("requests.post")
+def test_plugin_discord_template_not_utf8(mock_post, encoding, tmpdir):
+    """NotifyDiscord() fails cleanly on a template it cannot decode."""
+
+    # Latin-1 bytes are not valid UTF-8, and an unknown codec
+    # cannot read anything at all
+    template = tmpdir.join("discord.json")
+    template.write_binary('{"content": "café {{app_body}}"}'.encode("latin-1"))
+
+    obj = Apprise.instantiate(
+        "discord://{}/{}/".format("A" * 24, "B" * 64)
+        + "?template={}".format(str(template)),
+        asset=AppriseAsset(encoding=encoding),
+    )
+    assert isinstance(obj, NotifyDiscord)
+    assert bool(obj.notify(body="hello", title="world")) is False
+
+    # Nothing was sent
+    assert mock_post.call_count == 0
+
+
+@mock.patch("requests.post")
+def test_plugin_discord_template_asset_encoding(mock_post, tmpdir):
+    """NotifyDiscord() reads a template in the asset encoding."""
+    mock_post.return_value = mock.Mock(
+        status_code=requests.codes.ok, content=b"", headers={}
+    )
+
+    # A Korean template saved in a legacy Windows code page
+    template = tmpdir.join("discord.json")
+    template.write_binary(
+        ('{"content": "안녕하세요 {{app_body}}"}').encode("cp949")
+    )
+
+    obj = Apprise.instantiate(
+        "discord://{}/{}/".format("A" * 24, "B" * 64)
+        + "?template={}".format(str(template)),
+        asset=AppriseAsset(encoding="cp949"),
+    )
+    assert isinstance(obj, NotifyDiscord)
+    assert bool(obj.notify(body="hello", title="world")) is True
+
+    posted = loads(mock_post.call_args_list[0][1]["data"])
+    assert posted["content"] == "안녕하세요 hello"
 
 
 @mock.patch("requests.post")

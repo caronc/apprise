@@ -2813,6 +2813,108 @@ def test_plugin_telegram_template_blocks(mock_post, tmpdir):
     assert paragraph["text"] == "hello"
 
 
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-8-sig"])
+@mock.patch("requests.post")
+def test_plugin_telegram_template_utf8(mock_post, encoding, tmpdir):
+    """NotifyTelegram() reads a UTF-8 template whatever the locale encoding."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    # Non-ASCII text, with and without a byte order mark
+    template = tmpdir.join("blocks.json")
+    template.write_binary(
+        cleandoc("""
+        {
+          "blocks": [
+            {
+              "type": "section_heading",
+              "text": "{{app_title}}"
+            },
+            {
+              "type": "paragraph",
+              "text": "Łukasz ✨ {{app_body}}"
+            }
+          ]
+        }
+        """).encode(encoding)
+    )
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        )
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert (
+        obj.notify(body="hello", title="world", notify_type=NotifyType.INFO)
+        is True
+    )
+
+    posted = loads(mock_post.call_args_list[0][1]["data"])
+    blocks = posted["rich_message"]["blocks"]
+    paragraph = next(b for b in blocks if b.get("type") == "paragraph")
+    assert paragraph["text"] == "Łukasz ✨ hello"
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "not-a-codec"])
+@mock.patch("requests.post")
+def test_plugin_telegram_template_not_utf8(mock_post, encoding, tmpdir):
+    """NotifyTelegram() fails cleanly on a template it cannot decode."""
+
+    # Latin-1 bytes are not valid UTF-8, and an unknown codec
+    # cannot read anything at all
+    template = tmpdir.join("blocks.json")
+    template.write_binary(
+        '{"blocks": [{"type": "paragraph", '
+        '"text": "café {{app_body}}"}]}'.encode("latin-1")
+    )
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        ),
+        asset=AppriseAsset(encoding=encoding),
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert bool(obj.notify(body="hello", title="world")) is False
+
+    # Nothing was sent
+    assert mock_post.call_count == 0
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_asset_encoding(mock_post, tmpdir):
+    """NotifyTelegram() reads a template in the asset encoding."""
+    mock_post.return_value = mock.Mock(
+        status_code=requests.codes.ok, content=dumps({"ok": True})
+    )
+
+    # A Korean template saved in a legacy Windows code page
+    template = tmpdir.join("blocks.json")
+    template.write_binary(
+        (
+            '{"blocks": [{"type": "paragraph", '
+            '"text": "안녕하세요 {{app_body}}"}]}'
+        ).encode("cp949")
+    )
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        ),
+        asset=AppriseAsset(encoding="cp949"),
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert bool(obj.notify(body="hello", title="world")) is True
+
+    posted = loads(mock_post.call_args_list[0][1]["data"])
+    blocks = posted["rich_message"]["blocks"]
+    paragraph = next(b for b in blocks if b.get("type") == "paragraph")
+    assert paragraph["text"] == "안녕하세요 hello"
+
+
 @mock.patch("requests.post")
 def test_plugin_telegram_template_invalid_json(mock_post, tmpdir):
     """NotifyTelegram() - Rich Message template with invalid JSON fails."""

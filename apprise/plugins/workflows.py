@@ -474,14 +474,20 @@ class NotifyWorkflows(NotifyBase):
         }
 
         try:
-            with open(template.path) as fp:
-                content = json.loads(apply_template(fp.read(), **safe_tokens))
+            with open(template.path, encoding=self.asset.encoding) as fp:
+                # Drop a byte order mark that some Windows editors add.
+                content = json.loads(
+                    apply_template(
+                        fp.read().removeprefix("\ufeff"), **safe_tokens
+                    )
+                )
 
-        except OSError:
+        except (OSError, LookupError, UnicodeDecodeError) as e:
             self.logger.error(
                 "Workflow template"
                 f" {template.url(privacy=True)} could not be read."
             )
+            self.logger.debug("Template Exception: %s", str(e))
             return False
 
         except JSONDecodeError as e:
