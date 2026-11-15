@@ -23,7 +23,10 @@ jobs:
       fail-fast: false  # Let all jobs run, even if one fails
       matrix:
         include:
-          - python-version: "3.9"
+          # Python 3.9 has no build for newer Ubuntu releases,
+          # so it stays on the last Ubuntu image that has one
+          - os: ubuntu-24.04
+            python-version: "3.9"
             tox_env: qa
           - python-version: "3.10"
             tox_env: qa
