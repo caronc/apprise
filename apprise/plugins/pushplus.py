@@ -334,6 +334,7 @@ class NotifyPushplus(NotifyBase):
                 "name": _("Channel"),
                 "type": "list:string",
                 "values": PUSHPLUS_CHANNELS,
+                "default": PUSHPLUS_CHANNEL_DEFAULT,
             },
             # mode= is an alias for channel=; the two are fully synonymous.
             "mode": {
