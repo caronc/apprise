@@ -67,6 +67,10 @@ def apply_template(template, app_mode=TemplateType.RAW, **kwargs):
     # Our escape function
     fn = _escape_json if app_mode == TemplateType.JSON else _escape_raw
 
+    if not kwargs:
+        # Nothing to swap in
+        return template
+
     lookup = [re.escape(x) for x in kwargs]
 
     # Compile this into a list
@@ -79,7 +83,15 @@ def apply_template(template, app_mode=TemplateType.RAW, **kwargs):
         re.IGNORECASE,
     )
 
-    # we index 2 characters off the head and 2 characters from the tail
-    # to drop the '{{' and '}}' surrounding our match so that we can
-    # re-index it back into our list
-    return mask_r.sub(lambda x: fn(kwargs[x.group()[2:-2].strip()]), template)
+    def _swap(match):
+        keyword = match.group(1)
+        if keyword not in kwargs:
+            # The pattern ignores case, so find the keyword that matched
+            keyword = next(
+                k
+                for k in kwargs
+                if re.fullmatch(re.escape(k), keyword, re.IGNORECASE)
+            )
+        return fn(kwargs[keyword])
+
+    return mask_r.sub(_swap, template)
