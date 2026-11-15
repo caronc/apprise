@@ -101,7 +101,6 @@ def test_private_fields_are_hidden():
         "ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiacevi7FQ/us-west-2"
         "?token=SESSION",
         "kodi://[2001:db8::1]:8080",
-        "vapid://user@example.com/abc",
     ),
 )
 def test_fields_assemble_the_same_url(url):
@@ -110,6 +109,22 @@ def test_fields_assemble_the_same_url(url):
     again = Apprise.instantiate(built)
     assert again.url() == obj.url()
     assert again.url_fields() == fields
+
+
+def test_email_host_fields_assemble_the_same_url():
+    """An email written as the host comes back as the same email."""
+    # Vapid needs cryptography to load, so the URL is never instantiated
+    fields = parse_fields("vapid://user@example.com/abc?retry=2")
+    assert fields["subscriber"] == "user@example.com"
+    assert fields["targets"] == ["abc"]
+
+    # Options every service shares are kept too
+    assert fields["retry"] == 2
+
+    # The assembled URL reads back to the very same fields
+    built = fields_to_url(fields)
+    assert built.startswith("vapid://user@example.com/abc")
+    assert parse_fields(built) == fields
 
 
 def test_key_value_options_come_back_as_maps():
