@@ -37,6 +37,7 @@ import requests
 from apprise import Apprise
 from apprise.common import NotifyFormat
 from apprise.exception import AppriseImproperlyConfigured
+from apprise.plugins.base import _delivery_tracker
 from apprise.plugins.pushplus import (
     PUSHPLUS_CHANNEL_DEFAULT,
     PUSHPLUS_CHANNELS,
@@ -120,7 +121,8 @@ apprise_url_tests = (
         "pushplus://{}/mygroup".format(GOOD_TOKEN),
         {
             "instance": NotifyPushplus,
-            "privacy_url": "pushplus://****/mygroup/",
+            # url() always writes the # prefix for a topic
+            "privacy_url": "pushplus://****/#mygroup/",
             "requests_response_text": GOOD_RESPONSE,
         },
     ),
@@ -171,6 +173,110 @@ apprise_url_tests = (
         "pushplus://{}?channel=sms".format(GOOD_TOKEN),
         {
             "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    (
+        "pushplus://{}?channel=app".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    (
+        "pushplus://{}?channel=extension".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    (
+        "pushplus://{}?channel=clawbot".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    (
+        "pushplus://{}?channel=cmcc".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    (
+        "pushplus://{}?channel=qq".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    (
+        "pushplus://{}?channel=voice".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    (
+        "pushplus://{}?channel=wechat,mail".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    # Option parameter
+    (
+        "pushplus://{}?option=myopt".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    # Template parameter
+    (
+        "pushplus://{}?template=json".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    # Callback URL
+    (
+        "pushplus://{}?callbackUrl=https://example.com/cb".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    # Short ?callback= form
+    (
+        "pushplus://{}?callback=https://example.com/cb".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    # html, txt and markdown are picked with ?format= instead
+    (
+        "pushplus://{}?template=markdown".format(GOOD_TOKEN),
+        {
+            "instance": AppriseImproperlyConfigured,
+        },
+    ),
+    # An unknown channel inside a channel list is rejected
+    (
+        "pushplus://{}?channel=wechat,bogus".format(GOOD_TOKEN),
+        {
+            "instance": AppriseImproperlyConfigured,
+        },
+    ),
+    # Friend recipient with @ prefix
+    (
+        "pushplus://{}/@friend1".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "privacy_url": "pushplus://****/@friend1/",
             "requests_response_text": GOOD_RESPONSE,
         },
     ),
@@ -234,6 +340,20 @@ apprise_url_tests = (
     # ----------------------------------------------------------------
     (
         "https://www.pushplus.plus/send?token={}".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    (
+        "https://www.pushplus.plus/send/{}".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    (
+        "https://www.pushplus.plus/batchSend?token={}".format(GOOD_TOKEN),
         {
             "instance": NotifyPushplus,
             "requests_response_text": GOOD_RESPONSE,
@@ -373,7 +493,56 @@ def test_plugin_pushplus_init():
         webhook="myhook",
     )
     assert obj.webhook == "myhook"
+    assert obj.option == "myhook"
     assert obj.channel == PushPlusChannel.WEBHOOK
+
+    # Option parameter directly
+    obj = NotifyPushplus(token=GOOD_TOKEN, option="myopt")
+    assert obj.option == "myopt"
+    assert obj.webhook == "myopt"
+
+    # Friend targets with @ prefix
+    obj = NotifyPushplus(token=GOOD_TOKEN, targets=["@friend1", "@friend2"])
+    assert obj.friends == ["friend1", "friend2"]
+    assert obj.topics == []
+
+    # Topic with # prefix
+    obj = NotifyPushplus(token=GOOD_TOKEN, targets=["#mygroup"])
+    assert obj.topics == ["mygroup"]
+
+    # Mixed topic and friend
+    obj = NotifyPushplus(token=GOOD_TOKEN, targets=["mygroup", "@friend1"])
+    assert obj.topics == ["mygroup"]
+    assert obj.friends == ["friend1"]
+
+    # Template parameter
+    obj = NotifyPushplus(token=GOOD_TOKEN, template="json")
+    assert obj.template == "json"
+
+    # Callback URL
+    obj = NotifyPushplus(
+        token=GOOD_TOKEN, callback_url="https://example.com/cb"
+    )
+    assert obj.callback_url == "https://example.com/cb"
+
+    # Template matching ignores case but keeps PushPlus's spelling
+    obj = NotifyPushplus(token=GOOD_TOKEN, template="CLOUDMONITOR")
+    assert obj.template == "cloudMonitor"
+
+    # A template ?format= already covers is rejected
+    with pytest.raises(AppriseImproperlyConfigured):
+        NotifyPushplus(token=GOOD_TOKEN, template="html")
+
+    # Invalid @ and # targets
+    obj = NotifyPushplus(token=GOOD_TOKEN, targets=["", "@!bad", "#!bad"])
+    assert obj.topics == []
+    assert obj.friends == []
+    assert "@!bad" in obj.invalid_targets
+    assert "#!bad" in obj.invalid_targets
+
+    # Multi-channel
+    obj = NotifyPushplus(token=GOOD_TOKEN, channel="wechat,mail")
+    assert obj.channel == "wechat,mail"
 
 
 def test_plugin_pushplus_schema_aliases():
@@ -427,12 +596,12 @@ def test_plugin_pushplus_url():
     assert GOOD_TOKEN not in priv
     assert "****" in priv
 
-    # Group topic URL -- topic appears in the path
+    # Group topic URL -- topic appears in the path with its # prefix
     obj = NotifyPushplus(token=GOOD_TOKEN, targets=["mygroup"])
     url = obj.url()
-    assert "/mygroup/" in url
+    assert "/#mygroup/" in url
     priv = obj.url(privacy=True)
-    assert "/mygroup/" in priv
+    assert "/#mygroup/" in priv
     assert GOOD_TOKEN not in priv
 
     # Multiple topics all appear in the path
@@ -604,10 +773,18 @@ def test_plugin_pushplus_send_topic(mock_post):
 
     # Single topic -- one API call, topic present in payload
     obj = NotifyPushplus(token=GOOD_TOKEN, targets=["mygroup"])
-    assert obj.send(body="group msg") is True
-    assert mock_post.call_count == 1
-    payload = loads(mock_post.call_args[1]["data"])
-    assert payload["topic"] == "mygroup"
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        assert obj.send(body="group msg") is True
+        assert mock_post.call_count == 1
+        payload = loads(mock_post.call_args[1]["data"])
+        assert payload["topic"] == "mygroup"
+
+        # Already delivered topic skipped on retry
+        assert obj.send(body="group msg") is True
+        assert mock_post.call_count == 1
+    finally:
+        _delivery_tracker.reset(tracker_token)
 
 
 @mock.patch("requests.post")
@@ -870,6 +1047,192 @@ def test_plugin_pushplus_parse_url():
     assert result.get("channel") == "webhook"
 
 
+def test_plugin_pushplus_parse_url_advanced():
+    """NotifyPushplus() parse_url() supports advanced arguments."""
+    url = (
+        "pushplus://{}?channel=wechat,mail&option=myopt&template=json"
+        "&callbackUrl=https://example.com/cb"
+    ).format(GOOD_TOKEN)
+    result = NotifyPushplus.parse_url(url)
+    assert result["token"] == GOOD_TOKEN
+    assert result["channel"] == "wechat,mail"
+    assert result["option"] == "myopt"
+    assert result["webhook"] == "myopt"
+    assert result["template"] == "json"
+    assert result["callback_url"] == "https://example.com/cb"
+
+    # webhook= parameter fallback
+    url2 = "pushplus://{}?webhook=hook1".format(GOOD_TOKEN)
+    assert NotifyPushplus.parse_url(url2)["option"] == "hook1"
+
+    # ?callback= wins over ?callbackUrl= when both are given
+    url3 = (
+        "pushplus://{}?callbackUrl=https://example.com/cb1"
+        "&callback=https://example.com/cb2"
+    ).format(GOOD_TOKEN)
+    assert (
+        NotifyPushplus.parse_url(url3)["callback_url"]
+        == "https://example.com/cb2"
+    )
+
+
+@mock.patch("requests.post")
+def test_plugin_pushplus_send_friends(mock_post):
+    """NotifyPushplus() sends to friends via 'to' parameter."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = GOOD_RESPONSE.encode("utf-8")
+    mock_post.return_value = response
+
+    # Single friend
+    obj = NotifyPushplus(token=GOOD_TOKEN, targets=["@friend1"])
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        assert obj.send(body="hello friend") is True
+        assert mock_post.call_count == 1
+        payload = loads(mock_post.call_args[1]["data"])
+        assert payload["to"] == "friend1"
+        assert "topic" not in payload
+
+        # Second send skips already delivered target
+        assert obj.send(body="hello friend") is True
+        assert mock_post.call_count == 1
+    finally:
+        _delivery_tracker.reset(tracker_token)
+
+    mock_post.reset_mock()
+    response.content = GOOD_RESPONSE.encode("utf-8")
+
+    # Multiple friends (joined by comma)
+    obj2 = NotifyPushplus(token=GOOD_TOKEN, targets=["@friend1", "@friend2"])
+    assert obj2.send(body="hello friends") is True
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args[1]["data"])
+    assert payload["to"] == "friend1,friend2"
+    assert "topic" not in payload
+
+    # Friend delivery failure
+    mock_post.reset_mock()
+    response.status_code = requests.codes.internal_server_error
+    obj3 = NotifyPushplus(token=GOOD_TOKEN, targets=["@friend3"])
+    assert obj3.send(body="fail") is False
+
+
+@mock.patch("requests.post")
+def test_plugin_pushplus_send_advanced_params(mock_post):
+    """NotifyPushplus() sends with option, template and callbackUrl."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = GOOD_RESPONSE.encode("utf-8")
+    mock_post.return_value = response
+
+    obj = NotifyPushplus(
+        token=GOOD_TOKEN,
+        option="opt123",
+        template="json",
+        callback_url="https://example.com/cb",
+    )
+    assert obj.send(body='{"key": "value"}') is True
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args[1]["data"])
+    assert payload["option"] == "opt123"
+    assert payload["template"] == "json"
+    assert payload["callbackUrl"] == "https://example.com/cb"
+    assert "timestamp" not in payload
+
+
+@mock.patch("requests.post")
+def test_plugin_pushplus_send_batch_channels(mock_post):
+    """NotifyPushplus() uses /batchSend when multiple channels specified."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = GOOD_RESPONSE.encode("utf-8")
+    mock_post.return_value = response
+
+    obj = NotifyPushplus(token=GOOD_TOKEN, channel="wechat,mail")
+    assert obj.send(body="multi channel msg") is True
+    assert mock_post.call_count == 1
+    call = mock_post.call_args
+    assert call[0][0] == "https://www.pushplus.plus/batchSend"
+    payload = loads(call[1]["data"])
+    assert payload["channel"] == "wechat,mail"
+
+
+@mock.patch("requests.post")
+def test_plugin_pushplus_batch_channel_option(mock_post):
+    """NotifyPushplus() passes per-channel option codes through in order."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = GOOD_RESPONSE.encode("utf-8")
+    mock_post.return_value = response
+
+    # The second channel (webhook) gets the code; wechat gets none
+    obj = Apprise.instantiate(
+        "pushplus://{}?channel=wechat,webhook&option=,bark".format(GOOD_TOKEN)
+    )
+    assert obj.send(body="multi channel msg") is True
+    assert mock_post.call_args[0][0] == "https://www.pushplus.plus/batchSend"
+    payload = loads(mock_post.call_args[1]["data"])
+    assert payload["channel"] == "wechat,webhook"
+    assert payload["option"] == ",bark"
+
+    # The older webhook field is only added for a lone webhook channel
+    assert "webhook" not in payload
+
+
+@mock.patch("requests.post")
+def test_plugin_pushplus_friend_batches(mock_post):
+    """NotifyPushplus() sends friends in batches of ten."""
+    good = mock.Mock()
+    good.status_code = requests.codes.ok
+    good.content = GOOD_RESPONSE.encode("utf-8")
+    bad = mock.Mock()
+    bad.status_code = requests.codes.internal_server_error
+    bad.content = b""
+
+    # Eleven friends need two requests
+    friends = ["@friend{:02d}".format(i) for i in range(11)]
+    obj = NotifyPushplus(token=GOOD_TOKEN, targets=friends)
+
+    # The second batch fails on the first attempt
+    mock_post.side_effect = [good, bad]
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        assert obj.send(body="hi") is False
+        assert mock_post.call_count == 2
+        first = loads(mock_post.call_args_list[0][1]["data"])
+        second = loads(mock_post.call_args_list[1][1]["data"])
+        assert len(first["to"].split(",")) == 10
+        assert second["to"] == "friend10"
+
+        # A retry only re-sends the batch that failed
+        mock_post.reset_mock()
+        mock_post.side_effect = [good]
+        assert obj.send(body="hi") is True
+        assert mock_post.call_count == 1
+        payload = loads(mock_post.call_args[1]["data"])
+        assert payload["to"] == "friend10"
+
+    finally:
+        _delivery_tracker.reset(tracker_token)
+
+
+def test_plugin_pushplus_round_trip():
+    """NotifyPushplus() url() keeps every option through a round trip."""
+    obj = Apprise.instantiate(
+        "pushplus://{}/grp/@pal?channel=mail,webhook&option=m1,h1"
+        "&template=jenkins&callback=https://example.com/cb".format(GOOD_TOKEN)
+    )
+    obj2 = Apprise.instantiate(obj.url())
+    assert obj2.url_identifier == obj.url_identifier
+    assert obj2.topics == ["grp"]
+    assert obj2.friends == ["pal"]
+    assert obj2.channel == "mail,webhook"
+    assert obj2.option == "m1,h1"
+    assert obj2.template == "jenkins"
+    assert obj2.callback_url == "https://example.com/cb"
+
+
 def test_plugin_pushplus_parse_native_url():
     """NotifyPushplus() parse_native_url() handles all edge cases."""
 
@@ -910,6 +1273,32 @@ def test_plugin_pushplus_parse_native_url():
     obj = NotifyPushplus(**result)
     assert obj.webhook == "myhook"
     assert obj.channel == PushPlusChannel.WEBHOOK
+
+    # Native URL with token in path
+    result = NotifyPushplus.parse_native_url(
+        "https://www.pushplus.plus/send/{}".format(GOOD_TOKEN)
+    )
+    assert result is not None
+    obj = NotifyPushplus(**result)
+    assert obj.token == GOOD_TOKEN
+
+    # api.pushplus.plus only hosts documentation, not the API
+    assert (
+        NotifyPushplus.parse_native_url(
+            "https://api.pushplus.plus/send?token={}".format(GOOD_TOKEN)
+        )
+        is None
+    )
+
+    # Native batchSend URL
+    result = NotifyPushplus.parse_native_url(
+        "https://www.pushplus.plus/batchSend"
+        "?token={}&channel=wechat,mail".format(GOOD_TOKEN)
+    )
+    assert result is not None
+    obj = NotifyPushplus(**result)
+    assert obj.token == GOOD_TOKEN
+    assert obj.channel == "wechat,mail"
 
     # Native URL without a token -- not matched, returns None
     assert (

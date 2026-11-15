@@ -1656,6 +1656,14 @@ msgstr "채널"
 msgid "Webhook Name"
 msgstr "웹후크 이름"
 
+#: apprise/plugins/pushplus.py:348
+msgid "Channel Option"
+msgstr "채널 옵션"
+
+#: apprise/plugins/pushplus.py:371
+msgid "Callback URL"
+msgstr "콜백 URL"
+
 #: apprise/plugins/pushsafer.py:364
 msgid "Private Key"
 msgstr "개인 키"

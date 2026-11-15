@@ -1657,6 +1657,14 @@ msgstr "القناة"
 msgid "Webhook Name"
 msgstr "اسم الويب هوك"
 
+#: apprise/plugins/pushplus.py:348
+msgid "Channel Option"
+msgstr "خيار القناة"
+
+#: apprise/plugins/pushplus.py:371
+msgid "Callback URL"
+msgstr "رابط رد الاتصال"
+
 #: apprise/plugins/pushsafer.py:364
 msgid "Private Key"
 msgstr "المفتاح الخاص"

@@ -1656,6 +1656,14 @@ msgstr "Kênh"
 msgid "Webhook Name"
 msgstr "Tên webhook"
 
+#: apprise/plugins/pushplus.py:348
+msgid "Channel Option"
+msgstr "Tùy chọn kênh"
+
+#: apprise/plugins/pushplus.py:371
+msgid "Callback URL"
+msgstr "URL gọi lại"
+
 #: apprise/plugins/pushsafer.py:364
 msgid "Private Key"
 msgstr "Khóa riêng"

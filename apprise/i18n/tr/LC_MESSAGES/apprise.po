@@ -1656,6 +1656,14 @@ msgstr "Kanal"
 msgid "Webhook Name"
 msgstr "Web kancası adı"
 
+#: apprise/plugins/pushplus.py:348
+msgid "Channel Option"
+msgstr "Kanal seçeneği"
+
+#: apprise/plugins/pushplus.py:371
+msgid "Callback URL"
+msgstr "Geri çağırma URL'si"
+
 #: apprise/plugins/pushsafer.py:364
 msgid "Private Key"
 msgstr "Özel anahtar"
