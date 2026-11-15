@@ -196,7 +196,7 @@ Also try out the [Apprise URL Builder][buildurls] to easily construct the URLS
 this tool supports and works with.
 
 [serviceurls]: https://appriseit.com/services/
-[buildurls]: https://appriseit.com/tools/url-builder/
+[buildurls]: https://appriseit.com/url-builder/
 
 The **environment variable** of `APPRISE_URLS` (comma/space delimited) can be specified to
 provide the default set of URLs you wish to notify if none are otherwise specified.

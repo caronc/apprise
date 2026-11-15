@@ -32,6 +32,9 @@ import pytest
 
 from apprise import Apprise
 from apprise.fields import _hidden, _typed, fields_to_url, parse_fields
+from apprise.manager_plugins import NotificationManager
+
+N_MGR = NotificationManager()
 
 # A value nested far deeper than any field allows
 DEEP = "x"
@@ -251,6 +254,13 @@ def test_fields_of_a_url_its_service_would_refuse():
     # An unknown schema, or text that is not a URL, holds nothing
     for url in ("nope://x", "mailtos:", "tgram://bad", None):
         assert parse_fields(url) == {}
+
+
+def test_every_service_reads_a_broken_url_without_failing():
+    """A URL cut off mid-way gives no fields, whatever its service."""
+    for schema in N_MGR.schemas():
+        for url in (f"{schema}://[", f"{schema}://:@[", f"{schema}:///["):
+            assert isinstance(parse_fields(url), dict), url
 
 
 def test_url_that_cannot_be_read_back():

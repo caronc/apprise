@@ -63,7 +63,7 @@ The section identifies all of the services supported by this library. [Check out
 
 ## Productivity Based Notifications
 
-The table below identifies the services this tool supports and some example service URLs you need to use in order to take advantage of it. Click on any of the services listed below to get more details on how you can configure Apprise to access them. If you're having trouble constructing your own URL; try our [Apprise URL Builder](https://appriseit.com/tools/url-builder/) out.
+The table below identifies the services this tool supports and some example service URLs you need to use in order to take advantage of it. Click on any of the services listed below to get more details on how you can configure Apprise to access them. If you're having trouble constructing your own URL; try our [Apprise URL Builder](https://appriseit.com/url-builder/) out.
 
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
@@ -328,7 +328,7 @@ uptime | apprise -vv \
 
 ## CLI Configuration Files
 
-No one wants to put their credentials out for everyone to see on the command line.  No problem, *apprise* also supports configuration files.  It can handle both a specific YAML format or a very simple TEXT format. You can also pull these configuration files via an HTTP query too! Read more about the expected structure of the configuration files [here](https://appriseit.com/config/).
+No one wants to put their credentials out for everyone to see on the command line.  No problem, *apprise* also supports configuration files.  It can handle both a specific YAML format or a very simple TEXT format. You can also pull these configuration files via an HTTP query too! Read more about the expected structure of the configuration files [here](https://appriseit.com/getting-started/configuration/).
 
 ```bash
 # By default if no url or configuration is specified apprise will attempt to load
