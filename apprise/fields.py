@@ -40,7 +40,13 @@ from .logger import logger
 from .manager_plugins import NotificationManager
 from .plugins import details
 from .url import PrivacyMode, URLBase
-from .utils.parse import GET_SCHEMA_RE, is_email, is_ipaddr, parse_bool
+from .utils.parse import (
+    GET_SCHEMA_RE,
+    URL_SEGMENT_SAFE_CHARS,
+    is_email,
+    is_ipaddr,
+    parse_bool,
+)
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
@@ -172,11 +178,71 @@ def url_fields(plugin: Any, privacy: bool = False) -> dict[str, Any]:
     - An argument that is only another name for an entry (``alias_of``) is
       folded into that entry, such as ``to`` into ``targets``.
     - Key/value options come back as one map each, such as ``headers``.
-    - ``privacy`` masks every entry marked private.
+    - ``privacy`` masks every entry marked private, and any other text
+      that ``url(privacy=True)`` does not show.
     """
     # Read our own URL back; aliases and defaults are folded in by now
     results = plugin.parse_url(plugin.url().replace("/#", "/%23")) or {}
-    return _fields(type(plugin), results, privacy)
+    fields = _fields(type(plugin), results)
+    return hide_fields(plugin, fields) if privacy else fields
+
+
+def hide_fields(plugin: Any, fields: dict[str, Any]) -> dict[str, Any]:
+    """Return a masked copy of the fields url_fields(plugin) gave.
+
+    - The result is what ``url_fields(plugin, privacy=True)`` returns.
+    - Entries marked private are always masked.
+    - Any other text that ``plugin.url(privacy=True)`` does not show is
+      masked too, including entries in lists and key/value maps.
+    - ``schema``, numbers and on/off switches are never masked.
+    """
+    info = details(type(plugin))
+    tokens = info["tokens"]
+    shown = plugin.url(privacy=True)
+    shown = (shown, URLBase.unquote(shown))
+
+    def hide(value: Any) -> Any:
+        if isinstance(value, list):
+            return [hide(entry) for entry in value]
+
+        if isinstance(value, dict):
+            return {key: hide(entry) for key, entry in value.items()}
+
+        if not isinstance(value, str) or any(
+            text in url
+            for url in shown
+            for text in (value, URLBase.quote(value, safe=""))
+        ):
+            return value
+
+        return _hidden(value)
+
+    # A value is private when any token that sets it is (a private
+    # channel token makes the list of targets it belongs to private)
+    secret = {
+        meta["map_to"]
+        for meta in tokens.values()
+        if meta.get("private") and "map_to" in meta
+    }
+
+    hidden: dict[str, Any] = {}
+    for name, value in fields.items():
+        meta = (
+            tokens.get(name)
+            or info["args"].get(name)
+            or info["kwargs"].get(name)
+            or {}
+        )
+        if name == "schema":
+            hidden[name] = value
+
+        elif meta.get("private") or meta.get("map_to") in secret:
+            hidden[name] = _hidden(value)
+
+        else:
+            hidden[name] = hide(value)
+
+    return hidden
 
 
 def parse_fields(url: str, privacy: bool = False) -> dict[str, Any]:
@@ -184,19 +250,23 @@ def parse_fields(url: str, privacy: bool = False) -> dict[str, Any]:
 
     - Useful for showing what was typed so far, such as ``mailto://`` with
       nothing after it.
-    - Returns an empty dict when the schema is unknown or the URL can't be
-      read at all.
+    - Returns an empty dict when the schema is unknown or disabled, or the
+      URL can't be read at all.
+    - ``privacy`` masks all text but the schema and values picked from a
+      list of choices, since such a URL has no privacy URL to compare to.
     """
     found = GET_SCHEMA_RE.match(url) if isinstance(url, str) else None
     schema = found.group("schema").lower() if found else ""
-    if schema not in N_MGR:
+    if schema not in N_MGR or not N_MGR[schema].enabled:
         return {}
 
     results = N_MGR[schema].parse_url(url.replace("/#", "/%23")) or {}
     return _fields(N_MGR[schema], results, privacy)
 
 
-def _fields(plugin: Any, results: dict, privacy: bool) -> dict[str, Any]:
+def _fields(
+    plugin: Any, results: dict, privacy: bool = False
+) -> dict[str, Any]:
     """Return parse_url() results as fields named the way details() does."""
     info = details(plugin)
     tokens, args, kwargs = info["tokens"], info["args"], info["kwargs"]
@@ -264,15 +334,9 @@ def _fields(plugin: Any, results: dict, privacy: bool) -> dict[str, Any]:
             fields[name], entries[name] = dict(found), meta
 
     if privacy:
-        # A value is private when any token that sets it is (a private
-        # channel token makes the list of targets it belongs to private)
-        secret = {
-            meta["map_to"]
-            for meta in tokens.values()
-            if meta.get("private") and "map_to" in meta
-        }
+        # Only a value picked from a fixed list of choices is safe to show
         for name, meta in entries.items():
-            if meta.get("private") or meta.get("map_to") in secret:
+            if not meta.get("type", "").startswith("choice"):
                 fields[name] = _hidden(fields[name])
 
     return fields
@@ -323,8 +387,13 @@ def _encoded(value: Any, meta: dict[str, Any], path: bool = False) -> str:
 
     text = _text(value)
     if path:
-        # A path keeps its slashes
-        return URLBase.quote(text, safe="/")
+        # A path keeps its slashes, and each part is encoded the way
+        # parse_url() does it: escapes such as %20 are kept, while a space
+        # or a lone % typed by a person is encoded
+        return "/".join(
+            URLBase.quote(URLBase.unquote(part), safe=URL_SEGMENT_SAFE_CHARS)
+            for part in text.split("/")
+        )
 
     if meta.get("map_to") == "host" and is_ipaddr(text, ipv4=False):
         # An IPv6 host keeps its brackets and colons
@@ -342,15 +411,19 @@ def _encoded(value: Any, meta: dict[str, Any], path: bool = False) -> str:
 def fields_to_url(fields: dict[str, Any]) -> Optional[str]:
     """Assemble a URL from fields named the way details() does.
 
-    - ``fields`` must name its ``schema``; any name the plugin does not
-      define is refused.
+    - ``fields`` must name the ``schema`` of an enabled service; any name
+      the plugin does not define is refused.
     - The template that holds the given tokens best is filled in; the
       arguments and key/value options go into its query string.
     - Returns ``None`` when the URL cannot be assembled. The URL is not
       checked here; load it to find out whether it works.
     """
     schema = fields.get("schema") if isinstance(fields, dict) else None
-    if not isinstance(schema, str) or schema.lower() not in N_MGR:
+    if (
+        not isinstance(schema, str)
+        or schema.lower() not in N_MGR
+        or not N_MGR[schema.lower()].enabled
+    ):
         logger.warning("Fields must name a supported schema")
         return None
 

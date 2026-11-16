@@ -31,7 +31,13 @@ from unittest import mock
 import pytest
 
 from apprise import Apprise
-from apprise.fields import _hidden, _typed, fields_to_url, parse_fields
+from apprise.fields import (
+    _hidden,
+    _typed,
+    fields_to_url,
+    hide_fields,
+    parse_fields,
+)
 from apprise.manager_plugins import NotificationManager
 
 N_MGR = NotificationManager()
@@ -70,7 +76,7 @@ def test_fields_use_the_names_details_lists():
 
 
 def test_private_fields_are_hidden():
-    """Only the entries marked private are masked."""
+    """Entries marked private are masked; what the URL shows is kept."""
     obj = Apprise.instantiate("mailtos://user:secret@example.com")
     hidden = obj.url_fields(privacy=True)
     assert hidden["password"] == "****"
@@ -86,12 +92,79 @@ def test_private_fields_are_hidden():
 
 
 @pytest.mark.parametrize(
+    "url, secrets",
+    (
+        # The token is hidden by the privacy URL but not marked private
+        ("mastodon://SECRETTOKEN123@hostname", ("SECRETTOKEN123",)),
+        (
+            "plivo://AUTHIDAAAAAAAAAAAAAA@SECRETTOKENBBBBBBBBBBBBBBBBBBBBBBBBB"
+            "BBBBBB/15551231234",
+            (
+                "AUTHIDAAAAAAAAAAAAAA",
+                "SECRETTOKENBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            ),
+        ),
+        # The token is read from the user name, which is not private
+        ("ntfy://tk_SECRET123456@localhost/topic1", ("tk_SECRET123456",)),
+    ),
+)
+def test_privacy_fields_hide_what_the_privacy_url_hides(url, secrets):
+    """Text the privacy URL hides is masked in the privacy fields too."""
+    obj = Apprise.instantiate(url)
+    hidden = obj.url_fields(privacy=True)
+    for secret in secrets:
+        assert secret not in obj.url(privacy=True)
+        assert secret not in str(hidden)
+
+    # What the privacy URL shows is kept as it is
+    assert hidden["schema"] == obj.url_fields()["schema"]
+    assert hidden["verify"] is True
+    assert hidden["retry"] == 0
+
+
+def test_hide_fields_masks_fields_already_read():
+    """hide_fields() masks fields the way url_fields(privacy=True) does."""
+    obj = Apprise.instantiate("json://user:pass@localhost/?+X-Token=abc&-p1=v")
+    fields = obj.url_fields()
+    hidden = hide_fields(obj, fields)
+    assert hidden == obj.url_fields(privacy=True)
+    assert hidden["password"] == "****"
+    assert hidden["headers"] == {"X-Token": "abc"}
+
+    # The fields given are left as they were
+    assert fields["password"] == "pass"
+
+
+def test_privacy_fields_of_a_url_its_service_would_refuse():
+    """All text but the schema and fixed choices is masked."""
+    fields = parse_fields("plivo://AUTHID@SECRETTOKEN/", privacy=True)
+    assert fields["schema"] == "plivo"
+    assert fields["auth_id"] == "****"
+    assert fields["token"] == "****"
+    assert "AUTHID" not in str(fields)
+    assert "SECRETTOKEN" not in str(fields)
+
+    # Values picked from a list of choices, and switches, are kept
+    fields = parse_fields(
+        "mailtos://user:secret@example.com?mode=ssl", privacy=True
+    )
+    assert fields["mode"] == "ssl"
+    assert fields["verify"] is True
+    assert fields["user"] == "****"
+    assert fields["host"] == "****"
+
+
+@pytest.mark.parametrize(
     "url",
     (
         "mailtos://user:secret@example.com/a@example.com"
         "?smtp=smtp.example.com",
         "json://user:pass@localhost:8080/hooks/alert?+X-Token=abc&-p1=v",
         "xml://localhost/a/b/",
+        # A path that is already encoded is not encoded a second time
+        "json://localhost/a%20b/100%25/c%2Fd",
+        "form://localhost/a%20b/c",
+        "synology://localhost/token/a%20b/",
         "apprise://localhost/path/token",
         "synology://localhost/token/path/",
         "tgram://123456789:abcdefg_hijklmnop/-123/456?silent=yes",
@@ -157,6 +230,14 @@ def test_fields_from_a_form():
     assert obj.targets == [(False, "a@example.com")]
     assert "mode=ssl" in obj.url()
     assert "optional=yes" in obj.url()
+
+    # A path typed with a space or a lone % is encoded
+    assert (
+        fields_to_url(
+            {"schema": "json", "host": "localhost", "path": "/a b/50%/"}
+        )
+        == "json://localhost/a%20b/50%25/"
+    )
 
     # With nothing but the URL itself, there is no query string
     assert fields_to_url({"schema": "json", "host": "localhost"}) == (
@@ -269,6 +350,17 @@ def test_fields_of_a_url_its_service_would_refuse():
     # An unknown schema, or text that is not a URL, holds nothing
     for url in ("nope://x", "mailtos:", "tgram://bad", None):
         assert parse_fields(url) == {}
+
+
+def test_disabled_services_have_no_fields():
+    """A disabled service is treated like one that is not known."""
+    with mock.patch.object(N_MGR["json"], "enabled", False):
+        assert parse_fields("json://localhost") == {}
+        assert fields_to_url({"schema": "json", "host": "localhost"}) is None
+
+    # Enabled again, both work as before
+    assert parse_fields("json://localhost")["host"] == "localhost"
+    assert fields_to_url({"schema": "json", "host": "localhost"})
 
 
 def test_every_service_reads_a_broken_url_without_failing():
