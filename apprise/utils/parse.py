@@ -1218,11 +1218,11 @@ def _find_urls(text):
         limit = newlines[index] if index < len(newlines) else None
 
         # The first place to end at or after the body: in a delimiter
-        # span, or at the end of the text.
+        # span, or at the end of the text. The body always starts before
+        # any new line that closes the text, so it never starts past it.
         index = bisect_right(highs, body)
         ends = [max(spans[index][0], body)] if index < len(spans) else []
-        if tail >= body:
-            ends.append(tail)
+        ends.append(tail)
 
         ends = [end for end in ends if limit is None or end <= limit]
         if not ends:

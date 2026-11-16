@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 """Tests for turning URLs into their fields and back."""
 
+from importlib.util import find_spec
 from unittest import mock
 
 import pytest
@@ -41,6 +42,10 @@ from apprise.fields import (
 from apprise.manager_plugins import NotificationManager
 
 N_MGR = NotificationManager()
+
+# Whether cryptography is installed; Vapid is turned off without it. Checked
+# this way so it holds however few tests run, unlike looking in sys.modules.
+CRYPTOGRAPHY = find_spec("cryptography") is not None
 
 # A value nested far deeper than any field allows
 DEEP = "x"
@@ -186,18 +191,49 @@ def test_fields_assemble_the_same_url(url):
 
 def test_email_host_fields_assemble_the_same_url():
     """An email written as the host comes back as the same email."""
-    # Vapid needs cryptography to load, so the URL is never instantiated
-    fields = parse_fields("vapid://user@example.com/abc?retry=2")
-    assert fields["subscriber"] == "user@example.com"
-    assert fields["targets"] == ["abc"]
+    # Octopush needs nothing extra, so this runs wherever Apprise does
+    fields = parse_fields(
+        "octopush://user@example.com/apikey/+15551234567?retry=2"
+    )
+    assert fields["api_login"] == "user@example.com"
+    assert fields["targets"] == ["+15551234567"]
 
     # Options every service shares are kept too
     assert fields["retry"] == 2
 
-    # The assembled URL reads back to the very same fields
+    # The assembled URL reads back to the very same fields, and loads
+    built = fields_to_url(fields)
+    assert built.startswith("octopush://user@example.com/apikey/")
+    assert parse_fields(built) == fields
+    assert Apprise.instantiate(built) is not None
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY, reason="Requires cryptography")
+def test_vapid_fields_with_cryptography():
+    """With cryptography, a Vapid URL has fields that build the same URL."""
+    fields = parse_fields("vapid://user@example.com/abc?retry=2")
+    assert fields["subscriber"] == "user@example.com"
+    assert fields["targets"] == ["abc"]
+
     built = fields_to_url(fields)
     assert built.startswith("vapid://user@example.com/abc")
     assert parse_fields(built) == fields
+
+
+@pytest.mark.skipif(
+    CRYPTOGRAPHY, reason="Requires that cryptography NOT be installed"
+)
+def test_vapid_fields_without_cryptography():
+    """Without cryptography, Vapid is turned off rather than failing.
+
+    - It has no fields, nothing is built for it, and it does not load.
+    - Every other service carries on as normal.
+    """
+    assert N_MGR["vapid"].enabled is False
+    assert parse_fields("vapid://user@example.com/abc") == {}
+    assert fields_to_url({"schema": "vapid", "subscriber": "a@b.com"}) is None
+    assert Apprise.instantiate("vapid://user@example.com/abc") is None
+    assert parse_fields("json://localhost")["schema"] == "json"
 
 
 def test_key_value_options_come_back_as_maps():
@@ -277,6 +313,17 @@ def test_fields_that_cannot_be_assembled(fields):
     assert fields_to_url(fields) is None
 
 
+@pytest.mark.parametrize(
+    "schema", ("dbus", "glib", "gnome", "macosx", "windows")
+)
+def test_desktop_services_read_nothing_from_an_unreadable_url(schema):
+    """A URL a desktop service cannot read gives nothing back.
+
+    - It holds whether or not the service's own library is installed.
+    """
+    assert N_MGR[schema].parse_url(None) is None
+
+
 def test_values_cannot_change_the_url_around_them():
     """Text is quoted so it never adds options or splits differently."""
     # Brackets only stay unquoted around a real IPv6 host
@@ -287,12 +334,25 @@ def test_values_cannot_change_the_url_around_them():
     assert "verify=no" not in built
 
     # An email keeps its @ only when it is one valid address
+    phone = ["+15551234567"]
     built = fields_to_url(
-        {"schema": "vapid", "subscriber": "victim@example.com@evil.com"}
+        {
+            "schema": "octopush",
+            "api_login": "victim@example.com@evil.com",
+            "api_key": "key",
+            "targets": phone,
+        }
     )
     assert "victim%40example.com%40evil.com" in built
-    built = fields_to_url({"schema": "vapid", "subscriber": "me@example.com"})
-    assert "me@example.com" in built
+    built = fields_to_url(
+        {
+            "schema": "octopush",
+            "api_login": "me@example.com",
+            "api_key": "key",
+            "targets": phone,
+        }
+    )
+    assert built.startswith("octopush://me@example.com/")
 
 
 def test_aliases_are_merged_into_their_item():
