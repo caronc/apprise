@@ -13,6 +13,8 @@ To inform or tell (someone). To make one aware of something.
 * Supports the handling of images and attachments (_to the notification services that will accept them_).
 * It's incredibly lightweight.
 * Amazing response times because all messages sent asynchronously.
+* Group your services with tags, then notify only the ones that need to know.
+* Private by design: messages go straight from your machine to each service, with no third party in between.
 
 Developers who wish to provide a notification service no longer need to research each and every one out there. They no longer need to try to adapt to the new ones that comeout thereafter. They just need to include this one library and then they can immediately gain access to almost all of the notifications services available to us today.
 
@@ -33,7 +35,12 @@ Visit the [Official Documentation](https://appriseit.com/getting-started/) site 
 
 Apprise provides one consistent URL format and notification interface for your apps, automation, and infrastructure. Use the CLI or core library directly, or relay through Apprise API, to deliver notifications to a very [large amount of supported services](https://appriseit.com/services/).
 
-[![Apprise overview showing notification sources, entry points, and supported destinations](Apprise-overview.png)](Apprise-overview.png)
+<a href="https://appriseit.com/getting-started/#how-apprise-fits-together">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/caronc/apprise/master/Apprise-overview-dark.png">
+    <img alt="Apprise overview showing notification sources, entry points, and supported destinations" src="Apprise-overview.png">
+  </picture>
+</a>
 
 # Table of Contents
 <!--ts-->

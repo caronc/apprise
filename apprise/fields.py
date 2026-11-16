@@ -74,6 +74,8 @@ EMPTY_PLACEHOLDERS = (
 
 def _empty(value: Any) -> bool:
     """Return whether a value holds nothing worth keeping."""
+    # Empty text and empty collections count as nothing, while 0 and
+    # False are real values
     return (
         value is None
         or value == ""
@@ -126,7 +128,7 @@ def _typed(value: Any, meta: dict[str, Any]) -> Any:
             try:
                 return convert(value)
 
-            except (TypeError, ValueError):
+            except ValueError:
                 # Keep what was written when it is not a number
                 return value
 
@@ -140,6 +142,7 @@ def _fits(value: Any, meta: dict[str, Any], kwarg: bool = False) -> bool:
     - A list is one plain value or a flat list of them.
     - Anything else is one plain value: text, a number or True/False.
     """
+    # True/False count as numbers here, so they are plain values too
     plain = (str, int, float)
     if kwarg:
         return isinstance(value, dict) and all(
@@ -202,12 +205,15 @@ def hide_fields(plugin: Any, fields: dict[str, Any]) -> dict[str, Any]:
     shown = (shown, URLBase.unquote(shown))
 
     def hide(value: Any) -> Any:
+        """Return a value masked wherever the privacy URL hides it."""
+        # Each entry of a list or key/value map is checked on its own
         if isinstance(value, list):
             return [hide(entry) for entry in value]
 
         if isinstance(value, dict):
             return {key: hide(entry) for key, entry in value.items()}
 
+        # Text the privacy URL shows (as is or quoted) is kept
         if not isinstance(value, str) or any(
             text in url
             for url in shown
@@ -255,6 +261,7 @@ def parse_fields(url: str, privacy: bool = False) -> dict[str, Any]:
     - ``privacy`` masks all text but the schema and values picked from a
       list of choices, since such a URL has no privacy URL to compare to.
     """
+    # Only a known service that is turned on can read the URL
     found = GET_SCHEMA_RE.match(url) if isinstance(url, str) else None
     schema = found.group("schema").lower() if found else ""
     if schema not in N_MGR or not N_MGR[schema].enabled:
@@ -268,10 +275,12 @@ def _fields(
     plugin: Any, results: dict, privacy: bool = False
 ) -> dict[str, Any]:
     """Return parse_url() results as fields named the way details() does."""
+    if not results.get("schema"):
+        # The URL could not be read at all
+        return {}
+
     info = details(plugin)
     tokens, args, kwargs = info["tokens"], info["args"], info["kwargs"]
-    if not results.get("schema"):
-        return {}
 
     # The user and password are still quoted; plugins unquote them later
     for key in ("user", "password"):
@@ -309,7 +318,7 @@ def _fields(
             # A lone slash is no path at all
             value = None
 
-        value = _typed(value, meta) if value is not None else None
+        value = _typed(value, meta)
         if not _empty(value):
             fields[name], entries[name] = value, meta
 
@@ -321,8 +330,7 @@ def _fields(
         if "alias_of" in meta or name in fields or meta["map_to"] in held:
             continue
 
-        found = results.get(meta["map_to"])
-        value = _typed(found, meta) if found is not None else None
+        value = _typed(results.get(meta["map_to"]), meta)
         if not _empty(value):
             fields[name], entries[name] = value, meta
             held.add(meta["map_to"])
@@ -343,17 +351,33 @@ def _fields(
 
 
 def _value_for(name: str, given: dict[str, Any], tokens: dict) -> Any:
-    """Return the token value that fills a template placeholder."""
-    if name in given:
-        return given[name]
+    """Return the token value that fills a template placeholder.
 
-    # Another token may set the same value (a list token and its members)
-    key = tokens.get(name, {}).get("map_to", name)
-    for other, value in given.items():
-        if tokens[other]["map_to"] == key:
-            return value
+    A list placeholder also takes the values of every token that adds to
+    the same list, such as ``target_user`` for ``targets``.
+    """
+    # Other tokens may set the same value (a list token and its members)
+    meta = tokens.get(name, {})
+    key = meta.get("map_to", name)
+    found = [
+        value
+        for other, value in given.items()
+        if tokens[other]["map_to"] == key
+    ]
+    if not found:
+        # Nothing was given for this placeholder
+        return None
 
-    return None
+    if not meta.get("type", "").startswith("list"):
+        # One value fills it; the token the template names comes first
+        return given.get(name, found[0])
+
+    # Every value given is kept, so none is lost from the list
+    merged: list[Any] = []
+    for value in found:
+        merged.extend(value if isinstance(value, (list, tuple)) else [value])
+
+    return merged
 
 
 def _text(value: Any) -> str:

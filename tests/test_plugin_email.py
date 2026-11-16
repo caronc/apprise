@@ -4858,7 +4858,7 @@ def test_plugin_email_recipient_names(key, recipient, name):
     assert obj2.names[addr] == name
 
 
-def test_plugin_email_url_is_the_same_once_loaded_again():
+def test_plugin_email_url_reload():
     """An Email URL loads back to the same URL, connect timeout included."""
     for url in (
         "mailto://user:pass@example.com/",

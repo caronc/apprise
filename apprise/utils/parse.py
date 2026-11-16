@@ -1175,7 +1175,7 @@ def urlencode(query, doseq=False, safe="", encoding=None, errors=None):
     )
 
 
-def _find_urls(text):
+def _find_urls(text: str) -> list[str]:
     """Return the detected URLs.
 
     - A URL runs from its schema to the first place where up to 32

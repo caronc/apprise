@@ -2644,7 +2644,7 @@ def test_parse_urls():
     ]
 
 
-def test_parse_urls_keeps_urls_inside_urls():
+def test_parse_urls_nested_urls():
     """utils: parse_urls() only starts a new URL after a delimiter
 
     - A URL inside another (after "=", "/", "&", "#" or "@") stays part
@@ -2717,7 +2717,7 @@ def test_parse_urls_keeps_urls_inside_urls():
         assert utils.parse.parse_urls(text) == expected, repr(text)
 
 
-def test_find_urls_matches_the_url_detection_expression():
+def test_find_urls_matches_regex():
     """utils: _find_urls() finds exactly what URL_DETECTION_RE finds"""
     # The expression as it was before _find_urls() replaced it. Every
     # change to how URLs are split must still agree with it.

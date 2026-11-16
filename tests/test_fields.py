@@ -60,7 +60,7 @@ def round_trip(url):
     return obj, fields, fields_to_url(fields)
 
 
-def test_fields_use_the_names_details_lists():
+def test_field_names_and_types():
     """Fields are named and typed the way details() describes them."""
     _, fields, _ = round_trip(
         "mailtos://user:secret@example.com"
@@ -113,7 +113,7 @@ def test_private_fields_are_hidden():
         ("ntfy://tk_SECRET123456@localhost/topic1", ("tk_SECRET123456",)),
     ),
 )
-def test_privacy_fields_hide_what_the_privacy_url_hides(url, secrets):
+def test_privacy_fields_match_url(url, secrets):
     """Text the privacy URL hides is masked in the privacy fields too."""
     obj = Apprise.instantiate(url)
     hidden = obj.url_fields(privacy=True)
@@ -127,7 +127,7 @@ def test_privacy_fields_hide_what_the_privacy_url_hides(url, secrets):
     assert hidden["retry"] == 0
 
 
-def test_hide_fields_masks_fields_already_read():
+def test_hide_fields():
     """hide_fields() masks fields the way url_fields(privacy=True) does."""
     obj = Apprise.instantiate("json://user:pass@localhost/?+X-Token=abc&-p1=v")
     fields = obj.url_fields()
@@ -140,7 +140,7 @@ def test_hide_fields_masks_fields_already_read():
     assert fields["password"] == "pass"
 
 
-def test_privacy_fields_of_a_url_its_service_would_refuse():
+def test_privacy_fields_unloadable_url():
     """All text but the schema and fixed choices is masked."""
     fields = parse_fields("plivo://AUTHID@SECRETTOKEN/", privacy=True)
     assert fields["schema"] == "plivo"
@@ -181,7 +181,7 @@ def test_privacy_fields_of_a_url_its_service_would_refuse():
         "kodi://[2001:db8::1]:8080",
     ),
 )
-def test_fields_assemble_the_same_url(url):
+def test_fields_round_trip(url):
     """The fields of a URL put the same URL together again."""
     obj, fields, built = round_trip(url)
     again = Apprise.instantiate(built)
@@ -189,7 +189,7 @@ def test_fields_assemble_the_same_url(url):
     assert again.url_fields() == fields
 
 
-def test_email_host_fields_assemble_the_same_url():
+def test_email_host_round_trip():
     """An email written as the host comes back as the same email."""
     # Octopush needs nothing extra, so this runs wherever Apprise does
     fields = parse_fields(
@@ -236,7 +236,7 @@ def test_vapid_fields_without_cryptography():
     assert parse_fields("json://localhost")["schema"] == "json"
 
 
-def test_key_value_options_come_back_as_maps():
+def test_key_value_option_maps():
     """Each +, - and : option comes back in its own map."""
     _, fields, built = round_trip(
         "json://localhost?+X-Token=abc&-p1=v&:key=val"
@@ -308,7 +308,7 @@ def test_fields_from_a_form():
         },
     ),
 )
-def test_fields_that_cannot_be_assembled(fields):
+def test_fields_refused(fields):
     """Unknown schemas and names, and badly shaped values, are refused."""
     assert fields_to_url(fields) is None
 
@@ -316,7 +316,7 @@ def test_fields_that_cannot_be_assembled(fields):
 @pytest.mark.parametrize(
     "schema", ("dbus", "glib", "gnome", "macosx", "windows")
 )
-def test_desktop_services_read_nothing_from_an_unreadable_url(schema):
+def test_desktop_unreadable_url(schema):
     """A URL a desktop service cannot read gives nothing back.
 
     - It holds whether or not the service's own library is installed.
@@ -324,7 +324,7 @@ def test_desktop_services_read_nothing_from_an_unreadable_url(schema):
     assert N_MGR[schema].parse_url(None) is None
 
 
-def test_values_cannot_change_the_url_around_them():
+def test_field_values_quoted():
     """Text is quoted so it never adds options or splits differently."""
     # Brackets only stay unquoted around a real IPv6 host
     built = fields_to_url(
@@ -355,7 +355,7 @@ def test_values_cannot_change_the_url_around_them():
     assert built.startswith("octopush://me@example.com/")
 
 
-def test_aliases_are_merged_into_their_item():
+def test_alias_fields_merged():
     """Content given under an alias is kept, merged into what it stands for."""
     # A list alias adds to the list it stands for
     obj = Apprise.instantiate(
@@ -396,7 +396,22 @@ def test_aliases_are_merged_into_their_item():
     assert fields["sender"] == by_hand.url_fields()["sender"]
 
 
-def test_fields_of_a_url_its_service_would_refuse():
+def test_list_member_fields_merged():
+    """Tokens that add to the same list all end up in it."""
+    obj = Apprise.instantiate(
+        fields_to_url(
+            {
+                "schema": "slack",
+                "access_token": "xoxb-1234-1234-abc124",
+                "targets": ["#general"],
+                "target_user": "@bob",
+            }
+        )
+    )
+    assert sorted(obj.url_fields()["targets"]) == ["#general", "@bob"]
+
+
+def test_fields_unloadable_url():
     """What a URL holds is read even when its service would not load it."""
     # Nothing but the schema, in any case
     assert parse_fields("MAILTO://")["schema"] == "mailto"
@@ -412,7 +427,7 @@ def test_fields_of_a_url_its_service_would_refuse():
         assert parse_fields(url) == {}
 
 
-def test_disabled_services_have_no_fields():
+def test_disabled_service_fields():
     """A disabled service is treated like one that is not known."""
     with mock.patch.object(N_MGR["json"], "enabled", False):
         assert parse_fields("json://localhost") == {}
@@ -423,21 +438,21 @@ def test_disabled_services_have_no_fields():
     assert fields_to_url({"schema": "json", "host": "localhost"})
 
 
-def test_every_service_reads_a_broken_url_without_failing():
+def test_broken_url_fields():
     """A URL cut off mid-way gives no fields, whatever its service."""
     for schema in N_MGR.schemas():
         for url in (f"{schema}://[", f"{schema}://:@[", f"{schema}:///["):
             assert isinstance(parse_fields(url), dict), url
 
 
-def test_url_that_cannot_be_read_back():
+def test_unreadable_own_url():
     """A URL its own plugin cannot read back has no fields."""
     obj = Apprise.instantiate("json://localhost")
     with mock.patch.object(type(obj), "parse_url", return_value=None):
         assert obj.url_fields() == {}
 
 
-def test_values_are_read_as_their_type():
+def test_typed_values():
     """Values are converted to the type their entry describes."""
     # Sets have no order, so they come back sorted
     assert _typed({"b", "a"}, {"type": "list:string"}) == ["a", "b"]

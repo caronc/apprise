@@ -2936,7 +2936,7 @@ def test_apprise_details_email_token_types():
                 )
 
 
-def test_apprise_details_templates_keep_the_at_sign_before_the_path():
+def test_apprise_details_template_at_sign():
     """An @ in a URL template separates the login from the host.
 
     Anything after the first / is the path, where an @ is just text.
@@ -2952,7 +2952,7 @@ def test_apprise_details_templates_keep_the_at_sign_before_the_path():
             )
 
 
-def test_apprise_details_every_token_can_be_written():
+def test_apprise_details_tokens_writable():
     """Every token can be written into a URL.
 
     A token is written through a template placeholder, through another
