@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 import json
 import re
+from typing import Any
 
 
 class TemplateType:
@@ -40,7 +41,9 @@ class TemplateType:
     JSON = "json"
 
 
-def apply_template(template, app_mode=TemplateType.RAW, **kwargs):
+def apply_template(
+    template: str, app_mode: str = TemplateType.RAW, **kwargs: Any
+) -> str:
     """Takes a template in a str format and applies all of the keywords and
     their values to it.
 
@@ -67,6 +70,10 @@ def apply_template(template, app_mode=TemplateType.RAW, **kwargs):
     # Our escape function
     fn = _escape_json if app_mode == TemplateType.JSON else _escape_raw
 
+    if not kwargs:
+        # Nothing to swap in
+        return template
+
     lookup = [re.escape(x) for x in kwargs]
 
     # Compile this into a list
@@ -79,7 +86,18 @@ def apply_template(template, app_mode=TemplateType.RAW, **kwargs):
         re.IGNORECASE,
     )
 
-    # we index 2 characters off the head and 2 characters from the tail
-    # to drop the '{{' and '}}' surrounding our match so that we can
-    # re-index it back into our list
-    return mask_r.sub(lambda x: fn(kwargs[x.group()[2:-2].strip()]), template)
+    def _swap(match: re.Match) -> str:
+        """Return the escaped value for one matched {{keyword}}."""
+        # An exact match wins when two keywords only differ by case.
+        keyword = match.group(1)
+        if keyword not in kwargs:
+            # The pattern ignores case, so find the keyword that matched
+            keyword = next(
+                k
+                for k in kwargs
+                if re.fullmatch(re.escape(k), keyword, re.IGNORECASE)
+            )
+
+        return fn(kwargs[keyword])
+
+    return mask_r.sub(_swap, template)

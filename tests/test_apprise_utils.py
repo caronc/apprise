@@ -3591,6 +3591,25 @@ def test_apply_templating():
     )
     assert result == '{value: "\\"quotes are escaped\\""}'
 
+    # Keywords are matched without regard to case, and are swapped in too
+    result = utils.templates.apply_template(
+        "{{ Title }} {{BODY}} {{body}}", **{"title": "t", "body": "b"}
+    )
+    assert result == "t b b"
+
+    # An exact case match wins when keywords only differ by case
+    result = utils.templates.apply_template(
+        "{{A}} {{a}} {{ a }}", **{"A": "1", "a": "2"}
+    )
+    assert result == "1 2 2"
+
+    # Case matching follows the pattern, not str.lower()
+    result = utils.templates.apply_template("{{\u03a3}}", **{"\u03c2": "s"})
+    assert result == "s"
+
+    # An empty placeholder is never swapped
+    assert utils.templates.apply_template("{{}} {{ }}") == "{{}} {{ }}"
+
 
 def test_cwe312_word():
     """utils: cwe312_word() testing"""
