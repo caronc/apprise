@@ -1644,6 +1644,16 @@ class NotifyBase(URLBase):
         # return default parameters
         return params
 
+    def url_fields(self, privacy: bool = False) -> dict[str, Any]:
+        """Return this URL as fields named the way details() lists them.
+
+        ``apprise.fields.fields_to_url()`` turns them back into a URL.
+        """
+        # Imported here because the fields module loads the plugins
+        from ..fields import url_fields
+
+        return url_fields(self, privacy=privacy)
+
     @staticmethod
     def parse_url(
         url: str,

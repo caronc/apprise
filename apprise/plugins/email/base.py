@@ -115,8 +115,9 @@ class NotifyEmail(NotifyBase):
     # Email can send either HTML or plain text. HTML remains the default.
     notify_format = (NotifyFormat.HTML, NotifyFormat.TEXT)
 
-    # Default SMTP Timeout (in seconds)
-    socket_connect_timeout = 15
+    # Default SMTP Timeout (in seconds); a float like every other timeout,
+    # so the URL reads the same once it is loaded again
+    socket_connect_timeout = 15.0
 
     # Define object templates
     templates = (

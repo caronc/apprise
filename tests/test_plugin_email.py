@@ -4856,3 +4856,13 @@ def test_plugin_email_recipient_names(key, recipient, name):
     # Parse the URL it gives back
     obj2 = Apprise.instantiate(obj.url(), suppress_exceptions=False)
     assert obj2.names[addr] == name
+
+
+def test_plugin_email_url_reload():
+    """An Email URL loads back to the same URL, connect timeout included."""
+    for url in (
+        "mailto://user:pass@example.com/",
+        "mailto://user:pass@example.com/a@b.com/?cto=20",
+    ):
+        first = Apprise.instantiate(url).url()
+        assert Apprise.instantiate(first).url() == first

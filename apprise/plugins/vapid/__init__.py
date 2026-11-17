@@ -160,7 +160,7 @@ class NotifyVapid(NotifyBase):
         **{
             "subscriber": {
                 "name": _("API Key"),
-                "type": "string",
+                "type": "email",
                 "private": True,
                 "required": True,
             },
@@ -173,7 +173,7 @@ class NotifyVapid(NotifyBase):
 
     # Define our template args
     template_args = dict(
-        NotifyBase.template_tokens,
+        NotifyBase.template_args,
         **{
             "mode": {
                 "name": _("Mode"),

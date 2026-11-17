@@ -270,6 +270,9 @@ class NotifyWindows(NotifyBase):
         """
 
         results = NotifyBase.parse_url(url, verify_host=False)
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
 
         # Include images with our message
         results["include_image"] = parse_bool(

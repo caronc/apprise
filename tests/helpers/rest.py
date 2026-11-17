@@ -46,8 +46,28 @@ from apprise import (
     PersistentStoreMode,
 )
 from apprise.common import OverflowMode
+from apprise.fields import fields_to_url
 
 logging.disable(logging.CRITICAL)
+
+
+def ordered(fields):
+    """Return fields with every list sorted, so order is not compared."""
+    return {
+        name: sorted(value, key=str) if isinstance(value, list) else value
+        for name, value in fields.items()
+    }
+
+
+def leaves(value):
+    """Return every text value inside a field, lists and maps included."""
+    if isinstance(value, dict):
+        value = list(value.values())
+
+    if isinstance(value, list):
+        return [text for entry in value for text in leaves(entry)]
+
+    return [value] if isinstance(value, str) else []
 
 
 class AppriseURLTester:
@@ -154,6 +174,9 @@ class AppriseURLTester:
 
         # Our regular expression
         url_matches = meta.get("url_matches")
+
+        # Whether the URL's fields should turn back into the same URL
+        fields_round_trip = meta.get("fields_round_trip", True)
 
         # Detect our storage path (used to set persistent storage
         # mode
@@ -320,6 +343,46 @@ class AppriseURLTester:
                     f"url() of {obj.url()} produced target miscount "
                     f"{len(obj)} != {len(obj_cmp)}"
                 )
+
+            # The URL split into its fields assembles the same URL again,
+            # whenever the plugin reads its own URL back unchanged. When
+            # only the order of its lists changes, the same service with
+            # the same fields (in any order) is enough.
+            fields = obj.url_fields()
+            same = obj_cmp.url() == obj.url()
+            if fields_round_trip and (
+                same or ordered(obj_cmp.url_fields()) == ordered(fields)
+            ):
+                built = fields_to_url(fields)
+                obj_fields = Apprise.instantiate(built) if built else None
+                if not isinstance(obj_fields, NotifyBase) or (
+                    obj_fields.url_id() != obj.url_id()
+                    or ordered(obj_fields.url_fields()) != ordered(fields)
+                    or (same and obj_fields.url() != obj.url())
+                ):
+                    raise AssertionError(
+                        f"URL: {url} was split into the fields {fields},"
+                        f" which were put back together as {built}. That"
+                        " URL does not load as the same service. Check"
+                        " that the plugin's templates and template_tokens"
+                        " describe the URL its url() writes."
+                    )
+
+            # The privacy fields show no text the privacy URL hides
+            shown = obj.url(privacy=True)
+            shown = (shown, NotifyBase.unquote(shown))
+            for name, value in obj.url_fields(privacy=True).items():
+                for text in leaves(value):
+                    if text != "****" and not any(
+                        entry in where
+                        for where in shown
+                        for entry in (text, NotifyBase.quote(text, safe=""))
+                    ):
+                        raise AssertionError(
+                            f"URL: {url} has the privacy field {name}"
+                            f" showing '{text}', which its privacy URL"
+                            f" {shown[0]} hides."
+                        )
 
             # Tidy our object
             del obj_cmp

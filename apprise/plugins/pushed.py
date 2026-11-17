@@ -73,7 +73,7 @@ class NotifyPushed(NotifyBase):
     # Define object templates
     templates = (
         "{schema}://{app_key}/{app_secret}",
-        "{schema}://{app_key}/{app_secret}@{targets}",
+        "{schema}://{app_key}/{app_secret}/{targets}",
     )
 
     # Define our template tokens

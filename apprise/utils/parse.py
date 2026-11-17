@@ -24,6 +24,7 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
+from bisect import bisect_left, bisect_right
 import contextlib
 from functools import reduce
 import re
@@ -157,9 +158,23 @@ CALL_SIGN_DETECTION_RE = re.compile(
 )
 
 # Regular expression used to destinguish between multiple URLs.
+# parse_urls() finds the same URLs with _find_urls(), which reads the text
+# once; this expression is kept for anyone who uses it directly.
 URL_DETECTION_RE = re.compile(
-    r"([a-z0-9]+?:\/\/.*?)(?=$|[\s,;]{1,32}[a-z0-9]{1,32}?:\/\/)", re.I
+    r"((?<![a-z0-9])[a-z0-9]+?:\/\/.*?)"
+    r"(?=$|[\s,;]{1,32}[a-z0-9]{1,32}?:\/\/)",
+    re.I,
 )
+
+# Where a URL may start: a schema that is not the tail of a longer run of
+# letters and digits, followed by "://".
+URL_START_RE = re.compile(r"(?<![a-z0-9])[a-z0-9]+?:\/\/", re.I)
+
+# A run of the delimiters that may sit between two URLs.
+URL_DELIMITER_RUN_RE = re.compile(r"[\s,;]+")
+
+# A schema of at most 32 characters, directly after a delimiter run.
+URL_NEXT_SCHEMA_RE = re.compile(r"[a-z0-9]{1,32}:\/\/", re.I)
 
 # No leading separator; first-char anchors make separator positions O(1)-fail
 # so findall skips them without any backtracking blowup.
@@ -1160,6 +1175,66 @@ def urlencode(query, doseq=False, safe="", encoding=None, errors=None):
     )
 
 
+def _find_urls(text: str) -> list[str]:
+    """Return the detected URLs.
+
+    - A URL runs from its schema to the first place where up to 32
+      delimiters lead into another schema, or to the end of the text.
+    - It never runs past a new line.
+    - The regular expression scans to the end of the line again for every
+      schema that fails, which takes time that grows with the square of
+      the text's length. Here each position is looked at a set number of
+      times instead.
+    """
+    # Where a URL may end before another: anywhere in the last 32
+    # characters of a delimiter run that leads into a schema, kept as
+    # (first position, one past the last).
+    spans = []
+    for run in URL_DELIMITER_RUN_RE.finditer(text):
+        if URL_NEXT_SCHEMA_RE.match(text, run.end()):
+            spans.append((max(run.start(), run.end() - 32), run.end()))
+
+    # The end of the text also ends a URL; like "$", that includes the
+    # place just before a new line that closes the text.
+    tail = len(text) - 1 if text.endswith("\n") else len(text)
+
+    # Each URL stops at the first new line after its schema.
+    newlines = [index for index, char in enumerate(text) if char == "\n"]
+    highs = [high for _, high in spans]
+
+    found = []
+    # Where the last URL found ended; the next one starts after it.
+    resume = 0
+    for start in URL_START_RE.finditer(text):
+        if start.start() < resume:
+            # Part of the URL just found.
+            continue
+
+        # The text after the schema's "://".
+        body = start.end()
+
+        # The first new line at or after the body, if any.
+        index = bisect_left(newlines, body)
+        limit = newlines[index] if index < len(newlines) else None
+
+        # The first place to end at or after the body: in a delimiter
+        # span, or at the end of the text. The body always starts before
+        # any new line that closes the text, so it never starts past it.
+        index = bisect_right(highs, body)
+        ends = [max(spans[index][0], body)] if index < len(spans) else []
+        ends.append(tail)
+
+        ends = [end for end in ends if limit is None or end <= limit]
+        if not ends:
+            # It cannot end on its own line, so it is not a URL.
+            continue
+
+        resume = min(ends)
+        found.append(text[start.start() : resume])
+
+    return found
+
+
 def parse_urls(*args, store_unparseable=True, **kwargs):
     """Takes a string containing URLs separated by commas, semicolons and/or
     spaces and returns a list."""
@@ -1167,9 +1242,7 @@ def parse_urls(*args, store_unparseable=True, **kwargs):
     result = []
     for arg in _flatten_values(*args):
         if isinstance(arg, str) and arg:
-            result_ = (
-                URL_DETECTION_RE.findall(arg.rstrip()) if "://" in arg else []
-            )
+            result_ = _find_urls(arg.rstrip()) if "://" in arg else []
             if result_:
                 result += result_
 
