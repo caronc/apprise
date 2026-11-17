@@ -25,9 +25,8 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-
 # Disable logging for a cleaner testing output
-from hashlib import sha1
+from hashlib import sha256
 import json
 import logging
 from unittest import mock
@@ -37,7 +36,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise, NotifyType
+from apprise import Apprise, AppriseConfig, NotifyType
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.opsimate import NotifyOpsiMate
 
@@ -70,6 +69,20 @@ apprise_url_tests = (
         },
     ),
     (
+        "opsimate://{}@localhost?action=invalid".format(TOKEN),
+        {
+            # An action we do not know
+            "instance": AppriseImproperlyConfigured,
+        },
+    ),
+    (
+        "opsimate://{}@localhost?severity=invalid".format(TOKEN),
+        {
+            # A severity we do not know
+            "instance": AppriseImproperlyConfigured,
+        },
+    ),
+    (
         "opsimate://{}@localhost".format(TOKEN),
         {
             # A valid token and host
@@ -94,6 +107,14 @@ apprise_url_tests = (
         },
     ),
     (
+        "opsimates://{}@example.com/opsimate/".format(TOKEN),
+        {
+            # OpsiMate hosted on a sub-path
+            "instance": NotifyOpsiMate,
+            "privacy_url": "opsimates://o...e@example.com/opsimate/",
+        },
+    ),
+    (
         "opsimate://localhost?apikey={}".format(TOKEN),
         {
             # The token supplied as an argument
@@ -108,8 +129,9 @@ apprise_url_tests = (
         },
     ),
     (
-        "opsimate://{}@localhost:3001?id=disk-full&team=platform"
-        "&resolve=yes&+env=prod&+region=eu".format(TOKEN),
+        "opsimate://{}@localhost:3001?dedup=disk-full&action=resolve"
+        "&severity=crit&click=https://grafana.example.com/d/disk"
+        "&+team=platform&+env=prod".format(TOKEN),
         {
             # Every option in use
             "instance": NotifyOpsiMate,
@@ -170,13 +192,12 @@ def test_plugin_opsimate_payload(mock_post):
     mock_post.return_value = response
 
     obj = Apprise.instantiate(
-        "opsimates://{}@opsimate.example.com:8443/?team=platform"
+        "opsimates://{}@opsimate.example.com:8443/?+team=platform"
         "&+env=prod&+region=eu".format(TOKEN)
     )
     assert isinstance(obj, NotifyOpsiMate)
-    assert obj.team == "platform"
-    assert obj.resolve is False
-    assert obj.alert_id is None
+    assert obj.action == "map"
+    assert obj.dedup is None
 
     assert obj.notify(
         title="Disk full on web-01",
@@ -203,7 +224,7 @@ def test_plugin_opsimate_payload(mock_post):
     payload = json.loads(mock_post.call_args[1]["data"])
     assert payload == {
         "id": "apprise-{}".format(
-            sha1(b"disk full on web-01").hexdigest()[:16]
+            sha256(b"disk full on web-01").hexdigest()[:16]
         ),
         "alertName": "Disk full on web-01",
         "summary": "Disk usage at 98 percent",
@@ -215,7 +236,6 @@ def test_plugin_opsimate_payload(mock_post):
             "source": "apprise",
             "team": "platform",
         },
-        "team": "platform",
     }
 
     # A plain http URL on the default port
@@ -228,6 +248,17 @@ def test_plugin_opsimate_payload(mock_post):
     payload = json.loads(mock_post.call_args[1]["data"])
     assert payload["tags"] == {"source": "apprise"}
     assert "team" not in payload
+    assert "links" not in payload
+
+    # OpsiMate hosted on a sub-path keeps that path in front of the API
+    mock_post.reset_mock()
+    obj = Apprise.instantiate(
+        "opsimates://{}@example.com/tools/opsimate/".format(TOKEN)
+    )
+    assert obj.notify(title="Disk full", body="web-01")
+    assert mock_post.call_args[0][0] == (
+        "https://example.com/tools/opsimate/api/v1/alerts/custom"
+    )
 
 
 @mock.patch("requests.post")
@@ -239,7 +270,7 @@ def test_plugin_opsimate_severity(mock_post):
     response.content = b""
     mock_post.return_value = response
 
-    obj = NotifyOpsiMate(apikey=TOKEN, host="localhost")
+    obj = NotifyOpsiMate(apikey=TOKEN, host="localhost", action="trigger")
     for notify_type, severity in (
         (NotifyType.INFO, "info"),
         (NotifyType.SUCCESS, "info"),
@@ -252,13 +283,64 @@ def test_plugin_opsimate_severity(mock_post):
         payload = json.loads(mock_post.call_args[1]["data"])
         assert payload["severity"] == severity
 
-        # Without ?resolve=yes every notification fires the alert
+        # With action=trigger every notification fires the alert
         assert payload["status"] == "firing"
+
+    # A fixed severity wins over the notification type; partial names work
+    obj = Apprise.instantiate(
+        "opsimate://{}@localhost?severity=crit".format(TOKEN)
+    )
+    assert obj.severity == "critical"
+    for notify_type in (NotifyType.INFO, NotifyType.WARNING):
+        assert obj.notify(
+            title="Disk full", body="web-01", notify_type=notify_type
+        )
+        assert json.loads(mock_post.call_args[1]["data"])["severity"] == (
+            "critical"
+        )
+
+    # A resolve still leaves the severity out
+    assert obj.notify(
+        title="Disk full", body="web-01", notify_type=NotifyType.SUCCESS
+    )
+    payload = json.loads(mock_post.call_args[1]["data"])
+    assert payload["status"] == "resolved"
+    assert "severity" not in payload
+
+
+@mock.patch("requests.post")
+def test_plugin_opsimate_click(mock_post):
+    """NotifyOpsiMate() attaches the click link to the alert."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_post.return_value = response
+
+    link = "https://grafana.example.com/d/disk?var-host=web-01"
+    obj = Apprise.instantiate(
+        "opsimate://{}@localhost?click={}".format(
+            TOKEN, NotifyOpsiMate.quote(link, safe="")
+        )
+    )
+    assert obj.click == link
+
+    # The link rides along when the alert fires and when it resolves
+    for notify_type in (NotifyType.FAILURE, NotifyType.SUCCESS):
+        assert obj.notify(
+            title="Disk full", body="web-01", notify_type=notify_type
+        )
+        payload = json.loads(mock_post.call_args[1]["data"])
+        assert payload["links"] == [{"label": "Source", "url": link}]
+
+    # A blank link is ignored
+    obj = NotifyOpsiMate(apikey=TOKEN, host="localhost", click="  ")
+    assert obj.click is None
 
 
 @mock.patch("requests.post")
 def test_plugin_opsimate_resolve(mock_post):
-    """NotifyOpsiMate() resolves on success when asked to."""
+    """NotifyOpsiMate() resolves on success by default."""
 
     response = mock.Mock()
     response.status_code = requests.codes.ok
@@ -269,10 +351,10 @@ def test_plugin_opsimate_resolve(mock_post):
         return json.loads(mock_post.call_args[1]["data"])
 
     obj = Apprise.instantiate(
-        "opsimate://{}@localhost:3001?resolve=yes".format(TOKEN)
+        "opsimate://{}@localhost:3001?+team=platform".format(TOKEN)
     )
     assert isinstance(obj, NotifyOpsiMate)
-    assert obj.resolve is True
+    assert obj.action == "map"
 
     # A failure fires the alert
     assert obj.notify(
@@ -282,33 +364,47 @@ def test_plugin_opsimate_resolve(mock_post):
     assert fired["status"] == "firing"
     assert fired["severity"] == "critical"
 
-    # A success with the same title resolves that very alert.  Only the
-    # id and the status travel, so OpsiMate keeps the name, severity and
-    # summary the alert was fired with.
+    # A success with the same title resolves that very alert.  The
+    # severity is left out so OpsiMate keeps the one it was fired with.
     assert obj.notify(
         title="Disk full", body="at 40%", notify_type=NotifyType.SUCCESS
     )
-    assert sent() == {"id": fired["id"], "status": "resolved"}
+    assert sent() == {
+        "id": fired["id"],
+        "alertName": "Disk full",
+        "summary": "at 40%",
+        "status": "resolved",
+        "tags": {"source": "apprise", "team": "platform"},
+    }
 
     # Without a title the id still comes from the first line of the body
     assert obj.notify(body="Disk full\nat 40%", notify_type=NotifyType.SUCCESS)
-    assert sent() == {"id": fired["id"], "status": "resolved"}
+    assert sent()["id"] == fired["id"]
+    assert sent()["status"] == "resolved"
 
     # A fixed id resolves whatever it names
-    fixed = NotifyOpsiMate(
-        apikey=TOKEN, host="localhost", alert_id="disk-01", resolve=True
-    )
+    fixed = NotifyOpsiMate(apikey=TOKEN, host="localhost", dedup="disk-01")
     assert fixed.notify(
         title="anything", body="x", notify_type=NotifyType.SUCCESS
     )
-    assert sent() == {"id": "disk-01", "status": "resolved"}
+    assert sent()["id"] == "disk-01"
+    assert sent()["status"] == "resolved"
 
-    # Other notification types still fire even with resolve set
+    # Other notification types still fire
     for notify_type in (NotifyType.INFO, NotifyType.WARNING):
         assert obj.notify(
             title="Disk full", body="hmm", notify_type=notify_type
         )
         assert sent()["status"] == "firing"
+
+    # action=resolve resolves whatever the notification type
+    obj = NotifyOpsiMate(apikey=TOKEN, host="localhost", action="r")
+    assert obj.action == "resolve"
+    assert obj.notify(
+        title="Disk full", body="x", notify_type=NotifyType.FAILURE
+    )
+    assert sent()["status"] == "resolved"
+    assert "severity" not in sent()
 
 
 @mock.patch("requests.post")
@@ -329,7 +425,7 @@ def test_plugin_opsimate_alert_id(mock_post):
     # surrounding whitespace
     assert obj.notify(title="Disk full", body="a")
     first = sent()["id"]
-    assert first == "apprise-{}".format(sha1(b"disk full").hexdigest()[:16])
+    assert first == "apprise-{}".format(sha256(b"disk full").hexdigest()[:16])
     assert obj.notify(title="  DISK FULL ", body="b")
     assert sent()["id"] == first
 
@@ -347,10 +443,10 @@ def test_plugin_opsimate_alert_id(mock_post):
 
     # A long first line is cut to a sensible alert name
     assert obj.notify(body="x" * 300)
-    assert sent()["alertName"] == "x" * obj.opsimate_alert_name_maxlen
+    assert sent()["alertName"] == "x" * obj.title_maxlen
 
     # An explicit id always wins
-    obj = NotifyOpsiMate(apikey=TOKEN, host="localhost", alert_id="disk-01")
+    obj = NotifyOpsiMate(apikey=TOKEN, host="localhost", dedup="disk-01")
     assert obj.notify(title="Disk full", body="a")
     assert sent()["id"] == "disk-01"
     assert obj.notify(title="Something else", body="a")
@@ -359,7 +455,7 @@ def test_plugin_opsimate_alert_id(mock_post):
 
 @mock.patch("requests.post")
 def test_plugin_opsimate_tags(mock_post):
-    """NotifyOpsiMate() always tags the source and keeps the team."""
+    """NotifyOpsiMate() tags the source and keeps the user's tags."""
 
     response = mock.Mock()
     response.status_code = requests.codes.ok
@@ -374,20 +470,47 @@ def test_plugin_opsimate_tags(mock_post):
     assert obj.notify(title="Disk full", body="a")
     assert sent()["tags"] == {"source": "apprise"}
 
-    # Custom tags ride along; the source tag can not be overwritten
+    # Custom tags ride along, and a source given by the user wins
     obj = Apprise.instantiate(
         "opsimate://{}@localhost?+env=prod&+source=cron".format(TOKEN)
     )
-    assert obj.tags == {"env": "prod", "source": "cron"}
+    assert obj.xtags == {"env": "prod", "source": "cron"}
     assert obj.notify(title="Disk full", body="a")
-    assert sent()["tags"] == {"env": "prod", "source": "apprise"}
+    assert sent()["tags"] == {"env": "prod", "source": "cron"}
 
-    # The team is a tag and the owning team of the alert
-    obj = NotifyOpsiMate(apikey=TOKEN, host="localhost", team="platform")
-    assert obj.notify(title="Disk full", body="a")
-    payload = sent()
-    assert payload["tags"] == {"source": "apprise", "team": "platform"}
-    assert payload["team"] == "platform"
+
+@mock.patch("requests.post")
+def test_plugin_opsimate_apprise_tags(mock_post):
+    """NotifyOpsiMate() alert tags never replace Apprise's own tags."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_post.return_value = response
+
+    # A tagged URL is still notified when its tag is asked for
+    apobj = Apprise()
+    assert apobj.add(
+        "opsimate://{}@localhost?+env=prod".format(TOKEN), tag="devops"
+    )
+    assert "devops" in apobj[0].tags
+    assert apobj[0].xtags == {"env": "prod"}
+    assert apobj.notify(title="Disk full", body="a", tag="devops")
+    assert mock_post.call_count == 1
+    payload = json.loads(mock_post.call_args[1]["data"])
+    assert payload["tags"] == {"env": "prod", "source": "apprise"}
+
+    # A YAML tags: entry (an alias of tag:) keeps the alert tags too
+    config = AppriseConfig()
+    assert config.add_config(
+        "urls:\n"
+        "  - opsimate://{}@localhost?+env=prod:\n"
+        "      tags: devops\n".format(TOKEN),
+        format="yaml",
+    )
+    obj = config.services()[0]
+    assert "devops" in obj.tags
+    assert obj.xtags == {"env": "prod"}
 
 
 def test_plugin_opsimate_init():
@@ -397,15 +520,17 @@ def test_plugin_opsimate_init():
         apikey=TOKEN,
         host="localhost",
         port=3001,
-        alert_id="  disk-01  ",
-        team="  ",
-        resolve="yes",
-        tags={"env": "prod"},
+        dedup="  disk-01  ",
+        action="trigger",
+        click="https://grafana.example.com/d/disk",
+        severity="  Warn ",
+        xtags={"env": "prod"},
     )
-    assert obj.alert_id == "disk-01"
-    assert obj.team is None
-    assert obj.resolve is True
-    assert obj.tags == {"env": "prod"}
+    assert obj.dedup == "disk-01"
+    assert obj.action == "trigger"
+    assert obj.click == "https://grafana.example.com/d/disk"
+    assert obj.severity == "warning"
+    assert obj.xtags == {"env": "prod"}
     assert len(obj) == 1
 
     # The URL survives a round trip
@@ -414,10 +539,11 @@ def test_plugin_opsimate_init():
     result = NotifyOpsiMate.parse_url(url)
     obj2 = NotifyOpsiMate(**result)
     assert obj.url_identifier == obj2.url_identifier
-    assert obj2.alert_id == "disk-01"
-    assert obj2.team is None
-    assert obj2.resolve is True
-    assert obj2.tags == {"env": "prod"}
+    assert obj2.dedup == "disk-01"
+    assert obj2.action == "trigger"
+    assert obj2.click == "https://grafana.example.com/d/disk"
+    assert obj2.severity == "warning"
+    assert obj2.xtags == {"env": "prod"}
     assert obj2.port == 3001
     assert obj2.secure is False
 
@@ -431,7 +557,7 @@ def test_plugin_opsimate_init():
 
     # Every other option survives too, over a secure connection
     obj = Apprise.instantiate(
-        "opsimates://{}@opsimate.example.com/?team=platform".format(TOKEN)
+        "opsimates://{}@opsimate.example.com/".format(TOKEN)
     )
     assert isinstance(obj, NotifyOpsiMate)
     assert obj.secure is True
@@ -439,11 +565,24 @@ def test_plugin_opsimate_init():
     result = NotifyOpsiMate.parse_url(obj.url())
     obj2 = NotifyOpsiMate(**result)
     assert obj2.secure is True
-    assert obj2.team == "platform"
-    assert obj2.resolve is False
-    assert obj2.alert_id is None
-    assert obj2.tags == {}
+    assert obj2.action == "map"
+    assert obj2.dedup is None
+    assert obj2.click is None
+    assert obj2.severity is None
+    assert obj2.xtags == {}
     assert obj.url_identifier == obj2.url_identifier
+
+    # A sub-path survives a round trip and sets the connection apart
+    obj = Apprise.instantiate(
+        "opsimates://{}@example.com/opsimate/".format(TOKEN)
+    )
+    assert obj.url().startswith(
+        "opsimates://{}@example.com/opsimate/?".format(TOKEN)
+    )
+    obj2 = NotifyOpsiMate(**NotifyOpsiMate.parse_url(obj.url()))
+    assert obj.url_identifier == obj2.url_identifier
+    other = Apprise.instantiate("opsimates://{}@example.com/".format(TOKEN))
+    assert obj.url_identifier != other.url_identifier
 
     # The default port is left off the URL
     obj = NotifyOpsiMate(apikey=TOKEN, host="localhost", port=80)
@@ -461,6 +600,17 @@ def test_plugin_opsimate_init():
 
     with pytest.raises(AppriseImproperlyConfigured):
         NotifyOpsiMate(apikey=None, host="localhost")
+
+    # An unknown action is refused
+    with pytest.raises(AppriseImproperlyConfigured):
+        NotifyOpsiMate(apikey=TOKEN, host="localhost", action="close")
+
+    # An unknown severity is refused; a blank one means none is forced
+    with pytest.raises(AppriseImproperlyConfigured):
+        NotifyOpsiMate(apikey=TOKEN, host="localhost", severity="error")
+
+    obj = NotifyOpsiMate(apikey=TOKEN, host="localhost", severity=" ")
+    assert obj.severity is None
 
     # A URL without a host can not be loaded
     assert NotifyOpsiMate.parse_url("opsimate://") is None

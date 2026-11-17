@@ -38,22 +38,23 @@
 #  Your Apprise URL should be assembled as:
 #     opsimate://{apikey}@{host}
 #     opsimate://{apikey}@{host}:{port}
-#     opsimates://{apikey}@{host}:{port}
+#     opsimates://{apikey}@{host}:{port}/{path}
 #
 #  Each notification fires (or resolves) one alert.  Apprise's title is the
 #  alert name and its body the alert summary.  The notification type picks
 #  the severity: a failure is critical, a warning is warning and an info or
-#  success is info.
+#  success is info.  Add ?severity= to always use one severity, and
+#  ?click= to attach a link back to wherever the alert came from.
 #
 #  Every alert carries an id.  OpsiMate updates the alert that already
 #  carries the same id instead of adding a row, so a check that fires every
 #  minute keeps one alert open rather than one per minute.  The id is
-#  derived from the alert name unless ?id= names one.  Because of this, a
-#  success notification with ?resolve=yes resolves the alert a failure with
-#  the same title raised: a tool that reports "down" as a failure and "up"
-#  as a success keeps OpsiMate's active alert view clean by itself.  A
-#  resolve sends only the id and the status, so the alert keeps the name,
-#  severity and summary it was fired with.
+#  derived from the alert name unless ?dedup= names one.  Because of this,
+#  with the default ?action=map a success notification resolves the alert a
+#  failure with the same title raised: a tool that reports "down" as a
+#  failure and "up" as a success keeps OpsiMate's active alert view clean
+#  by itself.  A resolve leaves the severity out, so the alert keeps the
+#  severity it was fired with.
 #
 #  The Custom Alerts API has no way to upload files, so attachments are
 #  not supported.
@@ -63,16 +64,16 @@
 
 from __future__ import annotations
 
-from hashlib import sha1
+from hashlib import sha256
 from json import dumps, loads
 from typing import Any, Optional
 
 import requests
 
-from ..common import NotifyFormat, NotifyType
+from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import parse_bool, validate_regex
+from ..utils.parse import URL_PATH_SAFE_CHARS, validate_regex
 from .base import NotifyBase
 
 # Extend HTTP Error Messages
@@ -81,13 +82,29 @@ OPSIMATE_HTTP_ERROR_MAP = {
     401: "Authentication error - the OpsiMate API token is not valid.",
 }
 
+
+class OpsiMateSeverity:
+    """The severities OpsiMate accepts."""
+
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+
 # Map Apprise notification types to OpsiMate severities
-OPSIMATE_SEVERITIES = {
-    NotifyType.INFO: "info",
-    NotifyType.SUCCESS: "info",
-    NotifyType.WARNING: "warning",
-    NotifyType.FAILURE: "critical",
+OPSIMATE_SEVERITY_MAP = {
+    NotifyType.INFO: OpsiMateSeverity.INFO,
+    NotifyType.SUCCESS: OpsiMateSeverity.INFO,
+    NotifyType.WARNING: OpsiMateSeverity.WARNING,
+    NotifyType.FAILURE: OpsiMateSeverity.CRITICAL,
 }
+
+# The severities a user can force with ?severity=
+OPSIMATE_SEVERITIES = (
+    OpsiMateSeverity.INFO,
+    OpsiMateSeverity.WARNING,
+    OpsiMateSeverity.CRITICAL,
+)
 
 
 class OpsiMateStatus:
@@ -95,6 +112,27 @@ class OpsiMateStatus:
 
     FIRING = "firing"
     RESOLVED = "resolved"
+
+
+class OpsiMateAction:
+    """Tracks the actions supported by the OpsiMate plugin."""
+
+    # Resolve alerts on success, fire them otherwise
+    MAP = "map"
+
+    # Always fire (or update) the alert
+    TRIGGER = "trigger"
+
+    # Always resolve the alert that shares the same id
+    RESOLVE = "resolve"
+
+
+# Define our OpsiMate actions
+OPSIMATE_ACTIONS = (
+    OpsiMateAction.MAP,
+    OpsiMateAction.TRIGGER,
+    OpsiMateAction.RESOLVE,
+)
 
 
 class NotifyOpsiMate(NotifyBase):
@@ -119,25 +157,22 @@ class NotifyOpsiMate(NotifyBase):
     # is no need to throttle
     request_rate_per_sec = 0
 
-    # The alert summary is plain text
-    notify_format = NotifyFormat.TEXT
-
     # The Custom Alerts API has no field for files
     attachment_support = False
 
     # Our Custom Alerts API path
-    notify_path = "/api/v1/alerts/custom"
+    notify_path = "api/v1/alerts/custom"
 
-    # A name derived from the body (when there is no title) is cut here
-    opsimate_alert_name_maxlen = 120
-
-    # The tag every alert carries so OpsiMate shows where it came from
+    # The tag every alert carries (unless overridden) so OpsiMate shows
+    # where it came from
     opsimate_source_tag = "apprise"
 
     # Define object URL templates
     templates = (
         "{schema}://{apikey}@{host}",
         "{schema}://{apikey}@{host}:{port}",
+        "{schema}://{apikey}@{host}{path}",
+        "{schema}://{apikey}@{host}:{port}{path}",
     )
 
     # Define our template tokens
@@ -161,6 +196,12 @@ class NotifyOpsiMate(NotifyBase):
                 "min": 1,
                 "max": 65535,
             },
+            "path": {
+                "name": _("Path"),
+                "type": "string",
+                "map_to": "fullpath",
+                "default": "/",
+            },
         },
     )
 
@@ -174,26 +215,34 @@ class NotifyOpsiMate(NotifyBase):
             "token": {
                 "alias_of": "apikey",
             },
-            "id": {
-                "name": _("Alert ID"),
-                "type": "string",
-                "map_to": "alert_id",
+            "action": {
+                "name": _("Action"),
+                "type": "choice:string",
+                "values": OPSIMATE_ACTIONS,
+                "default": OPSIMATE_ACTIONS[0],
             },
-            "team": {
-                "name": _("Team"),
+            "dedup": {
+                "name": _("Deduplication Key"),
                 "type": "string",
             },
-            "resolve": {
-                "name": _("Resolve on Success"),
-                "type": "bool",
-                "default": False,
+            "click": {
+                "name": _("Click"),
+                "type": "string",
+            },
+            # The severity is automatically determined, however you can
+            # optionally over-ride its value and force it to be what you want
+            "severity": {
+                "name": _("Severity"),
+                "type": "choice:string",
+                "values": OPSIMATE_SEVERITIES,
             },
         },
     )
 
-    # Define any kwargs we're using
+    # Define any kwargs we're using.  These are not called "tags" because
+    # Apprise already uses that name for its own tag filtering.
     template_kwargs = {
-        "tags": {
+        "xtags": {
             "name": _("Tags"),
             "prefix": "+",
         },
@@ -202,10 +251,11 @@ class NotifyOpsiMate(NotifyBase):
     def __init__(
         self,
         apikey: str,
-        alert_id: Optional[str] = None,
-        team: Optional[str] = None,
-        resolve: bool = False,
-        tags: Optional[dict[str, str]] = None,
+        action: Optional[str] = None,
+        dedup: Optional[str] = None,
+        click: Optional[str] = None,
+        severity: Optional[str] = None,
+        xtags: Optional[dict[str, str]] = None,
         **kwargs: Any,
     ) -> None:
         """Initialize OpsiMate Object."""
@@ -220,19 +270,55 @@ class NotifyOpsiMate(NotifyBase):
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
 
+        # Resolve our action; partial names such as "r" are accepted
+        if action and isinstance(action, str) and action.strip():
+            self.action = next(
+                (
+                    a
+                    for a in OPSIMATE_ACTIONS
+                    if a.startswith(action.strip().lower())
+                ),
+                None,
+            )
+            if not self.action:
+                msg = "The OpsiMate action specified ({}) is invalid.".format(
+                    action
+                )
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
+        else:
+            # Default to mapping our notification type
+            self.action = self.template_args["action"]["default"]
+
         # A fixed alert id; every notification then addresses one alert
-        self.alert_id = (
-            alert_id.strip() if alert_id and alert_id.strip() else None
-        )
+        self.dedup = dedup.strip() if dedup and dedup.strip() else None
 
-        # The team that owns the alert
-        self.team = team.strip() if team and team.strip() else None
+        # A link back to wherever the alert came from
+        self.click = click.strip() if click and click.strip() else None
 
-        # Resolve the alert on a success notification instead of firing it
-        self.resolve = parse_bool(resolve, False)
+        # A fixed severity; partial names such as "c" are accepted
+        self.severity = None
+        if severity and isinstance(severity, str) and severity.strip():
+            self.severity = next(
+                (
+                    s
+                    for s in OPSIMATE_SEVERITIES
+                    if s.startswith(severity.strip().lower())
+                ),
+                None,
+            )
+            if not self.severity:
+                msg = (
+                    "The OpsiMate severity specified ({}) is invalid.".format(
+                        severity
+                    )
+                )
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Extra tags shown on the alert
-        self.tags = dict(tags) if tags else {}
+        self.xtags = dict(xtags) if xtags else {}
 
     def send(
         self,
@@ -248,54 +334,55 @@ class NotifyOpsiMate(NotifyBase):
         alert_name = title.strip() if title else ""
         if not alert_name:
             alert_name = (
-                body.strip()
-                .split("\n", 1)[0]
-                .strip()[: self.opsimate_alert_name_maxlen]
+                body.strip().split("\n", 1)[0].strip()[: self.title_maxlen]
             )
 
         # The id ties repeats of the same alert together.  OpsiMate updates
         # the alert that carries it instead of creating another, so the
         # same name must always yield the same id.
-        alert_id = self.alert_id
+        alert_id = self.dedup
         if not alert_id:
             alert_id = "apprise-{}".format(
-                sha1(alert_name.strip().lower().encode("utf-8")).hexdigest()[
-                    :16
-                ]
+                sha256(alert_name.lower().encode("utf-8")).hexdigest()[:16]
             )
 
-        if self.resolve and notify_type == NotifyType.SUCCESS:
-            # A success resolves the alert when asked to.  Only the id and
-            # the status are sent: OpsiMate keeps the name, severity and
-            # summary the alert was fired with for every field left out.
-            status = OpsiMateStatus.RESOLVED
-            payload = {
-                "id": alert_id,
-                "status": status,
-            }
+        # Map resolves on success and fires the alert otherwise
+        status = (
+            OpsiMateStatus.RESOLVED
+            if self.action == OpsiMateAction.RESOLVE
+            or (
+                self.action == OpsiMateAction.MAP
+                and notify_type == NotifyType.SUCCESS
+            )
+            else OpsiMateStatus.FIRING
+        )
 
-        else:
-            # Everything else fires the alert
-            status = OpsiMateStatus.FIRING
+        # Our tags; the source identifies Apprise unless one was given
+        tags = {"source": self.opsimate_source_tag}
+        tags.update(self.xtags)
 
-            # Our tags; the source always identifies Apprise
-            tags = dict(self.tags)
-            tags["source"] = self.opsimate_source_tag
-            if self.team:
-                tags["team"] = self.team
+        # Prepare our payload
+        payload = {
+            "id": alert_id,
+            "alertName": alert_name,
+            "summary": body,
+            "status": status,
+            "tags": tags,
+        }
 
-            # Prepare our payload
-            payload = {
-                "id": alert_id,
-                "alertName": alert_name,
-                "summary": body,
-                "severity": OPSIMATE_SEVERITIES[notify_type],
-                "status": status,
-                "tags": tags,
-            }
+        if status == OpsiMateStatus.FIRING:
+            # A resolve leaves the severity out so OpsiMate keeps the one
+            # the alert was fired with
+            payload["severity"] = (
+                self.severity
+                if self.severity
+                else OPSIMATE_SEVERITY_MAP[notify_type]
+            )
 
-            if self.team:
-                payload["team"] = self.team
+        if self.click:
+            # OpsiMate shows its links on the alert; "Source" is the label
+            # it gives its own link back to an alert's origin
+            payload["links"] = [{"label": "Source", "url": self.click}]
 
         # Prepare our headers
         headers = {
@@ -305,14 +392,23 @@ class NotifyOpsiMate(NotifyBase):
             "x-api-token": self.apikey,
         }
 
-        # Set our schema
-        schema = "https" if self.secure else "http"
+        # Our sub-path, if OpsiMate is not hosted at the server root
+        fullpath = self.fullpath.strip("/")
 
-        notify_url = "{}://{}".format(schema, self.host)
-        if isinstance(self.port, int):
-            notify_url += ":{}".format(self.port)
-
-        notify_url += self.notify_path
+        # Prepare our URL
+        notify_url = "{schema}://{host}{port}/{path}{api}".format(
+            schema="https" if self.secure else "http",
+            host=self.host,
+            port="" if not self.port else ":{}".format(self.port),
+            path=(
+                NotifyOpsiMate.quote(
+                    "{}/".format(fullpath), safe=URL_PATH_SAFE_CHARS
+                )
+                if fullpath
+                else ""
+            ),
+            api=self.notify_path,
+        )
 
         self.logger.debug(
             "OpsiMate POST URL: %s (cert_verify=%s)",
@@ -420,6 +516,7 @@ class NotifyOpsiMate(NotifyBase):
             self.apikey,
             self.host,
             self.port if self.port else (443 if self.secure else 80),
+            self.fullpath.rstrip("/"),
         )
 
     def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
@@ -427,23 +524,26 @@ class NotifyOpsiMate(NotifyBase):
 
         # Define any URL parameters
         params = {
-            "resolve": "yes" if self.resolve else "no",
+            "action": self.action,
         }
 
-        if self.alert_id:
-            params["id"] = self.alert_id
+        if self.dedup:
+            params["dedup"] = self.dedup
 
-        if self.team:
-            params["team"] = self.team
+        if self.click:
+            params["click"] = self.click
+
+        if self.severity:
+            params["severity"] = self.severity
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Our tags are passed along as +key=value entries
-        params.update({"+{}".format(k): v for k, v in self.tags.items()})
+        params.update({"+{}".format(k): v for k, v in self.xtags.items()})
 
         default_port = 443 if self.secure else 80
-        return "{schema}://{apikey}@{host}{port}/?{params}".format(
+        return "{schema}://{apikey}@{host}{port}{fullpath}?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             apikey=self.pprint(self.apikey, privacy, safe=""),
             # never encode hostname since we're expecting it to be a valid one
@@ -453,6 +553,7 @@ class NotifyOpsiMate(NotifyBase):
                 if self.port is None or self.port == default_port
                 else ":{}".format(self.port)
             ),
+            fullpath=NotifyOpsiMate.quote(self.fullpath, safe="/"),
             params=NotifyOpsiMate.urlencode(params),
         )
 
@@ -478,21 +579,28 @@ class NotifyOpsiMate(NotifyBase):
                 results["apikey"] = NotifyOpsiMate.unquote(results["qsd"][key])
                 break
 
-        if "id" in results["qsd"] and results["qsd"]["id"]:
-            results["alert_id"] = NotifyOpsiMate.unquote(results["qsd"]["id"])
-
-        if "team" in results["qsd"] and results["qsd"]["team"]:
-            results["team"] = NotifyOpsiMate.unquote(results["qsd"]["team"])
-
-        # Resolve the alert on a success notification
-        results["resolve"] = parse_bool(
-            results["qsd"].get(
-                "resolve", NotifyOpsiMate.template_args["resolve"]["default"]
+        # What to do with the alert
+        if "action" in results["qsd"] and results["qsd"]["action"]:
+            results["action"] = NotifyOpsiMate.unquote(
+                results["qsd"]["action"]
             )
-        )
+
+        # A fixed alert id
+        if "dedup" in results["qsd"] and results["qsd"]["dedup"]:
+            results["dedup"] = NotifyOpsiMate.unquote(results["qsd"]["dedup"])
+
+        # A link back to wherever the alert came from
+        if "click" in results["qsd"] and results["qsd"]["click"]:
+            results["click"] = NotifyOpsiMate.unquote(results["qsd"]["click"])
+
+        # A fixed severity
+        if "severity" in results["qsd"] and results["qsd"]["severity"]:
+            results["severity"] = NotifyOpsiMate.unquote(
+                results["qsd"]["severity"]
+            )
 
         # Store our +key=value tag entries
-        results["tags"] = {
+        results["xtags"] = {
             NotifyOpsiMate.unquote(x): NotifyOpsiMate.unquote(y)
             for x, y in results["qsd+"].items()
         }
