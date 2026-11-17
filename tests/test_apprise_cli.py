@@ -3125,36 +3125,47 @@ def test_apprise_cli_limit_option_times_out_service(
 def test_apprise_cli_limit_hard_exit(mock_request, mock_force_exit):
     """Force exit when a call outlives the timeout grace period.
 
-    A two-second delay avoids timing races. ``_force_exit()`` is mocked so the
+    The call stays blocked until the CLI returns, so it is always still
+    running when the grace period ends. ``_force_exit()`` is mocked so the
     test process stays alive.
     """
-    import time
+    import threading
 
-    def _slow_failure(*args, **kwargs):
-        """Return a delayed HTTP failure to force the CLI timeout path."""
-        time.sleep(2.0)
+    # Holds the service call open until the CLI has given up on it.
+    release = threading.Event()
+
+    def _blocked_failure(*args, **kwargs):
+        """Block until released, then return an HTTP failure."""
+        release.wait(10)
         response = mock.Mock()
         response.status_code = requests.codes.internal_server_error
         response.content = b""
         response.text = ""
         return response
 
-    mock_request.side_effect = _slow_failure
+    mock_request.side_effect = _blocked_failure
 
-    with mock.patch("apprise.cli.CLI_TIMEOUT_EXIT_GRACE_SECONDS", 0.05):
-        runner = CliRunner()
-        result = runner.invoke(
-            cli.main,
-            [
-                "-t",
-                "title",
-                "-b",
-                "body",
-                "--limit",
-                "0.05",
-                "json://good?retry=3",
-            ],
-        )
+    try:
+        with mock.patch("apprise.cli.CLI_TIMEOUT_EXIT_GRACE_SECONDS", 0.05):
+            runner = CliRunner()
+            # The limit leaves a busy runner time to start the call.  A call
+            # that starts after the limit is skipped and never forces an exit.
+            result = runner.invoke(
+                cli.main,
+                [
+                    "-t",
+                    "title",
+                    "-b",
+                    "body",
+                    "--limit",
+                    "0.5",
+                    "json://good?retry=3",
+                ],
+            )
+
+    finally:
+        # Let the abandoned call finish so it does not hold a pool thread.
+        release.set()
 
     assert result.exit_code == AppriseResultStatus.TIMEOUT
     mock_force_exit.assert_called_once()
