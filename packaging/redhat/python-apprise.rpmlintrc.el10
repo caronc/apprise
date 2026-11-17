@@ -4,4 +4,3 @@ from Config import *
 addFilter('spelling-error.*ntfy')
 addFilter('spelling-error.*ilert')
 addFilter('spelling-error.*xMatters')
-addFilter('spelling-error.*OpsiMate')
