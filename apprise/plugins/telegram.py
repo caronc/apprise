@@ -1164,10 +1164,11 @@ class NotifyTelegram(NotifyBase):
         *italic*       _italic_        _italic_
         `code`         `code`          `code`
         [l](<u>)       [l](u)          [l](u)
+        ||spoiler||    unchanged       ||spoiler||
         \\*            known escapes   all reserved escapes
 
         Both versions normalize links. MarkdownV2 also applies its stricter
-        reserved-character escaping pass.
+        reserved-character escaping pass, and keeps a balanced spoiler span.
         """
         # Telegram Markdown represents headings as bold text.
         body = commonmark_headings_to_bold(body)
@@ -1176,6 +1177,8 @@ class NotifyTelegram(NotifyBase):
         out = []
         # Record ``*`` and ``_`` markup, then match it after the full scan.
         delimiters = []
+        # MarkdownV2 spoiler delimiters (``||``), paired after the scan.
+        spoilers = []
         # Track possible link-label openings in LIFO order.
         link_stack = []
 
@@ -1334,6 +1337,15 @@ class NotifyTelegram(NotifyBase):
                 )
                 continue
 
+            # Record a MarkdownV2 spoiler delimiter. Its contents stay in
+            # this scan, so emphasis and reserved characters are still
+            # converted. A lone "|" falls through and is escaped below.
+            if strict and body.startswith("||", i):
+                spoilers.append({"matched": False})
+                out.append(f"{sentinel}|{len(spoilers) - 1}{sentinel}")
+                i += 2
+                continue
+
             # Escape remaining MarkdownV2-reserved characters.
             if strict and ch in cls._TELEGRAM_STRICT_CHARS:
                 out.append("\\" + ch)
@@ -1373,9 +1385,22 @@ class NotifyTelegram(NotifyBase):
         # Span depth at the current position of the substitution pass.
         span_depth = 0
 
+        # Pair spoiler delimiters from the left. MarkdownV2 does not nest
+        # one spoiler inside another, so each opener takes the next closer.
+        # A leftover marker is literal punctuation.
+        for idx in range(0, len(spoilers) - 1, 2):
+            spoilers[idx]["matched"] = True
+            spoilers[idx + 1]["matched"] = True
+
         def _substitute(match: re.Match) -> str:
             nonlocal span_depth
             kind = match.group(1)
+            if kind == "|":
+                # A paired "||" is a spoiler marker. An odd leftover is
+                # literal punctuation and must be escaped.
+                if spoilers[int(match.group(2))]["matched"]:
+                    return "||"
+                return "\\|\\|"
             if kind:
                 # A literal v1 "`" or "[" opens an entity that never ends
                 # unless it is escaped. Text inside a v1 span is taken
@@ -1405,7 +1430,7 @@ class NotifyTelegram(NotifyBase):
             return close_part + leftover + open_part
 
         marker_re = re.compile(
-            re.escape(sentinel) + r"([`[]?)(\d+)" + re.escape(sentinel)
+            re.escape(sentinel) + r"([`[|]?)(\d+)" + re.escape(sentinel)
         )
         text = marker_re.sub(_substitute, "".join(out))
 
