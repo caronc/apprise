@@ -368,6 +368,27 @@ class AppriseURLTester:
                         " describe the URL its url() writes."
                     )
 
+            # Each value is read into one field only, unless the URL
+            # itself writes it more than once. A parse_url() that copies a
+            # value into another field (a host that is really a topic or a
+            # token) has to clear the original, or a form built from the
+            # fields shows it twice and puts it back together twice.
+            written = NotifyBase.unquote(obj.url())
+            read_as = {}
+            for name, value in fields.items():
+                if name == "schema" or name not in obj.template_tokens:
+                    continue
+
+                for text in leaves(value):
+                    first = read_as.setdefault(text, name)
+                    if first != name and written.count(text) < 2:
+                        raise AssertionError(
+                            f"URL: {url} reads '{text}' as both the"
+                            f" {first} and the {name} field, but its url()"
+                            f" {obj.url()} writes it once. Clear the field"
+                            " it was copied from in parse_url()."
+                        )
+
             # The privacy fields show no text the privacy URL hides
             shown = obj.url(privacy=True)
             shown = (shown, NotifyBase.unquote(shown))

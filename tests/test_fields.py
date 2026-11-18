@@ -189,6 +189,84 @@ def test_fields_round_trip(url):
     assert again.url_fields() == fields
 
 
+TOKEN64 = "b" * 64
+LAMETRIC_TOKEN = "A" * 86 + "=="
+
+
+@pytest.mark.parametrize(
+    "url, expected",
+    (
+        # ntfy's cloud mode reads its host as the first topic
+        ("ntfys://abc", {"targets": ["abc"]}),
+        # A token written as the user, or as the password
+        (
+            "ntfys://tk_abc123@localhost/topic",
+            {"host": "localhost", "token": "tk_abc123", "targets": ["topic"]},
+        ),
+        (
+            "ntfys://user:tk_abc@localhost/topic?auth=token",
+            {"host": "localhost", "token": "tk_abc", "targets": ["topic"]},
+        ),
+        # Fluxer's cloud mode reads its host as the webhook id
+        (
+            "fluxer://0000000000/" + "B" * 40,
+            {"webhook_id": "0000000000", "webhook_token": "B" * 40},
+        ),
+        # LaMetric's cloud mode reads its host as the app id
+        (
+            f"lametric://{LAMETRIC_TOKEN}@com.lametric.941c51dff3135bd87aa72d"
+            "b9d855dd50/?mode=cloud",
+            {
+                "app_id": "941c51dff3135bd87aa72db9d855dd50",
+                "app_ver": "1",
+                "app_token": LAMETRIC_TOKEN,
+            },
+        ),
+        # Rocket.Chat keeps what came before the @ as the webhook or the
+        # password, as its mode says
+        (
+            "rockets://web/token@localhost/@user/?mode=webhook",
+            {
+                "host": "localhost",
+                "webhook": "web/token",
+                "targets": ["@user"],
+            },
+        ),
+        (
+            "rockets://user:pass%2Fwithslash@localhost/#channel/?mode=basic",
+            {
+                "host": "localhost",
+                "user": "user",
+                "password": "pass/withslash",
+                "targets": ["#channel"],
+            },
+        ),
+        # FCM's host is the API key in legacy mode, the project in OAuth2
+        ("fcm://abc123/device", {"apikey": "abc123", "targets": ["device"]}),
+        (
+            "fcm://myproject/device?keyfile=/tmp/keyfile.json",
+            {
+                "keyfile": "file:///tmp/keyfile.json",
+                "project": "myproject",
+                "targets": ["device"],
+            },
+        ),
+        # Matrix's t2bot mode reads its host as the webhook token
+        (f"matrix://{TOKEN64}/?mode=t2bot", {"password": TOKEN64}),
+    ),
+)
+def test_a_value_is_read_into_one_field(url, expected):
+    """A value the URL writes once fills one field, and comes back once."""
+    obj, fields, built = round_trip(url)
+    tokens = {
+        name: value
+        for name, value in fields.items()
+        if name != "schema" and name in obj.template_tokens
+    }
+    assert tokens == expected
+    assert Apprise.instantiate(built).url() == obj.url()
+
+
 def test_email_host_round_trip():
     """An email written as the host comes back as the same email."""
     # Octopush needs nothing extra, so this runs wherever Apprise does

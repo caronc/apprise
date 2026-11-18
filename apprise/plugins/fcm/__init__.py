@@ -632,6 +632,19 @@ class NotifyFCM(NotifyBase):
         if "keyfile" in results["qsd"] and results["qsd"]["keyfile"]:
             results["keyfile"] = NotifyFCM.unquote(results["qsd"]["keyfile"])
 
+        # The host is the project in OAuth2 mode and the API key in legacy
+        # mode. Work the mode out the way __init__() does, and keep only
+        # the one it uses, so the host is never read as both
+        mode = results["mode"]
+        if mode is None:
+            mode = FCMMode.OAuth2 if results.get("keyfile") else FCMMode.Legacy
+
+        if str(mode).lower() == FCMMode.OAuth2:
+            results["apikey"] = None
+
+        else:
+            results["project"] = None
+
         # Our Priority
         if "priority" in results["qsd"] and results["qsd"]["priority"]:
             results["priority"] = NotifyFCM.unquote(results["qsd"]["priority"])
