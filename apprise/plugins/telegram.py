@@ -1847,6 +1847,13 @@ class NotifyTelegram(NotifyBase):
                         "media": f"attach://{field_name}",
                     }
 
+                    # Telegram requires consistent placement on every item,
+                    # including those without a caption.
+                    if payload and "show_caption_above_media" in payload:
+                        item["show_caption_above_media"] = payload[
+                            "show_caption_above_media"
+                        ]
+
                     # Telegram displays the caption on the first item only.
                     if not no:
                         item.update(payload or {})

@@ -3555,8 +3555,19 @@ def test_plugin_telegram_album_kind_size():
         assert obj._album_kind(video[0]) == TelegramMediaKind.SINGLE
 
 
+@pytest.mark.parametrize("content", ["before", "after"])
+@pytest.mark.parametrize(
+    "extensions,kinds",
+    [
+        (("jpeg", "png", "jpeg"), ["photo"] * 3),
+        (("mp4",) * 3, ["video"] * 3),
+        (("jpeg", "png", "mp4"), ["photo", "photo", "video"]),
+    ],
+)
 @mock.patch("requests.post")
-def test_plugin_telegram_album_groups_media(mock_post):
+def test_plugin_telegram_album_groups_media(
+    mock_post, content, extensions, kinds
+):
     """Verify eligible attachments are posted as one album."""
 
     mock_post.return_value = mock.Mock()
@@ -3564,11 +3575,11 @@ def test_plugin_telegram_album_groups_media(mock_post):
     mock_post.return_value.content = b'{"ok":true}'
 
     obj = telegram_album_obj()
+    obj.content = content
     attach = AppriseAttachment(
         [
-            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
-            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
-            os.path.join(TEST_VAR_DIR, "apprise-test.mp4"),
+            os.path.join(TEST_VAR_DIR, f"apprise-test.{ext}")
+            for ext in extensions
         ]
     )
 
@@ -3581,7 +3592,7 @@ def test_plugin_telegram_album_groups_media(mock_post):
     assert urlparse(details[0][0]).hostname == "api.telegram.org"
 
     media = loads(details[1]["data"]["media"])
-    assert [entry["type"] for entry in media] == ["photo", "photo", "video"]
+    assert [entry["type"] for entry in media] == kinds
     assert [entry["media"] for entry in media] == [
         "attach://file0",
         "attach://file1",
@@ -3589,10 +3600,52 @@ def test_plugin_telegram_album_groups_media(mock_post):
     ]
     assert sorted(details[1]["files"]) == ["file0", "file1", "file2"]
 
+    # Telegram requires the same caption placement on every album item.
+    assert [entry["show_caption_above_media"] for entry in media] == [
+        content == "before"
+    ] * 3
+
     # The caption rides on the first album entry only
     assert media[0]["caption"] == "hello"
+    assert media[0]["parse_mode"] == "HTML"
     assert "caption" not in media[1]
     assert "caption" not in media[2]
+    assert "parse_mode" not in media[1]
+    assert "parse_mode" not in media[2]
+
+
+@pytest.mark.parametrize("content", ["before", "after"])
+@pytest.mark.parametrize("body", ["", "x" * 1024], ids=["empty", "long"])
+@mock.patch("requests.post")
+def test_plugin_telegram_album_without_caption(mock_post, content, body):
+    """Keep caption fields out of albums with no inline caption."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"ok":true}'
+
+    obj = telegram_album_obj()
+    obj.content = content
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.jpeg")
+    assert obj.notify(body=body, attach=AppriseAttachment([path] * 2))
+
+    endpoints = ["sendMediaGroup"]
+    if body:
+        if content == "before":
+            endpoints.insert(0, "sendMessage")
+        else:
+            endpoints.append("sendMessage")
+    assert telegram_album_calls(mock_post) == endpoints
+
+    album = mock_post.call_args_list[endpoints.index("sendMediaGroup")]
+    media = loads(album[1]["data"]["media"])
+    for entry in media:
+        assert "caption" not in entry
+        assert "parse_mode" not in entry
+        assert "show_caption_above_media" not in entry
+    if body:
+        message = mock_post.call_args_list[endpoints.index("sendMessage")]
+        assert loads(message[1]["data"])["text"] == body
 
 
 @mock.patch("requests.post")
@@ -3630,8 +3683,9 @@ def test_plugin_telegram_album_preserves_order(mock_post):
     assert "caption" not in media[0]
 
 
+@pytest.mark.parametrize("content", ["before", "after"])
 @mock.patch("requests.post")
-def test_plugin_telegram_album_batches(mock_post):
+def test_plugin_telegram_album_batches(mock_post, content):
     """Verify more than ten media are split across albums."""
 
     mock_post.return_value = mock.Mock()
@@ -3639,6 +3693,7 @@ def test_plugin_telegram_album_batches(mock_post):
     mock_post.return_value.content = b'{"ok":true}'
 
     obj = telegram_album_obj()
+    obj.content = content
     path = os.path.join(TEST_VAR_DIR, "apprise-test.jpeg")
 
     # Eleven photos: a full album of ten, then a single leftover
@@ -3653,7 +3708,16 @@ def test_plugin_telegram_album_batches(mock_post):
         "sendMediaGroup",
         "sendMediaGroup",
     ]
-    assert len(loads(mock_post.call_args_list[1][1]["data"]["media"])) == 2
+    first = loads(mock_post.call_args_list[0][1]["data"]["media"])
+    second = loads(mock_post.call_args_list[1][1]["data"]["media"])
+    assert [entry["show_caption_above_media"] for entry in first] == [
+        content == "before"
+    ] * 10
+    assert len(second) == 2
+    for entry in second:
+        assert "caption" not in entry
+        assert "parse_mode" not in entry
+        assert "show_caption_above_media" not in entry
 
 
 @mock.patch("requests.post")
@@ -4052,10 +4116,15 @@ def test_plugin_telegram_album_delivery_tracking(mock_post):
                 (12345, None),
                 NotifyType.INFO,
                 attach,
-                payload={"caption": "hello"},
+                payload={
+                    "caption": "hello",
+                    "show_caption_above_media": True,
+                },
             )
             is False
         )
+        media = loads(mock_post.call_args_list[0][1]["data"]["media"])
+        assert all(entry["show_caption_above_media"] for entry in media)
 
         # The retry skips the delivered photo and its caption, and the
         # two remaining photos still form an album
@@ -4066,14 +4135,19 @@ def test_plugin_telegram_album_delivery_tracking(mock_post):
                 (12345, None),
                 NotifyType.INFO,
                 attach,
-                payload={"caption": "hello"},
+                payload={
+                    "caption": "hello",
+                    "show_caption_above_media": True,
+                },
             )
             is True
         )
         assert telegram_album_calls(mock_post) == ["sendMediaGroup"]
         media = loads(mock_post.call_args_list[0][1]["data"]["media"])
         assert len(media) == 2
-        assert "caption" not in media[0]
+        for entry in media:
+            assert "caption" not in entry
+            assert "show_caption_above_media" not in entry
 
         # Nothing is left to send on a further retry
         mock_post.reset_mock()
