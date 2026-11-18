@@ -1341,7 +1341,15 @@ class NotifyTelegram(NotifyBase):
             # this scan, so emphasis and reserved characters are still
             # converted. A lone "|" falls through and is escaped below.
             if strict and body.startswith("||", i):
-                spoilers.append({"matched": False})
+                # Like emphasis, an opener must touch the text after it
+                # and a closer the text before it.  This keeps a spaced
+                # "a || b" (a shell "or") as literal punctuation.
+                spoilers.append(
+                    (
+                        i + 2 < n and not body[i + 2].isspace(),
+                        i > 0 and not body[i - 1].isspace(),
+                    )
+                )
                 out.append(f"{sentinel}|{len(spoilers) - 1}{sentinel}")
                 i += 2
                 continue
@@ -1388,9 +1396,17 @@ class NotifyTelegram(NotifyBase):
         # Pair spoiler delimiters from the left. MarkdownV2 does not nest
         # one spoiler inside another, so each opener takes the next closer.
         # A leftover marker is literal punctuation.
-        for idx in range(0, len(spoilers) - 1, 2):
-            spoilers[idx]["matched"] = True
-            spoilers[idx + 1]["matched"] = True
+        spoilers_matched = set()
+        opener = None
+        for idx, (can_open, can_close) in enumerate(spoilers):
+            if opener is not None and can_close:
+                # This marker ends the pending spoiler.
+                spoilers_matched.update((opener, idx))
+                opener = None
+
+            elif can_open:
+                # A newer opener replaces one that never found a closer.
+                opener = idx
 
         def _substitute(match: re.Match) -> str:
             nonlocal span_depth
@@ -1398,7 +1414,7 @@ class NotifyTelegram(NotifyBase):
             if kind == "|":
                 # A paired "||" is a spoiler marker. An odd leftover is
                 # literal punctuation and must be escaped.
-                if spoilers[int(match.group(2))]["matched"]:
+                if int(match.group(2)) in spoilers_matched:
                     return "||"
                 return "\\|\\|"
             if kind:

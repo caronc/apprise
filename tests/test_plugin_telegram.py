@@ -2218,11 +2218,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
 
 @mock.patch("requests.post")
 def test_plugin_telegram_markdown_v2_preserves_spoiler(mock_post):
-    """MarkdownV2 keeps a balanced spoiler when the input is Markdown.
-
-    A single pipe, or a ``||`` with no partner, stays escaped punctuation.
-    Legacy Markdown has no spoiler syntax, so its pipe handling is unchanged.
-    """
+    """MarkdownV2 keeps a balanced spoiler when the input is Markdown."""
 
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
@@ -2262,6 +2258,14 @@ def test_plugin_telegram_markdown_v2_preserves_spoiler(mock_post):
     assert convert("||a|| ||b", strict=True) == r"||a|| \|\|b"
     assert convert("a|b|c", strict=True) == r"a\|b\|c"
     assert convert("|", strict=True) == r"\|"
+
+    # A spaced "||" is a shell "or", not a spoiler.
+    assert convert("make || retry, deploy || undo", strict=True) == (
+        r"make \|\| retry, deploy \|\| undo"
+    )
+    # An opener that never closes gives way to a later one.
+    assert convert("||a ||b||", strict=True) == r"\|\|a ||b||"
+    assert convert("||a || b||", strict=True) == r"||a \|\| b||"
 
     # Legacy v1 does not treat "||" as markup and does not escape pipes.
     assert convert("Public ||spoiler text|| end") == (
