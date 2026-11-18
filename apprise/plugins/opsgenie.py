@@ -380,7 +380,12 @@ class NotifyOpsgenie(NotifyBase):
 
         if action and isinstance(action, str) and action.strip():
             self.action = next(
-                (a for a in OPSGENIE_ACTIONS if a.startswith(action)), None
+                (
+                    a
+                    for a in OPSGENIE_ACTIONS
+                    if a.startswith(action.strip().lower())
+                ),
+                None,
             )
             if self.action not in OPSGENIE_ACTIONS:
                 msg = f"The Opsgenie action specified ({action}) is invalid."
