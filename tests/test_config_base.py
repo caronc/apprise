@@ -41,7 +41,15 @@ from pytest_mock import MockerFixture
 import requests
 import yaml
 
-from apprise import Apprise, AppriseAsset, AppriseConfig, ConfigFormat
+from apprise import (
+    Apprise,
+    AppriseAsset,
+    AppriseConfig,
+    ConfigFormat,
+    NotifyFormat,
+    NotifyImageSize,
+    NotifyType,
+)
 from apprise.config import ConfigBase
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.email import NotifyEmail
@@ -1141,6 +1149,9 @@ urls:
     assert isinstance(asset.image_url_logo, str)
     assert asset.image_url_logo == ""
 
+    # Local file paths can not be set from a configuration
+    assert asset.image_path_mask == AppriseAsset().image_path_mask
+
     # For on-lookers looking through this file; here is a perfectly formatted
     # YAML configuration file for your reference so you can see it without
     # all of the errors like the ones identified above
@@ -1733,7 +1744,7 @@ asset:
   _private: "ignored"           # reserved (starts with _)
   name_: "ignored"              # reserved (ends with _)
   not_a_field: "ignored"        # invalid asset key
-  secure_logging: "yes"         # string -> bool via parse_bool
+  interpret_escapes: "yes"      # string -> bool via parse_bool
   app_id: null                  # None becomes empty string
   app_desc: [ "list" ]          # invalid type for string -> warning path
 urls:
@@ -1754,7 +1765,7 @@ urls:
     # See output as it was passed in and not corrected per IANA
     assert getattr(asset.tzinfo, "key", None).lower() == "america/toronto"
     # boolean coercion applied
-    assert asset.secure_logging is True
+    assert asset.interpret_escapes is True
     # None -> ""
     assert asset.app_id == ""
 
@@ -1827,6 +1838,122 @@ urls:
             )
             is None
         )
+
+
+@pytest.mark.parametrize("source", ["file", "memory"])
+def test_yaml_asset_read_only_keys(tmpdir, source):
+    """A configuration can not change read-only asset settings."""
+    secret = tmpdir.join("secret.key")
+    secret.write("top-secret")
+
+    content = cleandoc(f"""
+    version: 1
+    asset:
+      image_path_mask: {secret}
+      secure_logging: no
+      allow_templates: no
+      storage_path: /tmp
+      app_id: Custom
+    urls:
+      - json://localhost
+    """)
+
+    ac = AppriseConfig()
+    if source == "file":
+        cfg = tmpdir.join("host.yml")
+        cfg.write(content)
+        assert ac.add(str(cfg))
+
+    else:
+        assert ac.add_config(content, format=ConfigFormat.YAML)
+
+    services = ac.services()
+    assert len(services) == 1
+    asset = services[0].asset
+
+    # Other asset keys still apply
+    assert asset.app_id == "Custom"
+
+    # The host-only keys keep their defaults
+    assert asset.image_path_mask == AppriseAsset().image_path_mask
+    assert asset.secure_logging is True
+
+    # Other read-only settings are skipped instead of failing the load
+    assert asset.allow_templates is True
+    assert asset.storage_path is None
+
+    # The notification icon is never read from the named file
+    assert (
+        asset.image_raw(NotifyType.INFO, NotifyImageSize.XY_256)
+        != b"top-secret"
+    )
+
+
+def test_yaml_asset_clean_values():
+    """Asset values with a clean_<key>() check are vetted from YAML."""
+
+    def asset_for(content):
+        """Parse ``content`` and return the asset it was applied to."""
+        asset = AppriseAsset()
+        result, _ = ConfigBase.config_parse_yaml(
+            cleandoc(content), asset=asset
+        )
+        assert len(result) == 1
+        return asset
+
+    # Safe values are kept
+    asset = asset_for("""
+    asset:
+      theme: " dark "
+      default_extension: .jpeg
+    urls:
+      - json://localhost
+    """)
+    assert asset.theme == "dark"
+    assert asset.default_extension == ".jpeg"
+
+    # Values that lead to other folders are ignored
+    asset = asset_for("""
+    asset:
+      theme: ../../../etc
+      default_extension: /../../../etc/passwd
+    urls:
+      - json://localhost
+    """)
+    assert asset.theme == AppriseAsset().theme
+    assert asset.default_extension == AppriseAsset().default_extension
+
+
+def test_yaml_asset_body_format():
+    """A configuration may set the input format when none was chosen."""
+
+    def body_format_for(value, asset=None):
+        """Parse ``value`` as the asset body_format and return the result."""
+        asset = asset if asset is not None else AppriseAsset()
+        result, _ = ConfigBase.config_parse_yaml(
+            cleandoc(f"""
+            asset:
+              body_format: {value}
+            urls:
+              - json://localhost
+            """),
+            asset=asset,
+        )
+        assert len(result) == 1
+        return asset.body_format
+
+    # Accepted when nothing was set, ignoring case and spaces
+    assert body_format_for('"  Markdown "') == NotifyFormat.MARKDOWN
+    assert body_format_for("html") == NotifyFormat.HTML
+
+    # A format the program already chose is kept
+    assert (
+        body_format_for("markdown", AppriseAsset(body_format="html")) == "html"
+    )
+
+    # Anything we can not work with is ignored
+    for value in ("rtf", '"  "', "null", "[ a, b ]", "42"):
+        assert body_format_for(value) is None
 
 
 def test_yaml_asset_timezone_invalid_and_precedence(tmpdir):
