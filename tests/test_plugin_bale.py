@@ -1,4 +1,4 @@
-﻿# BSD 2-Clause License
+# BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
 # Copyright (c) 2026, pooya220
@@ -36,7 +36,6 @@ from apprise.common import NotifyType
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.bale import NotifyBale
 
-
 BOT_ID = "123456"
 TOKEN_SECRET = "s" * 16
 CHAT_ID = "987654321"
@@ -56,6 +55,12 @@ apprise_url_tests = (
     ),
     (
         f"bale://{BOT_ID}@{CHAT_ID}",
+        {
+            "instance": AppriseImproperlyConfigured,
+        },
+    ),
+    (
+        f"bale://bot-id:secret@{CHAT_ID}",
         {
             "instance": AppriseImproperlyConfigured,
         },
@@ -107,7 +112,7 @@ def test_plugin_bale_send_message(mock_post, title, expected_text):
         data={"chat_id": CHAT_ID, "text": expected_text},
         verify=True,
         timeout=(15.0, 15.0),
-        allow_redirects=True,
+        allow_redirects=False,
     )
 
 
@@ -117,7 +122,11 @@ def test_plugin_bale_send_message(mock_post, title, expected_text):
     (
         (requests.codes.ok, {"ok": False}, None),
         (requests.codes.internal_server_error, None, None),
-        (requests.codes.ok, None, ValueError("private response body")),
+        (
+            requests.codes.ok,
+            None,
+            ValueError(f"{TOKEN_SECRET} private response body"),
+        ),
     ),
 )
 def test_plugin_bale_rejects_failed_responses(
@@ -133,7 +142,17 @@ def test_plugin_bale_rejects_failed_responses(
 
     obj = apprise.Apprise.instantiate(URL)
     assert obj is not None
-    assert not obj.notify(body="private message")
+    marker = "PRIVATE-BALE-MARKER"
+    with mock.patch.multiple(
+        obj.logger, warning=mock.DEFAULT, debug=mock.DEFAULT
+    ) as logged_calls:
+        assert not obj.notify(body=marker)
+        logged = repr(logged_calls["warning"].call_args_list) + repr(
+            logged_calls["debug"].call_args_list
+        )
+
+    assert marker not in logged
+    assert TOKEN_SECRET not in logged
 
 
 @mock.patch("apprise.plugins.bale.requests.post")
@@ -144,12 +163,13 @@ def test_plugin_bale_hides_request_exception_details(mock_post):
 
     obj = apprise.Apprise.instantiate(URL)
     assert obj is not None
-    with mock.patch.object(obj.logger, "warning") as warning, mock.patch.object(
-        obj.logger, "debug"
-    ) as debug:
+    with mock.patch.multiple(
+        obj.logger, warning=mock.DEFAULT, debug=mock.DEFAULT
+    ) as logged_calls:
         assert not obj.notify(body=marker)
-        logged = repr(warning.call_args_list) + repr(debug.call_args_list)
+        logged = repr(logged_calls["warning"].call_args_list) + repr(
+            logged_calls["debug"].call_args_list
+        )
 
     assert marker not in logged
     assert TOKEN_SECRET not in logged
-
