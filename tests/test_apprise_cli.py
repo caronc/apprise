@@ -3075,6 +3075,58 @@ def test_apprise_cli_notify_runtime_stat_log(mock_request):
     )
 
 
+@mock.patch("requests.request")
+def test_apprise_cli_config_body_format(mock_request, tmpdir):
+    """CLI: a configuration file may supply the default input format."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_request.return_value = response
+
+    # Record the input format each notification is sent with
+    seen = []
+    notify = Apprise.notify
+
+    def spy(self, *args, **kwargs):
+        seen.append(self.asset.body_format)
+        return notify(self, *args, **kwargs)
+
+    with_format = tmpdir.join("with-format.yml")
+    with_format.write(
+        cleandoc("""
+        asset:
+          body_format: markdown
+        urls:
+          - json://localhost
+        """)
+    )
+    without_format = tmpdir.join("without-format.yml")
+    without_format.write("urls:\n  - json://localhost\n")
+
+    runner = CliRunner()
+    with mock.patch.object(Apprise, "notify", spy):
+        # The configuration file chooses the format
+        result = runner.invoke(
+            cli.main, ["-b", "body", "--config", str(with_format)]
+        )
+        assert result.exit_code == 0
+
+        # --input-format always wins over the configuration file
+        result = runner.invoke(
+            cli.main,
+            ["-b", "body", "--config", str(with_format), "-i", "html"],
+        )
+        assert result.exit_code == 0
+
+        # With neither, text is used as before
+        result = runner.invoke(
+            cli.main, ["-b", "body", "--config", str(without_format)]
+        )
+        assert result.exit_code == 0
+
+    assert seen == ["markdown", "html", "text"]
+
+
 @mock.patch("apprise.cli._force_exit")
 @mock.patch("requests.request")
 def test_apprise_cli_limit_option_times_out_service(

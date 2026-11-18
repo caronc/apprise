@@ -33,7 +33,11 @@ import time
 
 from .. import common, plugins
 from ..asset import AppriseAsset
-from ..exception import AppriseImproperlyConfigured, AppriseTemplateError
+from ..exception import (
+    AppriseImproperlyConfigured,
+    AppriseInvalidData,
+    AppriseTemplateError,
+)
 from ..locale import AppriseLocale
 from ..logger import logging
 from ..manager_config import ConfigurationManager
@@ -1049,9 +1053,38 @@ class ConfigBase(URLBase):
                     "Ignored invalid language %r", raw_lang
                 )
 
+            # A configuration may only supply the default input format.
+            # Whatever the program using Apprise already chose is kept.
+            raw_format = tokens.get("body_format")
+            if isinstance(raw_format, str) and raw_format.strip():
+                body_format = raw_format.strip().lower()
+                if body_format not in common.NOTIFY_FORMATS:
+                    ConfigBase.logger.warning(
+                        'Ignored invalid body_format "%s"', raw_format
+                    )
+
+                elif asset.body_format is None:
+                    # No format was chosen yet, so use the one given here.
+                    asset.body_format = common.NotifyFormat(body_format)
+
+                else:
+                    # Explain why the value had no effect.
+                    ConfigBase.logger.debug(
+                        "Ignored asset body_format %s; %s is already set",
+                        body_format,
+                        asset.body_format,
+                    )
+
+            elif raw_format is not None:
+                # %r quotes a string on its own, so no quotes are added
+                # around it here.
+                ConfigBase.logger.warning(
+                    "Ignored invalid body_format %r", raw_format
+                )
+
             # Iterate over remaining tokens
             for k, v in tokens.items():
-                if k in ("lang", "language", "timezone", "tz"):
+                if k in ("body_format", "lang", "language", "timezone", "tz"):
                     # These validated settings were already applied above.
                     continue
 
@@ -1059,6 +1092,17 @@ class ConfigBase(URLBase):
                     # Entries are considered reserved if they start or end
                     # with an underscore
                     ConfigBase.logger.warning(f'Ignored asset key "{k}".')
+                    continue
+
+                if isinstance(getattr(type(asset), k, None), property):
+                    # Read-only settings belong to the program using
+                    # Apprise.  A configuration may come from another server
+                    # or another user, so it can not change them.
+                    ConfigBase.logger.warning(
+                        'Ignored asset key "%s"; it can only be set on'
+                        " AppriseAsset",
+                        k,
+                    )
                     continue
 
                 if not (
@@ -1079,16 +1123,32 @@ class ConfigBase(URLBase):
                     # If the object in the Asset is a boolean, then
                     # we want to convert the specified string to
                     # match that.
-                    setattr(asset, k, parse_bool(v))
+                    v = parse_bool(v)
 
                 elif isinstance(v, str):
-                    # Set our asset object with the new value
-                    setattr(asset, k, v.strip())
+                    # Strip the new value before it is stored
+                    v = v.strip()
 
                 else:
                     # we must set strings with a string
                     ConfigBase.logger.warning(f'Invalid asset value to "{k}".')
                     continue
+
+                # Some keys provide a clean_<key>() check for their value.
+                clean = getattr(AppriseAsset, f"clean_{k}", None)
+                if clean is not None:
+                    try:
+                        v = clean(v)
+
+                    except AppriseInvalidData as e:
+                        # The asset refused the value; explain why.
+                        ConfigBase.logger.warning(
+                            'Ignored asset key "%s"; %s', k, str(e)
+                        )
+                        continue
+
+                # Set our asset object with the new value
+                setattr(asset, k, v)
         #
         # global tag root directive
         #

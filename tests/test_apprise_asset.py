@@ -35,7 +35,11 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from apprise.asset import AppriseAsset
-from apprise.exception import AppriseImproperlyConfigured
+from apprise.exception import (
+    AppriseException,
+    AppriseImproperlyConfigured,
+    AppriseInvalidData,
+)
 
 logging.disable(logging.CRITICAL)
 
@@ -274,6 +278,92 @@ def test_result_log_storage_sizes():
                 AppriseAsset(**{name: value})
         with pytest.raises(AppriseImproperlyConfigured):
             AppriseAsset(**{"_{}".format(name): 1})
+
+
+def test_secure_logging():
+    """secure_logging is set once, when the asset is created."""
+    assert AppriseAsset().secure_logging is True
+    assert AppriseAsset(secure_logging=False).secure_logging is False
+
+    # Only a bool is accepted
+    for value in ("no", 0, 1.5):
+        with pytest.raises(AppriseImproperlyConfigured):
+            AppriseAsset(secure_logging=value)
+
+    # The internal name can not be used to get around the check
+    with pytest.raises(AppriseImproperlyConfigured):
+        AppriseAsset(_secure_logging=False)
+
+    # It can not be changed afterwards
+    asset = AppriseAsset()
+    with pytest.raises(AttributeError):
+        asset.secure_logging = False
+
+
+def test_image_path_mask():
+    """image_path_mask is set once, when the asset is created."""
+    default = AppriseAsset().image_path_mask
+    assert isinstance(default, str)
+
+    # None keeps the default
+    assert AppriseAsset(image_path_mask=None).image_path_mask == default
+
+    # A custom mask, or False to turn local icons off
+    asset = AppriseAsset(image_path_mask="/icons/{TYPE}-{XY}{EXTENSION}")
+    assert asset.image_path_mask == "/icons/{TYPE}-{XY}{EXTENSION}"
+    assert AppriseAsset(image_path_mask=False).image_path_mask is False
+
+    # Anything else is refused
+    for value in (True, 42, ["/icons"]):
+        with pytest.raises(AppriseImproperlyConfigured):
+            AppriseAsset(image_path_mask=value)
+
+    # The internal name can not be used to get around the check
+    with pytest.raises(AppriseImproperlyConfigured):
+        AppriseAsset(_image_path_mask="/tmp")
+
+    # It can not be changed afterwards
+    with pytest.raises(AttributeError):
+        asset.image_path_mask = "/tmp"
+
+
+def test_clean_theme():
+    """A theme must name a single folder."""
+    assert AppriseAsset(theme="great.theme").theme == "great.theme"
+    assert AppriseAsset(theme="  dark ").theme == "dark"
+    assert AppriseAsset(theme="").theme == ""
+
+    # Anything that could lead to another folder is refused
+    for value in ("../../etc", "a/b", "a\\b", ".", "..", 42):
+        with pytest.raises(AppriseImproperlyConfigured):
+            AppriseAsset(theme=value)
+
+    # The cleaner explains why, using an AppriseException
+    with pytest.raises(AppriseInvalidData, match="folder name") as e:
+        AppriseAsset.clean_theme("../../etc")
+    assert isinstance(e.value, AppriseException)
+
+    with pytest.raises(AppriseInvalidData, match="must be a string"):
+        AppriseAsset.clean_theme(42)
+
+
+def test_clean_default_extension():
+    """An extension can not add folders to the icon file name."""
+    assert AppriseAsset(default_extension=".jpeg").default_extension == (
+        ".jpeg"
+    )
+
+    # Windows treats both separators alike, so both are refused
+    for value in ("/../../etc/passwd", ".png\\..\\..\\win.ini", None):
+        with pytest.raises(AppriseImproperlyConfigured):
+            AppriseAsset(default_extension=value)
+
+    # The cleaner explains why
+    with pytest.raises(AppriseInvalidData, match="folder separator"):
+        AppriseAsset.clean_default_extension("/../etc/passwd")
+
+    with pytest.raises(AppriseInvalidData, match="must be a string"):
+        AppriseAsset.clean_default_extension(None)
 
 
 def test_enforce_payload_max_size():

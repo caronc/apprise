@@ -39,7 +39,7 @@ from .common import (
     NotifyType,
     PersistentStoreMode,
 )
-from .exception import AppriseImproperlyConfigured
+from .exception import AppriseImproperlyConfigured, AppriseInvalidData
 from .locale import AppriseLocale
 from .manager_plugins import NotificationManager
 from .utils.time import zoneinfo
@@ -110,7 +110,7 @@ class AppriseAsset:
     )
 
     # Image Path Mask
-    image_path_mask = abspath(
+    _image_path_mask = abspath(
         join(
             dirname(__file__),
             "assets",
@@ -182,6 +182,13 @@ class AppriseAsset:
     # if Persistent Storage was set to `memory`
     pem_autogen = True
 
+    # By default, HTTP redirects (3xx responses) are followed, matching the
+    # behaviour of the underlying requests library. Set this to False to
+    # disable redirect following globally across all plugins without having
+    # to add redirect=no to every individual URL. Individual URLs can still
+    # override this via the redirect= parameter.
+    http_redirects = True
+
     # For more detail see CWE-312 @
     #    https://cwe.mitre.org/data/definitions/312.html
     #
@@ -191,14 +198,7 @@ class AppriseAsset:
     # this cleanup; system owners who run in a very isolated environment may
     # choose to disable this for a slight performance bump. It is recommended
     # that you leave this option as is otherwise.
-    secure_logging = True
-
-    # By default, HTTP redirects (3xx responses) are followed, matching the
-    # behaviour of the underlying requests library. Set this to False to
-    # disable redirect following globally across all plugins without having
-    # to add redirect=no to every individual URL. Individual URLs can still
-    # override this via the redirect= parameter.
-    http_redirects = True
+    _secure_logging = True
 
     # Optionally specify one or more path to attempt to scan for Python modules
     # By default, no paths are scanned.
@@ -290,6 +290,8 @@ class AppriseAsset:
         service_timeout: Optional[Union[int, float]] = None,
         payload_max_size: Optional[int] = None,
         allow_templates: Optional[bool] = None,
+        secure_logging: Optional[bool] = None,
+        image_path_mask: Optional[Union[str, bool]] = None,
         payload_buffer_threshold: Optional[int] = None,
         payload_min_buffer: Optional[int] = None,
         result_log_memory_size: Optional[int] = None,
@@ -321,6 +323,18 @@ class AppriseAsset:
                     f"AppriseAsset init(): {key} can not be set directly; "
                     "use its dedicated keyword argument instead."
                 )
+
+            # Some keys provide a clean_<key>() check for their value.
+            clean = getattr(AppriseAsset, f"clean_{key}", None)
+            if clean is not None:
+                try:
+                    value = clean(value)
+
+                except AppriseInvalidData as e:
+                    # Report the reason the value was refused.
+                    raise AppriseImproperlyConfigured(
+                        f"AppriseAsset init(): {e}"
+                    ) from None
 
             setattr(self, key, value)
 
@@ -395,6 +409,26 @@ class AppriseAsset:
                 )
 
             self._allow_templates = allow_templates
+
+        if secure_logging is not None:
+            if not isinstance(secure_logging, bool):
+                raise AppriseImproperlyConfigured(
+                    "AppriseAsset secure_logging must be a bool."
+                )
+
+            self._secure_logging = secure_logging
+
+        if image_path_mask is not None:
+            # False turns local icons off.
+            if image_path_mask is not False and not isinstance(
+                image_path_mask, str
+            ):
+                raise AppriseImproperlyConfigured(
+                    "AppriseAsset image_path_mask must be a string, or False"
+                    " to turn icons off."
+                )
+
+            self._image_path_mask = image_path_mask
 
         if service_timeout is not None:
             # Store all durations as floats and reject bool values.
@@ -757,6 +791,47 @@ class AppriseAsset:
         """
         return int(value.lstrip("#"), 16)
 
+    @staticmethod
+    def clean_theme(value: Any) -> str:
+        """Return ``value`` as a theme folder name.
+
+        Raises AppriseInvalidData when it could lead to another folder.
+        """
+        # A theme names one folder, so it may not lead to any other.
+        if not isinstance(value, str):
+            raise AppriseInvalidData(
+                f"theme must be a string, not {type(value).__name__}."
+            )
+
+        value = value.strip()
+        if value in (".", "..") or "/" in value or "\\" in value:
+            raise AppriseInvalidData(
+                f"theme ({value}) must be a folder name, not a path."
+            )
+
+        return value
+
+    @staticmethod
+    def clean_default_extension(value: Any) -> str:
+        """Return ``value`` as a file extension.
+
+        Raises AppriseInvalidData when it would add folders to a file name.
+        """
+        # An extension ends a file name, so it may not add folders to it.
+        if not isinstance(value, str):
+            raise AppriseInvalidData(
+                "default_extension must be a string, not"
+                f" {type(value).__name__}."
+            )
+
+        if "/" in value or "\\" in value:
+            raise AppriseInvalidData(
+                f"default_extension ({value}) can not contain a folder"
+                " separator."
+            )
+
+        return value.strip()
+
     @property
     def plugin_paths(self) -> Sequence[str]:
         """Return the plugin paths defined."""
@@ -788,6 +863,18 @@ class AppriseAsset:
     def allow_templates(self) -> bool:
         """Return whether a YAML configuration may use template variables."""
         return self._allow_templates
+
+    @property
+    def secure_logging(self) -> bool:
+        """Return whether secrets are hidden in log output."""
+        # Only the program using Apprise may turn this off.
+        return self._secure_logging
+
+    @property
+    def image_path_mask(self) -> Union[str, bool]:
+        """Return the local icon path mask, or False when icons are off."""
+        # This points at local files, so only the program may change it.
+        return self._image_path_mask
 
     @property
     def result_log_memory_size(self) -> int:
