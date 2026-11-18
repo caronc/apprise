@@ -1,7 +1,7 @@
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
-# Copyright (c) 2026, pooya220
+# Copyright (c) 2026, AryanZeynali
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -47,6 +47,12 @@ class NotifyBale(NotifyBase):
 
     socket_connect_timeout = 15.0
     socket_read_timeout = 15.0
+
+    # Bale limits the complete sendMessage text to 4096 characters. Keep the
+    # title and the newline inserted by send() within the same budget.
+    body_maxlen = 4096
+    overflow_buffer = 1
+    overflow_amalgamate_title = True
 
     templates = ("{schema}://{user}:{password}@{host}",)
 
@@ -180,7 +186,9 @@ class NotifyBale(NotifyBase):
     @staticmethod
     def parse_url(url):
         """Parse an Apprise URL into initialization parameters."""
-        results = NotifyBase.parse_url(url)
+        # The destination is a numeric chat ID (and may be negative for a
+        # group), not a hostname. Validate it in __init__ instead.
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             return results
 

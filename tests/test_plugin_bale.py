@@ -1,7 +1,7 @@
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
-# Copyright (c) 2026, pooya220
+# Copyright (c) 2026, AryanZeynali
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -39,6 +39,7 @@ from apprise.plugins.bale import NotifyBale
 BOT_ID = "123456"
 TOKEN_SECRET = "s" * 16
 CHAT_ID = "987654321"
+GROUP_CHAT_ID = "-987654321"
 URL = f"bale://{BOT_ID}:{TOKEN_SECRET}@{CHAT_ID}"
 ENDPOINT = f"https://tapi.bale.ai/bot{BOT_ID}:{TOKEN_SECRET}/sendMessage"
 
@@ -51,6 +52,15 @@ apprise_url_tests = (
             "notify_response": False,
             "requests_response_code": requests.codes.ok,
             "privacy_url": f"bale://{BOT_ID}:****@{CHAT_ID}",
+        },
+    ),
+    (
+        f"bale://{BOT_ID}:{TOKEN_SECRET}@{GROUP_CHAT_ID}",
+        {
+            "instance": NotifyBale,
+            "notify_response": False,
+            "requests_response_code": requests.codes.ok,
+            "privacy_url": f"bale://{BOT_ID}:****@{GROUP_CHAT_ID}",
         },
     ),
     (
@@ -106,7 +116,6 @@ def test_plugin_bale_send_message(mock_post, title, expected_text):
         title=title,
         notify_type=NotifyType.INFO,
     )
-
     mock_post.assert_called_once_with(
         ENDPOINT,
         data={"chat_id": CHAT_ID, "text": expected_text},
@@ -114,6 +123,84 @@ def test_plugin_bale_send_message(mock_post, title, expected_text):
         timeout=(15.0, 15.0),
         allow_redirects=False,
     )
+
+
+@pytest.mark.parametrize(
+    ("title", "body_length", "overflow"),
+    (
+        ("", 4097, "split"),
+        ("", 4097, "truncate"),
+        ("Alert", 4091, "split"),
+        ("Alert", 4091, "truncate"),
+    ),
+)
+@mock.patch("apprise.plugins.bale.requests.post")
+def test_plugin_bale_message_limit(mock_post, title, body_length, overflow):
+    """Respect Bale's 4096-character text limit for overflow modes."""
+    response = mock.Mock(status_code=requests.codes.ok)
+    response.json.return_value = {"ok": True}
+    mock_post.return_value = response
+
+    body = "x" * body_length
+    obj = apprise.Apprise.instantiate(f"{URL}?overflow={overflow}")
+    assert obj is not None
+    assert obj.notify(body=body, title=title)
+
+    texts = [call.kwargs["data"]["text"] for call in mock_post.call_args_list]
+    assert texts
+    assert all(len(text) <= 4096 for text in texts)
+    if overflow == "truncate":
+        assert len(texts) == 1
+    else:
+        assert len(texts) == 2
+        if title:
+            chunks = []
+            for index, text in enumerate(texts, start=1):
+                header, chunk = text.split("\n", 1)
+                assert header == f"{title} [{index}/{len(texts)}]"
+                chunks.append(chunk)
+            assert "".join(chunks) == body
+        else:
+            assert "".join(texts) == body
+
+
+@pytest.mark.parametrize(
+    ("title_length", "body_length", "overflow"),
+    (
+        (250, 3846, "split"),
+        (250, 3846, "truncate"),
+        (249, 3847, "split"),
+    ),
+)
+@mock.patch("apprise.plugins.bale.requests.post")
+def test_plugin_bale_long_title_message_limit(
+    mock_post, title_length, body_length, overflow
+):
+    """Keep long titles and split counters within Bale's text limit."""
+    response = mock.Mock(status_code=requests.codes.ok)
+    response.json.return_value = {"ok": True}
+    mock_post.return_value = response
+
+    title = "T" * title_length
+    body = "x" * body_length
+    obj = apprise.Apprise.instantiate(f"{URL}?overflow={overflow}")
+    assert obj is not None
+    assert obj.notify(body=body, title=title)
+
+    texts = [call.kwargs["data"]["text"] for call in mock_post.call_args_list]
+    assert texts
+    assert all(len(text) <= 4096 for text in texts)
+    if overflow == "split":
+        assert len(texts) == 2
+        chunks = []
+        for index, text in enumerate(texts, start=1):
+            header, chunk = text.split("\n", 1)
+            assert header == f"{title[:244]} [{index}/{len(texts)}]"
+            chunks.append(chunk)
+        assert "".join(chunks) == body
+    else:
+        assert len(texts) == 1
+        assert texts[0] == f"{title}\n{body[:3845]}"
 
 
 @mock.patch("apprise.plugins.bale.requests.post")
