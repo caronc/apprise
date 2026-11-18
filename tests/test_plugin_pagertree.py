@@ -277,3 +277,37 @@ def test_plugin_pagertree_retry_id(mock_post):
     assert mock_post.call_count == 2
     ids = {json.loads(c[1]["data"])["id"] for c in mock_post.call_args_list}
     assert len(ids) == 1
+
+
+@mock.patch("requests.post")
+def test_plugin_pagertree_action_urgency_case(mock_post):
+    """NotifyPagerTree() accepts action= and urgency= in any case."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        f"pagertree://{INTEGRATION_ID}?action=Resolve&urgency=HIGH&tid=abc"
+    )
+    assert obj.action == PagerTreeAction.RESOLVE
+    assert obj.urgency == "high"
+    assert obj.notify(title="Disk full", body="normal")
+    assert json.loads(mock_post.call_args[1]["data"])["event_type"] == (
+        "resolve"
+    )
+
+    obj = Apprise.instantiate(
+        f"pagertree://{INTEGRATION_ID}?action=CREATE&urgency=Critical"
+    )
+    assert obj.action == PagerTreeAction.CREATE
+    assert obj.notify(title="Disk full", body="at 95%")
+    assert json.loads(mock_post.call_args[1]["data"])["urgency"] == (
+        "critical"
+    )
+
+    # The normalized values are written back by url()
+    result = NotifyPagerTree.parse_url(obj.url())
+    obj2 = NotifyPagerTree(**result)
+    assert obj2.action == PagerTreeAction.CREATE
+    assert obj2.urgency == "critical"
