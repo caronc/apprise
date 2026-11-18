@@ -2876,6 +2876,8 @@ def test_apprise_details_email_token_types():
     """
     # (plugin class name, template_tokens key)
     expected_email_tokens = {
+        ("NotifyACS", "from_email"),
+        ("NotifyACS", "target_email"),
         ("NotifySES", "from_email"),
         ("NotifyPostmark", "from_email"),
         ("NotifyPostmark", "target_email"),
