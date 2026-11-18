@@ -241,15 +241,25 @@ LAMETRIC_TOKEN = "A" * 86 + "=="
                 "targets": ["#channel"],
             },
         ),
-        # FCM's host is the API key in legacy mode, the project in OAuth2
-        ("fcm://abc123/device", {"apikey": "abc123", "targets": ["device"]}),
-        (
+        # FCM's host is the API key in legacy mode, the project in OAuth2.
+        # FCM is turned off without cryptography.
+        pytest.param(
+            "fcm://abc123/device",
+            {"apikey": "abc123", "targets": ["device"]},
+            marks=pytest.mark.skipif(
+                not CRYPTOGRAPHY, reason="Requires cryptography"
+            ),
+        ),
+        pytest.param(
             "fcm://myproject/device?keyfile=/tmp/keyfile.json",
             {
                 "keyfile": "file:///tmp/keyfile.json",
                 "project": "myproject",
                 "targets": ["device"],
             },
+            marks=pytest.mark.skipif(
+                not CRYPTOGRAPHY, reason="Requires cryptography"
+            ),
         ),
         # Matrix's t2bot mode reads its host as the webhook token
         (f"matrix://{TOKEN64}/?mode=t2bot", {"password": TOKEN64}),
