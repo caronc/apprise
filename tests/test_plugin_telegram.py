@@ -2216,6 +2216,80 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
     mock_post.reset_mock()
 
 
+@mock.patch("requests.post")
+def test_plugin_telegram_markdown_v2_preserves_spoiler(mock_post):
+    """MarkdownV2 keeps a balanced spoiler when the input is Markdown."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = dumps({"ok": True, "result": True})
+
+    aobj = Apprise()
+    assert aobj.add(
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2"
+    )
+    assert aobj.notify(
+        body="Public ||spoiler text|| end",
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["parse_mode"] == "MarkdownV2"
+    assert payload["text"] == "Public ||spoiler text|| end"
+
+    convert = NotifyTelegram._commonmark_to_telegram
+
+    # Emphasis inside or around a spoiler is converted, and reserved
+    # characters inside the span are still escaped.
+    assert convert("||**bold** _italic_||", strict=True) == (
+        "||*bold* _italic_||"
+    )
+    assert convert("**bold ||secret||**", strict=True) == "*bold ||secret||*"
+    assert convert("||a.b(c)!||", strict=True) == r"||a\.b\(c\)\!||"
+    assert convert("||a|b||", strict=True) == r"||a\|b||"
+    # Code and link contents keep their own escaping rules.
+    assert convert("||use `a|b`||", strict=True) == "||use `a|b`||"
+    assert convert("||see [a](https://example.com/x.y)||", strict=True) == (
+        "||see [a](https://example.com/x.y)||"
+    )
+
+    # An unmatched marker and a lone pipe are literal punctuation.
+    assert convert("||only open", strict=True) == r"\|\|only open"
+    assert convert("only close||", strict=True) == r"only close\|\|"
+    assert convert("||a|| ||b", strict=True) == r"||a|| \|\|b"
+    assert convert("a|b|c", strict=True) == r"a\|b\|c"
+    assert convert("|", strict=True) == r"\|"
+
+    # A spaced "||" is a shell "or", not a spoiler.
+    assert convert("make || retry, deploy || undo", strict=True) == (
+        r"make \|\| retry, deploy \|\| undo"
+    )
+    # An opener that never closes gives way to a later one.
+    assert convert("||a ||b||", strict=True) == r"\|\|a ||b||"
+    assert convert("||a || b||", strict=True) == r"||a \|\| b||"
+
+    # Legacy v1 does not treat "||" as markup and does not escape pipes.
+    assert convert("Public ||spoiler text|| end") == (
+        "Public ||spoiler text|| end"
+    )
+    assert convert("||**bold**||") == "||*bold*||"
+    assert convert("||see 3.00!||") == "||see 3.00!||"
+    assert convert("a|b|c") == "a|b|c"
+    assert convert("||only open") == "||only open"
+
+    mock_post.reset_mock()
+    aobj = Apprise()
+    assert aobj.add(
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=1"
+    )
+    assert aobj.notify(
+        body="Public ||spoiler text|| end",
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["parse_mode"] == "MARKDOWN"
+    assert payload["text"] == "Public ||spoiler text|| end"
+
+
 def test_plugin_telegram_v1_unmatched_markers_escaped():
     """Legacy Markdown rejects an entity marker that never closes.
 
