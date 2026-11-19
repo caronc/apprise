@@ -813,11 +813,22 @@ class NotifyWorkflows(NotifyBase):
             or
             https://HOST:443/powerautomate/automations/direct/workflows
             /WORKFLOWID/triggers/manual/paths/invoke
+
+        HOST must be a Microsoft Logic Apps or Power Platform host.  The
+        ending is left loose because every Microsoft cloud (public, US
+        Government and China) uses its own:
+            https://learn.microsoft.com/power-automate/ip-address-configuration
         """
 
         # Match our workflows webhook URL and re-assemble
         result = re.match(
-            r"^https?://(?P<host>[A-Z0-9_.-]+)"
+            r"^https?://(?P<host>[A-Z0-9_.-]+\.(?:"
+            # Logic Apps, for example logic.azure.com or logic.azure.us
+            r"logic\.azure\.[A-Z]{2,12}"
+            # Power Platform, for example api.powerplatform.com or
+            # api.high.powerplatform.microsoft.us
+            r"|(?:power|apps)platform(?:\.[A-Z0-9-]{2,24}){1,3}"
+            r"))"
             r"(?P<port>:[1-9][0-9]{0,5})?"
             # The new URL structure includes /powerautomate/automations/direct
             # and may include a CU routing ID before /workflows

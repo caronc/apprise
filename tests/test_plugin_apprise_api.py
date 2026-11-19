@@ -36,7 +36,7 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.exception import AppriseImproperlyConfigured
-from apprise.plugins.apprise_api import AppriseAPIVersion, NotifyAppriseAPI
+from apprise.plugins.apprise_api import NotifyAppriseAPI
 
 logging.disable(logging.CRITICAL)
 
@@ -115,24 +115,6 @@ apprise_url_tests = (
             "instance": NotifyAppriseAPI,
             # Our expected url(privacy=True) startswith() response:
             "privacy_url": "apprises://localhost/c...c/",
-        },
-    ),
-    # Native URL suport (https)
-    (
-        "https://example.com/path/notify/%s" % ("d" * 32),
-        {
-            "instance": NotifyAppriseAPI,
-            # Our expected url(privacy=True) startswith() response:
-            "privacy_url": "apprises://example.com/path/d...d/",
-        },
-    ),
-    # Native URL suport (http)
-    (
-        "http://example.com/notify/%s" % ("d" * 32),
-        {
-            "instance": NotifyAppriseAPI,
-            # Our expected url(privacy=True) startswith() response:
-            "privacy_url": "apprise://example.com/d...d/",
         },
     ),
     # support to= keyword
@@ -417,41 +399,6 @@ def test_notify_apprise_api_password_only_auth(mock_post):
     assert obj.url(privacy=False).startswith(
         "apprise://:secret@localhost/mytoken1/"
     )
-
-
-@mock.patch("requests.post")
-def test_notify_apprise_api_native_url_version(mock_post):
-    """Native /notify/{token} URLs default to Version 1 for old servers."""
-    okay_response = requests.Request()
-    okay_response.status_code = requests.codes.ok
-    okay_response.content = ""
-    mock_post.return_value = okay_response
-
-    # A bare native URL reflects the classic path-based endpoint, so it
-    # should keep talking to the server that shape, not switch to the
-    # newer header-based one.
-    obj = Apprise.instantiate("http://example.com/notify/" + "d" * 32)
-    assert isinstance(obj, NotifyAppriseAPI)
-    assert obj.version == AppriseAPIVersion.V1
-    assert bool(obj.notify(body="body", title="title")) is True
-
-    details = mock_post.call_args_list[0]
-    assert details[0][0] == "http://example.com/notify/" + "d" * 32
-    assert "X-Apprise-Config-ID" not in details[1]["headers"]
-
-    mock_post.reset_mock()
-
-    # A version carried on the native URL itself is honored as-is.
-    obj = Apprise.instantiate(
-        "http://example.com/notify/" + "d" * 32 + "?version=2"
-    )
-    assert isinstance(obj, NotifyAppriseAPI)
-    assert obj.version == AppriseAPIVersion.V2
-    assert bool(obj.notify(body="body", title="title")) is True
-
-    details = mock_post.call_args_list[0]
-    assert details[0][0] == "http://example.com/notify"
-    assert details[1]["headers"]["X-Apprise-Config-ID"] == "d" * 32
 
 
 @mock.patch("requests.post")

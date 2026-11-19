@@ -183,9 +183,9 @@ apprise_url_tests = (
             "3ccdd113474722377935511fc85d3dd4"
         ),
         {
-            "instance": NotifyMattermost,
-            # Our expected url(privacy=True) startswith() response:
-            "privacy_url": "mmosts://mattermost.example.com/3...4/",
+            # Mattermost is only ever self-hosted, so a pasted webhook is
+            # not guessed to be one
+            "instance": None,
         },
     ),
     # Test our paths

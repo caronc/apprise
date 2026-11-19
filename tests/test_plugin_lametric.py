@@ -117,6 +117,14 @@ apprise_url_tests = (
         },
     ),
     (
+        # Only the official LaMetric host is treated as a native URL
+        "https://example.com/api/v1/dev/widget/update/"
+        "com.lametric.ABCD123/1?token={}==".format("D" * 88),
+        {
+            "instance": None,
+        },
+    ),
+    (
         "lametric://192.168.2.8/?mode=device&apikey=abc123",
         {
             # Everything is okay; Device mode forced

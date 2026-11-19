@@ -167,8 +167,8 @@ apprise_url_tests = (
     # Support native URLs
     (
         (
-            "https://server.azure.com:443/workflows/643e69f83c8944/"
-            "triggers/manual/paths/invoke?"
+            "https://prod-15.uksouth.logic.azure.com:443/workflows/"
+            "643e69f83c8944/triggers/manual/paths/invoke?"
             "api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&"
             "sv=1.0&sig=KODuebWbDGYFr0z0eu"
         ),
@@ -176,12 +176,38 @@ apprise_url_tests = (
             # All tokens provided - we're good
             "instance": NotifyWorkflows,
             # Our expected url(privacy=True) startswith() response
-            "privacy_url": "workflow://server.azure.com:443/6...4/K...u/",
+            "privacy_url": (
+                "workflow://prod-15.uksouth.logic.azure.com:443/6...4/K...u/"
+            ),
         },
     ),
     (
         (
-            "https://server.azure.com:443/"
+            # US Government cloud
+            "https://prod-01.usgovvirginia.logic.azure.us:443/workflows/"
+            "643e69f83c8944/triggers/manual/paths/invoke?"
+            "api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&"
+            "sv=1.0&sig=KODuebWbDGYFr0z0eu"
+        ),
+        {
+            "instance": NotifyWorkflows,
+        },
+    ),
+    (
+        (
+            # A host Microsoft does not own is never treated as Workflows
+            "https://server.example.com:443/workflows/643e69f83c8944/"
+            "triggers/manual/paths/invoke?"
+            "api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&"
+            "sv=1.0&sig=KODuebWbDGYFr0z0eu"
+        ),
+        {
+            "instance": None,
+        },
+    ),
+    (
+        (
+            "https://default.environment.api.powerplatform.com:443/"
             "powerautomate/automations/direct/"
             "workflows/643e69f83c8944/"
             "triggers/manual/paths/invoke?"
@@ -1329,3 +1355,30 @@ def test_plugin_workflows_mention_entities(mock_post):
     entity = payload["attachments"][0]["content"]["msteams"]["entities"][0]
     assert entity["text"] == "<at>  padded@example.com  </at>"
     assert entity["mentioned"]["id"] == "padded@example.com"
+
+
+@pytest.mark.parametrize(
+    "host",
+    (
+        "prod-15.uksouth.logic.azure.com",
+        "prod-01.usgovvirginia.logic.azure.us",
+        "prod-01.chinaeast2.logic.azure.cn",
+        "default1a2b.c3.environment.api.powerplatform.com",
+        "default1a2b.c3.environment.api.gov.powerplatform.microsoft.us",
+        "default1a2b.c3.environment.api.high.powerplatform.microsoft.us",
+        "default1a2b.c3.environment.api.appsplatform.us",
+        "default1a2b.c3.environment.api.powerplatform.partner"
+        ".microsoftonline.cn",
+    ),
+)
+def test_plugin_workflows_native_hosts(host):
+    """NotifyWorkflows() accepts native URLs from every Microsoft cloud."""
+
+    results = NotifyWorkflows.parse_native_url(
+        f"https://{host}:443/workflows/643e69f83c8944/"
+        "triggers/manual/paths/invoke?"
+        "api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&"
+        "sv=1.0&sig=KODuebWbDGYFr0z0eu"
+    )
+    assert results is not None
+    assert results["host"] == host

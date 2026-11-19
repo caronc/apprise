@@ -1136,7 +1136,7 @@ class NotifyLametric(NotifyBase):
         # ?token={APP_ACCESS_TOKEN} to the parameters at the end or the
         # URL will fail to load in later stages.
         result = re.match(
-            r"^http(?P<secure>s)?://(?P<host>[^/]+)"
+            r"^http(?P<secure>s)?://developer\.lametric\.com"
             r"/api/(?P<api_ver>v[1-9]*[0-9]+)"
             r"/dev/widget/update/"
             r"com\.lametric\.(?P<app_id>[0-9a-z.-]{1,64})"
