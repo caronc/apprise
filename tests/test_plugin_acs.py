@@ -37,7 +37,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.acs import NotifyACS
 
@@ -260,7 +260,7 @@ def test_plugin_acs_edge_cases():
         endpoint=EP,
         targets="!invalid",
     )
-    assert len(obj) == 0
+    assert len(obj) == 1
     assert obj.notify(body="body") is False
 
 
@@ -350,6 +350,59 @@ def test_plugin_acs_signature_and_payload(mock_post):
     }
     assert payload["recipients"] == {"to": [{"address": "user@example.com"}]}
     assert "replyTo" not in payload
+
+
+@mock.patch("requests.post")
+def test_plugin_acs_formats(mock_post):
+    """NotifyACS() picks html or plainText from the resolved format."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.accepted
+    response.content = b""
+    mock_post.return_value = response
+
+    url = f"acs://user@example.com/{KEY}/{EP}/target@example.com"
+
+    def _content(url, body, body_format=None):
+        """Send through Apprise and return the posted content block."""
+        mock_post.reset_mock()
+        a = Apprise()
+        assert a.add(url)
+        assert a.notify(body=body, title="a & <b>", body_format=body_format)
+        return loads(mock_post.call_args[1]["data"])["content"]
+
+    # Text input goes out as plainText, untouched
+    assert _content(url, "1 < 2 & *x*", NotifyFormat.TEXT) == {
+        "subject": "a & <b>",
+        "plainText": "1 < 2 & *x*",
+    }
+
+    # HTML input goes out as html, untouched
+    assert _content(url, "<b>hi</b>", NotifyFormat.HTML) == {
+        "subject": "a & <b>",
+        "html": "<b>hi</b>",
+    }
+
+    # Markdown is not declared, so it falls back to html
+    assert _content(url, "**hi**", NotifyFormat.MARKDOWN) == {
+        "subject": "a & <b>",
+        "html": "<p><strong>hi</strong></p>",
+    }
+
+    # ?format=text beats the input format
+    assert _content(f"{url}?format=text", "<b>hi</b>", NotifyFormat.HTML) == {
+        "subject": "a & <b>",
+        "plainText": "hi",
+    }
+
+    # A body with no declared format is relayed as html
+    obj = Apprise.instantiate(url)
+    mock_post.reset_mock()
+    assert obj.notify(body="<i>raw</i>", title="t") is True
+    assert loads(mock_post.call_args[1]["data"])["content"] == {
+        "subject": "t",
+        "html": "<i>raw</i>",
+    }
 
 
 @mock.patch("requests.post")

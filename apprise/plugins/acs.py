@@ -46,6 +46,8 @@
 #  - https://learn.microsoft.com/en-us/azure/communication-services/
 #       tutorials/hmac-header-tutorial
 
+from __future__ import annotations
+
 import base64
 import binascii
 from email.utils import formataddr, formatdate
@@ -54,6 +56,7 @@ import hmac
 from json import dumps
 import logging
 import re
+from typing import Any, Optional
 
 import requests
 
@@ -65,8 +68,8 @@ from ..utils.parse import is_email, parse_emails, validate_regex
 from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
+# Extend HTTP Error Messages
 ACS_HTTP_ERROR_MAP = {
-    202: "Accepted.",
     400: "The request was invalid; check the from address and recipients.",
     401: "The access key or request signature was rejected.",
     403: "The sender is not allowed to send from this domain.",
@@ -97,8 +100,8 @@ class NotifyACS(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/acs/"
 
-    # Default to HTML
-    notify_format = NotifyFormat.HTML
+    # ACS takes either an html or a plainText body, HTML is the default
+    notify_format = (NotifyFormat.HTML, NotifyFormat.TEXT)
 
     # The Email Send API path and version
     notify_path = "/emails:send?api-version=2023-03-31"
@@ -185,15 +188,15 @@ class NotifyACS(NotifyBase):
 
     def __init__(
         self,
-        from_email,
-        access_key,
-        endpoint,
-        targets=None,
-        cc=None,
-        bcc=None,
-        reply_to=None,
-        **kwargs,
-    ):
+        from_email: str,
+        access_key: str,
+        endpoint: str,
+        targets: Optional[Any] = None,
+        cc: Optional[Any] = None,
+        bcc: Optional[Any] = None,
+        reply_to: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize Azure Communication Services Email Object."""
         super().__init__(**kwargs)
 
@@ -239,7 +242,7 @@ class NotifyACS(NotifyBase):
                 continue
 
             self.logger.warning(
-                f"Dropped invalid ACS email ({recipient}) specified.",
+                "Dropped invalid ACS email (%s) specified.", recipient
             )
 
         if not self.targets and not targets:
@@ -250,7 +253,7 @@ class NotifyACS(NotifyBase):
         self.bcc = self._parse_list(bcc, "Blind Carbon Copy")
         self.reply_to = self._parse_list(reply_to, "Reply To")
 
-    def _parse_list(self, emails, label):
+    def _parse_list(self, emails: Optional[Any], label: str) -> set[str]:
         """Validate a list of emails, index any names, and drop bad ones."""
         valid = set()
         for recipient in parse_emails(emails):
@@ -261,11 +264,14 @@ class NotifyACS(NotifyBase):
                 continue
 
             self.logger.warning(
-                f"Dropped invalid ACS {label} email ({recipient}) specified.",
+                "Dropped invalid ACS %s email (%s) specified.",
+                label,
+                recipient,
             )
+
         return valid
 
-    def _address(self, email):
+    def _address(self, email: str) -> dict[str, str]:
         """Build an ACS address object."""
         name = self.names.get(email)
         return (
@@ -274,7 +280,7 @@ class NotifyACS(NotifyBase):
             else {"address": email}
         )
 
-    def _sign(self, body):
+    def _sign(self, body: bytes) -> dict[str, str]:
         """Return the HMAC-SHA256 headers ACS needs for this request body."""
         date = formatdate(usegmt=True)
         content_hash = base64.b64encode(hashlib.sha256(body).digest()).decode(
@@ -299,7 +305,7 @@ class NotifyACS(NotifyBase):
         }
 
     @property
-    def url_identifier(self):
+    def url_identifier(self) -> tuple[Any, ...]:
         """Returns all of the identifiers that make this URL unique from
         another similar one.
 
@@ -312,7 +318,7 @@ class NotifyACS(NotifyBase):
             self.endpoint,
         )
 
-    def url(self, privacy=False, *args, **kwargs):
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
 
         # Our URL parameters
@@ -337,7 +343,9 @@ class NotifyACS(NotifyBase):
             len(self.targets) == 1 and self.targets[0] == self.from_email
         )
 
-        return "{schema}://{from_email}/{key}/{endpoint}/{targets}?{params}".format(
+        return (
+            "{schema}://{from_email}/{key}/{endpoint}/{targets}?{params}"
+        ).format(
             schema=self.secure_protocol,
             # never encode email since it plays a huge role in our hostname
             from_email=self.from_email,
@@ -351,18 +359,20 @@ class NotifyACS(NotifyBase):
             params=NotifyACS.urlencode(params),
         )
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Returns the number of targets associated with this notification."""
-        return len(self.targets)
+        # Always return at least 1 so the framework counts this instance
+        return max(1, len(self.targets))
 
     def send(
         self,
-        body,
-        title="",
-        notify_type=NotifyType.INFO,
-        attach=None,
-        **kwargs,
-    ):
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        attach: Optional[Any] = None,
+        body_format: Optional[NotifyFormat] = None,
+        **kwargs: Any,
+    ) -> bool:
         """Perform Azure Communication Services Email Notification."""
 
         if not self.targets:
@@ -371,15 +381,18 @@ class NotifyACS(NotifyBase):
 
         notify_url = f"https://{self.endpoint}{self.notify_path}"
 
+        # Place the body in the field matching the format for this send
+        content_key = (
+            "plainText"
+            if self.resolve_format(body_format) == NotifyFormat.TEXT
+            else "html"
+        )
+
         payload_ = {
             "senderAddress": self.from_email,
             "content": {
                 "subject": title if title else self.default_empty_subject,
-                (
-                    "plainText"
-                    if self.notify_format == NotifyFormat.TEXT
-                    else "html"
-                ): body,
+                content_key: body,
             },
             "userEngagementTrackingDisabled": True,
         }
@@ -405,13 +418,14 @@ class NotifyACS(NotifyBase):
 
                 except exception.AppriseException:
                     self.logger.error(
-                        "Could not access ACS attachment"
-                        f" {attachment.url(privacy=True)}."
+                        "Could not access ACS attachment %s.",
+                        attachment.url(privacy=True),
                     )
                     return False
 
                 self.logger.debug(
-                    f"Appending ACS attachment {attachment.url(privacy=True)}"
+                    "Appending ACS attachment %s",
+                    attachment.url(privacy=True),
                 )
 
             payload_["attachments"] = attachments
@@ -456,8 +470,9 @@ class NotifyACS(NotifyBase):
                 # Attachments can make the payload large, so only show
                 # it when debugging.
                 self.logger.debug(
-                    f"ACS POST URL: {notify_url} "
-                    f"(cert_verify={self.verify_certificate!r})"
+                    "ACS POST URL: %s (cert_verify=%r)",
+                    notify_url,
+                    self.verify_certificate,
                 )
                 self.logger.debug("ACS Payload: %s", sanitize_payload(payload))
 
@@ -481,13 +496,12 @@ class NotifyACS(NotifyBase):
                     )
 
                     self.logger.warning(
-                        "Failed to send ACS notification to {}: "
-                        "{}{}error={}.".format(
-                            target,
-                            status_str,
-                            ", " if status_str else "",
-                            r.status_code,
-                        )
+                        "Failed to send ACS notification to %s: "
+                        "%s%serror=%s.",
+                        target,
+                        status_str,
+                        ", " if status_str else "",
+                        r.status_code,
                     )
 
                     self.logger.debug(
@@ -497,14 +511,15 @@ class NotifyACS(NotifyBase):
                     has_error = True
                     continue
 
-                self.logger.info(f"Sent ACS notification to {target}.")
+                self.logger.info("Sent ACS notification to %s.", target)
 
             except requests.RequestException as e:
                 self.logger.warning(
                     "A Connection error occurred sending ACS "
-                    f"notification to {target}."
+                    "notification to %s.",
+                    target,
                 )
-                self.logger.debug(f"Socket Exception: {e!s}")
+                self.logger.debug("Socket Exception: %s", str(e))
 
                 has_error = True
                 continue
@@ -515,7 +530,7 @@ class NotifyACS(NotifyBase):
         return not has_error
 
     @staticmethod
-    def parse_url(url):
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
 
