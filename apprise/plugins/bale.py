@@ -25,176 +25,405 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# Bale posts messages through a Bale Bot:
+#  1. In the Bale app, start a chat with the @botfather account.
+#  2. Send it /newbot and follow the prompts to name your bot.
+#  3. @botfather replies with your Bot Token; it looks like:
+#     123456789:abcdefghijKLMNOPqrst
+#
+#  Every person or group you want to notify must first message your bot.
+#  Their Chat ID is the result.message.chat.id value shown by:
+#     https://tapi.bale.ai/bot{bot_token}/getUpdates
+#
+#  A public channel can be addressed by its @channelusername instead, once
+#  the bot has been added to it as an administrator.
+#
+#  Your Apprise URL should be assembled as:
+#     bale://{bot_token}/{chat_id}
+#
+# Resources:
+# - https://docs.bale.ai/
+# - https://docs.bale.ai/#sendmessage
+
+from __future__ import annotations
+
+from json import loads
 import re
+from typing import Any, Optional
 
 import requests
 
+from ..apprise_attachment import AppriseAttachment
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..url import PrivacyMode
+from ..utils.parse import parse_list, validate_regex
 from .base import NotifyBase
+
+# Used to validate our Chat IDs.  A number is a person or a group (groups
+# are negative) and a name is a public channel's @channelusername.
+IS_CHAT_ID = re.compile(
+    r"^((?P<id>-?[0-9]+)|(@|%40)?(?P<name>[a-z_][a-z0-9_]+))$", re.I
+)
 
 
 class NotifyBale(NotifyBase):
-    """A wrapper for Bale Messenger notifications."""
+    """A wrapper for Bale Bot Notifications."""
 
-    service_name = "Bale Messenger"
-    service_url = "https://ble.ir/"
-    protocol = "bale"
-    setup_url = "https://docs.bale.ai/"
-    notify_url = "https://tapi.bale.ai/bot"
+    # The default descriptive name associated with the Notification
+    service_name = "Bale"
 
-    socket_connect_timeout = 15.0
-    socket_read_timeout = 15.0
+    # The services URL
+    service_url = "https://bale.ai/"
 
-    # Bale limits the complete sendMessage text to 4096 characters. Keep the
-    # title and the newline inserted by send() within the same budget.
+    # The default secure protocol
+    secure_protocol = "bale"
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = "https://appriseit.com/services/bale/"
+
+    # Our API URL; the Bot Token follows the word "bot"
+    notify_url = "https://tapi.bale.ai/bot{token}/{method}"
+
+    # Bale accepts photo and file uploads
+    attachment_support = True
+
+    # The maximum allowable characters allowed in the body per message
     body_maxlen = 4096
-    overflow_buffer = 1
-    overflow_amalgamate_title = True
 
-    templates = ("{schema}://{user}:{password}@{host}",)
+    # Bale has no title field, so the title is placed in the body
+    title_maxlen = 0
 
+    # Define object URL templates
+    templates = ("{schema}://{token}/{targets}",)
+
+    # Define our template tokens
     template_tokens = dict(
         NotifyBase.template_tokens,
         **{
-            "host": {
-                "name": _("Target Chat ID"),
-                "type": "string",
-                "map_to": "chat_id",
-                "required": True,
-            },
-            "user": {
-                "name": _("Bot ID"),
-                "type": "string",
-                "map_to": "bot_id",
-                "required": True,
-            },
-            "password": {
+            "token": {
                 "name": _("Bot Token"),
                 "type": "string",
-                "map_to": "token_secret",
                 "private": True,
+                "required": True,
+                "regex": (r"^[0-9]+:[A-Z0-9_-]+$", "i"),
+            },
+            "target_chat_id": {
+                "name": _("Target Chat ID"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
                 "required": True,
             },
         },
     )
 
-    def __init__(self, bot_id=None, token_secret=None, chat_id=None, **kwargs):
-        """Initialize the Bale notification service."""
+    # Define our template arguments
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "token": {
+                "alias_of": "token",
+            },
+        },
+    )
+
+    def __init__(
+        self,
+        token: str,
+        targets: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize Bale Object."""
         super().__init__(**kwargs)
 
-        self.bot_id = str(bot_id or "").strip()
-        if not re.fullmatch(r"[0-9]+", self.bot_id):
-            msg = "An invalid Bale bot ID was specified."
+        # Our Bot Token
+        self.token = validate_regex(
+            token, *self.template_tokens["token"]["regex"]
+        )
+        if not self.token:
+            msg = "An invalid Bale Bot Token was specified."
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
 
-        self.token_secret = str(token_secret or "")
-        if not self.token_secret.strip():
-            msg = "A Bale bot token secret was not specified."
-            self.logger.warning(msg)
-            raise AppriseImproperlyConfigured(msg)
+        # The Chat IDs we will notify
+        self.targets = []
 
-        self.chat_id = str(chat_id or "").strip()
-        if not re.fullmatch(r"-?[0-9]+", self.chat_id):
-            msg = "An invalid Bale chat ID was specified."
-            self.logger.warning(msg)
-            raise AppriseImproperlyConfigured(msg)
+        # Anything we could not make sense of; kept for url()
+        self.invalid_targets = []
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
-        """Send a text notification through the Bale Bot API."""
-        message = f"{title}\n{body}" if title else body
-        url = f"{self.notify_url}{self.bot_id}:{self.token_secret}/sendMessage"
-        payload = {
-            "chat_id": self.chat_id,
-            "text": message,
+        for target in parse_list(targets):
+            result = IS_CHAT_ID.match(target)
+            if result:
+                # Channel names are sent to Bale with their @ prefix
+                self.targets.append(
+                    result.group("id") or "@" + result.group("name")
+                )
+                continue
+
+            self.logger.warning(
+                "Dropped invalid Bale Chat ID (%s) specified.", target
+            )
+            self.invalid_targets.append(target)
+
+    def _post(
+        self,
+        method: str,
+        target: str,
+        payload: dict[str, Any],
+        files: Optional[dict[str, Any]] = None,
+    ) -> bool:
+        """Post one Bale API call for ``target`` and return its success."""
+
+        # Prepare our headers
+        headers = {
+            "User-Agent": self.app_id,
         }
 
-        self.logger.debug("Sending Bale notification.")
+        # Prepare our URL
+        url = self.notify_url.format(token=self.token, method=method)
+
+        # Never write the Bot Token to the logs
+        self.logger.debug(
+            "Bale POST URL: %s (cert_verify=%r)",
+            self.notify_url.format(token="****", method=method),
+            self.verify_certificate,
+        )
+        self.logger.debug("Bale Payload: %s", payload)
+
+        # Always call throttle before any remote server i/o is made
         self.throttle()
 
         try:
-            response = requests.post(
+            r = requests.post(
                 url,
                 data=payload,
+                headers=headers,
+                files=files,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
-                # The bot token is in the URL path; do not forward it through
-                # a redirect to another host.
-                allow_redirects=False,
+                allow_redirects=self.redirects,
             )
 
-            if not 200 <= response.status_code < 300:
-                status = self.http_response_code_lookup(response.status_code)
-                self.logger.warning(
-                    "Failed to send Bale notification: %s%sHTTP %s.",
-                    status,
-                    ", " if status else "",
-                    response.status_code,
-                )
-                return False
+            try:
+                content = loads(r.content)
 
-            result = response.json()
-            if not isinstance(result, dict) or result.get("ok") is not True:
-                self.logger.warning("Bale rejected the notification.")
+            except (AttributeError, TypeError, ValueError):
+                # The response was not JSON; rely on the status code
+                content = {}
+
+            # Bale reports a refused message with "ok" set to false
+            if r.status_code != requests.codes.ok or (
+                isinstance(content, dict) and content.get("ok") is False
+            ):
+                # We had a problem
+                status_str = NotifyBale.http_response_code_lookup(
+                    r.status_code
+                )
+
+                self.logger.warning(
+                    "Failed to send Bale %s to %s: %s%serror=%s.",
+                    method,
+                    target,
+                    status_str,
+                    ", " if status_str else "",
+                    r.status_code,
+                )
+
+                self.logger.debug(
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
                 return False
 
         except requests.RequestException as e:
             self.logger.warning(
-                "A connection error occurred sending the Bale notification."
+                "A Connection error occurred sending Bale %s to %s.",
+                method,
+                target,
             )
-            self.logger.debug("Bale request failed (%s).", type(e).__name__)
+            self.logger.debug("Socket Exception: %s", str(e))
             return False
 
-        except ValueError:
-            self.logger.warning("Bale returned an invalid response.")
-            return False
-
-        self.logger.info("Sent Bale notification.")
+        # We were successful
         return True
 
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        attach: Optional[AppriseAttachment] = None,
+        **kwargs: Any,
+    ) -> bool:
+        """Perform Bale Notification."""
+
+        if not self.targets:
+            # We have nothing to notify
+            self.logger.warning("There are no Bale Chat IDs to notify.")
+            return False
+
+        # error tracking (used for function return)
+        has_error = False
+
+        for target in self.targets:
+            # Send our text first, unless a retry finds it already arrived.
+            # An attachment-only notification has no text to send.
+            if body and not self.is_delivered(target):
+                if not self._post(
+                    "sendMessage", target, {"chat_id": target, "text": body}
+                ):
+                    # Mark our failure and leave this target for a retry
+                    has_error = True
+                    continue
+
+                # Delivered; a retry can safely skip this text.
+                self.mark_delivered(target)
+
+            for no, attachment in enumerate(attach or []):
+                # Skip an attachment this target already received
+                key = ("attach", target, no)
+                if self.is_delivered(key):
+                    continue
+
+                # Verify our attachment is accessible before opening it
+                if not attachment:
+                    self.logger.warning(
+                        "Could not access Bale attachment %s.",
+                        attachment.url(privacy=True),
+                    )
+
+                    # Mark our failure
+                    has_error = True
+                    break
+
+                # Images are shown as photos, everything else as a file
+                method, field = (
+                    ("sendPhoto", "photo")
+                    if attachment.mimetype.startswith("image/")
+                    else ("sendDocument", "document")
+                )
+
+                try:
+                    # Open our attachment for upload
+                    handle = attachment.open()
+
+                except OSError as e:
+                    self.logger.warning(
+                        "An I/O error occurred while reading %s.",
+                        attachment.name or "attachment",
+                    )
+                    self.logger.debug("I/O Exception: %s", str(e))
+
+                    # Mark our failure
+                    has_error = True
+                    break
+
+                try:
+                    # Upload our attachment
+                    files = {
+                        field: (
+                            attachment.name or f"file{no:02d}.dat",
+                            handle,
+                            attachment.mimetype,
+                        ),
+                    }
+                    sent = self._post(
+                        method, target, {"chat_id": target}, files=files
+                    )
+
+                finally:
+                    # Close our file handle whether we succeeded or not
+                    handle.close()
+
+                if not sent:
+                    # Mark our failure
+                    has_error = True
+                    break
+
+                # Delivered; a retry can safely skip this attachment.
+                self.mark_delivered(key)
+
+        return not has_error
+
+    def __len__(self) -> int:
+        """Returns the number of targets associated with this notification."""
+        # Always return at least 1 so the framework counts this instance
+        return len(self.targets) if self.targets else 1
+
     @property
-    def url_identifier(self):
-        """Return fields that uniquely identify the notification service."""
-        return (
-            self.protocol,
-            self.bot_id,
-            self.token_secret,
-            self.chat_id,
-        )
+    def url_identifier(self) -> tuple[Any, ...]:
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
 
-    def url(self, privacy=False, *args, **kwargs):
-        """Return a URL that recreates this notification service."""
+        Targets or end points should never be identified here.
+        """
+        # The Bot Token alone identifies our bot
+        return (self.secure_protocol, self.token)
+
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
+        """Returns the URL built dynamically based on specified arguments."""
+
+        # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
-        query = f"?{self.urlencode(params)}" if params else ""
 
-        return "{schema}://{bot_id}:{token_secret}@{chat_id}{query}".format(
-            schema=self.protocol,
-            bot_id=self.quote(self.bot_id, safe=""),
-            token_secret=self.pprint(
-                self.token_secret,
-                privacy,
-                mode=PrivacyMode.Secret,
-                safe="",
+        return "{schema}://{token}/{targets}?{params}".format(
+            schema=self.secure_protocol,
+            token=self.pprint(self.token, privacy, safe=":"),
+            targets="/".join(
+                NotifyBale.quote(x, safe="@")
+                for x in (self.targets + self.invalid_targets)
             ),
-            chat_id=self.quote(self.chat_id, safe=""),
-            query=query,
+            params=NotifyBale.urlencode(params),
         )
 
     @staticmethod
-    def parse_url(url):
-        """Parse an Apprise URL into initialization parameters."""
-        # The destination is a numeric chat ID (and may be negative for a
-        # group), not a hostname. Validate it in __init__ instead.
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
+
+        # The colon inside the Bot Token looks like a port to a URL parser.
+        # Swap it for a slash so the token is split across host and path.
+        if isinstance(url, str):
+            url = re.sub(
+                r"^(?P<schema>[a-z0-9]+://)(?P<id>[0-9]+)(:|%3A)",
+                r"\g<schema>\g<id>/",
+                url,
+                count=1,
+                flags=re.I,
+            )
+
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
+            # We're done early as we couldn't load the results
             return results
 
-        results["bot_id"] = NotifyBale.unquote(results.get("user") or "")
-        results["token_secret"] = NotifyBale.unquote(
-            results.get("password") or ""
-        )
-        results["chat_id"] = NotifyBale.unquote(results.get("host") or "")
+        # Our Chat IDs are in the path
+        entries = NotifyBale.split_path(results["fullpath"])
+
+        if results["qsd"].get("token"):
+            # The whole Bot Token was given as ?token=, so the host and
+            # path are all Chat IDs
+            results["token"] = NotifyBale.unquote(results["qsd"]["token"])
+            if results["host"]:
+                entries.insert(0, NotifyBale.unquote(results["host"]))
+
+        else:
+            # Rebuild the Bot Token from the host and first path entry
+            results["token"] = "{}:{}".format(
+                NotifyBale.unquote(results["host"]),
+                entries.pop(0) if entries else "",
+            )
+
+        results["targets"] = entries
+
+        # Support ?to= for targets
+        if results["qsd"].get("to"):
+            results["targets"] += NotifyBale.parse_list(results["qsd"]["to"])
+
         return results

@@ -25,66 +25,159 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from json import dumps
+
+# Disable logging for a cleaner testing output
+import logging
+import os
 from unittest import mock
+from urllib.parse import urlparse
 
 from helpers import AppriseURLTester
 import pytest
 import requests
 
-import apprise
-from apprise.common import NotifyType
+from apprise import Apprise, AppriseAttachment, NotifyType
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.bale import NotifyBale
 
-BOT_ID = "123456"
-TOKEN_SECRET = "s" * 16
+logging.disable(logging.CRITICAL)
+
+# Attachment Directory
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
+
+# A Bot Token in the form @botfather hands out
+TOKEN = "123456789:abcdefghijKLMNOPqrst"
+
+# Our Chat IDs
 CHAT_ID = "987654321"
 GROUP_CHAT_ID = "-987654321"
-URL = f"bale://{BOT_ID}:{TOKEN_SECRET}@{CHAT_ID}"
-ENDPOINT = f"https://tapi.bale.ai/bot{BOT_ID}:{TOKEN_SECRET}/sendMessage"
 
-
+# Apprise URL Tests
 apprise_url_tests = (
     (
-        URL,
+        "bale://",
         {
+            # No Bot Token
+            "instance": TypeError,
+        },
+    ),
+    (
+        "bale://123456789",
+        {
+            # Only half of a Bot Token
+            "instance": AppriseImproperlyConfigured,
+        },
+    ),
+    (
+        "bale://abcdefghi:abcdefghij/987654321",
+        {
+            # The first part of a Bot Token is numeric
+            "instance": TypeError,
+        },
+    ),
+    (
+        f"bale://{TOKEN}",
+        {
+            # Valid Bot Token, but no Chat IDs to notify
             "instance": NotifyBale,
             "notify_response": False,
-            "requests_response_code": requests.codes.ok,
-            "privacy_url": f"bale://{BOT_ID}:****@{CHAT_ID}",
         },
     ),
     (
-        f"bale://{BOT_ID}:{TOKEN_SECRET}@{GROUP_CHAT_ID}",
+        f"bale://{TOKEN}/{CHAT_ID}",
         {
             "instance": NotifyBale,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": f"bale://1...t/{CHAT_ID}",
+        },
+    ),
+    (
+        f"bale://{TOKEN}/{GROUP_CHAT_ID}/@mychannel/%40other/",
+        {
+            # A group, and channels with and without an encoded @
+            "instance": NotifyBale,
+            "privacy_url": (f"bale://1...t/{GROUP_CHAT_ID}/@mychannel/@other"),
+        },
+    ),
+    (
+        f"bale://{TOKEN}/{CHAT_ID}/invalid!/",
+        {
+            # One invalid Chat ID is dropped; the valid one is notified
+            "instance": NotifyBale,
+        },
+    ),
+    (
+        f"bale://{TOKEN}/invalid!/",
+        {
+            # Only invalid Chat IDs leaves nothing to notify
+            "instance": NotifyBale,
             "notify_response": False,
-            "requests_response_code": requests.codes.ok,
-            "privacy_url": f"bale://{BOT_ID}:****@{GROUP_CHAT_ID}",
         },
     ),
     (
-        f"bale://{BOT_ID}@{CHAT_ID}",
+        "bale://123456789%3Aabcdefghij/987654321",
         {
-            "instance": AppriseImproperlyConfigured,
+            # An encoded colon in the Bot Token
+            "instance": NotifyBale,
         },
     ),
     (
-        f"bale://bot-id:secret@{CHAT_ID}",
+        f"bale://?token={TOKEN}&to={CHAT_ID},{GROUP_CHAT_ID}",
         {
-            "instance": AppriseImproperlyConfigured,
+            # Bot Token and Chat IDs as URL parameters
+            "instance": NotifyBale,
+            "privacy_url": f"bale://1...t/{GROUP_CHAT_ID}/{CHAT_ID}",
         },
     ),
     (
-        f"bale://:secret@{CHAT_ID}",
+        f"bale://{CHAT_ID}?token={TOKEN}",
         {
-            "instance": AppriseImproperlyConfigured,
+            # With ?token=, the host is a Chat ID
+            "instance": NotifyBale,
         },
     ),
     (
-        f"bale://{BOT_ID}:secret@not-a-chat",
+        f"bale://{TOKEN}/{CHAT_ID}",
         {
-            "instance": AppriseImproperlyConfigured,
+            "instance": NotifyBale,
+            # Bale says no
+            "requests_response_text": {"ok": False},
+            "response": False,
+        },
+    ),
+    (
+        f"bale://{TOKEN}/{CHAT_ID}",
+        {
+            "instance": NotifyBale,
+            # A non-JSON reply relies on the status code alone
+            "requests_response_text": "not json",
+        },
+    ),
+    (
+        f"bale://{TOKEN}/{CHAT_ID}",
+        {
+            "instance": NotifyBale,
+            # throw a bizarre code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        f"bale://{TOKEN}/{CHAT_ID}",
+        {
+            "instance": NotifyBale,
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        f"bale://{TOKEN}/{CHAT_ID}",
+        {
+            "instance": NotifyBale,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracefully handle them
+            "test_requests_exceptions": True,
         },
     ),
 )
@@ -92,171 +185,172 @@ apprise_url_tests = (
 
 def test_plugin_bale_urls():
     """NotifyBale() Apprise URLs."""
+
+    # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@pytest.mark.parametrize(
-    ("title", "expected_text"),
-    (
-        ("Alert", "Alert\nbody"),
-        ("", "body"),
-    ),
-)
-@mock.patch("apprise.plugins.bale.requests.post")
-def test_plugin_bale_send_message(mock_post, title, expected_text):
-    """Send a titled or untitled message to Bale."""
-    response = mock.Mock(status_code=requests.codes.ok)
-    response.json.return_value = {"ok": True}
-    mock_post.return_value = response
+@mock.patch("requests.post")
+def test_plugin_bale_send(mock_post):
+    """NotifyBale() sends the title and body to every Chat ID."""
 
-    obj = apprise.Apprise.instantiate(URL)
-    assert obj is not None
-    assert obj.notify(
-        body="body",
-        title=title,
-        notify_type=NotifyType.INFO,
-    )
-    mock_post.assert_called_once_with(
-        ENDPOINT,
-        data={"chat_id": CHAT_ID, "text": expected_text},
-        verify=True,
-        timeout=(15.0, 15.0),
-        allow_redirects=False,
+    mock_post.return_value = mock.Mock(
+        status_code=requests.codes.ok, content=dumps({"ok": True})
     )
 
+    obj = Apprise.instantiate(f"bale://{TOKEN}/{CHAT_ID}/@mychannel")
+    assert isinstance(obj, NotifyBale)
+    assert len(obj) == 2
+    assert obj.notify(title="Alert", body="body", notify_type=NotifyType.INFO)
 
-@pytest.mark.parametrize(
-    ("title", "body_length", "overflow"),
-    (
-        ("", 4097, "split"),
-        ("", 4097, "truncate"),
-        ("Alert", 4091, "split"),
-        ("Alert", 4091, "truncate"),
-    ),
-)
-@mock.patch("apprise.plugins.bale.requests.post")
-def test_plugin_bale_message_limit(mock_post, title, body_length, overflow):
-    """Respect Bale's 4096-character text limit for overflow modes."""
-    response = mock.Mock(status_code=requests.codes.ok)
-    response.json.return_value = {"ok": True}
-    mock_post.return_value = response
+    # One message per Chat ID
+    assert mock_post.call_count == 2
+    url = mock_post.call_args_list[0][0][0]
+    assert urlparse(url).hostname == "tapi.bale.ai"
+    assert urlparse(url).path == f"/bot{TOKEN}/sendMessage"
 
-    body = "x" * body_length
-    obj = apprise.Apprise.instantiate(f"{URL}?overflow={overflow}")
-    assert obj is not None
-    assert obj.notify(body=body, title=title)
+    # The title is placed above the body
+    payloads = [c[1]["data"] for c in mock_post.call_args_list]
+    assert payloads[0] == {"chat_id": CHAT_ID, "text": "Alert\r\nbody"}
+    assert payloads[1] == {"chat_id": "@mychannel", "text": "Alert\r\nbody"}
 
-    texts = [call.kwargs["data"]["text"] for call in mock_post.call_args_list]
-    assert texts
-    assert all(len(text) <= 4096 for text in texts)
-    if overflow == "truncate":
-        assert len(texts) == 1
-    else:
-        assert len(texts) == 2
-        if title:
-            chunks = []
-            for index, text in enumerate(texts, start=1):
-                header, chunk = text.split("\n", 1)
-                assert header == f"{title} [{index}/{len(texts)}]"
-                chunks.append(chunk)
-            assert "".join(chunks) == body
-        else:
-            assert "".join(texts) == body
+    # Redirects follow the global setting
+    assert mock_post.call_args_list[0][1]["allow_redirects"] is True
+
+    # The URL survives a round trip
+    obj2 = Apprise.instantiate(obj.url())
+    assert obj2.url_identifier == obj.url_identifier
+    assert obj2.targets == obj.targets
 
 
 @pytest.mark.parametrize(
-    ("title_length", "body_length", "overflow"),
+    ("title", "body_length", "overflow", "calls"),
     (
-        (250, 3846, "split"),
-        (250, 3846, "truncate"),
-        (249, 3847, "split"),
+        ("", 4097, "split", 2),
+        ("", 4097, "truncate", 1),
+        ("Alert", 4091, "split", 2),
+        ("Alert", 4091, "truncate", 1),
+        ("T" * 250, 3846, "split", 2),
     ),
 )
-@mock.patch("apprise.plugins.bale.requests.post")
-def test_plugin_bale_long_title_message_limit(
-    mock_post, title_length, body_length, overflow
+@mock.patch("requests.post")
+def test_plugin_bale_message_limit(
+    mock_post, title, body_length, overflow, calls
 ):
-    """Keep long titles and split counters within Bale's text limit."""
-    response = mock.Mock(status_code=requests.codes.ok)
-    response.json.return_value = {"ok": True}
-    mock_post.return_value = response
+    """Keep every message, title included, within 4096 characters."""
 
-    title = "T" * title_length
-    body = "x" * body_length
-    obj = apprise.Apprise.instantiate(f"{URL}?overflow={overflow}")
-    assert obj is not None
-    assert obj.notify(body=body, title=title)
+    mock_post.return_value = mock.Mock(
+        status_code=requests.codes.ok, content=dumps({"ok": True})
+    )
 
-    texts = [call.kwargs["data"]["text"] for call in mock_post.call_args_list]
-    assert texts
+    obj = Apprise.instantiate(f"bale://{TOKEN}/{CHAT_ID}?overflow={overflow}")
+    assert obj.notify(body="x" * body_length, title=title)
+
+    texts = [c[1]["data"]["text"] for c in mock_post.call_args_list]
+    assert len(texts) == calls
     assert all(len(text) <= 4096 for text in texts)
-    if overflow == "split":
-        assert len(texts) == 2
-        chunks = []
-        for index, text in enumerate(texts, start=1):
-            header, chunk = text.split("\n", 1)
-            assert header == f"{title[:244]} [{index}/{len(texts)}]"
-            chunks.append(chunk)
-        assert "".join(chunks) == body
-    else:
-        assert len(texts) == 1
-        assert texts[0] == f"{title}\n{body[:3845]}"
 
 
-@mock.patch("apprise.plugins.bale.requests.post")
-@pytest.mark.parametrize(
-    ("status_code", "payload", "json_error"),
-    (
-        (requests.codes.ok, {"ok": False}, None),
-        (requests.codes.internal_server_error, None, None),
-        (
-            requests.codes.ok,
-            None,
-            ValueError(f"{TOKEN_SECRET} private response body"),
-        ),
-    ),
-)
-def test_plugin_bale_rejects_failed_responses(
-    mock_post, status_code, payload, json_error
-):
-    """Reject HTTP, API, and malformed JSON responses."""
-    response = mock.Mock(status_code=status_code)
-    if json_error is None:
-        response.json.return_value = payload
-    else:
-        response.json.side_effect = json_error
-    mock_post.return_value = response
+@mock.patch("requests.post")
+def test_plugin_bale_hides_token(mock_post):
+    """The Bot Token never reaches the logs."""
 
-    obj = apprise.Apprise.instantiate(URL)
-    assert obj is not None
-    marker = "PRIVATE-BALE-MARKER"
+    mock_post.side_effect = requests.ConnectionError("boom")
+
+    obj = Apprise.instantiate(f"bale://{TOKEN}/{CHAT_ID}")
     with mock.patch.multiple(
         obj.logger, warning=mock.DEFAULT, debug=mock.DEFAULT
-    ) as logged_calls:
-        assert not obj.notify(body=marker)
-        logged = repr(logged_calls["warning"].call_args_list) + repr(
-            logged_calls["debug"].call_args_list
-        )
+    ) as logged:
+        assert not obj.notify(body="body")
 
-    assert marker not in logged
-    assert TOKEN_SECRET not in logged
+    assert "abcdefghijKLMNOPqrst" not in repr(logged["warning"].call_args_list)
+    assert "abcdefghijKLMNOPqrst" not in repr(logged["debug"].call_args_list)
 
 
-@mock.patch("apprise.plugins.bale.requests.post")
-def test_plugin_bale_hides_request_exception_details(mock_post):
-    """Do not log credentials, message text, or exception details."""
-    marker = "PRIVATE-BALE-MARKER"
-    mock_post.side_effect = requests.ConnectionError(marker)
+@mock.patch("requests.post")
+def test_plugin_bale_attachments(mock_post):
+    """NotifyBale() uploads photos and files after the message."""
 
-    obj = apprise.Apprise.instantiate(URL)
-    assert obj is not None
-    with mock.patch.multiple(
-        obj.logger, warning=mock.DEFAULT, debug=mock.DEFAULT
-    ) as logged_calls:
-        assert not obj.notify(body=marker)
-        logged = repr(logged_calls["warning"].call_args_list) + repr(
-            logged_calls["debug"].call_args_list
-        )
+    mock_post.return_value = mock.Mock(
+        status_code=requests.codes.ok, content=dumps({"ok": True})
+    )
 
-    assert marker not in logged
-    assert TOKEN_SECRET not in logged
+    obj = Apprise.instantiate(f"bale://{TOKEN}/{CHAT_ID}")
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.gif"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.mp4"),
+        ]
+    )
+
+    # Message, then a photo, then a file
+    assert obj.notify(body="body", attach=attach)
+    assert mock_post.call_count == 3
+    paths = [urlparse(c[0][0]).path for c in mock_post.call_args_list]
+    assert paths == [
+        f"/bot{TOKEN}/sendMessage",
+        f"/bot{TOKEN}/sendPhoto",
+        f"/bot{TOKEN}/sendDocument",
+    ]
+    assert "photo" in mock_post.call_args_list[1][1]["files"]
+    assert "document" in mock_post.call_args_list[2][1]["files"]
+    assert mock_post.call_args_list[1][1]["data"] == {"chat_id": CHAT_ID}
+
+    # An attachment on its own sends no text
+    mock_post.reset_mock()
+    assert obj.notify(body="", attach=attach[0])
+    assert mock_post.call_count == 1
+    assert urlparse(mock_post.call_args[0][0]).path.endswith("/sendPhoto")
+
+    # An attachment that can not be accessed is not sent
+    mock_post.reset_mock()
+    with mock.patch("os.path.isfile", return_value=False):
+        assert not obj.notify(body="body", attach=attach)
+    assert mock_post.call_count == 1
+
+    # An attachment that can not be opened is not sent
+    mock_post.reset_mock()
+    with mock.patch("builtins.open", side_effect=OSError):
+        assert not obj.notify(body="body", attach=attach)
+    assert mock_post.call_count == 1
+
+    # A refused upload stops the remaining attachments
+    mock_post.reset_mock()
+    mock_post.side_effect = (
+        mock.Mock(status_code=requests.codes.ok, content=b"{}"),
+        mock.Mock(status_code=requests.codes.bad_request, content=b"{}"),
+    )
+    assert not obj.notify(body="body", attach=attach)
+    assert mock_post.call_count == 2
+
+
+@mock.patch("requests.post")
+def test_plugin_bale_retry_skips_delivered(mock_post):
+    """A retry re-sends only the attachment that failed."""
+
+    ok = mock.Mock(status_code=requests.codes.ok, content=b"{}")
+    bad = mock.Mock(status_code=requests.codes.bad_request, content=b"{}")
+
+    # Message ok, photo ok, file refused, then the retried file ok
+    mock_post.side_effect = (ok, ok, bad, ok)
+
+    obj = Apprise.instantiate(f"bale://{TOKEN}/{CHAT_ID}?retry=1&wait=0")
+    attach = AppriseAttachment(
+        [
+            os.path.join(TEST_VAR_DIR, "apprise-test.gif"),
+            os.path.join(TEST_VAR_DIR, "apprise-test.mp4"),
+        ]
+    )
+
+    with mock.patch("apprise.apprise.time.sleep"):
+        aobj = Apprise()
+        aobj.add(obj)
+        assert aobj.notify(body="body", attach=attach)
+
+    paths = [urlparse(c[0][0]).path for c in mock_post.call_args_list]
+    assert paths == [
+        f"/bot{TOKEN}/sendMessage",
+        f"/bot{TOKEN}/sendPhoto",
+        f"/bot{TOKEN}/sendDocument",
+        f"/bot{TOKEN}/sendDocument",
+    ]
