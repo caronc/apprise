@@ -399,7 +399,10 @@ class NotifyOpsgenie(NotifyBase):
         if mapping and isinstance(mapping, dict):
             for k_, v_ in mapping.items():
                 # Get our mapping
-                k = next((t for t in NotifyType if t.startswith(k_)), None)
+                k_lower = k_.lower()
+                k = next(
+                    (t for t in NotifyType if t.startswith(k_lower)), None
+                )
                 if not k:
                     msg = (
                         f"The Opsgenie mapping key specified ({k_}) "

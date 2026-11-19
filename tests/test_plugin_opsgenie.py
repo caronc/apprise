@@ -542,3 +542,18 @@ def test_plugin_opsgenie_action_case(mock_post, tmpdir):
     result = NotifyOpsgenie.parse_url(obj.url())
     obj2 = NotifyOpsgenie(**result)
     assert obj2.action == OpsgenieAlertAction.ACKNOWLEDGE
+
+
+def test_plugin_opsgenie_mapping_case():
+    """NotifyOpsgenie() accepts :key= mapping keys in any case."""
+    obj = apprise.Apprise.instantiate(
+        "opsgenie://apikey/@user?action=map&:Failure=Close&:WARN=ack"
+    )
+    assert isinstance(obj, NotifyOpsgenie)
+    assert obj.mapping[NotifyType.FAILURE] == OpsgenieAlertAction.CLOSE
+    assert obj.mapping[NotifyType.WARNING] == OpsgenieAlertAction.ACKNOWLEDGE
+
+    # The normalized keys are written back by url()
+    obj2 = apprise.Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyOpsgenie)
+    assert obj2.mapping == obj.mapping
