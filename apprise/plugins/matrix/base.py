@@ -3539,6 +3539,10 @@ class NotifyMatrix(NotifyBase):
             # unquote our hostname and pass it in as the password/token
             results["password"] = NotifyMatrix.unquote(results["host"])
 
+            # t2bot has no host of our own; reporting one would read the
+            # webhook token twice
+            results["host"] = None
+
         # Support the message type keyword
         if "msgtype" in results["qsd"] and len(results["qsd"]["msgtype"]):
             results["msgtype"] = NotifyMatrix.unquote(

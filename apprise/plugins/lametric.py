@@ -877,7 +877,7 @@ class NotifyLametric(NotifyBase):
         except requests.RequestException as e:
             self.logger.warning(
                 "A Connection error occurred sending LaMetric "
-                f"notification to {self.host}."
+                f"notification to {self.host or 'the LaMetric cloud'}."
             )
             self.logger.debug(f"Socket Exception: {e!s}")
 
@@ -1110,6 +1110,10 @@ class NotifyLametric(NotifyBase):
                 results["app_token"] = NotifyLametric.unquote(
                     results["password"]
                 )
+
+            # The cloud has no host of our own; the host was the app id,
+            # and reporting both would read it twice
+            results["host"] = None
 
         # Set cycles
         with contextlib.suppress(TypeError, ValueError):

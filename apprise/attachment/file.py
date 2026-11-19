@@ -55,8 +55,9 @@ class AttachFile(AttachBase):
         # verification at this point.
         self.dirty_path = path_decode(path)
 
-        # Track our file as it was saved
-        self.__original_path = os.path.normpath(path)
+        # Track our file as it was saved.  URLs always use forward slashes,
+        # so Windows backslashes are swapped out for them here.
+        self.__original_path = os.path.normpath(path).replace(os.sep, "/")
         return
 
     def url(self, privacy=False, *args, **kwargs):

@@ -1099,6 +1099,11 @@ class NotifyFluxer(NotifyBase):
         if "path" in results["qsd"] and results["qsd"]["path"]:
             results["fullpath"] = NotifyFluxer.unquote(results["qsd"]["path"])
 
+        if results["mode"] == FluxerMode.CLOUD:
+            # Cloud mode always posts to fluxer.app, so there is no host of
+            # our own; reporting one would read the webhook id twice
+            results["host"] = None
+
         return results
 
     @staticmethod

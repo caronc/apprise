@@ -833,6 +833,15 @@ class NotifyRocketChat(NotifyBase):
                 results["qsd"]["to"]
             )
 
+        if match and "mode" in results:
+            # What came before the @ was kept as both a webhook and a
+            # password, since either could be meant; the mode says which
+            if results["mode"].strip().lower() == RocketChatAuthMode.WEBHOOK:
+                results["password"] = None
+
+            else:
+                results["webhook"] = None
+
         # The 'webhook' over-ride (if specified)
         if "webhook" in results["qsd"] and len(results["qsd"]["webhook"]):
             results["webhook"] = NotifyRocketChat.unquote(
