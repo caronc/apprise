@@ -799,6 +799,10 @@ msgstr "URL"
 msgid "Thread ID"
 msgstr "ID chủ đề"
 
+#: apprise/plugins/notifyapp.py:137
+msgid "Time Sensitive"
+msgstr "Nhạy cảm thời gian"
+
 #: apprise/plugins/discord.py:216 apprise/plugins/fluxer.py:267
 msgid "Display Footer"
 msgstr "Hiện chân trang"

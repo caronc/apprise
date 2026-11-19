@@ -799,6 +799,10 @@ msgstr "URL"
 msgid "Thread ID"
 msgstr "ID ng thread"
 
+#: apprise/plugins/notifyapp.py:137
+msgid "Time Sensitive"
+msgstr "Sensitibo sa Oras"
+
 #: apprise/plugins/discord.py:216 apprise/plugins/fluxer.py:267
 msgid "Display Footer"
 msgstr "Ipakita ang footer"

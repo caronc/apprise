@@ -799,6 +799,10 @@ msgstr "URL"
 msgid "Thread ID"
 msgstr "Konu kimliği"
 
+#: apprise/plugins/notifyapp.py:137
+msgid "Time Sensitive"
+msgstr "Zamana Duyarlı"
+
 #: apprise/plugins/discord.py:216 apprise/plugins/fluxer.py:267
 msgid "Display Footer"
 msgstr "Alt bilgiyi göster"
