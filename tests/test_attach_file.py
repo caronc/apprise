@@ -27,6 +27,8 @@
 
 # Disable logging for a cleaner testing output
 import logging
+import ntpath
+import os
 from os.path import dirname, join
 import re
 import time
@@ -56,6 +58,24 @@ def test_attach_file_parse_url():
 
     # no file path specified
     assert AttachFile.parse_url("file://") is None
+
+
+def test_attach_file_url_slashes():
+    """A Windows path is written to its URL with forward slashes."""
+    # Load the paths the way Windows would read them
+    with (
+        mock.patch("os.path.normpath", ntpath.normpath),
+        mock.patch("os.sep", "\\"),
+    ):
+        absolute = AttachFile("/tmp/keyfile.json")
+        drive = AttachFile("C:\\tmp\\keyfile.json")
+
+    # No %5C (an encoded backslash) is ever written
+    assert absolute.url() == "file:///tmp/keyfile.json"
+    assert drive.url() == "file://C%3A/tmp/keyfile.json"
+
+    # The URL still loads back to a usable path
+    assert AttachFile.parse_url(drive.url())["path"] == "C:/tmp/keyfile.json"
 
 
 def test_file_expiry(tmpdir):
@@ -141,8 +161,8 @@ def test_attach_file():
     assert response.exists() is True
 
     # On Windows, it is:
-    #  `file://D%3A%5Ca%5Capprise%5Capprise%5Ctest%5Cvar%5Capprise-test.gif`
-    path_in_url = urllib.parse.quote(path)
+    #  `file://D%3A/a/apprise/apprise/test/var/apprise-test.gif`
+    path_in_url = urllib.parse.quote(path.replace(os.sep, "/"))
     assert response.url().startswith(f"file://{path_in_url}")
 
     # No mime-type and/or filename over-ride was specified, so it

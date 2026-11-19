@@ -76,6 +76,13 @@ FLEET = (
         {},
     ),
     (
+        "bale",
+        "bale://123456789:abcdefghij/111/999/",
+        "111",
+        "999",
+        {},
+    ),
+    (
         "zalo",
         "zalo://123456789:abcdefghij/chat1/chat999/",
         "chat1",

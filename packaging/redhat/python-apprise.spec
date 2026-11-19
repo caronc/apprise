@@ -63,7 +63,7 @@ notification services. It supports sending alerts to platforms such as: \
 \
 `46elks`, `800.com`, `AfricasTalking`, `AMQP`, \
 `Apprise API`, `APRS`, \
-`AWS End User Messaging Social`, `AWS SES`, `AWS SNS`, \
+`AWS End User Messaging Social`, `AWS SES`, `AWS SNS`, `Bale`, \
 `Azure Communication Services`, `Bark`, \
 `Better Stack`, `Blink(1)`, `BlueSky`, \
 `Brevo`, `Burst SMS`, `BulkSMS`, `BulkVS`, \
@@ -86,7 +86,7 @@ notification services. It supports sending alerts to platforms such as: \
 `NextcloudTalk`, `Nostr`, `Notica`, `Notifiarr`, `Notifico`, \
 `Notifyre`, \
 `ntfy`, `Octopush`, `Office365`, `OneBot`, `OneSignal`, \
-`Opsgenie`, `PagerDuty`, \
+`Opsgenie`, `OpsiMate`, `PagerDuty`, \
 `PagerTree`, `ParsePlatform`, `Pinglet`, `Pingram`, `Plivo`, `Prowl`, \
 `Postmark`, `Pushalot`, `PushBullet`, \
 `Pushjet`, `PushMe`, `Pushover`, `Pushplus`, `PushSafer`, `PushWard`, \

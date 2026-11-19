@@ -258,7 +258,12 @@ class NotifySplunk(NotifyBase):
 
         if action and isinstance(action, str) and action.strip():
             self.action = next(
-                (a for a in SPLUNK_ACTIONS if a.startswith(action)), None
+                (
+                    a
+                    for a in SPLUNK_ACTIONS
+                    if a.startswith(action.strip().lower())
+                ),
+                None,
             )
             if self.action not in SPLUNK_ACTIONS:
                 msg = f"The Splunk action specified ({action}) is invalid."
@@ -272,7 +277,10 @@ class NotifySplunk(NotifyBase):
         if mapping and isinstance(mapping, dict):
             for k_, v_ in mapping.items():
                 # Get our mapping
-                k = next((t for t in NOTIFY_TYPES if t.startswith(k_)), None)
+                k_lower = k_.lower()
+                k = next(
+                    (t for t in NOTIFY_TYPES if t.startswith(k_lower)), None
+                )
                 if not k:
                     msg = (
                         f"The Splunk mapping key specified ({k_}) is invalid."

@@ -2216,6 +2216,80 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
     mock_post.reset_mock()
 
 
+@mock.patch("requests.post")
+def test_plugin_telegram_markdown_v2_preserves_spoiler(mock_post):
+    """MarkdownV2 keeps a balanced spoiler when the input is Markdown."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = dumps({"ok": True, "result": True})
+
+    aobj = Apprise()
+    assert aobj.add(
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2"
+    )
+    assert aobj.notify(
+        body="Public ||spoiler text|| end",
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["parse_mode"] == "MarkdownV2"
+    assert payload["text"] == "Public ||spoiler text|| end"
+
+    convert = NotifyTelegram._commonmark_to_telegram
+
+    # Emphasis inside or around a spoiler is converted, and reserved
+    # characters inside the span are still escaped.
+    assert convert("||**bold** _italic_||", strict=True) == (
+        "||*bold* _italic_||"
+    )
+    assert convert("**bold ||secret||**", strict=True) == "*bold ||secret||*"
+    assert convert("||a.b(c)!||", strict=True) == r"||a\.b\(c\)\!||"
+    assert convert("||a|b||", strict=True) == r"||a\|b||"
+    # Code and link contents keep their own escaping rules.
+    assert convert("||use `a|b`||", strict=True) == "||use `a|b`||"
+    assert convert("||see [a](https://example.com/x.y)||", strict=True) == (
+        "||see [a](https://example.com/x.y)||"
+    )
+
+    # An unmatched marker and a lone pipe are literal punctuation.
+    assert convert("||only open", strict=True) == r"\|\|only open"
+    assert convert("only close||", strict=True) == r"only close\|\|"
+    assert convert("||a|| ||b", strict=True) == r"||a|| \|\|b"
+    assert convert("a|b|c", strict=True) == r"a\|b\|c"
+    assert convert("|", strict=True) == r"\|"
+
+    # A spaced "||" is a shell "or", not a spoiler.
+    assert convert("make || retry, deploy || undo", strict=True) == (
+        r"make \|\| retry, deploy \|\| undo"
+    )
+    # An opener that never closes gives way to a later one.
+    assert convert("||a ||b||", strict=True) == r"\|\|a ||b||"
+    assert convert("||a || b||", strict=True) == r"||a \|\| b||"
+
+    # Legacy v1 does not treat "||" as markup and does not escape pipes.
+    assert convert("Public ||spoiler text|| end") == (
+        "Public ||spoiler text|| end"
+    )
+    assert convert("||**bold**||") == "||*bold*||"
+    assert convert("||see 3.00!||") == "||see 3.00!||"
+    assert convert("a|b|c") == "a|b|c"
+    assert convert("||only open") == "||only open"
+
+    mock_post.reset_mock()
+    aobj = Apprise()
+    assert aobj.add(
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=1"
+    )
+    assert aobj.notify(
+        body="Public ||spoiler text|| end",
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["parse_mode"] == "MARKDOWN"
+    assert payload["text"] == "Public ||spoiler text|| end"
+
+
 def test_plugin_telegram_v1_unmatched_markers_escaped():
     """Legacy Markdown rejects an entity marker that never closes.
 
@@ -3481,8 +3555,19 @@ def test_plugin_telegram_album_kind_size():
         assert obj._album_kind(video[0]) == TelegramMediaKind.SINGLE
 
 
+@pytest.mark.parametrize("content", ["before", "after"])
+@pytest.mark.parametrize(
+    "extensions,kinds",
+    [
+        (("jpeg", "png", "jpeg"), ["photo"] * 3),
+        (("mp4",) * 3, ["video"] * 3),
+        (("jpeg", "png", "mp4"), ["photo", "photo", "video"]),
+    ],
+)
 @mock.patch("requests.post")
-def test_plugin_telegram_album_groups_media(mock_post):
+def test_plugin_telegram_album_groups_media(
+    mock_post, content, extensions, kinds
+):
     """Verify eligible attachments are posted as one album."""
 
     mock_post.return_value = mock.Mock()
@@ -3490,11 +3575,11 @@ def test_plugin_telegram_album_groups_media(mock_post):
     mock_post.return_value.content = b'{"ok":true}'
 
     obj = telegram_album_obj()
+    obj.content = content
     attach = AppriseAttachment(
         [
-            os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
-            os.path.join(TEST_VAR_DIR, "apprise-test.png"),
-            os.path.join(TEST_VAR_DIR, "apprise-test.mp4"),
+            os.path.join(TEST_VAR_DIR, f"apprise-test.{ext}")
+            for ext in extensions
         ]
     )
 
@@ -3507,7 +3592,7 @@ def test_plugin_telegram_album_groups_media(mock_post):
     assert urlparse(details[0][0]).hostname == "api.telegram.org"
 
     media = loads(details[1]["data"]["media"])
-    assert [entry["type"] for entry in media] == ["photo", "photo", "video"]
+    assert [entry["type"] for entry in media] == kinds
     assert [entry["media"] for entry in media] == [
         "attach://file0",
         "attach://file1",
@@ -3515,10 +3600,52 @@ def test_plugin_telegram_album_groups_media(mock_post):
     ]
     assert sorted(details[1]["files"]) == ["file0", "file1", "file2"]
 
+    # Telegram requires the same caption placement on every album item.
+    assert [entry["show_caption_above_media"] for entry in media] == [
+        content == "before"
+    ] * 3
+
     # The caption rides on the first album entry only
     assert media[0]["caption"] == "hello"
+    assert media[0]["parse_mode"] == "HTML"
     assert "caption" not in media[1]
     assert "caption" not in media[2]
+    assert "parse_mode" not in media[1]
+    assert "parse_mode" not in media[2]
+
+
+@pytest.mark.parametrize("content", ["before", "after"])
+@pytest.mark.parametrize("body", ["", "x" * 1024], ids=["empty", "long"])
+@mock.patch("requests.post")
+def test_plugin_telegram_album_without_caption(mock_post, content, body):
+    """Keep caption fields out of albums with no inline caption."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"ok":true}'
+
+    obj = telegram_album_obj()
+    obj.content = content
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.jpeg")
+    assert obj.notify(body=body, attach=AppriseAttachment([path] * 2))
+
+    endpoints = ["sendMediaGroup"]
+    if body:
+        if content == "before":
+            endpoints.insert(0, "sendMessage")
+        else:
+            endpoints.append("sendMessage")
+    assert telegram_album_calls(mock_post) == endpoints
+
+    album = mock_post.call_args_list[endpoints.index("sendMediaGroup")]
+    media = loads(album[1]["data"]["media"])
+    for entry in media:
+        assert "caption" not in entry
+        assert "parse_mode" not in entry
+        assert "show_caption_above_media" not in entry
+    if body:
+        message = mock_post.call_args_list[endpoints.index("sendMessage")]
+        assert loads(message[1]["data"])["text"] == body
 
 
 @mock.patch("requests.post")
@@ -3556,8 +3683,9 @@ def test_plugin_telegram_album_preserves_order(mock_post):
     assert "caption" not in media[0]
 
 
+@pytest.mark.parametrize("content", ["before", "after"])
 @mock.patch("requests.post")
-def test_plugin_telegram_album_batches(mock_post):
+def test_plugin_telegram_album_batches(mock_post, content):
     """Verify more than ten media are split across albums."""
 
     mock_post.return_value = mock.Mock()
@@ -3565,6 +3693,7 @@ def test_plugin_telegram_album_batches(mock_post):
     mock_post.return_value.content = b'{"ok":true}'
 
     obj = telegram_album_obj()
+    obj.content = content
     path = os.path.join(TEST_VAR_DIR, "apprise-test.jpeg")
 
     # Eleven photos: a full album of ten, then a single leftover
@@ -3579,7 +3708,16 @@ def test_plugin_telegram_album_batches(mock_post):
         "sendMediaGroup",
         "sendMediaGroup",
     ]
-    assert len(loads(mock_post.call_args_list[1][1]["data"]["media"])) == 2
+    first = loads(mock_post.call_args_list[0][1]["data"]["media"])
+    second = loads(mock_post.call_args_list[1][1]["data"]["media"])
+    assert [entry["show_caption_above_media"] for entry in first] == [
+        content == "before"
+    ] * 10
+    assert len(second) == 2
+    for entry in second:
+        assert "caption" not in entry
+        assert "parse_mode" not in entry
+        assert "show_caption_above_media" not in entry
 
 
 @mock.patch("requests.post")
@@ -3978,10 +4116,15 @@ def test_plugin_telegram_album_delivery_tracking(mock_post):
                 (12345, None),
                 NotifyType.INFO,
                 attach,
-                payload={"caption": "hello"},
+                payload={
+                    "caption": "hello",
+                    "show_caption_above_media": True,
+                },
             )
             is False
         )
+        media = loads(mock_post.call_args_list[0][1]["data"]["media"])
+        assert all(entry["show_caption_above_media"] for entry in media)
 
         # The retry skips the delivered photo and its caption, and the
         # two remaining photos still form an album
@@ -3992,14 +4135,19 @@ def test_plugin_telegram_album_delivery_tracking(mock_post):
                 (12345, None),
                 NotifyType.INFO,
                 attach,
-                payload={"caption": "hello"},
+                payload={
+                    "caption": "hello",
+                    "show_caption_above_media": True,
+                },
             )
             is True
         )
         assert telegram_album_calls(mock_post) == ["sendMediaGroup"]
         media = loads(mock_post.call_args_list[0][1]["data"]["media"])
         assert len(media) == 2
-        assert "caption" not in media[0]
+        for entry in media:
+            assert "caption" not in entry
+            assert "show_caption_above_media" not in entry
 
         # Nothing is left to send on a further retry
         mock_post.reset_mock()

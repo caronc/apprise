@@ -34,11 +34,13 @@ import re
 from unittest import mock
 
 from helpers import AppriseURLTester
+import pytest
 import requests
 
 import apprise
-from apprise import NotifyFormat
+from apprise import Apprise, NotifyFormat
 from apprise.exception import AppriseImproperlyConfigured
+from apprise.fields import fields_to_url
 from apprise.plugins.ntfy import NotifyNtfy, NtfyPriority
 
 logging.disable(logging.CRITICAL)
@@ -564,7 +566,9 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     assert results["user"] is None
     assert results["password"] is None
     assert results["port"] is None
-    assert results["host"] == "abc---,topic2,~~,,"
+    # Cloud mode has no host of its own; it became the first topic
+    assert results["host"] is None
+    assert results["targets"] == ["abc---,topic2,~~,,"]
     assert results["fullpath"] is None
     assert results["path"] is None
     assert results["query"] is None
@@ -650,6 +654,30 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0] == "https://ntfy.sh"
     assert "X-Markdown" in mock_post.call_args_list[0][1]["headers"]
+
+
+@pytest.mark.parametrize(
+    "url, topics",
+    (
+        ("ntfys://abc", ["abc"]),
+        ("ntfys://abc/def?mode=cloud", ["abc", "def"]),
+        ("ntfy://ntfy.sh/topic?mode=cloud", ["topic"]),
+    ),
+)
+def test_plugin_ntfy_cloud_fields(url, topics):
+    """A cloud URL's fields hold its topics once, and no host."""
+    obj = Apprise.instantiate(url)
+    fields = obj.url_fields()
+    assert "host" not in fields
+    assert fields["targets"] == topics
+    assert fields["mode"] == "cloud"
+
+    # Put back together, the topics are written once
+    built = fields_to_url(fields)
+    assert built.split("?")[0] == "ntfys://" + "/".join(topics) + (
+        "/" if len(topics) == 1 else ""
+    )
+    assert Apprise.instantiate(built).url() == obj.url()
 
 
 def test_plugin_ntfy_attach_filename():

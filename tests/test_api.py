@@ -1849,6 +1849,16 @@ def test_apprise_multi_format_details():
         "html",
     ]
 
+    class NoFormatArgNotification(SingleFormatNotification):
+        """Test plugin that defines its own arguments without ?format=."""
+
+        protocol = "noformatarg"
+        template_args = {}
+
+    # A plugin without a ?format= argument still has its details read
+    no_format_details = plugins.details(NoFormatArgNotification)
+    assert "format" not in no_format_details["args"]
+
 
 def test_apprise_asset(tmpdir):
     """

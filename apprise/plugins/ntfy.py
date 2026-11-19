@@ -971,13 +971,17 @@ class NotifyNtfy(NotifyBase):
             )
 
         if results.get("auth") == NtfyAuth.TOKEN and not results.get("token"):
+            # A token is sent on its own, so the user or password it was
+            # written as is not kept as well (it would read twice)
             if results["user"] and not results["password"]:
                 # Make sure we properly set our token
                 results["token"] = NotifyNtfy.unquote(results["user"])
+                results["user"] = None
 
             elif results["password"]:
                 # Make sure we properly set our token
                 results["token"] = NotifyNtfy.unquote(results["password"])
+                results["password"] = None
 
         # Mode override
         if "mode" in results["qsd"] and results["qsd"]["mode"]:
@@ -1011,6 +1015,10 @@ class NotifyNtfy(NotifyBase):
             if not NotifyNtfy.__auto_cloud_host.search(results["host"]):
                 # Add it to the front of the list for consistency
                 results["targets"].insert(0, results["host"])
+
+            # Cloud mode always posts to ntfy.sh, so there is no host of
+            # our own; reporting one would read the first topic twice
+            results["host"] = None
 
         elif results["mode"] == NtfyMode.PRIVATE and not (
             is_hostname(results["host"] or is_ipaddr(results["host"]))

@@ -224,6 +224,7 @@ class NotifyPagerTree(NotifyBase):
             self.meta_extras.update(meta_extras)
 
         # Setup our action
+        action = action.strip().lower() if isinstance(action, str) else None
         self.action = (
             NotifyPagerTree.template_args["action"]["default"]
             if action not in PAGERTREE_ACTIONS
@@ -231,7 +232,9 @@ class NotifyPagerTree(NotifyBase):
         )
 
         # Setup our urgency
-        self.urgency = PAGERTREE_URGENCIES.get(urgency)
+        self.urgency = PAGERTREE_URGENCIES.get(
+            urgency.strip().lower() if isinstance(urgency, str) else None
+        )
 
         # Any optional tags to attach to the notification
         self.__tags = parse_list(tags)

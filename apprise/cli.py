@@ -698,7 +698,8 @@ def _force_exit(apobj: Apprise, status: AppriseResultStatus) -> None:
 @click.option(
     "--input-format",
     "-i",
-    default=DEFAULT_NOTIFY_FORMAT.value,
+    # Left unset so a configuration file can supply its own default.
+    default=None,
     type=str,
     metavar="FORMAT",
     help=(
@@ -937,8 +938,11 @@ def main(
         # issue.  For consistency, we also return a 2
         ctx.exit(2)
 
-    input_format = input_format.strip().lower()
-    if input_format not in NOTIFY_FORMATS:
+    # A format given here always wins over one in a configuration file.
+    input_format = (
+        input_format.strip().lower() if input_format is not None else None
+    )
+    if input_format is not None and input_format not in NOTIFY_FORMATS:
         click.echo(
             f"The --input-format (-i) value of {input_format} is not"
             " supported."
@@ -1502,6 +1506,11 @@ def main(
             logger.trace("No --body (-b) specified; reading from stdin")
             # if no body was specified, then read from STDIN
             body = sys.stdin.read()
+
+        # Fall back to the default input format when neither --input-format
+        # nor a loaded configuration file chose one.
+        if asset.body_format is None:
+            asset.body_format = DEFAULT_NOTIFY_FORMAT
 
         # Send the notification. AppriseResult.status maps directly to the
         # process exit values handled after the dry-run branch.
