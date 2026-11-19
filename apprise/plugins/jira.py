@@ -386,7 +386,12 @@ class NotifyJira(NotifyBase):
 
         if action and isinstance(action, str) and action.strip():
             self.action = next(
-                (a for a in JIRA_ACTIONS if a.startswith(action)), None
+                (
+                    a
+                    for a in JIRA_ACTIONS
+                    if a.startswith(action.strip().lower())
+                ),
+                None,
             )
             if self.action not in JIRA_ACTIONS:
                 msg = "The Jira action specified ({}) is invalid.".format(
@@ -402,7 +407,10 @@ class NotifyJira(NotifyBase):
         if mapping and isinstance(mapping, dict):
             for _k, _v in mapping.items():
                 # Get our mapping
-                k = next((t for t in NotifyType if t.startswith(_k)), None)
+                _k_lower = _k.lower()
+                k = next(
+                    (t for t in NotifyType if t.startswith(_k_lower)), None
+                )
                 if not k:
                     msg = (
                         "The Jira mapping key specified ({}) "

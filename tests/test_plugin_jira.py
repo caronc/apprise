@@ -579,3 +579,23 @@ def test_plugin_jira_blank_action():
 
     obj = NotifyJira(apikey="a" * 32, targets=["user"], action="  ")
     assert obj.action == NotifyJira.template_args["action"]["default"]
+
+
+def test_plugin_jira_action_case():
+    """NotifyJira() accepts action= and :key= mapping keys in any case."""
+    obj = apprise.Apprise.instantiate("jira://apikey/@user?action=New")
+    assert isinstance(obj, NotifyJira)
+    assert obj.action == "new"
+
+    obj = apprise.Apprise.instantiate(
+        "jira://apikey/@user?action=MAP&:Failure=Close"
+    )
+    assert isinstance(obj, NotifyJira)
+    assert obj.action == "map"
+    assert obj.mapping[NotifyType.FAILURE] == "close"
+
+    # The normalized values are written back by url()
+    obj2 = apprise.Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyJira)
+    assert obj2.action == "map"
+    assert obj2.mapping == obj.mapping

@@ -287,3 +287,24 @@ def test_plugin_splunk_blank_action():
 
     obj = NotifySplunk(apikey="abc123", routing_key="db", action="  ")
     assert obj.action == NotifySplunk.template_args["action"]["default"]
+
+
+def test_plugin_splunk_action_case():
+    """NotifySplunk() accepts action= and :key= mapping keys in any case."""
+    obj = NotifySplunk(
+        **NotifySplunk.parse_url("splunk://db@token?action=Res")
+    )
+    assert obj.action == "resolve"
+
+    obj = NotifySplunk(
+        **NotifySplunk.parse_url(
+            "splunk://db@token?action=MAP&:Failure=critical"
+        )
+    )
+    assert obj.action == "map"
+    assert obj.mapping["failure"] == "CRITICAL"
+
+    # The normalized values are written back by url()
+    obj2 = NotifySplunk(**NotifySplunk.parse_url(obj.url()))
+    assert obj2.action == "map"
+    assert obj2.mapping == obj.mapping
