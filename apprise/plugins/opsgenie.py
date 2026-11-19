@@ -380,7 +380,12 @@ class NotifyOpsgenie(NotifyBase):
 
         if action and isinstance(action, str) and action.strip():
             self.action = next(
-                (a for a in OPSGENIE_ACTIONS if a.startswith(action)), None
+                (
+                    a
+                    for a in OPSGENIE_ACTIONS
+                    if a.startswith(action.strip().lower())
+                ),
+                None,
             )
             if self.action not in OPSGENIE_ACTIONS:
                 msg = f"The Opsgenie action specified ({action}) is invalid."
@@ -394,7 +399,10 @@ class NotifyOpsgenie(NotifyBase):
         if mapping and isinstance(mapping, dict):
             for k_, v_ in mapping.items():
                 # Get our mapping
-                k = next((t for t in NotifyType if t.startswith(k_)), None)
+                k_lower = k_.lower()
+                k = next(
+                    (t for t in NotifyType if t.startswith(k_lower)), None
+                )
                 if not k:
                     msg = (
                         f"The Opsgenie mapping key specified ({k_}) "

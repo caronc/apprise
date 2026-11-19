@@ -40,6 +40,7 @@ from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.opsgenie import (
     NotifyOpsgenie,
     NotifyType,
+    OpsgenieAlertAction,
     OpsgeniePriority,
 )
 
@@ -503,3 +504,56 @@ def test_plugin_opsgenie_blank_action():
 
     obj = NotifyOpsgenie(apikey="a" * 32, targets=["user"], action="  ")
     assert obj.action == NotifyOpsgenie.template_args["action"]["default"]
+
+
+@mock.patch("requests.post")
+def test_plugin_opsgenie_action_case(mock_post, tmpdir):
+    """NotifyOpsgenie() accepts action= in any case."""
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = OPSGENIE_GOOD_RESPONSE
+
+    # Share a store so the close call can find the alert it opened
+    asset = apprise.AppriseAsset(
+        storage_mode=apprise.PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+
+    obj = apprise.Apprise.instantiate(
+        "opsgenie://apikey/@user?entity=case&action=NEW", asset=asset
+    )
+    assert isinstance(obj, NotifyOpsgenie)
+    assert obj.action == OpsgenieAlertAction.NEW
+    assert obj.notify("test", "key", NotifyType.FAILURE)
+
+    obj = apprise.Apprise.instantiate(
+        "opsgenie://apikey/@user?entity=case&action=Close", asset=asset
+    )
+    assert isinstance(obj, NotifyOpsgenie)
+    assert obj.action == OpsgenieAlertAction.CLOSE
+    assert obj.notify("test", "key", NotifyType.SUCCESS)
+    assert mock_post.call_args[0][0].endswith("/close")
+
+    # Abbreviations and surrounding whitespace are accepted too
+    obj = NotifyOpsgenie(apikey="a" * 32, targets=["user"], action=" ACK ")
+    assert obj.action == OpsgenieAlertAction.ACKNOWLEDGE
+
+    # The normalized value is written back by url()
+    result = NotifyOpsgenie.parse_url(obj.url())
+    obj2 = NotifyOpsgenie(**result)
+    assert obj2.action == OpsgenieAlertAction.ACKNOWLEDGE
+
+
+def test_plugin_opsgenie_mapping_case():
+    """NotifyOpsgenie() accepts :key= mapping keys in any case."""
+    obj = apprise.Apprise.instantiate(
+        "opsgenie://apikey/@user?action=map&:Failure=Close&:WARN=ack"
+    )
+    assert isinstance(obj, NotifyOpsgenie)
+    assert obj.mapping[NotifyType.FAILURE] == OpsgenieAlertAction.CLOSE
+    assert obj.mapping[NotifyType.WARNING] == OpsgenieAlertAction.ACKNOWLEDGE
+
+    # The normalized keys are written back by url()
+    obj2 = apprise.Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyOpsgenie)
+    assert obj2.mapping == obj.mapping
