@@ -496,8 +496,7 @@ class NotifyACS(NotifyBase):
                     )
 
                     self.logger.warning(
-                        "Failed to send ACS notification to %s: "
-                        "%s%serror=%s.",
+                        "Failed to send ACS notification to %s: %s%serror=%s.",
                         target,
                         status_str,
                         ", " if status_str else "",
