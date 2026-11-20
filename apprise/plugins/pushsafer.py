@@ -34,7 +34,7 @@ from .. import exception
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import parse_list, validate_regex
+from ..utils.parse import parse_choice, parse_list, validate_regex
 from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
@@ -442,18 +442,7 @@ class NotifyPushSafer(NotifyBase):
             # low, lo, l (for low);
             # normal, norma, norm, nor, no, n (for normal)
             # ... etc
-            match = (
-                next(
-                    (
-                        key
-                        for key in PUSHSAFER_PRIORITY_MAP
-                        if key.startswith(priority)
-                    ),
-                    None,
-                )
-                if priority
-                else None
-            )
+            match = parse_choice(priority, PUSHSAFER_PRIORITY_MAP)
 
             # Now test to see if we got a match
             if not match:
@@ -496,18 +485,7 @@ class NotifyPushSafer(NotifyBase):
             # This little bit of black magic allows us to match against
             # against multiple versions of the same string
             # ... etc
-            match = (
-                next(
-                    (
-                        key
-                        for key in PUSHSAFER_SOUND_MAP
-                        if key.startswith(sound)
-                    ),
-                    None,
-                )
-                if sound
-                else None
-            )
+            match = parse_choice(sound, PUSHSAFER_SOUND_MAP)
 
             # Now test to see if we got a match
             if not match:

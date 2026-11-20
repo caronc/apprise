@@ -40,7 +40,7 @@ from ..conversion import commonmark_decode_backslash_escapes
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import parse_bool, parse_list, validate_regex
+from ..utils.parse import parse_bool, parse_choice, parse_list, validate_regex
 from .base import NotifyBase
 
 # Accept:
@@ -308,14 +308,7 @@ class NotifyMastodon(NotifyBase):
             # This little bit of black magic allows us to match against
             # against multiple versions of the same string
             # ... etc
-            self.visibility = next(
-                (
-                    v
-                    for v in MASTODON_MESSAGE_VISIBILITIES
-                    if v.startswith(vis)
-                ),
-                None,
-            )
+            self.visibility = parse_choice(vis, MASTODON_MESSAGE_VISIBILITIES)
 
             if self.visibility not in MASTODON_MESSAGE_VISIBILITIES:
                 msg = (

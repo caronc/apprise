@@ -49,7 +49,13 @@ import requests
 from ..common import NotifyType, PersistentStoreMode
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import is_uuid, parse_bool, parse_list, validate_regex
+from ..utils.parse import (
+    is_uuid,
+    parse_bool,
+    parse_choice,
+    parse_list,
+    validate_regex,
+)
 from .base import NotifyBase
 
 
@@ -385,14 +391,7 @@ class NotifyJira(NotifyBase):
             raise AppriseImproperlyConfigured(msg)
 
         if action and isinstance(action, str) and action.strip():
-            self.action = next(
-                (
-                    a
-                    for a in JIRA_ACTIONS
-                    if a.startswith(action.strip().lower())
-                ),
-                None,
-            )
+            self.action = parse_choice(action, JIRA_ACTIONS)
             if self.action not in JIRA_ACTIONS:
                 msg = "The Jira action specified ({}) is invalid.".format(
                     action
@@ -407,10 +406,7 @@ class NotifyJira(NotifyBase):
         if mapping and isinstance(mapping, dict):
             for _k, _v in mapping.items():
                 # Get our mapping
-                _k_lower = _k.lower()
-                k = next(
-                    (t for t in NotifyType if t.startswith(_k_lower)), None
-                )
+                k = parse_choice(_k, NotifyType)
                 if not k:
                     msg = (
                         "The Jira mapping key specified ({}) "
@@ -419,11 +415,7 @@ class NotifyJira(NotifyBase):
                     self.logger.warning(msg)
                     raise AppriseImproperlyConfigured(msg)
 
-                _v_lower = _v.lower()
-                v = next(
-                    (v for v in JIRA_ACTIONS[1:] if v.startswith(_v_lower)),
-                    None,
-                )
+                v = parse_choice(_v, JIRA_ACTIONS[1:])
                 if not v:
                     msg = (
                         "The Jira mapping value (assigned to {}) "

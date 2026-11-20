@@ -50,7 +50,7 @@ import requests
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import validate_regex
+from ..utils.parse import parse_choice, validate_regex
 from .base import NotifyBase
 
 
@@ -170,9 +170,7 @@ class NotifyMisskey(NotifyBase):
 
             # This little bit of black magic allows us to match against
             # against multiple versions of the same string ... etc
-            self.visibility = next(
-                (v for v in MISSKEY_VISIBILITIES if v.startswith(vis)), None
-            )
+            self.visibility = parse_choice(vis, MISSKEY_VISIBILITIES)
 
             if self.visibility not in MISSKEY_VISIBILITIES:
                 msg = (

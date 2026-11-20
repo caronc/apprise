@@ -37,6 +37,7 @@ from ..url import PrivacyMode
 from ..utils.parse import (
     is_phone_no,
     parse_bool,
+    parse_choice,
     parse_phone_no,
     validate_regex,
 )
@@ -341,18 +342,7 @@ class NotifyExotel(NotifyBase):
             # Allow partial matching against supported priorities:
             # normal, norma, norm, nor, no, n (for normal)
             # high, hig, hi, h (for high)
-            result = (
-                next(
-                    (
-                        key
-                        for key in EXOTEL_PRIORITY_MAP
-                        if key.startswith(self.priority)
-                    ),
-                    None,
-                )
-                if self.priority
-                else None
-            )
+            result = parse_choice(self.priority, EXOTEL_PRIORITY_MAP)
 
             # Now test to see if we got a match
             if not result:

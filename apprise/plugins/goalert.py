@@ -65,7 +65,7 @@ from ..common import NotifyFormat, NotifyType
 from ..conversion import commonmark_decode_backslash_escapes
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import URL_PATH_SAFE_CHARS, parse_list
+from ..utils.parse import URL_PATH_SAFE_CHARS, parse_choice, parse_list
 from .base import NotifyBase
 
 # Integration keys used by the Generic API are always UUIDs
@@ -217,14 +217,7 @@ class NotifyGoAlert(NotifyBase):
 
         # Resolve our action; partial names such as "c" are accepted
         if action and isinstance(action, str) and action.strip():
-            self.action = next(
-                (
-                    a
-                    for a in GOALERT_ACTIONS
-                    if a.startswith(action.strip().lower())
-                ),
-                None,
-            )
+            self.action = parse_choice(action, GOALERT_ACTIONS)
             if not self.action:
                 msg = f"The GoAlert action specified ({action}) is invalid."
                 self.logger.warning(msg)

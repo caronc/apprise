@@ -68,6 +68,7 @@ from ..locale import gettext_lazy as _
 from ..utils.parse import (
     URL_PATH_SAFE_CHARS,
     parse_bool,
+    parse_choice,
     parse_list,
     validate_regex,
 )
@@ -258,10 +259,7 @@ class NotifyMattermost(NotifyBase):
 
         # Mode
         if isinstance(mode, str) and mode.strip():
-            mode_ = mode.strip().lower()
-            self.mode = next(
-                (m for m in MATTERMOST_MODES if m.startswith(mode_)), None
-            )
+            self.mode = parse_choice(mode, MATTERMOST_MODES)
             if self.mode not in MATTERMOST_MODES:
                 msg = f"The Mattermost mode specified ({mode}) is invalid."
                 self.logger.warning(msg)

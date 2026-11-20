@@ -56,7 +56,12 @@ from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
+from ..utils.parse import (
+    is_phone_no,
+    parse_choice,
+    parse_phone_no,
+    validate_regex,
+)
 from .base import NotifyBase
 
 # Twilio Mode Detection
@@ -254,14 +259,7 @@ class NotifyTwilio(NotifyBase):
 
         # Set notification method
         if isinstance(method, str) and method:
-            self.method = next(
-                (
-                    a
-                    for a in TWILIO_NOTIFICATION_METHODS
-                    if a.startswith(method.lower())
-                ),
-                None,
-            )
+            self.method = parse_choice(method, TWILIO_NOTIFICATION_METHODS)
 
             if self.method not in TWILIO_NOTIFICATION_METHODS:
                 msg = (

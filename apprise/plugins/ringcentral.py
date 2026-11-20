@@ -71,7 +71,12 @@ from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
+from ..utils.parse import (
+    is_phone_no,
+    parse_choice,
+    parse_phone_no,
+    validate_regex,
+)
 from .base import NotifyBase
 
 
@@ -281,15 +286,7 @@ class NotifyRingCentral(NotifyBase):
 
         # Resolve authentication mode
         if isinstance(mode, str):
-            _mode = mode.lower().strip()
-            match = (
-                next(
-                    (m for m in RINGCENTRAL_AUTH_MODES if m.startswith(_mode)),
-                    None,
-                )
-                if _mode
-                else None
-            )
+            match = parse_choice(mode, RINGCENTRAL_AUTH_MODES)
 
             if not match:
                 msg = (
@@ -364,18 +361,7 @@ class NotifyRingCentral(NotifyBase):
             if isinstance(environment, str)
             else RingCentralEnvironment.PRODUCTION
         )
-        match = (
-            next(
-                (
-                    e
-                    for e in RINGCENTRAL_ENVIRONMENTS
-                    if e.startswith(_environment)
-                ),
-                None,
-            )
-            if _environment
-            else None
-        )
+        match = parse_choice(_environment, RINGCENTRAL_ENVIRONMENTS)
         if not match:
             msg = (
                 "An invalid RingCentral environment "

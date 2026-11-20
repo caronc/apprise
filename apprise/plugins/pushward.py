@@ -72,7 +72,7 @@ from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.base64 import base64_urlencode
-from ..utils.parse import parse_bool, parse_list, validate_regex
+from ..utils.parse import parse_bool, parse_choice, parse_list, validate_regex
 from .base import NotifyBase
 
 # Extend HTTP Error Messages
@@ -116,13 +116,7 @@ PUSHWARD_PLAINTEXT_MAXLEN = (PUSHWARD_ENVELOPE_MAXLEN - 13) * 3 // 4 - 28
 def pushward_level(value):
     """Resolve a full or short-form level (e.g. 'crit', 'c') to a canonical
     PushWard level, or None if it does not match one."""
-    value = str(value).strip().lower()
-    if not value:
-        return None
-    return next(
-        (level for level in PUSHWARD_LEVELS if level.startswith(value)),
-        None,
-    )
+    return parse_choice(str(value), PUSHWARD_LEVELS)
 
 
 def pushward_hkdf(key: bytes, info: bytes, length: int) -> bytes:

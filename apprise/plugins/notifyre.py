@@ -64,7 +64,7 @@ import requests
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import is_phone_no, parse_bool, parse_phone_no
+from ..utils.parse import is_phone_no, parse_bool, parse_choice, parse_phone_no
 from .base import NotifyBase
 
 # Notifyre REST API versioned base
@@ -221,11 +221,7 @@ class NotifyNotifyre(NotifyBase):
 
         # Resolve delivery mode
         if mode and isinstance(mode, str):
-            _mode = mode.lower().strip()
-            self.mode = next(
-                (m for m in NOTIFYRE_MODES if m.startswith(_mode)),
-                None,
-            )
+            self.mode = parse_choice(mode, NOTIFYRE_MODES)
             if self.mode not in NOTIFYRE_MODES:
                 msg = "The Notifyre mode specified ({}) is invalid.".format(
                     mode

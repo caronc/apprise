@@ -36,7 +36,7 @@ from ...common import NotifyType
 from ...exception import AppriseImproperlyConfigured
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
-from ...utils.parse import parse_bool, parse_list, validate_regex
+from ...utils.parse import parse_bool, parse_choice, parse_list, validate_regex
 from ..base import NotifyBase
 from .adapter import (
     SLIXMPP_SUPPORT_AVAILABLE,
@@ -230,11 +230,7 @@ class NotifyXMPP(NotifyBase):
             self.targets.append((mtype, jid))
 
         if isinstance(secure_mode, str) and secure_mode.strip():
-            self.secure_mode = secure_mode.strip().lower()
-            self.secure_mode = next(
-                (k for k in SECURE_MODES if k.startswith(self.secure_mode)),
-                None,
-            )
+            self.secure_mode = parse_choice(secure_mode, SECURE_MODES)
             if self.secure_mode not in SECURE_MODES:
                 msg = (
                     "The XMPP secure mode specified "
