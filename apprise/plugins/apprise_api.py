@@ -27,7 +27,6 @@
 
 from json import dumps
 import logging
-import re
 from typing import Optional, Union
 
 import requests
@@ -547,57 +546,6 @@ class NotifyAppriseAPI(NotifyBase):
                 file[1][1].close()
 
         return True
-
-    @staticmethod
-    def parse_native_url(url):
-        """
-        Support http://hostname/notify/token and
-                http://hostname/path/notify/token
-        """
-
-        result = re.match(
-            r"^http(?P<secure>s?)://(?P<hostname>[A-Z0-9._-]+)"
-            r"(:(?P<port>[0-9]+))?"
-            r"(?P<path>/[^?]+?)?/notify/(?P<token>[A-Z0-9_-]{1,32})/?"
-            r"(?P<params>\?.+)?$",
-            url,
-            re.I,
-        )
-
-        if result:
-            results = NotifyAppriseAPI.parse_url(
-                "{schema}://{hostname}{port}{path}/{token}/{params}".format(
-                    schema=(
-                        NotifyAppriseAPI.secure_protocol
-                        if result.group("secure")
-                        else NotifyAppriseAPI.protocol
-                    ),
-                    hostname=result.group("hostname"),
-                    port=(
-                        ""
-                        if not result.group("port")
-                        else ":{}".format(result.group("port"))
-                    ),
-                    path=(
-                        ""
-                        if not result.group("path")
-                        else result.group("path")
-                    ),
-                    token=result.group("token"),
-                    # The "params" group already includes its own leading
-                    # "?" (it's captured by the regex), so it's used as-is.
-                    params=result.group("params") or "",
-                )
-            )
-
-            if results and not results.get("version"):
-                # A /notify/{token} URL is the Version 1 endpoint shape, so
-                # default to it unless the URL already specified a version.
-                results["version"] = AppriseAPIVersion.V1
-
-            return results
-
-        return None
 
     @staticmethod
     def parse_url(url):
