@@ -817,3 +817,19 @@ def test_plugin_webex_teams_bot_room_retry(mock_post, mock_sleep):
     # The first room was notified once; the second one was retried
     first, second = aobj[0].targets
     assert rooms == [first, second, second]
+
+
+def test_plugin_webex_teams_mode_case():
+    """NotifyWebexTeams() accepts mode= in any case."""
+    obj = Apprise.instantiate(f"wxteams://{WEBHOOK_TOKEN}?mode=Webhook")
+    assert isinstance(obj, NotifyWebexTeams)
+    assert obj.mode == WebexTeamsMode.WEBHOOK
+
+    # Surrounding whitespace is accepted too
+    obj = NotifyWebexTeams(token=WEBHOOK_TOKEN, mode=" WEBHOOK ")
+    assert obj.mode == WebexTeamsMode.WEBHOOK
+
+    # The normalized value is written back by url()
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyWebexTeams)
+    assert obj2.mode == WebexTeamsMode.WEBHOOK

@@ -844,3 +844,23 @@ def test_plugin_pingram_edge_cases():
     assert isinstance(obj, NotifyPingram)
     assert isinstance(obj.url(), str)
     assert obj.tokens == {}
+
+
+def test_plugin_pingram_mode_case():
+    """NotifyPingram() accepts mode= in any case."""
+    obj = Apprise.instantiate(
+        "pingram://pingram_sk_key/+15551235553/?mode=Message"
+    )
+    assert isinstance(obj, NotifyPingram)
+    assert obj.mode == "message"
+
+    # Surrounding whitespace is accepted too
+    obj = NotifyPingram(
+        apikey="pingram_sk_key", targets=["+15551235553"], mode=" MESSAGE "
+    )
+    assert obj.mode == "message"
+
+    # The normalized value is written back by url()
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyPingram)
+    assert obj2.mode == "message"

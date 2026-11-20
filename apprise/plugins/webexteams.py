@@ -218,9 +218,10 @@ class NotifyWebexTeams(NotifyBase):
         super().__init__(**kwargs)
 
         # Resolve mode: explicit override wins, otherwise auto-detect
-        if mode and isinstance(mode, str):
+        if mode and isinstance(mode, str) and mode.strip():
+            mode_ = mode.strip().lower()
             self.mode = next(
-                (m for m in WEBEX_TEAMS_MODES if m.startswith(mode)), None
+                (m for m in WEBEX_TEAMS_MODES if m.startswith(mode_)), None
             )
             if self.mode not in WEBEX_TEAMS_MODES:
                 msg = f"The Webex Teams mode specified ({mode}) is invalid."

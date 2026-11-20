@@ -269,9 +269,11 @@ class NotifyTwitter(NotifyBase):
             else mode.lower()
         )
 
-        if mode and isinstance(mode, str):
+        if mode and isinstance(mode, str) and mode.strip():
+            mode_ = mode.strip().lower()
             self.mode = next(
-                (a for a in TWITTER_MESSAGE_MODES if a.startswith(mode)), None
+                (a for a in TWITTER_MESSAGE_MODES if a.startswith(mode_)),
+                None,
             )
             if self.mode not in TWITTER_MESSAGE_MODES:
                 msg = (

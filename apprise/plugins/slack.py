@@ -628,10 +628,11 @@ class NotifySlack(NotifyBase):
         super().__init__(**kwargs)
 
         # Track explicit modes; otherwise workflow segments select the mode.
-        _mode_explicit = bool(mode and isinstance(mode, str))
+        _mode_explicit = bool(mode and isinstance(mode, str) and mode.strip())
         if _mode_explicit:
+            mode_ = mode.strip().lower()
             self.mode = next(
-                (a for a in SLACK_MODES if a.startswith(mode)), None
+                (a for a in SLACK_MODES if a.startswith(mode_)), None
             )
             if self.mode not in SLACK_MODES:
                 msg = f"The Slack mode specified ({mode}) is invalid."
@@ -1841,7 +1842,7 @@ class NotifySlack(NotifyBase):
         # Resolve via the same prefix-matching used in __init__ so that
         # abbreviated inputs (e.g. mode=tri or mode=work) are handled
         # identically in both places.
-        _mode_raw = results["qsd"].get("mode", "")
+        _mode_raw = results["qsd"].get("mode", "").strip().lower()
         _mode = (
             next(
                 (a for a in SLACK_MODES if a.startswith(_mode_raw)),

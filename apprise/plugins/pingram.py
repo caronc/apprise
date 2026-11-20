@@ -330,9 +330,10 @@ class NotifyPingram(NotifyBase):
                 }
 
         # Resolve our mode
-        if mode and isinstance(mode, str):
+        if mode and isinstance(mode, str) and mode.strip():
+            mode_ = mode.strip().lower()
             self.mode = next(
-                (a for a in PINGRAM_MODES if a.startswith(mode)), None
+                (a for a in PINGRAM_MODES if a.startswith(mode_)), None
             )
             if self.mode not in PINGRAM_MODES:
                 msg = f"The Pingram mode specified ({mode}) is invalid."
