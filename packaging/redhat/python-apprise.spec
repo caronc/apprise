@@ -110,7 +110,7 @@ notification services. It supports sending alerts to platforms such as: \
 `xMatters`, `XMPP`, `YouLMK`, `Zalo`, `Zoho Cliq`, `Zoom`, and `Zulip`.}
 
 Name:           python-%{pypi_name}
-Version:        2.2.0
+Version:        2.3.0
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD-2-Clause
@@ -309,6 +309,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %{python3_sitelib}/%{pypi_name}/__pycache__/cli*.py?
 
 %changelog
+* Fri Nov 20 2026 Chris Caron <lead2gold@gmail.com> - 2.3.0-1
+- Updated to v2.3.0
+
 * Sat Nov  7 2026 Chris Caron <lead2gold@gmail.com> - 2.2.0-1
 - Updated to v2.2.0
 

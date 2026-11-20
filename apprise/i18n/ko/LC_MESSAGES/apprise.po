@@ -5,9 +5,9 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 2.2.0\n"
+"Project-Id-Version: apprise 2.3.0\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2026-11-07 22:18-0500\n"
+"POT-Creation-Date: 2026-11-20 13:40-0500\n"
 "PO-Revision-Date: 2026-09-25 12:00-0400\n"
 "Last-Translator: Chris Caron <lead2gold@gmail.com>\n"
 "Language: ko\n"
@@ -18,19 +18,19 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: apprise/attachment/base.py:97 apprise/url.py:158
+#: apprise/attachment/base.py:97 apprise/url.py:159
 msgid "Verify SSL"
 msgstr "SSL 확인"
 
-#: apprise/url.py:168
+#: apprise/url.py:169
 msgid "Follow Redirects"
 msgstr "리디렉션 따라가기"
 
-#: apprise/url.py:178
+#: apprise/url.py:179
 msgid "Socket Read Timeout"
 msgstr "소켓 읽기 제한 시간"
 
-#: apprise/url.py:192
+#: apprise/url.py:193
 msgid "Socket Connect Timeout"
 msgstr "소켓 연결 제한 시간"
 
@@ -50,7 +50,7 @@ msgstr "강제 지정할 파일 이름"
 msgid "Local File"
 msgstr "로컬 파일"
 
-#: apprise/attachment/http.py:50 apprise/config/http.py:57
+#: apprise/attachment/http.py:57 apprise/config/http.py:57
 msgid "Web Based"
 msgstr "웹 기반"
 
@@ -74,150 +74,207 @@ msgstr "작동하려면 패키지가 필요합니다."
 msgid "Packages are recommended to improve functionality."
 msgstr "기능을 높이려면 패키지 설치를 권장합니다."
 
-#: apprise/plugins/africas_talking.py:142
-msgid "App User Name"
-msgstr "앱 사용자 이름"
+#: apprise/plugins/acs.py:129 apprise/plugins/brevo.py:166
+#: apprise/plugins/groundmail.py:152 apprise/plugins/mailersend.py:135
+#: apprise/plugins/postmark.py:124 apprise/plugins/resend.py:115
+#: apprise/plugins/sendgrid.py:124
+msgid "Source Email"
+msgstr "원본 이메일"
 
-#: apprise/plugins/africas_talking.py:148 apprise/plugins/brevo.py:159
-#: apprise/plugins/burstsms.py:111 apprise/plugins/clicksend.py:99
-#: apprise/plugins/dot.py:136 apprise/plugins/evolution.py:122
-#: apprise/plugins/exotel.py:214 apprise/plugins/fcm/__init__.py:144
-#: apprise/plugins/flowtriq.py:113 apprise/plugins/groundmail.py:145
-#: apprise/plugins/groundmail.py:183 apprise/plugins/gupshup.py:124
-#: apprise/plugins/httpsms.py:78 apprise/plugins/infobip.py:116
-#: apprise/plugins/jira.py:231 apprise/plugins/join.py:141
-#: apprise/plugins/kaleyra.py:178 apprise/plugins/kavenegar.py:116
-#: apprise/plugins/kumulos.py:88 apprise/plugins/mailersend.py:128
-#: apprise/plugins/mailgun.py:140 apprise/plugins/messagebird.py:79
-#: apprise/plugins/notifyre.py:131 apprise/plugins/octopush.py:137
-#: apprise/plugins/one_signal.py:115 apprise/plugins/opsgenie.py:229
-#: apprise/plugins/pagerduty.py:158 apprise/plugins/pinglet.py:138
-#: apprise/plugins/pingram.py:182 apprise/plugins/postmark.py:118
-#: apprise/plugins/prowl.py:122 apprise/plugins/resend.py:108
-#: apprise/plugins/resend.py:146 apprise/plugins/sendgrid.py:117
-#: apprise/plugins/seven.py:76 apprise/plugins/smsmanager.py:107
-#: apprise/plugins/smstunnel.py:122 apprise/plugins/smtp2go.py:119
-#: apprise/plugins/sparkpost.py:170 apprise/plugins/splunk.py:166
-#: apprise/plugins/techuluspush.py:98 apprise/plugins/telesign.py:136
-#: apprise/plugins/telnyx.py:88 apprise/plugins/trigv.py:143
-#: apprise/plugins/twilio.py:197 apprise/plugins/vapid/__init__.py:162
-#: apprise/plugins/vonage.py:81 apprise/plugins/wpush.py:158
-#: apprise/plugins/xmatters.py:135
-msgid "API Key"
-msgstr "API 키"
+#: apprise/plugins/acs.py:134 apprise/plugins/flock.py:100
+#: apprise/plugins/twitter.py:176
+msgid "Access Key"
+msgstr "액세스 키"
 
-#: apprise/plugins/africas_talking.py:155 apprise/plugins/fortysixelks.py:107
-msgid "Target Phone"
-msgstr "대상 전화"
+#: apprise/plugins/acs.py:141 apprise/plugins/amqp/base.py:163
+#: apprise/plugins/apprise_api.py:126 apprise/plugins/bark.py:174
+#: apprise/plugins/betterstack.py:152 apprise/plugins/custom_form.py:141
+#: apprise/plugins/custom_json.py:123 apprise/plugins/custom_xml.py:123
+#: apprise/plugins/emby.py:86 apprise/plugins/enigma2.py:111
+#: apprise/plugins/evolution.py:128 apprise/plugins/flowtriq.py:119
+#: apprise/plugins/fluxer.py:187 apprise/plugins/goalert.py:151
+#: apprise/plugins/gorush.py:155 apprise/plugins/gotify.py:130
+#: apprise/plugins/growl.py:140 apprise/plugins/home_assistant.py:124
+#: apprise/plugins/humhub.py:139 apprise/plugins/infobip.py:122
+#: apprise/plugins/irc/base.py:118 apprise/plugins/kodi.py:96
+#: apprise/plugins/lametric.py:461 apprise/plugins/mastodon.py:189
+#: apprise/plugins/matrix/base.py:295 apprise/plugins/mattermost.py:162
+#: apprise/plugins/misskey.py:118 apprise/plugins/mqtt.py:150
+#: apprise/plugins/nextcloud.py:116 apprise/plugins/nextcloudtalk.py:102
+#: apprise/plugins/notica.py:127 apprise/plugins/notifico.py:167
+#: apprise/plugins/ntfy.py:212 apprise/plugins/onebot.py:137
+#: apprise/plugins/opsimate.py:189 apprise/plugins/parseplatform.py:91
+#: apprise/plugins/pinglet.py:144 apprise/plugins/pushdeer.py:76
+#: apprise/plugins/pushjet.py:72 apprise/plugins/rocketchat.py:121
+#: apprise/plugins/rsyslog.py:181 apprise/plugins/signal_api.py:125
+#: apprise/plugins/smseagle.py:137 apprise/plugins/sogs.py:209
+#: apprise/plugins/synology.py:87 apprise/plugins/workflows.py:139
+#: apprise/plugins/xmatters.py:130 apprise/plugins/xmpp/base.py:102
+msgid "Hostname"
+msgstr "호스트 이름"
 
-#: apprise/plugins/africas_talking.py:160 apprise/plugins/amqp/base.py:183
-#: apprise/plugins/aprs.py:191 apprise/plugins/bark.py:200
-#: apprise/plugins/brevo.py:176 apprise/plugins/bulksms.py:148
-#: apprise/plugins/bulkvs.py:111 apprise/plugins/burstsms.py:138
-#: apprise/plugins/clickatell.py:94 apprise/plugins/clicksend.py:113
-#: apprise/plugins/cliq.py:191 apprise/plugins/cm.py:158
-#: apprise/plugins/d7networks.py:111 apprise/plugins/dapnet.py:139
-#: apprise/plugins/dingtalk.py:123 apprise/plugins/eight00com.py:129
-#: apprise/plugins/email/base.py:168 apprise/plugins/evolution.py:151
-#: apprise/plugins/exotel.py:191 apprise/plugins/fcm/__init__.py:169
-#: apprise/plugins/flock.py:126 apprise/plugins/fortysixelks.py:112
-#: apprise/plugins/gorush.py:180 apprise/plugins/groundmail.py:162
-#: apprise/plugins/gupshup.py:144 apprise/plugins/home_assistant.py:155
-#: apprise/plugins/httpsms.py:98 apprise/plugins/humhub.py:150
-#: apprise/plugins/infobip.py:134 apprise/plugins/irc/base.py:150
+#: apprise/plugins/acs.py:146 apprise/plugins/brevo.py:171
+#: apprise/plugins/email/base.py:165 apprise/plugins/groundmail.py:157
+#: apprise/plugins/mailersend.py:140 apprise/plugins/mailgun.py:146
+#: apprise/plugins/office365.py:283 apprise/plugins/one_signal.py:126
+#: apprise/plugins/pingram.py:190 apprise/plugins/postmark.py:129
+#: apprise/plugins/pushbullet.py:101 apprise/plugins/pushsafer.py:375
+#: apprise/plugins/resend.py:120 apprise/plugins/sendgrid.py:129
+#: apprise/plugins/sendpulse.py:136 apprise/plugins/slack.py:284
+#: apprise/plugins/threema.py:106
+msgid "Target Email"
+msgstr "대상 이메일"
+
+#: apprise/plugins/acs.py:151 apprise/plugins/africas_talking.py:161
+#: apprise/plugins/amqp/base.py:183 apprise/plugins/aprs.py:191
+#: apprise/plugins/awswhatsapp.py:170 apprise/plugins/bale.py:117
+#: apprise/plugins/bark.py:200 apprise/plugins/brevo.py:176
+#: apprise/plugins/bulksms.py:148 apprise/plugins/bulkvs.py:111
+#: apprise/plugins/burstsms.py:138 apprise/plugins/clickatell.py:94
+#: apprise/plugins/clicksend.py:113 apprise/plugins/cliq.py:191
+#: apprise/plugins/cm.py:158 apprise/plugins/d7networks.py:111
+#: apprise/plugins/dapnet.py:139 apprise/plugins/dingtalk.py:123
+#: apprise/plugins/eight00com.py:129 apprise/plugins/email/base.py:170
+#: apprise/plugins/evolution.py:151 apprise/plugins/exotel.py:192
+#: apprise/plugins/fcm/__init__.py:169 apprise/plugins/flock.py:126
+#: apprise/plugins/fortysixelks.py:112 apprise/plugins/gorush.py:180
+#: apprise/plugins/groundmail.py:162 apprise/plugins/gupshup.py:144
+#: apprise/plugins/home_assistant.py:155 apprise/plugins/httpsms.py:98
+#: apprise/plugins/humhub.py:150 apprise/plugins/infobip.py:134
+#: apprise/plugins/instagram.py:152 apprise/plugins/irc/base.py:150
 #: apprise/plugins/join.py:173 apprise/plugins/kakaotalk.py:185
 #: apprise/plugins/kaleyra.py:196 apprise/plugins/kavenegar.py:136
 #: apprise/plugins/kook.py:179 apprise/plugins/line.py:94
 #: apprise/plugins/mailersend.py:145 apprise/plugins/mailgun.py:151
 #: apprise/plugins/mastodon.py:211 apprise/plugins/matrix/base.py:340
-#: apprise/plugins/mattermost.py:195 apprise/plugins/messagebird.py:100
+#: apprise/plugins/mattermost.py:196 apprise/plugins/messagebird.py:100
 #: apprise/plugins/mobilemessage.py:145 apprise/plugins/mqtt.py:178
 #: apprise/plugins/msg91.py:124 apprise/plugins/nextcloud.py:148
 #: apprise/plugins/nextcloudtalk.py:135 apprise/plugins/nostr/base.py:247
 #: apprise/plugins/notifiarr.py:108 apprise/plugins/notifyre.py:144
 #: apprise/plugins/ntfy.py:242 apprise/plugins/octopush.py:154
 #: apprise/plugins/office365.py:288 apprise/plugins/one_signal.py:143
-#: apprise/plugins/onebot.py:167 apprise/plugins/pingram.py:205
+#: apprise/plugins/onebot.py:167 apprise/plugins/pingram.py:206
 #: apprise/plugins/plivo.py:118 apprise/plugins/postmark.py:134
 #: apprise/plugins/pushbullet.py:106 apprise/plugins/pushed.py:108
-#: apprise/plugins/pushover.py:399 apprise/plugins/pushsafer.py:380
-#: apprise/plugins/pushy.py:98 apprise/plugins/reddit.py:173
-#: apprise/plugins/resend.py:125 apprise/plugins/revolt.py:113
-#: apprise/plugins/ringcentral.py:220 apprise/plugins/rocketchat.py:168
-#: apprise/plugins/sendgrid.py:134 apprise/plugins/sendpulse.py:141
-#: apprise/plugins/serwersms.py:162 apprise/plugins/seven.py:89
-#: apprise/plugins/sfr.py:114 apprise/plugins/signal_api.py:166
-#: apprise/plugins/simplepush.py:195 apprise/plugins/sinch.py:141
-#: apprise/plugins/slack.py:291 apprise/plugins/smpp.py:133
-#: apprise/plugins/smsc.py:157 apprise/plugins/smseagle.py:173
-#: apprise/plugins/smsmanager.py:120 apprise/plugins/smstunnel.py:136
-#: apprise/plugins/sns.py:172 apprise/plugins/telegram.py:609
-#: apprise/plugins/telesign.py:150 apprise/plugins/telnyx.py:108
-#: apprise/plugins/threema.py:116 apprise/plugins/trigv.py:156
-#: apprise/plugins/twilio.py:177 apprise/plugins/twist.py:124
-#: apprise/plugins/twitter.py:194 apprise/plugins/vapid/__init__.py:168
-#: apprise/plugins/voipms.py:109 apprise/plugins/vonage.py:109
-#: apprise/plugins/wechat.py:219 apprise/plugins/whapi.py:181
-#: apprise/plugins/whatsapp.py:167 apprise/plugins/wxpusher.py:140
-#: apprise/plugins/xmatters.py:155 apprise/plugins/xmpp/base.py:135
-#: apprise/plugins/zalo.py:125 apprise/plugins/zulip.py:157
+#: apprise/plugins/pushover.py:399 apprise/plugins/pushplus.py:312
+#: apprise/plugins/pushsafer.py:380 apprise/plugins/pushy.py:98
+#: apprise/plugins/reddit.py:173 apprise/plugins/resend.py:125
+#: apprise/plugins/revolt.py:113 apprise/plugins/ringcentral.py:225
+#: apprise/plugins/rocketchat.py:168 apprise/plugins/sendgrid.py:134
+#: apprise/plugins/sendpulse.py:141 apprise/plugins/serwersms.py:162
+#: apprise/plugins/seven.py:89 apprise/plugins/sfr.py:114
+#: apprise/plugins/signal_api.py:166 apprise/plugins/simplepush.py:195
+#: apprise/plugins/sinch.py:141 apprise/plugins/slack.py:301
+#: apprise/plugins/smpp.py:133 apprise/plugins/smsc.py:157
+#: apprise/plugins/smseagle.py:174 apprise/plugins/smsmanager.py:120
+#: apprise/plugins/smstunnel.py:136 apprise/plugins/sns.py:172
+#: apprise/plugins/telegram.py:609 apprise/plugins/telesign.py:150
+#: apprise/plugins/telnyx.py:108 apprise/plugins/threema.py:116
+#: apprise/plugins/trigv.py:162 apprise/plugins/twilio.py:182
+#: apprise/plugins/twist.py:124 apprise/plugins/twitter.py:194
+#: apprise/plugins/vapid/__init__.py:168 apprise/plugins/voipms.py:109
+#: apprise/plugins/vonage.py:109 apprise/plugins/wechat.py:219
+#: apprise/plugins/whapi.py:181 apprise/plugins/whatsapp.py:167
+#: apprise/plugins/wxpusher.py:140 apprise/plugins/xmatters.py:155
+#: apprise/plugins/xmpp/base.py:135 apprise/plugins/zalo.py:125
+#: apprise/plugins/zulip.py:157
 msgid "Targets"
 msgstr "대상"
 
-#: apprise/plugins/africas_talking.py:176
+#: apprise/plugins/acs.py:174 apprise/plugins/brevo.py:195
+#: apprise/plugins/email/base.py:246 apprise/plugins/groundmail.py:196
+#: apprise/plugins/mailersend.py:159 apprise/plugins/mailgun.py:180
+#: apprise/plugins/office365.py:308 apprise/plugins/pingram.py:253
+#: apprise/plugins/postmark.py:158 apprise/plugins/resend.py:159
+#: apprise/plugins/sendgrid.py:154 apprise/plugins/sendpulse.py:171
+#: apprise/plugins/ses.py:233 apprise/plugins/smtp2go.py:144
+#: apprise/plugins/sparkpost.py:202
+msgid "Carbon Copy"
+msgstr "참조"
+
+#: apprise/plugins/acs.py:178 apprise/plugins/brevo.py:199
+#: apprise/plugins/email/base.py:250 apprise/plugins/groundmail.py:200
+#: apprise/plugins/mailersend.py:163 apprise/plugins/mailgun.py:184
+#: apprise/plugins/office365.py:312 apprise/plugins/pingram.py:257
+#: apprise/plugins/postmark.py:162 apprise/plugins/resend.py:163
+#: apprise/plugins/sendgrid.py:158 apprise/plugins/sendpulse.py:175
+#: apprise/plugins/ses.py:237 apprise/plugins/smtp2go.py:148
+#: apprise/plugins/sparkpost.py:206
+msgid "Blind Carbon Copy"
+msgstr "숨은 참조"
+
+#: apprise/plugins/acs.py:182 apprise/plugins/email/base.py:202
+#: apprise/plugins/groundmail.py:188 apprise/plugins/mailersend.py:167
+#: apprise/plugins/office365.py:316 apprise/plugins/pingram.py:239
+#: apprise/plugins/resend.py:151
+msgid "Reply To"
+msgstr "회신 주소"
+
+#: apprise/plugins/africas_talking.py:143
+msgid "App User Name"
+msgstr "앱 사용자 이름"
+
+#: apprise/plugins/africas_talking.py:149 apprise/plugins/brevo.py:159
+#: apprise/plugins/burstsms.py:111 apprise/plugins/clicksend.py:99
+#: apprise/plugins/dot.py:136 apprise/plugins/evolution.py:122
+#: apprise/plugins/exotel.py:215 apprise/plugins/fcm/__init__.py:144
+#: apprise/plugins/flowtriq.py:113 apprise/plugins/groundmail.py:145
+#: apprise/plugins/groundmail.py:183 apprise/plugins/gupshup.py:124
+#: apprise/plugins/httpsms.py:78 apprise/plugins/infobip.py:116
+#: apprise/plugins/jira.py:237 apprise/plugins/join.py:141
+#: apprise/plugins/kaleyra.py:178 apprise/plugins/kavenegar.py:116
+#: apprise/plugins/kumulos.py:88 apprise/plugins/mailersend.py:128
+#: apprise/plugins/mailgun.py:140 apprise/plugins/messagebird.py:79
+#: apprise/plugins/notifyre.py:131 apprise/plugins/octopush.py:137
+#: apprise/plugins/one_signal.py:115 apprise/plugins/opsgenie.py:235
+#: apprise/plugins/pagerduty.py:158 apprise/plugins/pinglet.py:138
+#: apprise/plugins/pingram.py:183 apprise/plugins/postmark.py:118
+#: apprise/plugins/prowl.py:122 apprise/plugins/resend.py:108
+#: apprise/plugins/resend.py:146 apprise/plugins/sendgrid.py:117
+#: apprise/plugins/seven.py:76 apprise/plugins/smsmanager.py:107
+#: apprise/plugins/smstunnel.py:122 apprise/plugins/smtp2go.py:119
+#: apprise/plugins/sparkpost.py:170 apprise/plugins/splunk.py:166
+#: apprise/plugins/techuluspush.py:98 apprise/plugins/telesign.py:136
+#: apprise/plugins/telnyx.py:88 apprise/plugins/trigv.py:149
+#: apprise/plugins/twilio.py:202 apprise/plugins/vapid/__init__.py:162
+#: apprise/plugins/vonage.py:81 apprise/plugins/wpush.py:158
+#: apprise/plugins/xmatters.py:135
+msgid "API Key"
+msgstr "API 키"
+
+#: apprise/plugins/africas_talking.py:156 apprise/plugins/fortysixelks.py:107
+msgid "Target Phone"
+msgstr "대상 전화"
+
+#: apprise/plugins/africas_talking.py:177
 msgid "From"
 msgstr "보내는 사람"
 
-#: apprise/plugins/africas_talking.py:182
+#: apprise/plugins/africas_talking.py:183
 msgid "SMS Mode"
 msgstr "SMS 모드"
 
-#: apprise/plugins/africas_talking.py:191 apprise/plugins/bulksms.py:181
+#: apprise/plugins/africas_talking.py:192 apprise/plugins/bulksms.py:181
 #: apprise/plugins/bulkvs.py:132 apprise/plugins/burstsms.py:173
 #: apprise/plugins/clicksend.py:131 apprise/plugins/cm.py:183
 #: apprise/plugins/d7networks.py:145 apprise/plugins/dapnet.py:168
-#: apprise/plugins/exotel.py:223 apprise/plugins/home_assistant.py:172
-#: apprise/plugins/jira.py:283 apprise/plugins/kaleyra.py:241
+#: apprise/plugins/exotel.py:224 apprise/plugins/home_assistant.py:172
+#: apprise/plugins/jira.py:289 apprise/plugins/kaleyra.py:241
 #: apprise/plugins/mailgun.py:188 apprise/plugins/mastodon.py:256
 #: apprise/plugins/mobilemessage.py:182 apprise/plugins/octopush.py:174
-#: apprise/plugins/one_signal.py:190 apprise/plugins/opsgenie.py:308
+#: apprise/plugins/one_signal.py:190 apprise/plugins/opsgenie.py:314
 #: apprise/plugins/plivo.py:141 apprise/plugins/signal_api.py:188
-#: apprise/plugins/smseagle.py:212 apprise/plugins/smsmanager.py:153
+#: apprise/plugins/smseagle.py:213 apprise/plugins/smsmanager.py:153
 #: apprise/plugins/smtp2go.py:152 apprise/plugins/sparkpost.py:210
 #: apprise/plugins/twitter.py:219
 msgid "Batch Mode"
 msgstr "일괄 모드"
 
-#: apprise/plugins/amqp/base.py:163 apprise/plugins/apprise_api.py:126
-#: apprise/plugins/bark.py:174 apprise/plugins/betterstack.py:152
-#: apprise/plugins/custom_form.py:140 apprise/plugins/custom_json.py:122
-#: apprise/plugins/custom_xml.py:122 apprise/plugins/emby.py:86
-#: apprise/plugins/enigma2.py:111 apprise/plugins/evolution.py:128
-#: apprise/plugins/flowtriq.py:119 apprise/plugins/fluxer.py:187
-#: apprise/plugins/goalert.py:151 apprise/plugins/gorush.py:155
-#: apprise/plugins/gotify.py:130 apprise/plugins/growl.py:140
-#: apprise/plugins/home_assistant.py:124 apprise/plugins/humhub.py:139
-#: apprise/plugins/infobip.py:122 apprise/plugins/irc/base.py:118
-#: apprise/plugins/kodi.py:96 apprise/plugins/lametric.py:461
-#: apprise/plugins/mastodon.py:189 apprise/plugins/matrix/base.py:295
-#: apprise/plugins/mattermost.py:161 apprise/plugins/misskey.py:118
-#: apprise/plugins/mqtt.py:150 apprise/plugins/nextcloud.py:116
-#: apprise/plugins/nextcloudtalk.py:102 apprise/plugins/notica.py:127
-#: apprise/plugins/notifico.py:167 apprise/plugins/ntfy.py:212
-#: apprise/plugins/onebot.py:137 apprise/plugins/parseplatform.py:91
-#: apprise/plugins/pinglet.py:144 apprise/plugins/pushdeer.py:76
-#: apprise/plugins/pushjet.py:72 apprise/plugins/rocketchat.py:121
-#: apprise/plugins/rsyslog.py:181 apprise/plugins/signal_api.py:125
-#: apprise/plugins/smseagle.py:136 apprise/plugins/sogs.py:209
-#: apprise/plugins/synology.py:86 apprise/plugins/workflows.py:139
-#: apprise/plugins/xmatters.py:130 apprise/plugins/xmpp/base.py:102
-msgid "Hostname"
-msgstr "호스트 이름"
-
 #: apprise/plugins/amqp/base.py:168 apprise/plugins/apprise_api.py:131
 #: apprise/plugins/bark.py:179 apprise/plugins/betterstack.py:156
-#: apprise/plugins/custom_form.py:145 apprise/plugins/custom_json.py:127
-#: apprise/plugins/custom_xml.py:127 apprise/plugins/email/base.py:157
+#: apprise/plugins/custom_form.py:146 apprise/plugins/custom_json.py:128
+#: apprise/plugins/custom_xml.py:128 apprise/plugins/email/base.py:159
 #: apprise/plugins/emby.py:91 apprise/plugins/enigma2.py:116
 #: apprise/plugins/evolution.py:133 apprise/plugins/flowtriq.py:124
 #: apprise/plugins/fluxer.py:191 apprise/plugins/goalert.py:156
@@ -226,44 +283,44 @@ msgstr "호스트 이름"
 #: apprise/plugins/humhub.py:144 apprise/plugins/irc/base.py:123
 #: apprise/plugins/kodi.py:101 apprise/plugins/lametric.py:465
 #: apprise/plugins/mastodon.py:199 apprise/plugins/matrix/base.py:300
-#: apprise/plugins/mattermost.py:177 apprise/plugins/misskey.py:128
+#: apprise/plugins/mattermost.py:178 apprise/plugins/misskey.py:128
 #: apprise/plugins/mqtt.py:155 apprise/plugins/nextcloud.py:121
 #: apprise/plugins/nextcloudtalk.py:107 apprise/plugins/notica.py:131
 #: apprise/plugins/notifico.py:171 apprise/plugins/ntfy.py:216
-#: apprise/plugins/onebot.py:142 apprise/plugins/parseplatform.py:96
-#: apprise/plugins/pinglet.py:149 apprise/plugins/pushdeer.py:80
-#: apprise/plugins/pushjet.py:77 apprise/plugins/rocketchat.py:126
-#: apprise/plugins/rsyslog.py:186 apprise/plugins/signal_api.py:130
-#: apprise/plugins/smpp.py:113 apprise/plugins/smseagle.py:141
-#: apprise/plugins/sogs.py:214 apprise/plugins/synology.py:91
-#: apprise/plugins/trigv.py:164 apprise/plugins/workflows.py:144
-#: apprise/plugins/xmpp/base.py:107
+#: apprise/plugins/onebot.py:142 apprise/plugins/opsimate.py:194
+#: apprise/plugins/parseplatform.py:96 apprise/plugins/pinglet.py:149
+#: apprise/plugins/pushdeer.py:80 apprise/plugins/pushjet.py:77
+#: apprise/plugins/rocketchat.py:126 apprise/plugins/rsyslog.py:186
+#: apprise/plugins/signal_api.py:130 apprise/plugins/smpp.py:113
+#: apprise/plugins/smseagle.py:142 apprise/plugins/sogs.py:214
+#: apprise/plugins/synology.py:92 apprise/plugins/trigv.py:170
+#: apprise/plugins/workflows.py:144 apprise/plugins/xmpp/base.py:107
 msgid "Port"
 msgstr "포트"
 
 #: apprise/plugins/apprise_api.py:137 apprise/plugins/bark.py:185
-#: apprise/plugins/bluesky.py:126 apprise/plugins/custom_form.py:151
-#: apprise/plugins/custom_json.py:133 apprise/plugins/custom_xml.py:133
+#: apprise/plugins/bluesky.py:126 apprise/plugins/custom_form.py:152
+#: apprise/plugins/custom_json.py:134 apprise/plugins/custom_xml.py:134
 #: apprise/plugins/emby.py:98 apprise/plugins/enigma2.py:122
 #: apprise/plugins/freemobile.py:79 apprise/plugins/gorush.py:166
-#: apprise/plugins/home_assistant.py:135 apprise/plugins/jira.py:237
+#: apprise/plugins/home_assistant.py:135 apprise/plugins/jira.py:243
 #: apprise/plugins/kodi.py:107 apprise/plugins/lametric.py:472
 #: apprise/plugins/matrix/base.py:306 apprise/plugins/nextcloud.py:127
 #: apprise/plugins/nextcloudtalk.py:113 apprise/plugins/notica.py:137
 #: apprise/plugins/notifico.py:177 apprise/plugins/ntfy.py:222
-#: apprise/plugins/opsgenie.py:235 apprise/plugins/pushjet.py:89
+#: apprise/plugins/opsgenie.py:241 apprise/plugins/pushjet.py:89
 #: apprise/plugins/rocketchat.py:132 apprise/plugins/serwersms.py:132
 #: apprise/plugins/signal_api.py:136 apprise/plugins/smpp.py:97
-#: apprise/plugins/synology.py:97 apprise/plugins/xmatters.py:140
+#: apprise/plugins/synology.py:98 apprise/plugins/xmatters.py:140
 msgid "Username"
 msgstr "사용자 이름"
 
 #: apprise/plugins/amqp/base.py:178 apprise/plugins/apprise_api.py:141
 #: apprise/plugins/aprs.py:176 apprise/plugins/bark.py:189
 #: apprise/plugins/bluesky.py:131 apprise/plugins/bulkvs.py:91
-#: apprise/plugins/custom_form.py:155 apprise/plugins/custom_json.py:137
-#: apprise/plugins/custom_xml.py:137 apprise/plugins/dapnet.py:124
-#: apprise/plugins/email/base.py:147 apprise/plugins/emby.py:102
+#: apprise/plugins/custom_form.py:156 apprise/plugins/custom_json.py:138
+#: apprise/plugins/custom_xml.py:138 apprise/plugins/dapnet.py:124
+#: apprise/plugins/email/base.py:149 apprise/plugins/emby.py:102
 #: apprise/plugins/enigma2.py:126 apprise/plugins/freemobile.py:84
 #: apprise/plugins/gorush.py:170 apprise/plugins/growl.py:151
 #: apprise/plugins/home_assistant.py:139 apprise/plugins/humhub.py:134
@@ -275,53 +332,63 @@ msgstr "사용자 이름"
 #: apprise/plugins/reddit.py:148 apprise/plugins/rocketchat.py:136
 #: apprise/plugins/serwersms.py:137 apprise/plugins/signal_api.py:140
 #: apprise/plugins/simplepush.py:179 apprise/plugins/smpp.py:102
-#: apprise/plugins/smsc.py:144 apprise/plugins/synology.py:101
+#: apprise/plugins/smsc.py:144 apprise/plugins/synology.py:102
 #: apprise/plugins/twist.py:102 apprise/plugins/voipms.py:89
 #: apprise/plugins/xmatters.py:144 apprise/plugins/xmpp/base.py:118
 msgid "Password"
 msgstr "비밀번호"
 
-#: apprise/plugins/apprise_api.py:146 apprise/plugins/betterstack.py:146
+#: apprise/plugins/apprise_api.py:146 apprise/plugins/custom_form.py:161
+#: apprise/plugins/custom_json.py:143 apprise/plugins/custom_xml.py:143
+#: apprise/plugins/enigma2.py:131 apprise/plugins/fluxer.py:197
+#: apprise/plugins/goalert.py:162 apprise/plugins/gotify.py:135
+#: apprise/plugins/mattermost.py:174 apprise/plugins/notica.py:146
+#: apprise/plugins/opsimate.py:200 apprise/plugins/pinglet.py:155
+#: apprise/plugins/synology.py:107
+msgid "Path"
+msgstr "경로"
+
+#: apprise/plugins/apprise_api.py:152 apprise/plugins/betterstack.py:146
 #: apprise/plugins/bulksms.py:121 apprise/plugins/chanify.py:75
-#: apprise/plugins/dingtalk.py:105 apprise/plugins/exotel.py:167
-#: apprise/plugins/feishu.py:81 apprise/plugins/firehydrant.py:147
+#: apprise/plugins/dingtalk.py:105 apprise/plugins/exotel.py:168
+#: apprise/plugins/feishu.py:95 apprise/plugins/firehydrant.py:147
 #: apprise/plugins/gotify.py:124 apprise/plugins/incidentio.py:127
 #: apprise/plugins/kook.py:173 apprise/plugins/lauther.py:116
-#: apprise/plugins/lfgalarm.py:99 apprise/plugins/mattermost.py:167
+#: apprise/plugins/lfgalarm.py:99 apprise/plugins/mattermost.py:168
 #: apprise/plugins/notica.py:120 apprise/plugins/notifiarr.py:96
-#: apprise/plugins/ntfy.py:231 apprise/plugins/pushme.py:63
-#: apprise/plugins/ryver.py:100 apprise/plugins/serverchan.py:71
-#: apprise/plugins/slack.py:341 apprise/plugins/synology.py:106
-#: apprise/plugins/zulip.py:140
+#: apprise/plugins/notifyapp.py:111 apprise/plugins/ntfy.py:231
+#: apprise/plugins/pushme.py:63 apprise/plugins/ryver.py:100
+#: apprise/plugins/serverchan.py:71 apprise/plugins/slack.py:351
+#: apprise/plugins/synology.py:113 apprise/plugins/zulip.py:140
 msgid "Token"
 msgstr "토큰"
 
-#: apprise/plugins/apprise_api.py:160 apprise/plugins/firehydrant.py:190
-#: apprise/plugins/jira.py:302 apprise/plugins/ntfy.py:290
-#: apprise/plugins/opsgenie.py:295 apprise/plugins/pagertree.py:148
-#: apprise/plugins/squadcast.py:194
+#: apprise/plugins/apprise_api.py:166 apprise/plugins/firehydrant.py:190
+#: apprise/plugins/jira.py:308 apprise/plugins/ntfy.py:290
+#: apprise/plugins/opsgenie.py:301 apprise/plugins/opsimate.py:246
+#: apprise/plugins/pagertree.py:148 apprise/plugins/squadcast.py:194
 msgid "Tags"
 msgstr "태그"
 
-#: apprise/plugins/apprise_api.py:164
+#: apprise/plugins/apprise_api.py:170
 msgid "Query Method"
 msgstr "질의 방식"
 
-#: apprise/plugins/apprise_api.py:170
+#: apprise/plugins/apprise_api.py:176
 msgid "Apprise API Version"
 msgstr "Apprise API 버전"
 
-#: apprise/plugins/apprise_api.py:184 apprise/plugins/custom_form.py:184
-#: apprise/plugins/custom_json.py:160 apprise/plugins/custom_xml.py:160
+#: apprise/plugins/apprise_api.py:190 apprise/plugins/custom_form.py:191
+#: apprise/plugins/custom_json.py:167 apprise/plugins/custom_xml.py:167
 #: apprise/plugins/enigma2.py:154 apprise/plugins/nextcloud.py:181
 #: apprise/plugins/nextcloudtalk.py:162 apprise/plugins/notica.py:157
-#: apprise/plugins/pagertree.py:157 apprise/plugins/synology.py:131
+#: apprise/plugins/pagertree.py:157 apprise/plugins/synology.py:138
 msgid "HTTP Header"
 msgstr "HTTP 헤더"
 
 #: apprise/plugins/amqp/base.py:174 apprise/plugins/aprs.py:171
 #: apprise/plugins/bulkvs.py:86 apprise/plugins/clicksend.py:94
-#: apprise/plugins/dapnet.py:119 apprise/plugins/email/base.py:143
+#: apprise/plugins/dapnet.py:119 apprise/plugins/email/base.py:145
 #: apprise/plugins/mailgun.py:130 apprise/plugins/mqtt.py:161
 #: apprise/plugins/reddit.py:143 apprise/plugins/sendpulse.py:112
 #: apprise/plugins/smtp2go.py:109 apprise/plugins/sparkpost.py:160
@@ -341,6 +408,85 @@ msgstr "재전송 지연 시간"
 msgid "Locale"
 msgstr "지역 설정"
 
+#: apprise/plugins/awswhatsapp.py:132 apprise/plugins/ses.py:158
+#: apprise/plugins/sns.py:134
+msgid "Session Token"
+msgstr "세션 토큰"
+
+#: apprise/plugins/awswhatsapp.py:138 apprise/plugins/ses.py:170
+#: apprise/plugins/sns.py:140
+msgid "Access Key ID"
+msgstr "액세스 키 ID"
+
+#: apprise/plugins/awswhatsapp.py:144 apprise/plugins/ses.py:176
+#: apprise/plugins/sns.py:146
+msgid "Secret Access Key"
+msgstr "비밀 액세스 키"
+
+#: apprise/plugins/awswhatsapp.py:150 apprise/plugins/cliq.py:212
+#: apprise/plugins/kaleyra.py:220 apprise/plugins/ses.py:182
+#: apprise/plugins/sinch.py:158 apprise/plugins/sns.py:152
+msgid "Region"
+msgstr "지역"
+
+#: apprise/plugins/awswhatsapp.py:157 apprise/plugins/whatsapp.py:135
+msgid "From Phone ID"
+msgstr "보내는 전화 ID"
+
+#: apprise/plugins/awswhatsapp.py:163 apprise/plugins/bulksms.py:134
+#: apprise/plugins/bulkvs.py:104 apprise/plugins/burstsms.py:131
+#: apprise/plugins/clickatell.py:87 apprise/plugins/clicksend.py:106
+#: apprise/plugins/cm.py:151 apprise/plugins/d7networks.py:104
+#: apprise/plugins/dingtalk.py:118 apprise/plugins/eight00com.py:122
+#: apprise/plugins/evolution.py:144 apprise/plugins/exotel.py:185
+#: apprise/plugins/gupshup.py:137 apprise/plugins/httpsms.py:91
+#: apprise/plugins/infobip.py:127 apprise/plugins/kaleyra.py:189
+#: apprise/plugins/kavenegar.py:129 apprise/plugins/messagebird.py:93
+#: apprise/plugins/mobilemessage.py:138 apprise/plugins/msg91.py:117
+#: apprise/plugins/notifyre.py:137 apprise/plugins/octopush.py:147
+#: apprise/plugins/plivo.py:111 apprise/plugins/ringcentral.py:219
+#: apprise/plugins/serwersms.py:149 apprise/plugins/seven.py:82
+#: apprise/plugins/signal_api.py:152 apprise/plugins/sinch.py:128
+#: apprise/plugins/smpp.py:126 apprise/plugins/smsc.py:150
+#: apprise/plugins/smseagle.py:153 apprise/plugins/smsmanager.py:113
+#: apprise/plugins/smstunnel.py:129 apprise/plugins/sns.py:159
+#: apprise/plugins/telesign.py:143 apprise/plugins/telnyx.py:101
+#: apprise/plugins/threema.py:99 apprise/plugins/twilio.py:169
+#: apprise/plugins/voipms.py:102 apprise/plugins/vonage.py:102
+#: apprise/plugins/whapi.py:162 apprise/plugins/whatsapp.py:148
+msgid "Target Phone No"
+msgstr "대상 전화번호"
+
+#: apprise/plugins/awswhatsapp.py:202 apprise/plugins/notifyre.py:173
+#: apprise/plugins/whatsapp.py:129
+msgid "Template Name"
+msgstr "템플릿 이름"
+
+#: apprise/plugins/awswhatsapp.py:207 apprise/plugins/one_signal.py:161
+#: apprise/plugins/sfr.py:126 apprise/plugins/whatsapp.py:142
+msgid "Language"
+msgstr "언어"
+
+#: apprise/plugins/awswhatsapp.py:214
+msgid "S3 Bucket"
+msgstr "S3 버킷"
+
+#: apprise/plugins/awswhatsapp.py:227 apprise/plugins/gupshup.py:180
+#: apprise/plugins/msg91.py:149 apprise/plugins/whatsapp.py:204
+msgid "Template Mapping"
+msgstr "템플릿 매핑"
+
+#: apprise/plugins/bale.py:105 apprise/plugins/lark.py:89
+#: apprise/plugins/revolt.py:99 apprise/plugins/telegram.py:594
+#: apprise/plugins/zalo.py:113
+msgid "Bot Token"
+msgstr "봇 토큰"
+
+#: apprise/plugins/bale.py:112 apprise/plugins/telegram.py:603
+#: apprise/plugins/whapi.py:175 apprise/plugins/zalo.py:120
+msgid "Target Chat ID"
+msgstr "대상 대화 ID"
+
 #: apprise/plugins/bark.py:194 apprise/plugins/fcm/__init__.py:158
 #: apprise/plugins/gorush.py:175 apprise/plugins/home_assistant.py:150
 #: apprise/plugins/pushbullet.py:90 apprise/plugins/pushover.py:387
@@ -356,18 +502,19 @@ msgid "Sound"
 msgstr "소리"
 
 #: apprise/plugins/bark.py:218 apprise/plugins/firehydrant.py:172
-#: apprise/plugins/pushward.py:153
+#: apprise/plugins/pushward.py:191
 msgid "Level"
 msgstr "수준"
 
-#: apprise/plugins/bark.py:223 apprise/plugins/pushward.py:183
+#: apprise/plugins/bark.py:223 apprise/plugins/pushward.py:221
 #: apprise/plugins/simplepush.py:221
 msgid "Volume"
 msgstr "음량"
 
 #: apprise/plugins/bark.py:229 apprise/plugins/firehydrant.py:186
 #: apprise/plugins/ilert.py:173 apprise/plugins/incidentio.py:156
-#: apprise/plugins/ntfy.py:272 apprise/plugins/pagerduty.py:199
+#: apprise/plugins/ntfy.py:272 apprise/plugins/opsimate.py:229
+#: apprise/plugins/pagerduty.py:199
 msgid "Click"
 msgstr "클릭"
 
@@ -382,7 +529,7 @@ msgstr "분류"
 
 #: apprise/plugins/bark.py:242 apprise/plugins/join.py:159
 #: apprise/plugins/lauther.py:158 apprise/plugins/pagerduty.py:190
-#: apprise/plugins/youlmk.py:222
+#: apprise/plugins/youlmk.py:212
 msgid "Group"
 msgstr "그룹"
 
@@ -394,18 +541,18 @@ msgstr "그룹"
 #: apprise/plugins/growl.py:175 apprise/plugins/ilert.py:177
 #: apprise/plugins/join.py:184 apprise/plugins/kodi.py:129
 #: apprise/plugins/line.py:109 apprise/plugins/macosx.py:157
-#: apprise/plugins/matrix/base.py:351 apprise/plugins/mattermost.py:218
-#: apprise/plugins/notifiarr.py:130 apprise/plugins/ntfy.py:258
-#: apprise/plugins/one_signal.py:169 apprise/plugins/pagerduty.py:218
-#: apprise/plugins/ryver.py:125 apprise/plugins/slack.py:309
-#: apprise/plugins/telegram.py:620 apprise/plugins/vapid/__init__.py:214
-#: apprise/plugins/windows.py:106 apprise/plugins/workflows.py:176
-#: apprise/plugins/youlmk.py:229
+#: apprise/plugins/matrix/base.py:351 apprise/plugins/mattermost.py:219
+#: apprise/plugins/notifiarr.py:130 apprise/plugins/notifyapp.py:127
+#: apprise/plugins/ntfy.py:258 apprise/plugins/one_signal.py:169
+#: apprise/plugins/pagerduty.py:218 apprise/plugins/ryver.py:125
+#: apprise/plugins/slack.py:319 apprise/plugins/telegram.py:620
+#: apprise/plugins/vapid/__init__.py:214 apprise/plugins/windows.py:106
+#: apprise/plugins/workflows.py:176 apprise/plugins/youlmk.py:219
 msgid "Include Image"
 msgstr "이미지 포함"
 
 #: apprise/plugins/bark.py:252 apprise/plugins/lauther.py:147
-#: apprise/plugins/mattermost.py:214 apprise/plugins/revolt.py:130
+#: apprise/plugins/mattermost.py:215 apprise/plugins/revolt.py:130
 msgid "Icon URL"
 msgstr "아이콘 URL"
 
@@ -414,6 +561,7 @@ msgid "Call"
 msgstr "통화"
 
 #: apprise/plugins/bark.py:261 apprise/plugins/one_signal.py:157
+#: apprise/plugins/pushward.py:253
 msgid "Subtitle"
 msgstr "부제목"
 
@@ -423,10 +571,11 @@ msgstr "복사할 내용"
 
 #: apprise/plugins/bark.py:269 apprise/plugins/firehydrant.py:164
 #: apprise/plugins/goalert.py:187 apprise/plugins/ilert.py:153
-#: apprise/plugins/incidentio.py:146 apprise/plugins/jira.py:309
-#: apprise/plugins/opsgenie.py:299 apprise/plugins/pagerduty.py:224
-#: apprise/plugins/pagertree.py:127 apprise/plugins/signl4.py:137
-#: apprise/plugins/splunk.py:203 apprise/plugins/squadcast.py:174
+#: apprise/plugins/incidentio.py:146 apprise/plugins/jira.py:315
+#: apprise/plugins/opsgenie.py:305 apprise/plugins/opsimate.py:219
+#: apprise/plugins/pagerduty.py:224 apprise/plugins/pagertree.py:127
+#: apprise/plugins/signl4.py:137 apprise/plugins/splunk.py:203
+#: apprise/plugins/squadcast.py:174
 msgid "Action"
 msgstr "동작"
 
@@ -447,6 +596,7 @@ msgid "Delete Notification"
 msgstr "알림 삭제"
 
 #: apprise/plugins/bark.py:296 apprise/plugins/pushover.py:448
+#: apprise/plugins/pushward.py:273
 msgid "Encryption Key"
 msgstr "암호화 키"
 
@@ -482,14 +632,14 @@ msgstr "재시도 간 대기 시간"
 msgid "Optional Service"
 msgstr "선택 서비스"
 
-#: apprise/plugins/betterstack.py:162 apprise/plugins/email/base.py:178
-#: apprise/plugins/pingram.py:243 apprise/plugins/sendpulse.py:152
+#: apprise/plugins/betterstack.py:162 apprise/plugins/email/base.py:180
+#: apprise/plugins/pingram.py:244 apprise/plugins/sendpulse.py:152
 #: apprise/plugins/ses.py:164
 msgid "From Email"
 msgstr "보내는 이메일"
 
-#: apprise/plugins/betterstack.py:166 apprise/plugins/jira.py:259
-#: apprise/plugins/opsgenie.py:257
+#: apprise/plugins/betterstack.py:166 apprise/plugins/jira.py:265
+#: apprise/plugins/opsgenie.py:263
 msgid "Target Team"
 msgstr "대상 팀"
 
@@ -525,76 +675,15 @@ msgstr "페이드 시간 (밀리초)"
 msgid "LED Number"
 msgstr "LED 번호"
 
-#: apprise/plugins/brevo.py:166 apprise/plugins/groundmail.py:152
-#: apprise/plugins/mailersend.py:135 apprise/plugins/postmark.py:124
-#: apprise/plugins/resend.py:115 apprise/plugins/sendgrid.py:124
-msgid "Source Email"
-msgstr "원본 이메일"
-
-#: apprise/plugins/brevo.py:171 apprise/plugins/email/base.py:163
-#: apprise/plugins/groundmail.py:157 apprise/plugins/mailersend.py:140
-#: apprise/plugins/mailgun.py:146 apprise/plugins/office365.py:283
-#: apprise/plugins/one_signal.py:126 apprise/plugins/pingram.py:189
-#: apprise/plugins/postmark.py:129 apprise/plugins/pushbullet.py:101
-#: apprise/plugins/pushsafer.py:375 apprise/plugins/resend.py:120
-#: apprise/plugins/sendgrid.py:129 apprise/plugins/sendpulse.py:136
-#: apprise/plugins/slack.py:274 apprise/plugins/threema.py:106
-msgid "Target Email"
-msgstr "대상 이메일"
-
 #: apprise/plugins/brevo.py:187 apprise/plugins/postmark.py:150
 #: apprise/plugins/ses.py:206
 msgid "Reply To Email"
 msgstr "회신 이메일"
 
-#: apprise/plugins/brevo.py:195 apprise/plugins/email/base.py:244
-#: apprise/plugins/groundmail.py:196 apprise/plugins/mailersend.py:159
-#: apprise/plugins/mailgun.py:180 apprise/plugins/office365.py:308
-#: apprise/plugins/pingram.py:252 apprise/plugins/postmark.py:158
-#: apprise/plugins/resend.py:159 apprise/plugins/sendgrid.py:154
-#: apprise/plugins/sendpulse.py:171 apprise/plugins/ses.py:233
-#: apprise/plugins/smtp2go.py:144 apprise/plugins/sparkpost.py:202
-msgid "Carbon Copy"
-msgstr "참조"
-
-#: apprise/plugins/brevo.py:199 apprise/plugins/email/base.py:248
-#: apprise/plugins/groundmail.py:200 apprise/plugins/mailersend.py:163
-#: apprise/plugins/mailgun.py:184 apprise/plugins/office365.py:312
-#: apprise/plugins/pingram.py:256 apprise/plugins/postmark.py:162
-#: apprise/plugins/resend.py:163 apprise/plugins/sendgrid.py:158
-#: apprise/plugins/sendpulse.py:175 apprise/plugins/ses.py:237
-#: apprise/plugins/smtp2go.py:148 apprise/plugins/sparkpost.py:206
-msgid "Blind Carbon Copy"
-msgstr "숨은 참조"
-
 #: apprise/plugins/bulksms.py:127 apprise/plugins/dingtalk.py:112
 #: apprise/plugins/nextcloudtalk.py:124 apprise/plugins/signl4.py:100
 msgid "Secret"
 msgstr "시크릿"
-
-#: apprise/plugins/bulksms.py:134 apprise/plugins/bulkvs.py:104
-#: apprise/plugins/burstsms.py:131 apprise/plugins/clickatell.py:87
-#: apprise/plugins/clicksend.py:106 apprise/plugins/cm.py:151
-#: apprise/plugins/d7networks.py:104 apprise/plugins/dingtalk.py:118
-#: apprise/plugins/eight00com.py:122 apprise/plugins/evolution.py:144
-#: apprise/plugins/exotel.py:184 apprise/plugins/gupshup.py:137
-#: apprise/plugins/httpsms.py:91 apprise/plugins/infobip.py:127
-#: apprise/plugins/kaleyra.py:189 apprise/plugins/kavenegar.py:129
-#: apprise/plugins/messagebird.py:93 apprise/plugins/mobilemessage.py:138
-#: apprise/plugins/msg91.py:117 apprise/plugins/notifyre.py:137
-#: apprise/plugins/octopush.py:147 apprise/plugins/plivo.py:111
-#: apprise/plugins/ringcentral.py:214 apprise/plugins/serwersms.py:149
-#: apprise/plugins/seven.py:82 apprise/plugins/signal_api.py:152
-#: apprise/plugins/sinch.py:128 apprise/plugins/smpp.py:126
-#: apprise/plugins/smsc.py:150 apprise/plugins/smseagle.py:152
-#: apprise/plugins/smsmanager.py:113 apprise/plugins/smstunnel.py:129
-#: apprise/plugins/sns.py:159 apprise/plugins/telesign.py:143
-#: apprise/plugins/telnyx.py:101 apprise/plugins/threema.py:99
-#: apprise/plugins/twilio.py:164 apprise/plugins/voipms.py:102
-#: apprise/plugins/vonage.py:102 apprise/plugins/whapi.py:162
-#: apprise/plugins/whatsapp.py:148
-msgid "Target Phone No"
-msgstr "대상 전화번호"
 
 #: apprise/plugins/bulksms.py:141 apprise/plugins/nextcloud.py:142
 #: apprise/plugins/pushover.py:393
@@ -605,11 +694,11 @@ msgstr "대상 그룹"
 #: apprise/plugins/bulkvs.py:123 apprise/plugins/clickatell.py:82
 #: apprise/plugins/eight00com.py:115 apprise/plugins/eight00com.py:143
 #: apprise/plugins/fortysixelks.py:101 apprise/plugins/httpsms.py:84
-#: apprise/plugins/httpsms.py:116 apprise/plugins/ringcentral.py:208
+#: apprise/plugins/httpsms.py:116 apprise/plugins/ringcentral.py:213
 #: apprise/plugins/signal_api.py:145 apprise/plugins/sinch.py:121
 #: apprise/plugins/smpp.py:119 apprise/plugins/smsmanager.py:135
 #: apprise/plugins/telnyx.py:94 apprise/plugins/telnyx.py:126
-#: apprise/plugins/twilio.py:157 apprise/plugins/voipms.py:95
+#: apprise/plugins/twilio.py:162 apprise/plugins/voipms.py:95
 #: apprise/plugins/vonage.py:95
 msgid "From Phone No"
 msgstr "보내는 전화번호"
@@ -619,7 +708,7 @@ msgid "Route Group"
 msgstr "라우팅 그룹"
 
 #: apprise/plugins/bulksms.py:173 apprise/plugins/d7networks.py:137
-#: apprise/plugins/exotel.py:229 apprise/plugins/mobilemessage.py:164
+#: apprise/plugins/exotel.py:230 apprise/plugins/mobilemessage.py:164
 msgid "Unicode Characters"
 msgstr "유니코드 문자"
 
@@ -652,7 +741,8 @@ msgid "Clickatell"
 msgstr "Clickatell"
 
 #: apprise/plugins/clickatell.py:76 apprise/plugins/eight00com.py:109
-#: apprise/plugins/rocketchat.py:141 apprise/plugins/simplepush.py:173
+#: apprise/plugins/opsimate.py:183 apprise/plugins/rocketchat.py:141
+#: apprise/plugins/simplepush.py:173
 msgid "API Token"
 msgstr "API 토큰"
 
@@ -664,16 +754,16 @@ msgstr "웹후크 토큰"
 
 #: apprise/plugins/cliq.py:175 apprise/plugins/discord.py:165
 #: apprise/plugins/flock.py:107 apprise/plugins/fluxer.py:203
-#: apprise/plugins/ryver.py:107 apprise/plugins/slack.py:226
+#: apprise/plugins/ryver.py:107 apprise/plugins/slack.py:236
 #: apprise/plugins/viber.py:100 apprise/plugins/zulip.py:128
 msgid "Bot Name"
 msgstr "봇 이름"
 
 #: apprise/plugins/cliq.py:179 apprise/plugins/irc/base.py:144
-#: apprise/plugins/mattermost.py:183 apprise/plugins/notifiarr.py:102
+#: apprise/plugins/mattermost.py:184 apprise/plugins/notifiarr.py:102
 #: apprise/plugins/pushbullet.py:95 apprise/plugins/pushed.py:102
-#: apprise/plugins/rocketchat.py:151 apprise/plugins/slack.py:285
-#: apprise/plugins/trigv.py:151 apprise/plugins/twist.py:113
+#: apprise/plugins/rocketchat.py:151 apprise/plugins/slack.py:295
+#: apprise/plugins/trigv.py:157 apprise/plugins/twist.py:113
 #: apprise/plugins/xmpp/base.py:129
 msgid "Target Channel"
 msgstr "대상 채널"
@@ -681,12 +771,6 @@ msgstr "대상 채널"
 #: apprise/plugins/cliq.py:185
 msgid "Target Bot"
 msgstr "대상 봇"
-
-#: apprise/plugins/cliq.py:212 apprise/plugins/kaleyra.py:220
-#: apprise/plugins/ses.py:182 apprise/plugins/sinch.py:158
-#: apprise/plugins/sns.py:152
-msgid "Region"
-msgstr "지역"
 
 #: apprise/plugins/cliq.py:218
 msgid "Company ID"
@@ -700,27 +784,27 @@ msgstr "브로드캐스트"
 msgid "Product Token"
 msgstr "제품 토큰"
 
-#: apprise/plugins/cm.py:179 apprise/plugins/pingram.py:222
+#: apprise/plugins/cm.py:179 apprise/plugins/pingram.py:223
 #: apprise/plugins/signalgrid.py:102
 msgid "Channels"
 msgstr "채널"
 
-#: apprise/plugins/custom_form.py:167 apprise/plugins/custom_json.py:149
-#: apprise/plugins/custom_xml.py:149
+#: apprise/plugins/custom_form.py:174 apprise/plugins/custom_json.py:156
+#: apprise/plugins/custom_xml.py:156
 msgid "Fetch Method"
 msgstr "가져오기 방식"
 
-#: apprise/plugins/custom_form.py:173
+#: apprise/plugins/custom_form.py:180
 msgid "Attach File As"
 msgstr "첨부 파일 이름"
 
-#: apprise/plugins/custom_form.py:188 apprise/plugins/custom_json.py:164
-#: apprise/plugins/custom_xml.py:164 apprise/plugins/pagertree.py:161
+#: apprise/plugins/custom_form.py:195 apprise/plugins/custom_json.py:171
+#: apprise/plugins/custom_xml.py:171 apprise/plugins/pagertree.py:161
 msgid "Payload Extras"
 msgstr "페이로드 추가 항목"
 
-#: apprise/plugins/custom_form.py:192 apprise/plugins/custom_json.py:168
-#: apprise/plugins/custom_xml.py:168
+#: apprise/plugins/custom_form.py:199 apprise/plugins/custom_json.py:175
+#: apprise/plugins/custom_xml.py:175
 msgid "GET Params"
 msgstr "GET 매개변수"
 
@@ -733,16 +817,16 @@ msgid "Originating Address"
 msgstr "발신 주소"
 
 #: apprise/plugins/amqp/base.py:222 apprise/plugins/dapnet.py:151
-#: apprise/plugins/exotel.py:241 apprise/plugins/firehydrant.py:177
+#: apprise/plugins/exotel.py:242 apprise/plugins/firehydrant.py:177
 #: apprise/plugins/gorush.py:201 apprise/plugins/gotify.py:154
 #: apprise/plugins/growl.py:163 apprise/plugins/ilert.py:163
-#: apprise/plugins/jira.py:288 apprise/plugins/join.py:190
+#: apprise/plugins/jira.py:294 apprise/plugins/join.py:190
 #: apprise/plugins/lametric.py:495 apprise/plugins/lauther.py:133
-#: apprise/plugins/ntfy.py:284 apprise/plugins/opsgenie.py:281
+#: apprise/plugins/ntfy.py:284 apprise/plugins/opsgenie.py:287
 #: apprise/plugins/pinglet.py:178 apprise/plugins/prowl.py:142
 #: apprise/plugins/pushover.py:410 apprise/plugins/pushsafer.py:391
-#: apprise/plugins/simplepush.py:216 apprise/plugins/smseagle.py:188
-#: apprise/plugins/squadcast.py:184 apprise/plugins/youlmk.py:177
+#: apprise/plugins/simplepush.py:216 apprise/plugins/smseagle.py:189
+#: apprise/plugins/squadcast.py:184 apprise/plugins/youlmk.py:167
 msgid "Priority"
 msgstr "우선순위"
 
@@ -760,7 +844,7 @@ msgstr "DBus 알림"
 
 #: apprise/plugins/dbus.py:205 apprise/plugins/glib.py:166
 #: apprise/plugins/gnome.py:142 apprise/plugins/pagertree.py:143
-#: apprise/plugins/trigv.py:190
+#: apprise/plugins/trigv.py:196
 msgid "Urgency"
 msgstr "긴급도"
 
@@ -791,17 +875,15 @@ msgid "Avatar URL"
 msgstr "아바타 URL"
 
 #: apprise/plugins/discord.py:203 apprise/plugins/fluxer.py:252
-#: apprise/plugins/pushover.py:422 apprise/plugins/trigv.py:181
+#: apprise/plugins/pushover.py:422 apprise/plugins/pushward.py:248
+#: apprise/plugins/trigv.py:187
 msgid "URL"
 msgstr "URL"
 
 #: apprise/plugins/discord.py:212 apprise/plugins/fluxer.py:259
+#: apprise/plugins/notifyapp.py:133 apprise/plugins/pushward.py:257
 msgid "Thread ID"
 msgstr "스레드 ID"
-
-#: apprise/plugins/notifyapp.py:137
-msgid "Time Sensitive"
-msgstr "시간 민감"
 
 #: apprise/plugins/discord.py:216 apprise/plugins/fluxer.py:267
 msgid "Display Footer"
@@ -823,7 +905,7 @@ msgstr "Discord 플래그"
 msgid "Ping Users/Roles"
 msgstr "사용자 또는 역할 멘션"
 
-#: apprise/plugins/discord.py:249 apprise/plugins/slack.py:348
+#: apprise/plugins/discord.py:249 apprise/plugins/slack.py:358
 #: apprise/plugins/workflows.py:201
 msgid "Template Path"
 msgstr "템플릿 경로"
@@ -833,7 +915,7 @@ msgid "Batch Attachments"
 msgstr "첨부 파일 묶어 보내기"
 
 #: apprise/plugins/discord.py:267 apprise/plugins/mailgun.py:202
-#: apprise/plugins/pingram.py:265 apprise/plugins/slack.py:358
+#: apprise/plugins/pingram.py:266 apprise/plugins/slack.py:368
 #: apprise/plugins/sparkpost.py:224 apprise/plugins/telegram.py:679
 #: apprise/plugins/workflows.py:222
 msgid "Template Tokens"
@@ -864,7 +946,7 @@ msgid "Image Base64 (Image API)"
 msgstr "Base64 이미지 (이미지 API)"
 
 #: apprise/plugins/dot.py:180 apprise/plugins/kakaotalk.py:199
-#: apprise/plugins/simplepush.py:231 apprise/plugins/youlmk.py:210
+#: apprise/plugins/simplepush.py:231 apprise/plugins/youlmk.py:200
 msgid "Link"
 msgstr "링크"
 
@@ -888,13 +970,6 @@ msgstr "작업 키"
 msgid "Modal"
 msgstr "모달"
 
-#: apprise/plugins/enigma2.py:131 apprise/plugins/fluxer.py:197
-#: apprise/plugins/goalert.py:162 apprise/plugins/gotify.py:135
-#: apprise/plugins/mattermost.py:173 apprise/plugins/notica.py:146
-#: apprise/plugins/pinglet.py:155
-msgid "Path"
-msgstr "경로"
-
 #: apprise/plugins/enigma2.py:141
 msgid "Server Timeout"
 msgstr "서버 제한 시간"
@@ -903,39 +978,36 @@ msgstr "서버 제한 시간"
 msgid "Instance Name"
 msgstr "인스턴스 이름"
 
-#: apprise/plugins/exotel.py:161 apprise/plugins/kaleyra.py:173
-#: apprise/plugins/sinch.py:107 apprise/plugins/twilio.py:143
+#: apprise/plugins/exotel.py:162 apprise/plugins/kaleyra.py:173
+#: apprise/plugins/sinch.py:107 apprise/plugins/twilio.py:148
 msgid "Account SID"
 msgstr "계정 SID"
 
-#: apprise/plugins/exotel.py:173
+#: apprise/plugins/exotel.py:174
 msgid "From Phone No / Sender ID"
 msgstr "보내는 전화번호 또는 발신자 ID"
 
-#: apprise/plugins/exotel.py:234 apprise/plugins/jira.py:276
-#: apprise/plugins/mailgun.py:170 apprise/plugins/opsgenie.py:274
-#: apprise/plugins/pagerduty.py:203 apprise/plugins/pingram.py:227
+#: apprise/plugins/exotel.py:235 apprise/plugins/jira.py:282
+#: apprise/plugins/mailgun.py:170 apprise/plugins/opsgenie.py:280
+#: apprise/plugins/pagerduty.py:203 apprise/plugins/pingram.py:228
 #: apprise/plugins/sparkpost.py:192 apprise/plugins/squadcast.py:167
 msgid "Region Name"
 msgstr "지역 이름"
 
-#: apprise/plugins/feishu.py:50
+#: apprise/plugins/feishu.py:51
 msgid "Feishu"
 msgstr "Feishu"
 
 #: apprise/plugins/firehydrant.py:182 apprise/plugins/goalert.py:193
 #: apprise/plugins/ilert.py:159 apprise/plugins/incidentio.py:152
-#: apprise/plugins/pagerduty.py:230 apprise/plugins/squadcast.py:180
+#: apprise/plugins/opsimate.py:225 apprise/plugins/pagerduty.py:230
+#: apprise/plugins/squadcast.py:180
 msgid "Deduplication Key"
 msgstr "중복 제거 키"
 
 #: apprise/plugins/firehydrant.py:205
 msgid "Annotations"
 msgstr "주석"
-
-#: apprise/plugins/flock.py:100 apprise/plugins/twitter.py:176
-msgid "Access Key"
-msgstr "액세스 키"
 
 #: apprise/plugins/flock.py:112
 msgid "To User ID"
@@ -951,10 +1023,10 @@ msgstr "웹후크 경로"
 
 #: apprise/plugins/fcm/__init__.py:183 apprise/plugins/fcm/__init__.py:189
 #: apprise/plugins/fluxer.py:229 apprise/plugins/kook.py:199
-#: apprise/plugins/lametric.py:511 apprise/plugins/mattermost.py:230
+#: apprise/plugins/lametric.py:511 apprise/plugins/mattermost.py:231
 #: apprise/plugins/nostr/base.py:264 apprise/plugins/notifyre.py:158
 #: apprise/plugins/ntfy.py:298 apprise/plugins/office365.py:320
-#: apprise/plugins/pingram.py:233 apprise/plugins/sns.py:204
+#: apprise/plugins/pingram.py:234 apprise/plugins/sns.py:204
 #: apprise/plugins/vapid/__init__.py:179 apprise/plugins/webexteams.py:198
 #: apprise/plugins/zoom.py:159
 msgid "Mode"
@@ -981,12 +1053,13 @@ msgid "Free-Mobile"
 msgstr "Free-Mobile"
 
 #: apprise/plugins/github.py:197 apprise/plugins/groupme.py:131
-#: apprise/plugins/line.py:83 apprise/plugins/mastodon.py:194
-#: apprise/plugins/matrix/base.py:315 apprise/plugins/misskey.py:123
-#: apprise/plugins/onebot.py:148 apprise/plugins/pushbullet.py:84
-#: apprise/plugins/pushover.py:381 apprise/plugins/smseagle.py:147
-#: apprise/plugins/spugpush.py:69 apprise/plugins/streamlabs.py:108
-#: apprise/plugins/whapi.py:155 apprise/plugins/whatsapp.py:122
+#: apprise/plugins/instagram.py:139 apprise/plugins/line.py:83
+#: apprise/plugins/mastodon.py:194 apprise/plugins/matrix/base.py:315
+#: apprise/plugins/misskey.py:123 apprise/plugins/onebot.py:148
+#: apprise/plugins/pushbullet.py:84 apprise/plugins/pushover.py:381
+#: apprise/plugins/smseagle.py:148 apprise/plugins/spugpush.py:69
+#: apprise/plugins/streamlabs.py:108 apprise/plugins/whapi.py:155
+#: apprise/plugins/whatsapp.py:122
 msgid "Access Token"
 msgstr "액세스 토큰"
 
@@ -1068,18 +1141,12 @@ msgstr "데이터 항목"
 msgid "From Address"
 msgstr "보내는 주소"
 
-#: apprise/plugins/email/base.py:183 apprise/plugins/groundmail.py:178
+#: apprise/plugins/email/base.py:185 apprise/plugins/groundmail.py:178
 #: apprise/plugins/mailgun.py:162 apprise/plugins/postmark.py:145
 #: apprise/plugins/resend.py:141 apprise/plugins/ses.py:211
 #: apprise/plugins/smtp2go.py:136 apprise/plugins/sparkpost.py:187
 msgid "From Name"
 msgstr "보내는 사람 이름"
-
-#: apprise/plugins/email/base.py:200 apprise/plugins/groundmail.py:188
-#: apprise/plugins/mailersend.py:167 apprise/plugins/office365.py:316
-#: apprise/plugins/pingram.py:238 apprise/plugins/resend.py:151
-msgid "Reply To"
-msgstr "회신 주소"
 
 #: apprise/plugins/groupme.py:124
 msgid "Bot ID"
@@ -1109,11 +1176,6 @@ msgstr "원본 전화번호"
 msgid "Template ID"
 msgstr "템플릿 ID"
 
-#: apprise/plugins/gupshup.py:180 apprise/plugins/msg91.py:149
-#: apprise/plugins/whatsapp.py:204
-msgid "Template Mapping"
-msgstr "템플릿 매핑"
-
 #: apprise/plugins/home_assistant.py:144
 msgid "Long-Lived Access Token"
 msgstr "장기 액세스 토큰"
@@ -1139,7 +1201,7 @@ msgid "Remove Tokens"
 msgstr "토큰 삭제"
 
 #: apprise/plugins/ilert.py:136 apprise/plugins/pagerduty.py:165
-#: apprise/plugins/pushward.py:135 apprise/plugins/spike.py:69
+#: apprise/plugins/pushward.py:173 apprise/plugins/spike.py:69
 msgid "Integration Key"
 msgstr "연동 키"
 
@@ -1151,47 +1213,54 @@ msgstr "경로 설정"
 msgid "Alert Source ID"
 msgstr "알림 소스 ID"
 
-#: apprise/plugins/jira.py:241 apprise/plugins/opsgenie.py:239
+#: apprise/plugins/instagram.py:146 apprise/plugins/onebot.py:153
+#: apprise/plugins/wxpusher.py:134
+msgid "Target User ID"
+msgstr "대상 사용자 ID"
+
+#: apprise/plugins/jira.py:247 apprise/plugins/opsgenie.py:245
 msgid "Target Escalation"
 msgstr "대상 에스컬레이션"
 
-#: apprise/plugins/jira.py:247 apprise/plugins/opsgenie.py:245
+#: apprise/plugins/jira.py:253 apprise/plugins/opsgenie.py:251
 msgid "Target Schedule"
 msgstr "대상 일정"
 
-#: apprise/plugins/irc/base.py:138 apprise/plugins/jira.py:253
+#: apprise/plugins/irc/base.py:138 apprise/plugins/jira.py:259
 #: apprise/plugins/line.py:89 apprise/plugins/mastodon.py:205
 #: apprise/plugins/matrix/base.py:322 apprise/plugins/nextcloud.py:136
 #: apprise/plugins/nostr/base.py:242 apprise/plugins/one_signal.py:131
-#: apprise/plugins/opsgenie.py:251 apprise/plugins/pushed.py:96
-#: apprise/plugins/rocketchat.py:157 apprise/plugins/slack.py:279
-#: apprise/plugins/twitter.py:188 apprise/plugins/wechat.py:199
-#: apprise/plugins/xmpp/base.py:124 apprise/plugins/zulip.py:147
+#: apprise/plugins/opsgenie.py:257 apprise/plugins/pushed.py:96
+#: apprise/plugins/pushplus.py:305 apprise/plugins/rocketchat.py:157
+#: apprise/plugins/slack.py:289 apprise/plugins/twitter.py:188
+#: apprise/plugins/wechat.py:199 apprise/plugins/xmpp/base.py:124
+#: apprise/plugins/zulip.py:147
 msgid "Target User"
 msgstr "대상 사용자"
 
-#: apprise/plugins/jira.py:265 apprise/plugins/opsgenie.py:263
+#: apprise/plugins/jira.py:271 apprise/plugins/opsgenie.py:269
 msgid "Targets "
 msgstr "대상 "
 
-#: apprise/plugins/jira.py:294 apprise/plugins/opsgenie.py:287
+#: apprise/plugins/jira.py:300 apprise/plugins/opsgenie.py:293
 msgid "Entity"
 msgstr "엔티티"
 
-#: apprise/plugins/jira.py:298 apprise/plugins/opsgenie.py:291
+#: apprise/plugins/jira.py:304 apprise/plugins/opsgenie.py:297
 msgid "Alias"
 msgstr "별칭"
 
-#: apprise/plugins/jira.py:320 apprise/plugins/opsgenie.py:318
+#: apprise/plugins/jira.py:326 apprise/plugins/opsgenie.py:324
 msgid "Details"
 msgstr "세부 정보"
 
-#: apprise/plugins/jira.py:324 apprise/plugins/opsgenie.py:322
+#: apprise/plugins/jira.py:330 apprise/plugins/opsgenie.py:328
 #: apprise/plugins/splunk.py:214
 msgid "Action Mapping"
 msgstr "동작 매핑"
 
-#: apprise/plugins/join.py:148 apprise/plugins/smstunnel.py:154
+#: apprise/plugins/join.py:148 apprise/plugins/notifyapp.py:104
+#: apprise/plugins/smstunnel.py:154
 msgid "Device ID"
 msgstr "기기 ID"
 
@@ -1200,13 +1269,13 @@ msgid "Device Name"
 msgstr "기기 이름"
 
 #: apprise/plugins/kakaotalk.py:159 apprise/plugins/mqtt.py:202
-#: apprise/plugins/office365.py:270 apprise/plugins/ringcentral.py:193
+#: apprise/plugins/office365.py:270 apprise/plugins/ringcentral.py:198
 #: apprise/plugins/sendpulse.py:122
 msgid "Client ID"
 msgstr "클라이언트 ID"
 
 #: apprise/plugins/kakaotalk.py:166 apprise/plugins/office365.py:277
-#: apprise/plugins/ringcentral.py:200 apprise/plugins/sendpulse.py:129
+#: apprise/plugins/ringcentral.py:205 apprise/plugins/sendpulse.py:129
 msgid "Client Secret"
 msgstr "클라이언트 시크릿"
 
@@ -1214,17 +1283,17 @@ msgstr "클라이언트 시크릿"
 msgid "Refresh Token"
 msgstr "리프레시 토큰"
 
-#: apprise/plugins/kakaotalk.py:179 apprise/plugins/pingram.py:194
+#: apprise/plugins/kakaotalk.py:179 apprise/plugins/pingram.py:195
 msgid "Target ID"
 msgstr "대상 ID"
 
 #: apprise/plugins/kaleyra.py:226 apprise/plugins/matrix/base.py:385
-#: apprise/plugins/pingram.py:176 apprise/plugins/telesign.py:170
+#: apprise/plugins/pingram.py:177 apprise/plugins/telesign.py:170
 msgid "Message Type"
 msgstr "메시지 형식"
 
 #: apprise/plugins/kaleyra.py:236 apprise/plugins/seven.py:114
-#: apprise/plugins/smseagle.py:204
+#: apprise/plugins/smseagle.py:205
 msgid "Flash"
 msgstr "플래시"
 
@@ -1266,14 +1335,9 @@ msgstr "아이콘 형식"
 msgid "Cycles"
 msgstr "반복 횟수"
 
-#: apprise/plugins/lark.py:48
+#: apprise/plugins/lark.py:49
 msgid "Lark (Feishu)"
 msgstr "Lark (Feishu)"
-
-#: apprise/plugins/lark.py:76 apprise/plugins/revolt.py:99
-#: apprise/plugins/telegram.py:594 apprise/plugins/zalo.py:113
-msgid "Bot Token"
-msgstr "봇 토큰"
 
 #: apprise/plugins/lauther.py:143 apprise/plugins/wpush.py:211
 msgid "Click URL"
@@ -1307,13 +1371,13 @@ msgstr "Terminal-Notifier 버전"
 msgid "Sender"
 msgstr "발신자"
 
-#: apprise/plugins/email/base.py:152 apprise/plugins/mailgun.py:135
+#: apprise/plugins/email/base.py:154 apprise/plugins/mailgun.py:135
 #: apprise/plugins/sendpulse.py:117 apprise/plugins/smtp2go.py:114
 #: apprise/plugins/sparkpost.py:165
 msgid "Domain"
 msgstr "도메인"
 
-#: apprise/plugins/email/base.py:257 apprise/plugins/mailgun.py:198
+#: apprise/plugins/email/base.py:259 apprise/plugins/mailgun.py:198
 #: apprise/plugins/smtp2go.py:162 apprise/plugins/sparkpost.py:220
 msgid "Email Header"
 msgstr "이메일 헤더"
@@ -1346,12 +1410,12 @@ msgstr "민감한 첨부 파일"
 msgid "Ping Users/Tags"
 msgstr "사용자 또는 태그 멘션"
 
-#: apprise/plugins/irc/base.py:129 apprise/plugins/mattermost.py:157
+#: apprise/plugins/irc/base.py:129 apprise/plugins/mattermost.py:158
 #: apprise/plugins/xmpp/base.py:113
 msgid "User"
 msgstr "사용자"
 
-#: apprise/plugins/mattermost.py:189 apprise/plugins/twist.py:119
+#: apprise/plugins/mattermost.py:190 apprise/plugins/twist.py:119
 msgid "Target Channel ID"
 msgstr "대상 채널 ID"
 
@@ -1427,13 +1491,13 @@ msgstr "IRC 색상"
 msgid "Prefix"
 msgstr "접두사"
 
+#: apprise/plugins/notifyapp.py:137
+msgid "Time Sensitive"
+msgstr "시간 민감"
+
 #: apprise/plugins/notifyre.py:169
 msgid "Campaign Name"
 msgstr "캠페인 이름"
-
-#: apprise/plugins/notifyre.py:173 apprise/plugins/whatsapp.py:129
-msgid "Template Name"
-msgstr "템플릿 이름"
 
 #: apprise/plugins/notifyre.py:177
 msgid "Client Reference"
@@ -1495,7 +1559,8 @@ msgstr "계정 이메일 또는 객체 ID"
 msgid "Save to Sent Items"
 msgstr "보낸 항목에 저장"
 
-#: apprise/plugins/one_signal.py:110 apprise/plugins/sendgrid.py:147
+#: apprise/plugins/one_signal.py:110 apprise/plugins/pushplus.py:366
+#: apprise/plugins/sendgrid.py:147
 msgid "Template"
 msgstr "템플릿"
 
@@ -1506,11 +1571,6 @@ msgstr "대상 플레이어 ID"
 #: apprise/plugins/one_signal.py:137
 msgid "Include Segment"
 msgstr "세그먼트 포함"
-
-#: apprise/plugins/one_signal.py:161 apprise/plugins/sfr.py:126
-#: apprise/plugins/whatsapp.py:142
-msgid "Language"
-msgstr "언어"
 
 #: apprise/plugins/one_signal.py:175
 msgid "Enable Contents"
@@ -1528,15 +1588,15 @@ msgstr "사용자 지정 데이터"
 msgid "Postback Data"
 msgstr "포스트백 데이터"
 
-#: apprise/plugins/onebot.py:153 apprise/plugins/wxpusher.py:134
-msgid "Target User ID"
-msgstr "대상 사용자 ID"
-
 #: apprise/plugins/onebot.py:160 apprise/plugins/serwersms.py:156
-#: apprise/plugins/signal_api.py:159 apprise/plugins/smseagle.py:159
+#: apprise/plugins/signal_api.py:159 apprise/plugins/smseagle.py:160
 #: apprise/plugins/whapi.py:169 apprise/plugins/whatsapp.py:160
 msgid "Target Group ID"
 msgstr "대상 그룹 ID"
+
+#: apprise/plugins/opsimate.py:235 apprise/plugins/pagerduty.py:212
+msgid "Severity"
+msgstr "심각도"
 
 #: apprise/plugins/pagerduty.py:178
 msgid "Component"
@@ -1545,10 +1605,6 @@ msgstr "구성 요소"
 #: apprise/plugins/pagerduty.py:194
 msgid "Class"
 msgstr "클래스"
-
-#: apprise/plugins/pagerduty.py:212
-msgid "Severity"
-msgstr "심각도"
 
 #: apprise/plugins/pagerduty.py:239
 msgid "Custom Details"
@@ -1582,7 +1638,7 @@ msgstr "이름 공간"
 msgid "Badges"
 msgstr "배지"
 
-#: apprise/plugins/pingram.py:200
+#: apprise/plugins/pingram.py:201
 msgid "Target SMS"
 msgstr "대상 SMS"
 
@@ -1591,7 +1647,7 @@ msgid "Auth ID"
 msgstr "인증 ID"
 
 #: apprise/plugins/plivo.py:98 apprise/plugins/simplepush.py:235
-#: apprise/plugins/sinch.py:114 apprise/plugins/twilio.py:150
+#: apprise/plugins/sinch.py:114 apprise/plugins/twilio.py:155
 msgid "Auth Token"
 msgstr "인증 토큰"
 
@@ -1616,7 +1672,7 @@ msgid "Secret Key"
 msgstr "비밀 키"
 
 #: apprise/plugins/pushme.py:82 apprise/plugins/signal_api.py:180
-#: apprise/plugins/smseagle.py:194
+#: apprise/plugins/smseagle.py:195
 msgid "Show Status"
 msgstr "상태 표시"
 
@@ -1632,39 +1688,41 @@ msgstr "URL 제목"
 msgid "Emergency Retry Interval"
 msgstr "긴급 재시도 간격"
 
-#: apprise/plugins/pushover.py:438
+#: apprise/plugins/pushover.py:438 apprise/plugins/pushward.py:241
 msgid "Expire"
 msgstr "만료"
 
-#: apprise/plugins/pushover.py:455
+#: apprise/plugins/pushover.py:455 apprise/plugins/pushward.py:281
 msgid "E2EE"
 msgstr "E2EE"
 
-#: apprise/plugins/pushplus.py:173
+#: apprise/plugins/pushplus.py:248
 msgid "Pushplus"
 msgstr "Pushplus"
 
-#: apprise/plugins/pushplus.py:211 apprise/plugins/qq.py:67
+#: apprise/plugins/pushplus.py:289 apprise/plugins/qq.py:67
 msgid "User Token"
 msgstr "사용자 토큰"
 
-#: apprise/plugins/pushplus.py:220
-msgid "Group Topics"
-msgstr "그룹 주제"
+#: apprise/plugins/fcm/__init__.py:163 apprise/plugins/pushplus.py:298
+#: apprise/plugins/pushy.py:92 apprise/plugins/simplepush.py:184
+#: apprise/plugins/sns.py:165 apprise/plugins/wxpusher.py:129
+msgid "Target Topic"
+msgstr "대상 주제"
 
-#: apprise/plugins/pushplus.py:241 apprise/plugins/wpush.py:183
+#: apprise/plugins/pushplus.py:334 apprise/plugins/wpush.py:183
 msgid "Channel"
 msgstr "채널"
 
-#: apprise/plugins/pushplus.py:258
-msgid "Webhook Name"
-msgstr "웹후크 이름"
-
-#: apprise/plugins/pushplus.py:348
+#: apprise/plugins/pushplus.py:349
 msgid "Channel Option"
 msgstr "채널 옵션"
 
-#: apprise/plugins/pushplus.py:371
+#: apprise/plugins/pushplus.py:356
+msgid "Webhook Name"
+msgstr "웹후크 이름"
+
+#: apprise/plugins/pushplus.py:372
 msgid "Callback URL"
 msgstr "콜백 URL"
 
@@ -1676,47 +1734,41 @@ msgstr "개인 키"
 msgid "Vibration"
 msgstr "진동"
 
-#: apprise/plugins/pushward.py:159
+#: apprise/plugins/pushward.py:197
 msgid "Info Level"
 msgstr "정보 수준"
 
-#: apprise/plugins/pushward.py:165
+#: apprise/plugins/pushward.py:203
 msgid "Success Level"
 msgstr "성공 수준"
 
-#: apprise/plugins/pushward.py:171
+#: apprise/plugins/pushward.py:209
 msgid "Warning Level"
 msgstr "경고 수준"
 
-#: apprise/plugins/pushward.py:177
+#: apprise/plugins/pushward.py:215
 msgid "Failure Level"
 msgstr "실패 수준"
 
-#: apprise/plugins/pushward.py:189
+#: apprise/plugins/pushward.py:227
 msgid "Acknowledge"
 msgstr "수신 확인"
 
-#: apprise/plugins/pushward.py:195
+#: apprise/plugins/pushward.py:233
 msgid "Repeat Interval"
 msgstr "반복 간격"
 
-#: apprise/plugins/pushward.py:224
+#: apprise/plugins/pushward.py:262
 msgid "Collapse ID"
 msgstr "축소 ID"
 
-#: apprise/plugins/pushward.py:230
+#: apprise/plugins/pushward.py:268
 msgid "Snooze"
 msgstr "다시 알림"
 
 #: apprise/plugins/pushy.py:80
 msgid "Secret API Key"
 msgstr "비밀 API 키"
-
-#: apprise/plugins/fcm/__init__.py:163 apprise/plugins/pushy.py:92
-#: apprise/plugins/simplepush.py:184 apprise/plugins/sns.py:165
-#: apprise/plugins/wxpusher.py:129
-msgid "Target Topic"
-msgstr "대상 주제"
 
 #: apprise/plugins/qq.py:47
 msgid "QQ Push"
@@ -1770,15 +1822,15 @@ msgstr "채널 ID"
 msgid "Embed URL"
 msgstr "임베드 URL"
 
-#: apprise/plugins/ringcentral.py:187
+#: apprise/plugins/ringcentral.py:192
 msgid "Token / Password"
 msgstr "토큰 또는 비밀번호"
 
-#: apprise/plugins/ringcentral.py:240
+#: apprise/plugins/ringcentral.py:245
 msgid "Environment"
 msgstr "환경"
 
-#: apprise/plugins/ringcentral.py:253
+#: apprise/plugins/ringcentral.py:258
 msgid "Authentication Mode"
 msgstr "인증 모드"
 
@@ -1818,18 +1870,6 @@ msgstr "템플릿 데이터"
 #: apprise/plugins/serwersms.py:143 apprise/plugins/sfr.py:132
 msgid "Sender Name"
 msgstr "발신자 이름"
-
-#: apprise/plugins/ses.py:158 apprise/plugins/sns.py:134
-msgid "Session Token"
-msgstr "세션 토큰"
-
-#: apprise/plugins/ses.py:170 apprise/plugins/sns.py:140
-msgid "Access Key ID"
-msgstr "액세스 키 ID"
-
-#: apprise/plugins/ses.py:176 apprise/plugins/sns.py:146
-msgid "Secret Access Key"
-msgstr "비밀 액세스 키"
 
 #: apprise/plugins/ses.py:189 apprise/plugins/smtp2go.py:125
 #: apprise/plugins/sparkpost.py:176
@@ -1916,47 +1956,47 @@ msgstr "공유"
 msgid "Tag"
 msgstr "태그"
 
-#: apprise/plugins/sinch.py:135 apprise/plugins/twilio.py:171
+#: apprise/plugins/sinch.py:135 apprise/plugins/twilio.py:176
 msgid "Target Short Code"
 msgstr "대상 단축 번호"
 
-#: apprise/plugins/slack.py:234
+#: apprise/plugins/slack.py:244
 msgid "OAuth Access Token"
 msgstr "OAuth 액세스 토큰"
 
-#: apprise/plugins/slack.py:243
+#: apprise/plugins/slack.py:253
 msgid "Token A"
 msgstr "토큰 A"
 
-#: apprise/plugins/slack.py:252
+#: apprise/plugins/slack.py:262
 msgid "Token B"
 msgstr "토큰 B"
 
-#: apprise/plugins/slack.py:261
+#: apprise/plugins/slack.py:271
 msgid "Token C"
 msgstr "토큰 C"
 
-#: apprise/plugins/slack.py:268
+#: apprise/plugins/slack.py:278
 msgid "Target Encoded ID"
 msgstr "인코딩된 대상 ID"
 
-#: apprise/plugins/slack.py:297
+#: apprise/plugins/slack.py:307
 msgid "Workflow Path"
 msgstr "워크플로 경로"
 
-#: apprise/plugins/slack.py:315
+#: apprise/plugins/slack.py:325
 msgid "Include Footer"
 msgstr "꼬리말 포함"
 
-#: apprise/plugins/slack.py:323
+#: apprise/plugins/slack.py:333
 msgid "Use Blocks"
 msgstr "블록 사용"
 
-#: apprise/plugins/slack.py:329
+#: apprise/plugins/slack.py:339
 msgid "Include Timestamp"
 msgstr "타임스탬프 포함"
 
-#: apprise/plugins/slack.py:335 apprise/plugins/twitter.py:205
+#: apprise/plugins/slack.py:345 apprise/plugins/twitter.py:205
 msgid "Message Mode"
 msgstr "메시지 모드"
 
@@ -1976,11 +2016,11 @@ msgstr "로그인 이름"
 msgid "Transliterate"
 msgstr "음역"
 
-#: apprise/plugins/smseagle.py:166
+#: apprise/plugins/smseagle.py:167
 msgid "Target Contact"
 msgstr "대상 연락처"
 
-#: apprise/plugins/smseagle.py:199
+#: apprise/plugins/smseagle.py:200
 msgid "Test Only"
 msgstr "테스트만"
 
@@ -2052,18 +2092,13 @@ msgstr "이름"
 msgid "Identifier"
 msgstr "식별자"
 
-#: apprise/plugins/synology.py:119
+#: apprise/plugins/synology.py:126
 msgid "Upload"
 msgstr "업로드"
 
 #: apprise/plugins/syslog.py:168
 msgid "Log to STDERR"
 msgstr "STDERR에 기록"
-
-#: apprise/plugins/telegram.py:603 apprise/plugins/whapi.py:175
-#: apprise/plugins/zalo.py:120
-msgid "Target Chat ID"
-msgstr "대상 대화 ID"
 
 #: apprise/plugins/telegram.py:626
 msgid "Detect Bot Owner"
@@ -2109,23 +2144,23 @@ msgstr "게이트웨이 ID"
 msgid "Target Threema ID"
 msgstr "대상 Threema ID"
 
-#: apprise/plugins/trigv.py:160
+#: apprise/plugins/trigv.py:166
 msgid "API Hostname"
 msgstr "API 호스트 이름"
 
-#: apprise/plugins/trigv.py:186
+#: apprise/plugins/trigv.py:192
 msgid "Image URL"
 msgstr "이미지 URL"
 
-#: apprise/plugins/trigv.py:196
+#: apprise/plugins/trigv.py:202
 msgid "Event type"
 msgstr "이벤트 종류"
 
-#: apprise/plugins/trigv.py:200
+#: apprise/plugins/trigv.py:206
 msgid "Priority (Pushover compatibility)"
 msgstr "우선순위 (Pushover 호환)"
 
-#: apprise/plugins/twilio.py:203
+#: apprise/plugins/twilio.py:208
 msgid "Notification Method: sms or call"
 msgstr "알림 방식: sms 또는 통화"
 
@@ -2197,10 +2232,6 @@ msgstr "대상 태그"
 msgid "Bot Webhook Key"
 msgstr "봇 웹후크 키"
 
-#: apprise/plugins/whatsapp.py:135
-msgid "From Phone ID"
-msgstr "보내는 전화 ID"
-
 #: apprise/plugins/windows.py:62
 msgid "A local Microsoft Windows environment is required."
 msgstr "로컬 Microsoft Windows 환경이 필요합니다."
@@ -2241,27 +2272,27 @@ msgstr "그룹 또는 옵션 코드"
 msgid "App Token"
 msgstr "앱 토큰"
 
-#: apprise/plugins/youlmk.py:159
+#: apprise/plugins/youlmk.py:149
 msgid "Token or Key"
 msgstr "토큰 또는 키"
 
-#: apprise/plugins/youlmk.py:183
+#: apprise/plugins/youlmk.py:173
 msgid "Info Priority"
 msgstr "정보 우선순위"
 
-#: apprise/plugins/youlmk.py:189
+#: apprise/plugins/youlmk.py:179
 msgid "Success Priority"
 msgstr "성공 우선순위"
 
-#: apprise/plugins/youlmk.py:195
+#: apprise/plugins/youlmk.py:185
 msgid "Warning Priority"
 msgstr "경고 우선순위"
 
-#: apprise/plugins/youlmk.py:201
+#: apprise/plugins/youlmk.py:191
 msgid "Failure Priority"
 msgstr "실패 우선순위"
 
-#: apprise/plugins/youlmk.py:216
+#: apprise/plugins/youlmk.py:206
 msgid "Link Label"
 msgstr "링크 레이블"
 
@@ -2299,35 +2330,35 @@ msgstr "필수"
 msgid "Message Headers"
 msgstr "메시지 헤더"
 
-#: apprise/plugins/email/base.py:188
+#: apprise/plugins/email/base.py:190
 msgid "SMTP Server"
 msgstr "SMTP 서버"
 
-#: apprise/plugins/email/base.py:193 apprise/plugins/xmpp/base.py:150
+#: apprise/plugins/email/base.py:195 apprise/plugins/xmpp/base.py:150
 msgid "Secure Mode"
 msgstr "보안 모드"
 
-#: apprise/plugins/email/base.py:205
+#: apprise/plugins/email/base.py:207
 msgid "PGP Security Mode"
 msgstr "PGP 보안 모드"
 
-#: apprise/plugins/email/base.py:212
+#: apprise/plugins/email/base.py:214
 msgid "PGP Public Key Path"
 msgstr "PGP 공개 키 경로"
 
-#: apprise/plugins/email/base.py:220
+#: apprise/plugins/email/base.py:222
 msgid "PGP Private Key Path"
 msgstr "PGP 개인 키 경로"
 
-#: apprise/plugins/email/base.py:228
+#: apprise/plugins/email/base.py:230
 msgid "Web Key Directory"
 msgstr "웹 키 디렉터리"
 
-#: apprise/plugins/email/base.py:234
+#: apprise/plugins/email/base.py:236
 msgid "Inline Attachments"
 msgstr "본문에 넣는 첨부 파일"
 
-#: apprise/plugins/email/base.py:239
+#: apprise/plugins/email/base.py:241
 msgid "To Email"
 msgstr "받는 이메일"
 
@@ -2422,7 +2453,3 @@ msgstr "MUC 별명"
 #: apprise/plugins/xmpp/base.py:177
 msgid "SCRAM-PLUS Channel Binding"
 msgstr "SCRAM-PLUS 채널 바인딩"
-
-#: apprise/plugins/awswhatsapp.py:214
-msgid "S3 Bucket"
-msgstr "S3 버킷"
