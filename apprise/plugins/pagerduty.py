@@ -42,7 +42,7 @@ from ..common import NotifyImageSize, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import parse_bool, validate_regex
+from ..utils.parse import parse_bool, parse_choice, validate_regex
 from .base import NotifyBase
 
 
@@ -362,14 +362,7 @@ class NotifyPagerDuty(NotifyBase):
 
         # Resolve our action; partial names such as "r" are accepted
         if action and isinstance(action, str) and action.strip():
-            self.action = next(
-                (
-                    a
-                    for a in PAGERDUTY_ACTIONS
-                    if a.startswith(action.strip().lower())
-                ),
-                None,
-            )
+            self.action = parse_choice(action, PAGERDUTY_ACTIONS)
             if not self.action:
                 msg = f"The PagerDuty action specified ({action}) is invalid."
                 self.logger.warning(msg)

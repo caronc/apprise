@@ -56,7 +56,7 @@ from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..conversion import commonmark_decode_backslash_escapes
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import parse_bool, validate_regex
+from ..utils.parse import parse_bool, parse_choice, validate_regex
 from .base import NotifyBase
 
 # Extend HTTP Error Messages
@@ -218,14 +218,7 @@ class NotifyILert(NotifyBase):
 
         # Resolve our action; partial names such as "r" are accepted
         if action and isinstance(action, str) and action.strip():
-            self.action = next(
-                (
-                    a
-                    for a in ILERT_ACTIONS
-                    if a.startswith(action.strip().lower())
-                ),
-                None,
-            )
+            self.action = parse_choice(action, ILERT_ACTIONS)
             if not self.action:
                 msg = "The ilert action specified ({}) is invalid.".format(
                     action
@@ -243,14 +236,7 @@ class NotifyILert(NotifyBase):
         # Our priority; partial names such as "h" are accepted
         self.priority = None
         if priority and isinstance(priority, str) and priority.strip():
-            self.priority = next(
-                (
-                    p
-                    for p in ILERT_PRIORITIES
-                    if p.startswith(priority.strip().lower())
-                ),
-                None,
-            )
+            self.priority = parse_choice(priority, ILERT_PRIORITIES)
             if not self.priority:
                 msg = "The ilert priority specified ({}) is invalid.".format(
                     priority

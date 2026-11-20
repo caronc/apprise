@@ -43,6 +43,7 @@ from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_phone_no,
     parse_bool,
+    parse_choice,
     parse_phone_no,
     validate_regex,
 )
@@ -246,14 +247,7 @@ class NotifyAfricasTalking(NotifyBase):
         )
 
         if isinstance(mode, str) and mode:
-            self.mode = next(
-                (
-                    a
-                    for a in AFRICAS_TALKING_SMS_MODES
-                    if a.startswith(mode.lower())
-                ),
-                None,
-            )
+            self.mode = parse_choice(mode, AFRICAS_TALKING_SMS_MODES)
 
             if self.mode not in AFRICAS_TALKING_SMS_MODES:
                 msg = (

@@ -50,7 +50,7 @@ from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..exception import AppriseImproperlyConfigured, ApprisePluginException
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import parse_bool, parse_list
+from ..utils.parse import parse_bool, parse_choice, parse_list
 from .base import NotifyBase
 
 # Sounds generated off of: https://github.com/Finb/Bark/tree/master/Sounds
@@ -376,13 +376,7 @@ class NotifyBark(NotifyBase):
             )
 
         # Sound (easy-lookup)
-        self.sound = (
-            None
-            if not sound
-            else next(
-                (f for f in BARK_SOUNDS if f.startswith(sound.lower())), None
-            )
-        )
+        self.sound = parse_choice(sound, BARK_SOUNDS)
         if sound and not self.sound:
             self.logger.warning(
                 "The specified Bark sound (%s) was not found", sound

@@ -408,3 +408,18 @@ def test_plugin_pushsafer_priority(mock_post):
     obj = Apprise.instantiate("psafer://abc123")
     assert obj.notify(body="body")
     assert "pr" not in mock_post.call_args[1]["data"]
+
+
+def test_plugin_pushsafer_sound_names():
+    """NotifyPushSafer() picks the exact sound name over a longer one."""
+    # "whah" is its own sound, not the start of "whahwhah"
+    obj = Apprise.instantiate("psafer://abc123?sound=whah")
+    assert isinstance(obj, NotifyPushSafer)
+    assert obj.sound == 42
+
+    obj = Apprise.instantiate("psafer://abc123?sound=whahwhah")
+    assert obj.sound == 28
+
+    # Abbreviations and mixed case still work
+    obj = Apprise.instantiate("psafer://abc123?sound=CUCKOO")
+    assert obj.sound == 14

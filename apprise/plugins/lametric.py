@@ -95,7 +95,7 @@ import requests
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import is_hostname, is_ipaddr, validate_regex
+from ..utils.parse import is_hostname, is_ipaddr, parse_choice, validate_regex
 from .base import NotifyBase
 
 # A URL Parser to detect App ID
@@ -667,8 +667,7 @@ class NotifyLametric(NotifyBase):
         LametricSound object it was found in."""
 
         for x in LAMETRIC_SOUNDS:
-            match = next((f for f in x[1] if f.startswith(lookup)), None)
-            if match:
+            if parse_choice(lookup, x[1]):
                 # We're done
                 return x
 

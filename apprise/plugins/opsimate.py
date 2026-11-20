@@ -73,7 +73,7 @@ import requests
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import URL_PATH_SAFE_CHARS, validate_regex
+from ..utils.parse import URL_PATH_SAFE_CHARS, parse_choice, validate_regex
 from .base import NotifyBase
 
 # Extend HTTP Error Messages
@@ -272,14 +272,7 @@ class NotifyOpsiMate(NotifyBase):
 
         # Resolve our action; partial names such as "r" are accepted
         if action and isinstance(action, str) and action.strip():
-            self.action = next(
-                (
-                    a
-                    for a in OPSIMATE_ACTIONS
-                    if a.startswith(action.strip().lower())
-                ),
-                None,
-            )
+            self.action = parse_choice(action, OPSIMATE_ACTIONS)
             if not self.action:
                 msg = "The OpsiMate action specified ({}) is invalid.".format(
                     action
@@ -300,14 +293,7 @@ class NotifyOpsiMate(NotifyBase):
         # A fixed severity; partial names such as "c" are accepted
         self.severity = None
         if severity and isinstance(severity, str) and severity.strip():
-            self.severity = next(
-                (
-                    s
-                    for s in OPSIMATE_SEVERITIES
-                    if s.startswith(severity.strip().lower())
-                ),
-                None,
-            )
+            self.severity = parse_choice(severity, OPSIMATE_SEVERITIES)
             if not self.severity:
                 msg = (
                     "The OpsiMate severity specified ({}) is invalid.".format(

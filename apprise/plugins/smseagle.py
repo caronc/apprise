@@ -40,6 +40,7 @@ from ..url import PrivacyMode
 from ..utils.parse import (
     is_phone_no,
     parse_bool,
+    parse_choice,
     parse_phone_no,
     validate_regex,
 )
@@ -282,18 +283,7 @@ class NotifySMSEagle(NotifyBase):
             # low, lo, l (for low);
             # normal, norma, norm, nor, no, n (for normal)
             # ... etc
-            result = (
-                next(
-                    (
-                        key
-                        for key in SMSEAGLE_PRIORITY_MAP
-                        if key.startswith(priority)
-                    ),
-                    None,
-                )
-                if priority
-                else None
-            )
+            result = parse_choice(priority, SMSEAGLE_PRIORITY_MAP)
 
             # Now test to see if we got a match
             if not result:

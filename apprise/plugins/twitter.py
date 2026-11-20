@@ -61,7 +61,7 @@ from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import parse_bool, parse_list, validate_regex
+from ..utils.parse import parse_bool, parse_choice, parse_list, validate_regex
 from .base import NotifyBase
 
 IS_USER = re.compile(r"^\s*@?(?P<user>[A-Z0-9_]+)$", re.I)
@@ -270,11 +270,7 @@ class NotifyTwitter(NotifyBase):
         )
 
         if mode and isinstance(mode, str) and mode.strip():
-            mode_ = mode.strip().lower()
-            self.mode = next(
-                (a for a in TWITTER_MESSAGE_MODES if a.startswith(mode_)),
-                None,
-            )
+            self.mode = parse_choice(mode, TWITTER_MESSAGE_MODES)
             if self.mode not in TWITTER_MESSAGE_MODES:
                 msg = (
                     f"The Twitter message mode specified ({mode}) is invalid."

@@ -59,7 +59,7 @@ import requests
 from ..common import NotifyImageSize, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import parse_bool, parse_list, validate_regex
+from ..utils.parse import parse_bool, parse_choice, parse_list, validate_regex
 from .base import NotifyBase
 
 # Extend HTTP Error Messages
@@ -273,7 +273,7 @@ class NotifyFireHydrant(NotifyBase):
             return None
 
         # Partial names such as "r" for "resolve" are accepted
-        result = next((v for v in values if v.startswith(choice)), None)
+        result = parse_choice(choice, values)
         if not result:
             msg = "The FireHydrant {} specified ({}) is invalid.".format(
                 name, value

@@ -71,7 +71,7 @@ from ..common import NotifyFormat, NotifyType
 from ..conversion import commonmark_headings_to_bold
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import parse_list
+from ..utils.parse import parse_choice, parse_list
 from .base import NotifyBase
 
 # Extended HTTP error messages for Kook API responses
@@ -224,10 +224,7 @@ class NotifyKook(NotifyBase):
         # Resolve operating mode
         if mode and isinstance(mode, str):
             # Accept a partial prefix match (e.g. "web" -> "webhook")
-            self.mode = next(
-                (m for m in KOOK_MODES if m.startswith(mode.lower())),
-                None,
-            )
+            self.mode = parse_choice(mode, KOOK_MODES)
             if self.mode not in KOOK_MODES:
                 msg = f"The Kook mode specified ({mode}) is not valid."
                 self.logger.warning(msg)

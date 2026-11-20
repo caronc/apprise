@@ -59,7 +59,7 @@ from ..common import NotifyFormat, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import parse_list
+from ..utils.parse import parse_choice, parse_list
 from .base import NotifyBase
 
 
@@ -257,14 +257,7 @@ class NotifyGorush(NotifyBase):
         # Gorush accepts "normal" or "high"; unset leaves it to Gorush.
         self.priority = None
         if priority:
-            self.priority = next(
-                (
-                    p
-                    for p in GORUSH_PRIORITIES
-                    if p.startswith(str(priority).strip().lower())
-                ),
-                None,
-            )
+            self.priority = parse_choice(str(priority), GORUSH_PRIORITIES)
             if not self.priority:
                 msg = f"The Gorush priority specified ({priority}) is invalid."
                 self.logger.warning(msg)

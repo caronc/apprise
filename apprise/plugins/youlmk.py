@@ -60,7 +60,7 @@ import requests
 from ..common import NotifyImageSize, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import parse_bool, validate_regex
+from ..utils.parse import parse_bool, parse_choice, validate_regex
 from .base import NotifyBase
 
 # Extend HTTP Error Messages with YouLMK's own codes
@@ -99,17 +99,7 @@ YOULMK_DEFAULT_PRIORITIES = {
 def youlmk_priority(value: Any) -> Optional[str]:
     """Resolve a full or short-form priority (e.g. 'crit', 'c') to one of
     YouLMK's four, or None when it matches none."""
-    value = str(value).strip().lower()
-    if not value:
-        return None
-    return next(
-        (
-            priority
-            for priority in YOULMK_PRIORITIES
-            if priority.startswith(value)
-        ),
-        None,
-    )
+    return parse_choice(str(value), YOULMK_PRIORITIES)
 
 
 class NotifyYouLMK(NotifyBase):

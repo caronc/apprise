@@ -53,7 +53,13 @@ import requests
 from ..common import NotifyType, PersistentStoreMode
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import is_uuid, parse_bool, parse_list, validate_regex
+from ..utils.parse import (
+    is_uuid,
+    parse_bool,
+    parse_choice,
+    parse_list,
+    validate_regex,
+)
 from .base import NotifyBase
 
 
@@ -379,14 +385,7 @@ class NotifyOpsgenie(NotifyBase):
             raise AppriseImproperlyConfigured(msg)
 
         if action and isinstance(action, str) and action.strip():
-            self.action = next(
-                (
-                    a
-                    for a in OPSGENIE_ACTIONS
-                    if a.startswith(action.strip().lower())
-                ),
-                None,
-            )
+            self.action = parse_choice(action, OPSGENIE_ACTIONS)
             if self.action not in OPSGENIE_ACTIONS:
                 msg = f"The Opsgenie action specified ({action}) is invalid."
                 self.logger.warning(msg)
@@ -399,10 +398,7 @@ class NotifyOpsgenie(NotifyBase):
         if mapping and isinstance(mapping, dict):
             for k_, v_ in mapping.items():
                 # Get our mapping
-                k_lower = k_.lower()
-                k = next(
-                    (t for t in NotifyType if t.startswith(k_lower)), None
-                )
+                k = parse_choice(k_, NotifyType)
                 if not k:
                     msg = (
                         f"The Opsgenie mapping key specified ({k_}) "
@@ -411,11 +407,7 @@ class NotifyOpsgenie(NotifyBase):
                     self.logger.warning(msg)
                     raise AppriseImproperlyConfigured(msg)
 
-                v_lower = v_.lower()
-                v = next(
-                    (v for v in OPSGENIE_ACTIONS[1:] if v.startswith(v_lower)),
-                    None,
-                )
+                v = parse_choice(v_, OPSGENIE_ACTIONS[1:])
                 if not v:
                     msg = (
                         f"The Opsgenie mapping value (assigned to {k}) "

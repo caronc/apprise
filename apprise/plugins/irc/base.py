@@ -51,7 +51,7 @@ from ...common import NotifyType
 from ...exception import AppriseImproperlyConfigured
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
-from ...utils.parse import parse_bool, parse_list
+from ...utils.parse import parse_bool, parse_choice, parse_list
 from ...utils.socket import AppriseSocketError
 from ..base import NotifyBase
 from . import templates
@@ -202,11 +202,7 @@ class NotifyIRC(NotifyBase):
         self.apply_irc_defaults(**kwargs)
 
         if isinstance(mode, str) and mode.strip():
-            self.auth_mode = mode.strip().lower()
-            self.auth_mode = next(
-                (a for a in IRC_AUTH_MODES if a.startswith(self.auth_mode)),
-                None,
-            )
+            self.auth_mode = parse_choice(mode, IRC_AUTH_MODES)
             if self.auth_mode not in IRC_AUTH_MODES:
                 msg = f"The IRC auth mode specified ({mode}) is invalid."
                 self.logger.warning(msg)

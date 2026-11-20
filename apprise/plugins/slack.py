@@ -100,7 +100,13 @@ from ..conversion import (
 )
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import is_email, parse_bool, parse_list, validate_regex
+from ..utils.parse import (
+    is_email,
+    parse_bool,
+    parse_choice,
+    parse_list,
+    validate_regex,
+)
 from ..utils.templates import TemplateType, apply_template
 from .base import NotifyBase
 
@@ -630,10 +636,7 @@ class NotifySlack(NotifyBase):
         # Track explicit modes; otherwise workflow segments select the mode.
         _mode_explicit = bool(mode and isinstance(mode, str) and mode.strip())
         if _mode_explicit:
-            mode_ = mode.strip().lower()
-            self.mode = next(
-                (a for a in SLACK_MODES if a.startswith(mode_)), None
-            )
+            self.mode = parse_choice(mode, SLACK_MODES)
             if self.mode not in SLACK_MODES:
                 msg = f"The Slack mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
@@ -1842,15 +1845,7 @@ class NotifySlack(NotifyBase):
         # Resolve via the same prefix-matching used in __init__ so that
         # abbreviated inputs (e.g. mode=tri or mode=work) are handled
         # identically in both places.
-        _mode_raw = results["qsd"].get("mode", "").strip().lower()
-        _mode = (
-            next(
-                (a for a in SLACK_MODES if a.startswith(_mode_raw)),
-                "",
-            )
-            if _mode_raw
-            else ""
-        )
+        _mode = parse_choice(results["qsd"].get("mode"), SLACK_MODES)
 
         if _mode in (SlackMode.WORKFLOW, SlackMode.WORKFLOW_TRIGGER):
             # All path segments form the workflow_path

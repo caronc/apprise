@@ -89,7 +89,7 @@ import requests
 from ..common import NotifyFormat, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import parse_list, validate_regex
+from ..utils.parse import parse_choice, parse_list, validate_regex
 from .base import NotifyBase
 
 # Extend HTTP Error Messages
@@ -219,10 +219,7 @@ class NotifyWebexTeams(NotifyBase):
 
         # Resolve mode: explicit override wins, otherwise auto-detect
         if mode and isinstance(mode, str) and mode.strip():
-            mode_ = mode.strip().lower()
-            self.mode = next(
-                (m for m in WEBEX_TEAMS_MODES if m.startswith(mode_)), None
-            )
+            self.mode = parse_choice(mode, WEBEX_TEAMS_MODES)
             if self.mode not in WEBEX_TEAMS_MODES:
                 msg = f"The Webex Teams mode specified ({mode}) is invalid."
                 self.logger.warning(msg)

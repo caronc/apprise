@@ -28,6 +28,7 @@ from bisect import bisect_left, bisect_right
 import contextlib
 from functools import reduce
 import re
+from typing import Any, Optional
 from urllib.parse import quote, unquote, urlencode as _urlencode, urlparse
 
 from .disk import tidy_path
@@ -973,6 +974,63 @@ def parse_bool(arg, default=False):
 
     # Handle other types
     return bool(arg)
+
+
+def parse_choice(
+    value: Any,
+    choices: Any,
+    default: Optional[Any] = None,
+    length: Optional[int] = None,
+) -> Optional[Any]:
+    """Match a value to one of the choices.
+
+    - Case and surrounding spaces in the value are ignored.
+    - An exact match wins; otherwise the first choice (in the order given)
+      that starts with the value is returned, so abbreviations work.
+    - Set length to only compare the first few characters of the value;
+      with length=2, "highest" matches "high". An invalid length is
+      ignored.
+    - Choices can be a list, tuple, dict (its keys) or a str Enum.
+    - The matching choice is returned as-is; default is returned when
+      nothing matches or the input can not be used.
+    """
+
+    if not isinstance(value, str):
+        # Only strings can be matched
+        return default
+
+    # Ignore case and surrounding spaces
+    value = value.strip().lower()
+    if not value:
+        # Nothing to match against
+        return default
+
+    if isinstance(choices, str):
+        # A single string is a single choice, not a set of characters
+        choices = (choices,)
+
+    try:
+        # Pair each choice with its lowercase name; keep the order given
+        options = [(c, c.lower()) for c in choices if isinstance(c, str)]
+
+    except Exception:
+        # Choices can not be iterated over (or broke while we tried)
+        return default
+
+    # An exact match always wins
+    for choice, name in options:
+        if name == value:
+            return choice
+
+    if isinstance(length, int) and not isinstance(length, bool) and length > 0:
+        # Only the first few characters of our value are compared
+        value = value[:length]
+
+    # Otherwise take the first choice that starts with our value
+    return next(
+        (choice for choice, name in options if name.startswith(value)),
+        default,
+    )
 
 
 def _flatten_values(*args):

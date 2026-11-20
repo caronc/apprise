@@ -39,6 +39,7 @@ from unittest import mock
 from urllib.parse import unquote
 
 from apprise import Apprise, NotificationManager, utils
+from apprise.common import NotifyType
 from apprise.tag import AppriseTag
 
 logging.disable(logging.CRITICAL)
@@ -1475,6 +1476,112 @@ def test_parse_bool():
     assert utils.parse.parse_bool("OhYeah") is False
     # Adjust Default and get a different result
     assert utils.parse.parse_bool("OhYeah", True) is True
+
+
+def test_parse_choice_matches():
+    """utils: parse_choice() resolves full, partial and mixed-case values."""
+    choices = ("webhook", "bot", "workflow")
+
+    # Full names, any case, surrounding spaces ignored
+    assert utils.parse.parse_choice("bot", choices) == "bot"
+    assert utils.parse.parse_choice("BOT", choices) == "bot"
+    assert utils.parse.parse_choice("  WebHook \n", choices) == "webhook"
+
+    # Abbreviations take the first match in the order given
+    assert utils.parse.parse_choice("w", choices) == "webhook"
+    assert utils.parse.parse_choice("WO", choices) == "workflow"
+    assert utils.parse.parse_choice("b", choices) == "bot"
+
+    # An exact match beats an earlier, longer choice
+    assert utils.parse.parse_choice("ab", ("abc", "ab")) == "ab"
+    assert utils.parse.parse_choice("a", ("abc", "ab")) == "abc"
+
+    # Mixed-case choices are matched and returned untouched
+    assert utils.parse.parse_choice("info", ("INFO", "WARNING")) == "INFO"
+
+    # A dict matches on its keys
+    assert utils.parse.parse_choice("hi", {"low": 1, "high": 2}) == "high"
+
+    # A str Enum returns its member
+    assert utils.parse.parse_choice("warn", NotifyType) is NotifyType.WARNING
+
+    # A single string is treated as one choice
+    assert utils.parse.parse_choice("al", "alpha") == "alpha"
+    assert utils.parse.parse_choice("p", "alpha") is None
+
+    # A length limits how much of the value is compared
+    priorities = ("min", "low", "normal", "high", "max")
+    assert utils.parse.parse_choice("highest", priorities, length=2) == "high"
+    assert utils.parse.parse_choice("MAXIMUM", priorities, length=2) == "max"
+    assert utils.parse.parse_choice("n", priorities, length=2) == "normal"
+    assert utils.parse.parse_choice("highest", priorities) is None
+
+    # An exact match is checked on the whole value first
+    assert utils.parse.parse_choice("abc", ("ab", "abc"), length=2) == "abc"
+    assert utils.parse.parse_choice("abd", ("ab", "abc"), length=2) == "ab"
+
+    # An invalid length is ignored
+    for length in (None, 0, -1, True, 1.5, "2"):
+        assert (
+            utils.parse.parse_choice("highest", priorities, length=length)
+            is None
+        )
+        assert (
+            utils.parse.parse_choice("hi", priorities, length=length) == "high"
+        )
+
+    # Generators work, and non-string entries are skipped
+    assert (
+        utils.parse.parse_choice("t", (c for c in (None, 3, b"two", "two")))
+        == "two"
+    )
+
+
+def test_parse_choice_no_match():
+    """utils: parse_choice() returns the default for anything unusable."""
+    choices = ("webhook", "bot")
+
+    # Nothing matches
+    assert utils.parse.parse_choice("invalid", choices) is None
+    assert utils.parse.parse_choice("bots", choices) is None
+    assert utils.parse.parse_choice("invalid", choices, "bot") == "bot"
+
+    # Empty or blank values never match the first choice
+    assert utils.parse.parse_choice("", choices) is None
+    assert utils.parse.parse_choice("   ", choices) is None
+    assert utils.parse.parse_choice("", choices, default="x") == "x"
+
+    # Values that are not strings
+    for value in (None, 0, 1, True, 1.5, b"bot", ["bot"], ("bot",), {}):
+        assert utils.parse.parse_choice(value, choices) is None
+        assert utils.parse.parse_choice(value, choices, "d") == "d"
+
+    # Choices that can not be used
+    for bad in (None, 0, 1.5, True, object(), (), [], {}, ""):
+        assert utils.parse.parse_choice("bot", bad) is None
+        assert utils.parse.parse_choice("bot", bad, "d") == "d"
+
+    # Choices that hold no strings
+    assert utils.parse.parse_choice("1", (1, 2, None, b"1")) is None
+
+    class Broken:
+        """An iterable that fails part way through."""
+
+        def __iter__(self):
+            yield "bot"
+            raise RuntimeError("broken")
+
+    assert utils.parse.parse_choice("bot", Broken()) is None
+
+    # A dict that changes while it is read
+    shifting = {"bot": 1}
+
+    def mutate():
+        for key in shifting:
+            shifting["x"] = 1
+            yield key
+
+    assert utils.parse.parse_choice("bot", mutate()) is None
 
 
 def test_is_uuid():

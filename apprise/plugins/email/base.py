@@ -48,6 +48,7 @@ from ...utils.parse import (
     is_hostname,
     is_ipaddr,
     parse_bool,
+    parse_choice,
     parse_emails,
 )
 from ..base import NotifyBase
@@ -481,10 +482,7 @@ class NotifyEmail(NotifyBase):
             self.pgp_mode = PGPMode.NONE
 
         else:
-            self.pgp_mode = next(
-                (m for m in PGP_MODES if m.startswith(str(pgp_mode).lower())),
-                None,
-            )
+            self.pgp_mode = parse_choice(str(pgp_mode), PGP_MODES)
             if self.pgp_mode is None:
                 msg = f"The Email PGP mode specified ({pgp_mode}) is invalid."
                 self.logger.warning(msg)
@@ -958,14 +956,10 @@ class NotifyEmail(NotifyBase):
         # Accept PGP mode prefixes and treat "none" as "no".
         pgp_raw = results["qsd"].get("pgp", "")
         if pgp_raw:
-            pgp_mode = next(
-                (m for m in PGP_MODES if m.startswith(str(pgp_raw).lower())),
-                None,
+            # Let __init__ report invalid and removed boolean values.
+            results["pgp_mode"] = parse_choice(
+                str(pgp_raw), PGP_MODES, default=pgp_raw
             )
-            if pgp_mode is None:
-                # Let __init__ report invalid and removed boolean values.
-                pgp_mode = pgp_raw
-            results["pgp_mode"] = pgp_mode
 
         # Get Web Key Directory flag
         if "wkd" in results["qsd"] and results["qsd"]["wkd"]:

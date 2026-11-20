@@ -64,7 +64,7 @@ import requests
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import validate_regex
+from ..utils.parse import parse_choice, validate_regex
 from .base import NotifyBase
 
 # Extend HTTP Error Messages
@@ -198,19 +198,8 @@ class NotifyZoom(NotifyBase):
             self.mode = ZOOM_MODE_DEFAULT
 
         else:
-            # Reject empty or whitespace-only strings before prefix matching;
-            # an empty string would match every mode (false positive).
-            normalized_mode = (
-                mode.strip().lower() if isinstance(mode, str) else ""
-            )
-            if not normalized_mode:
-                self.mode = None
-            else:
-                # Allow partial prefix matching (e.g. "sim" -> "simple")
-                self.mode = next(
-                    (m for m in ZOOM_MODES if m.startswith(normalized_mode)),
-                    None,
-                )
+            # Allow partial prefix matching (e.g. "sim" -> "simple")
+            self.mode = parse_choice(mode, ZOOM_MODES)
             if not self.mode:
                 msg = "The Zoom mode ({}) is invalid.".format(mode)
                 self.logger.warning(msg)

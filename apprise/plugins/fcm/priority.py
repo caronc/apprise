@@ -33,6 +33,7 @@
 # - https://firebase.google.com/docs/cloud-messaging/http-server-ref
 from ...exception import AppriseImproperlyConfigured
 from ...logger import logger
+from ...utils.parse import parse_choice
 from .common import FCM_MODES, FCMMode
 
 
@@ -176,14 +177,7 @@ class FCMPriorityManager:
 
         self.priority = None
         if priority:
-            self.priority = next(
-                (
-                    p
-                    for p in FCM_PRIORITIES
-                    if p.startswith(priority[:2].lower())
-                ),
-                None,
-            )
+            self.priority = parse_choice(priority, FCM_PRIORITIES, length=2)
             if not self.priority:
                 msg = f"An invalid FCM Priority ({priority}) was specified."
                 logger.warning(msg)

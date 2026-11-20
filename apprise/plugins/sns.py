@@ -39,7 +39,7 @@ from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import is_phone_no, parse_list, validate_regex
+from ..utils.parse import is_phone_no, parse_choice, parse_list, validate_regex
 from ..utils.xml import flatten_xml_response
 from .base import NotifyBase
 
@@ -292,10 +292,7 @@ class NotifySNS(NotifyBase):
         # auto-detect from target composition
         if mode and isinstance(mode, str):
             # Resolve via prefix match (e.g. "t" -> "topic")
-            self.mode = next(
-                (m for m in SNS_MODES if m.startswith(mode.lower())),
-                None,
-            )
+            self.mode = parse_choice(mode, SNS_MODES)
             if self.mode not in SNS_MODES:
                 msg = f"The AWS SNS mode specified ({mode}) is invalid."
                 self.logger.warning(msg)

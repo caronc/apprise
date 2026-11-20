@@ -54,7 +54,7 @@ from ..common import NotifyFormat, NotifyType
 from ..conversion import commonmark_decode_backslash_escapes
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import validate_regex
+from ..utils.parse import parse_choice, validate_regex
 from .base import NotifyBase
 
 # Extend HTTP Error Messages
@@ -203,14 +203,7 @@ class NotifyIncidentIO(NotifyBase):
 
         # Resolve our action; partial names such as "r" are accepted
         if action and isinstance(action, str) and action.strip():
-            self.action = next(
-                (
-                    a
-                    for a in INCIDENTIO_ACTIONS
-                    if a.startswith(action.strip().lower())
-                ),
-                None,
-            )
+            self.action = parse_choice(action, INCIDENTIO_ACTIONS)
             if not self.action:
                 msg = (
                     "The incident.io action specified ({}) is invalid.".format(

@@ -31,7 +31,7 @@ import socket
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import parse_bool
+from ..utils.parse import parse_bool, parse_choice
 from .base import NotifyBase
 
 
@@ -382,9 +382,8 @@ class NotifyRSyslog(NotifyBase):
             # during the __init__() call. The benifit of doing this
             # check here is if we do have a valid match, we can support
             # short form matches like 'u' which will match against user
-            facility = next(
-                (f for f in SYSLOG_FACILITY_MAP if f.startswith(facility)),
-                facility,
+            facility = parse_choice(
+                facility, SYSLOG_FACILITY_MAP, default=facility
             )
 
         # Save facility if set
