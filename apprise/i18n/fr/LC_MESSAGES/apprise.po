@@ -799,6 +799,10 @@ msgstr "URL"
 msgid "Thread ID"
 msgstr "Identifiant du fil"
 
+#: apprise/plugins/notifyapp.py:137
+msgid "Time Sensitive"
+msgstr "Urgent"
+
 #: apprise/plugins/discord.py:216 apprise/plugins/fluxer.py:267
 msgid "Display Footer"
 msgstr "Afficher le pied de page"

@@ -800,6 +800,10 @@ msgstr "URL"
 msgid "Thread ID"
 msgstr "Идентификатор обсуждения"
 
+#: apprise/plugins/notifyapp.py:137
+msgid "Time Sensitive"
+msgstr "Срочно"
+
 #: apprise/plugins/discord.py:216 apprise/plugins/fluxer.py:267
 msgid "Display Footer"
 msgstr "Показывать нижний колонтитул"

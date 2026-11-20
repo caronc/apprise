@@ -799,6 +799,10 @@ msgstr "URL"
 msgid "Thread ID"
 msgstr "Draad-id"
 
+#: apprise/plugins/notifyapp.py:137
+msgid "Time Sensitive"
+msgstr "Tijdgevoelig"
+
 #: apprise/plugins/discord.py:216 apprise/plugins/fluxer.py:267
 msgid "Display Footer"
 msgstr "Voettekst weergeven"
