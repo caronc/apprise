@@ -3006,3 +3006,30 @@ def test_plugin_slack_deeply_nested_links():
 
     # Only the outer labels become links; the rest stay as plain text
     assert result.count("](u)") == depth - MAX_LINK_DEPTH
+
+
+def test_plugin_slack_mode_case():
+    """NotifySlack() accepts mode= in any case."""
+    obj = Apprise.instantiate(
+        "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#chan?mode=Hook"
+    )
+    assert isinstance(obj, NotifySlack)
+    assert obj.mode == SlackMode.WEBHOOK
+
+    # parse_url() peeks at mode= to split the path for workflows
+    obj = Apprise.instantiate(
+        "slack://T1JJ3T3L2/Ft07XXXX/XXXXXXXX/YYYYYYYY/?mode=Workflow"
+    )
+    assert isinstance(obj, NotifySlack)
+    assert obj.mode == SlackMode.WORKFLOW
+
+    obj = Apprise.instantiate(
+        "slack://T1JJ3T3L2/XXXXXXXX/YYYYYYYY/?mode=%20TRIGGER%20"
+    )
+    assert isinstance(obj, NotifySlack)
+    assert obj.mode == SlackMode.WORKFLOW_TRIGGER
+
+    # The normalized value is written back by url()
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifySlack)
+    assert obj2.mode == SlackMode.WORKFLOW_TRIGGER

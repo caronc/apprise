@@ -1602,3 +1602,25 @@ def test_plugin_twitter_dm_retry(
     # The first message was never repeated
     assert texts == ["body", "02/02", "02/02"]
     assert not messages
+
+
+def test_plugin_twitter_mode_case():
+    """NotifyTwitter() accepts mode= in any case."""
+    obj = Apprise.instantiate("twitter://ckey/csecret/akey/asecret?mode=Tweet")
+    assert isinstance(obj, NotifyTwitter)
+    assert obj.mode == "tweet"
+
+    # Surrounding whitespace is accepted too
+    obj = NotifyTwitter(
+        ckey="ckey",
+        csecret="csecret",
+        akey="akey",
+        asecret="asecret",
+        mode=" DM ",
+    )
+    assert obj.mode == "dm"
+
+    # The normalized value is written back by url()
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyTwitter)
+    assert obj2.mode == "dm"
