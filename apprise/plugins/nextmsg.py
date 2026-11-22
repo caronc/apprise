@@ -30,11 +30,9 @@
 #
 # To get your key:
 #  1. Install the NextMsg app; no account is needed.
-#  2. Your send key (nextmsg_live_...) is shown under Settings.
-#  3. Or give Apprise its own key, which you can revoke on its own: in the
-#     app open Settings -> Agents -> Connect agent and claim the code it
-#     shows (see https://nextmsg.app/docs#agent-keys); agent keys start
-#     with nextmsg_agent_.
+#  2. Open Settings -> Send keys. Use the Default key, or tap Create a key
+#     to give Apprise a key of its own that you can revoke on its own.
+#     Every key starts with nextmsg_live_.
 #
 # Your Apprise URL should be assembled as:
 #     nextmsg://{key}
@@ -139,7 +137,7 @@ class NotifyNextMsg(NotifyBase):
                 "type": "string",
                 "private": True,
                 "required": True,
-                "regex": (r"^nextmsg_(live|agent)_[0-9a-f]{48}$", "i"),
+                "regex": (r"^nextmsg_live_[0-9a-f]{48}$", "i"),
             },
             "channel": {
                 "name": _("Channel"),
@@ -171,7 +169,7 @@ class NotifyNextMsg(NotifyBase):
         """Initialize NextMsg Object."""
         super().__init__(**kwargs)
 
-        # The send key or an agent key
+        # The send key
         self.apikey = validate_regex(
             apikey.strip() if isinstance(apikey, str) else apikey,
             *self.template_tokens["apikey"]["regex"],

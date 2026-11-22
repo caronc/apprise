@@ -42,7 +42,8 @@ logging.disable(logging.CRITICAL)
 
 # Keys as the NextMsg app hands them out
 SEND_KEY = "nextmsg_live_" + "0123456789abcdef" * 3
-AGENT_KEY = "nextmsg_agent_" + "fedcba9876543210" * 3
+OTHER_KEY = "nextmsg_live_" + "fedcba9876543210" * 3
+OLD_AGENT_KEY = "nextmsg_agent_" + "fedcba9876543210" * 3
 
 # Our Testing URLs
 apprise_url_tests = (
@@ -74,6 +75,13 @@ apprise_url_tests = (
         },
     ),
     (
+        "nextmsg://{}".format(OLD_AGENT_KEY),
+        {
+            # The retired nextmsg_agent_ format
+            "instance": AppriseImproperlyConfigured,
+        },
+    ),
+    (
         "nextmsg://{}".format(SEND_KEY),
         {
             "instance": NotifyNextMsg,
@@ -82,8 +90,8 @@ apprise_url_tests = (
         },
     ),
     (
-        # An agent key and a channel
-        "nextmsg://{}/deploys".format(AGENT_KEY),
+        # Another key and a channel
+        "nextmsg://{}/deploys".format(OTHER_KEY),
         {
             "instance": NotifyNextMsg,
             "privacy_url": "nextmsg://n...0/deploys",
@@ -186,7 +194,7 @@ def test_plugin_nextmsg_payload(mock_post):
     ).encode("utf-8")
     mock_post.return_value = response
 
-    obj = apprise.Apprise.instantiate(f"nextmsg://{AGENT_KEY}/deploys")
+    obj = apprise.Apprise.instantiate(f"nextmsg://{OTHER_KEY}/deploys")
     assert isinstance(obj, NotifyNextMsg)
 
     # The title is sent in bold on the first line
@@ -199,7 +207,7 @@ def test_plugin_nextmsg_payload(mock_post):
     assert mock_post.call_count == 1
     assert mock_post.call_args[0][0] == "https://api.nextmsg.app/v1/send"
     headers = mock_post.call_args[1]["headers"]
-    assert headers["Authorization"] == f"Bearer {AGENT_KEY}"
+    assert headers["Authorization"] == f"Bearer {OTHER_KEY}"
     assert headers["Content-Type"] == "application/json"
 
     payload = loads(mock_post.call_args[1]["data"])
@@ -301,10 +309,10 @@ def test_plugin_nextmsg_native_url():
     assert result["apikey"] == SEND_KEY
     assert result["channel"] == "ci"
 
-    # Agent keys never work in a URL, so they are not native URLs
+    # The retired nextmsg_agent_ format is not a NextMsg key
     assert (
         NotifyNextMsg.parse_native_url(
-            f"https://api.nextmsg.app/p/{AGENT_KEY}"
+            f"https://api.nextmsg.app/p/{OLD_AGENT_KEY}"
         )
         is None
     )
