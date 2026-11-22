@@ -39,9 +39,14 @@
 # The source is the sender's name shown on each notification, for example
 # "Nightly backup". It defaults to "Apprise".
 #
+# Images and buttons are part of Nowlark's paid Upgrade Pass, and a send
+# that uses one without it is refused, so this plugin sends text only.
+#
 # API reference: https://nowlark.com/api
+
 from json import dumps
 import re
+from typing import Any, Optional, Union
 
 import requests
 
@@ -51,6 +56,15 @@ from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import validate_regex
 from .base import NotifyBase
+
+# Extend HTTP Error Messages
+# Based on: https://nowlark.com/api/errors
+NOWLARK_HTTP_ERROR_MAP = {
+    400: "Bad Request - A field is missing or invalid.",
+    401: "Unauthorized - Missing, unknown or revoked key.",
+    402: "Payment Required - The send used an Upgrade Pass feature.",
+    429: "Too Many Requests - The key's hourly limit was reached.",
+}
 
 
 class NowlarkPriority:
@@ -166,11 +180,17 @@ class NotifyNowlark(NotifyBase):
     )
 
     def __init__(
-        self, apikey, source=None, priority=None, click=None, **kwargs
-    ):
+        self,
+        apikey: str,
+        source: Optional[str] = None,
+        priority: Optional[Union[str, int]] = None,
+        click: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize Nowlark Object."""
         super().__init__(**kwargs)
 
+        # Validate our API Key (nlk_ prefix)
         self.apikey = validate_regex(
             apikey, *self.template_tokens["apikey"]["regex"]
         )
@@ -179,6 +199,7 @@ class NotifyNowlark(NotifyBase):
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
 
+        # The sender's name shown on each notification
         self.source = (source or "").strip() or self.app_id
         if len(self.source) > self.source_maxlen:
             msg = (
@@ -188,6 +209,7 @@ class NotifyNowlark(NotifyBase):
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
 
+        # Accept a priority by name or by Nowlark's own -2 to 2 number
         self.priority = int(
             NotifyNowlark.template_args["priority"]["default"]
             if priority is None
@@ -214,36 +236,48 @@ class NotifyNowlark(NotifyBase):
                 )
                 self.logger.warning(msg)
                 raise AppriseImproperlyConfigured(msg)
+
             self.click = click
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Send our Nowlark Notification."""
 
-        # Nowlark needs a title or a body; Apprise always passes a body
+        # Prepare our headers
         headers = {
             "User-Agent": self.app_id,
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.apikey}",
         }
 
+        # Prepare our payload. Nowlark needs a title or a body, and only
+        # the fields that are set are sent.
         payload = {
             "source": self.source,
             "priority": self.priority,
         }
         if title:
             payload["title"] = title
+
         if body:
             payload["body"] = body
+
         if self.click:
             payload["url"] = self.click
 
         self.logger.debug(
-            "Nowlark POST URL:"
-            f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
+            "Nowlark POST URL: %s (cert_verify=%r)",
+            self.notify_url,
+            self.verify_certificate,
         )
-        self.logger.debug(f"Nowlark Payload: {payload!s}")
+        self.logger.debug("Nowlark Payload: %s", payload)
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -259,16 +293,14 @@ class NotifyNowlark(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = NotifyNowlark.http_response_code_lookup(
-                    r.status_code
+                    r.status_code, NOWLARK_HTTP_ERROR_MAP
                 )
 
                 self.logger.warning(
-                    "Failed to send Nowlark notification: "
-                    "{}{}error={}.".format(
-                        status_str,
-                        ", " if status_str else "",
-                        r.status_code,
-                    )
+                    "Failed to send Nowlark notification: %s%serror=%s.",
+                    status_str,
+                    ", " if status_str else "",
+                    r.status_code,
                 )
 
                 self.logger.debug(
@@ -282,27 +314,30 @@ class NotifyNowlark(NotifyBase):
             self.logger.warning(
                 "A Connection error occurred sending Nowlark notification."
             )
-            self.logger.debug(f"Socket Exception: {e!s}")
+            self.logger.debug("Socket Exception: %s", str(e))
             return False
 
         return True
 
     @property
-    def url_identifier(self):
+    def url_identifier(self) -> tuple[Any, ...]:
         """Returns all of the identifiers that make this URL unique from
         another simliar one.
 
         Targets or end points should never be identified here.
         """
+        # One key is one connection; the source is only a display name
         return (self.secure_protocol, self.apikey)
 
-    def url(self, privacy=False, *args, **kwargs):
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
-        params = {
+        params: dict[str, Any] = {
             "priority": str(self.priority),
         }
+
+        # Only include the link when one was set
         if self.click:
             params["url"] = self.click
 
@@ -319,7 +354,7 @@ class NotifyNowlark(NotifyBase):
         )
 
     @staticmethod
-    def parse_url(url):
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
 
@@ -329,10 +364,11 @@ class NotifyNowlark(NotifyBase):
             return results
 
         # The key is the host, or ?key= for yaml configuration
-        if "key" in results["qsd"] and len(results["qsd"]["key"]):
-            results["apikey"] = NotifyNowlark.unquote(results["qsd"]["key"])
-        else:
-            results["apikey"] = NotifyNowlark.unquote(results["host"])
+        results["apikey"] = NotifyNowlark.unquote(
+            results["qsd"]["key"]
+            if "key" in results["qsd"] and len(results["qsd"]["key"])
+            else results["host"]
+        )
 
         # The source is the first path entry, or ?source=
         entries = NotifyNowlark.split_path(results["fullpath"])
@@ -341,11 +377,13 @@ class NotifyNowlark(NotifyBase):
         elif entries:
             results["source"] = entries[0]
 
+        # Set our priority
         if "priority" in results["qsd"] and len(results["qsd"]["priority"]):
             results["priority"] = NotifyNowlark.unquote(
                 results["qsd"]["priority"]
             )
 
+        # The link the notification opens
         if "url" in results["qsd"] and len(results["qsd"]["url"]):
             results["click"] = NotifyNowlark.unquote(results["qsd"]["url"])
 

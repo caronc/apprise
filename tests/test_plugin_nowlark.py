@@ -115,6 +115,23 @@ apprise_url_tests = (
         f"nowlark://{KEY}",
         {
             "instance": NotifyNowlark,
+            # A key without the Upgrade Pass sending a paid feature
+            "response": False,
+            "requests_response_code": 402,
+        },
+    ),
+    (
+        f"nowlark://{KEY}",
+        {
+            "instance": NotifyNowlark,
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        f"nowlark://{KEY}",
+        {
+            "instance": NotifyNowlark,
             # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
@@ -193,3 +210,22 @@ def test_plugin_nowlark_payload(mock_post):
     assert obj.priority == 2
     assert obj.click == "https://example.com/run/42"
     assert len(obj) == 1
+
+
+@mock.patch("requests.post")
+def test_plugin_nowlark_title_only(mock_post):
+    """A title with no body sends no empty body field."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b'{"id":"n_1"}'
+    mock_post.return_value = response
+
+    obj = NotifyNowlark(apikey=KEY, source="CI")
+    assert obj.send(body="", title="Build passed") is True
+
+    assert mock_post.call_count == 1
+    assert loads(mock_post.call_args[1]["data"]) == {
+        "source": "CI",
+        "priority": 0,
+        "title": "Build passed",
+    }
