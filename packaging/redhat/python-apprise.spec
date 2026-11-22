@@ -83,7 +83,7 @@ notification services. It supports sending alerts to platforms such as: \
 `Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
 `Microsoft Teams`, `Misskey`, `Mobile Message`, \
 `MQTT`, `MSG91`, `MyAndroid`, `Nexmo`, `Nextcloud`, \
-`NextcloudTalk`, `Nostr`, `Notica`, `Notifiarr`, `Notifico`, \
+`NextcloudTalk`, `NextMsg`, `Nostr`, `Notica`, `Notifiarr`, `Notifico`, \
 `Notify!`, `Notifyre`, \
 `ntfy`, `Octopush`, `Office365`, `OneBot`, `OneSignal`, \
 `Opsgenie`, `OpsiMate`, `PagerDuty`, \
