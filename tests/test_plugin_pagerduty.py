@@ -31,6 +31,7 @@ import logging
 from unittest import mock
 
 from helpers import AppriseURLTester
+import pytest
 import requests
 
 from apprise import Apprise, NotifyType
@@ -346,3 +347,29 @@ def test_plugin_pagerduty_action_url():
         apikey="apikey", integrationkey="routekey", action="  "
     )
     assert obj.action == PagerDutyAction.TRIGGER
+
+
+def test_plugin_pagerduty_severity_case():
+    """NotifyPagerDuty() accepts severity= in any case."""
+    obj = Apprise.instantiate(
+        "pagerduty://myroutekey@myapikey/Apprise/Notification?severity=Critical"
+    )
+    assert isinstance(obj, NotifyPagerDuty)
+    assert obj.severity == "critical"
+
+    # Surrounding whitespace is accepted too
+    obj = NotifyPagerDuty(
+        apikey="apikey", integrationkey="routekey", severity=" WARNING "
+    )
+    assert obj.severity == "warning"
+
+    # The normalized value is written back by url()
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyPagerDuty)
+    assert obj2.severity == "warning"
+
+    # Unknown values are still rejected
+    with pytest.raises(AppriseImproperlyConfigured):
+        NotifyPagerDuty(
+            apikey="apikey", integrationkey="routekey", severity="invalid"
+        )

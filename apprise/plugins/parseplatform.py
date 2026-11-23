@@ -33,7 +33,11 @@ import requests
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import URL_ENCODED_PATH_SAFE_CHARS, validate_regex
+from ..utils.parse import (
+    URL_ENCODED_PATH_SAFE_CHARS,
+    parse_choice,
+    validate_regex,
+)
 from .base import NotifyBase
 
 # Used to break path apart into list of targets
@@ -164,8 +168,8 @@ class NotifyParsePlatform(NotifyBase):
         self.devices = []
 
         if device:
-            self.device = device.lower()
-            if device not in PARSE_PLATFORM_DEVICES:
+            self.device = parse_choice(device, PARSE_PLATFORM_DEVICES)
+            if not self.device:
                 msg = (
                     "An invalid Parse Platform device "
                     f"({device}) was specified."
@@ -183,7 +187,7 @@ class NotifyParsePlatform(NotifyBase):
             ]
         else:
             # Store our device
-            self.devices.append(device)
+            self.devices.append(self.device)
 
         return
 

@@ -42,7 +42,7 @@ import requests
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import validate_regex
+from ..utils.parse import parse_choice, validate_regex
 from .base import NotifyBase
 
 
@@ -224,11 +224,10 @@ class NotifyStreamlabs(NotifyBase):
         # Store the alert_type
         # only applicable when calling /alerts
         try:
-            if alert_type not in STRMLABS_ALERTS:
+            self.alert_type = parse_choice(alert_type, STRMLABS_ALERTS)
+            if not self.alert_type:
                 # allow the outer except to handle this common response
                 raise
-            else:
-                self.alert_type = alert_type
         except Exception as e:
             # Invalid region specified
             msg = f"The streamlabs alert type specified ({call}) is invalid."
