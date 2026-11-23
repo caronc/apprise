@@ -338,7 +338,7 @@ class NotifyGorush(NotifyBase):
         }
 
         # Basic auth is only needed when a reverse proxy asks for it.
-        auth = (self.user, self.password) if self.user else None
+        auth = (self.user, self.password or "") if self.user else None
 
         # Prepare our URL
         url = "{schema}://{host}{port}/api/push".format(

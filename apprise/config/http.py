@@ -163,7 +163,7 @@ class ConfigHTTP(ConfigBase):
         auth = None
         if self.user or self.password:
             # Basic Auth also permits a password with an empty username.
-            auth = (self.user or "", self.password)
+            auth = (self.user or "", self.password or "")
 
         url = f"{self.schema}://{self.host}"
         if isinstance(self.port, int):

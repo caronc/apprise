@@ -547,7 +547,7 @@ class NotifyNtfy(NotifyBase):
         else:  # NotifyNtfy.PRVATE
             # Allow more settings to be applied now
             if self.auth == NtfyAuth.BASIC and self.user:
-                auth = (self.user, self.password)
+                auth = (self.user, self.password or "")
 
             elif self.auth == NtfyAuth.TOKEN:
                 if not self.token:
