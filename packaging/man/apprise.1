@@ -28,6 +28,10 @@ The Apprise options are as follows:
 .P
 \fB\-t\fR, \fB\-\-title=\fR\fIVALUE\fR: Specify the message title\. This field is completely optional\.
 .P
+\fB\-E\fR, \fB\-\-email\-input\fR: Read an email message from \fIstdin\fR, such as one a mail transfer agent pipes in\. The \fBSubject\fR becomes the title (or "(no subject)" when there is none)\. The body names the sender (\fBFrom\fR) and the \fBDate\fR, followed by the first plain text part of the message, decoded with its own character set\. An explicit \fB\-\-title\fR (\fB\-t\fR) wins over the \fBSubject\fR\. This option can not be combined with \fB\-\-body\fR (\fB\-b\fR)\.
+.P
+\fB\-X\fR, \fB\-\-exit\-codes=\fR\fIMODE\fR: Specify how the outcome is reported as an exit code\. Possible values are "apprise" (the default; see \fBEXIT STATUS\fR) and "sysexits", which uses the codes from \fIsysexits\.h\fR that a mail transfer agent acts on\. See \fBEXIT STATUS\fR for the mapping\.
+.P
 \fB\-c\fR, \fB\-\-config=\fR\fICONFIG\-URL\fR: Specify one or more configuration locations\.
 .P
 \fB\-a\fR, \fB\-\-attach=\fR\fIATTACH\-URL\fR: Specify one or more file attachment locations\.
@@ -132,6 +136,17 @@ The \fBstorage\fR action has the following sub actions:
 .IP "\(bu" 4
 \fB5\fR if no notification was sent, and the only problem was that one or more services ran out of time\.
 .IP "" 0
+.P
+With \fB\-\-exit\-codes=sysexits\fR (\fB\-X sysexits\fR), \fBapprise\fR exits instead with a status of:
+.IP "\(bu" 4
+\fB0\fR if all of the notifications were sent successfully\.
+.IP "\(bu" 4
+\fB67\fR (EX_NOUSER) if one or more Apprise Service URLs were loaded but none matched the tags\. Retrying can not help, so a mail transfer agent bounces the message\.
+.IP "\(bu" 4
+\fB75\fR (EX_TEMPFAIL) if any notification failed or ran out of time, or if no Apprise Service URL could be loaded (a remote configuration may only be unreachable for now)\. A mail transfer agent keeps the message and tries again later\. Apprise can not tell a temporary failure from a permanent one, so every failure is reported as temporary\. When only some notifications failed, a retry sends the message to every service again\.
+.IP "\(bu" 4
+\fB2\fR if there was an error specified on the command line, as above\.
+.IP "" 0
 .SH "SERVICE URLS"
 There are too many service URL and combinations to list here\. It's best to visit the Apprise GitHub page \fIhttps://appriseit\.com/services/\fR and see what's available\. Also try out the Apprise URL Builder \fIhttps://appriseit\.com/url\-builder/\fR to easily construct the URLS this tool supports and works with\.
 .P
@@ -151,6 +166,13 @@ If you don't specify a \fB\-\-body\fR (\fB\-b\fR) then stdin is used allowing yo
 .nf
 $ cat /proc/cpuinfo | apprise \-vv \-t "cpu info" \e
     "mailto://myemail:mypass@gmail\.com"
+.fi
+.IP "" 0
+.P
+Turn system mail (from cron, for example) into notifications\. With this line in \fI/etc/aliases\fR, a mail transfer agent such as Postfix pipes each message for root into \fBapprise\fR, and defers or bounces it based on the exit status:
+.IP "" 4
+.nf
+root: "|/usr/bin/apprise \-E \-X sysexits \-\-config=/etc/apprise\.yml"
 .fi
 .IP "" 0
 .P

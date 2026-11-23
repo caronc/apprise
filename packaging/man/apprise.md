@@ -30,6 +30,20 @@ The Apprise options are as follows:
   `-t`, `--title=`<VALUE>:
   Specify the message title. This field is completely optional.
 
+  `-E`, `--email-input`:
+  Read an email message from <stdin>, such as one a mail transfer agent pipes
+  in. The **Subject** becomes the title (or "(no subject)" when there is
+  none). The body names the sender (**From**) and the **Date**, followed by
+  the first plain text part of the message, decoded with its own character
+  set. An explicit **--title** (**-t**) wins over the **Subject**. This option
+  can not be combined with **--body** (**-b**).
+
+  `-X`, `--exit-codes=`<MODE>:
+  Specify how the outcome is reported as an exit code. Possible values are
+  "apprise" (the default; see **EXIT STATUS**) and "sysexits", which uses the
+  codes from _sysexits.h_ that a mail transfer agent acts on. See
+  **EXIT STATUS** for the mapping.
+
   `-c`, `--config=`<CONFIG-URL>:
   Specify one or more configuration locations.
 
@@ -188,6 +202,21 @@ The **storage** action has the following sub actions:
 * **5** if no notification was sent, and the only problem was that one or
   more services ran out of time.
 
+With **--exit-codes=sysexits** (**-X sysexits**), **apprise** exits instead
+with a status of:
+
+* **0** if all of the notifications were sent successfully.
+* **67** (EX_NOUSER) if one or more Apprise Service URLs were loaded but none
+  matched the tags. Retrying can not help, so a mail transfer agent bounces
+  the message.
+* **75** (EX_TEMPFAIL) if any notification failed or ran out of time, or if no
+  Apprise Service URL could be loaded (a remote configuration may only be
+  unreachable for now). A mail transfer agent keeps the message and tries
+  again later. Apprise can not tell a temporary failure from a permanent one,
+  so every failure is reported as temporary. When only some notifications
+  failed, a retry sends the message to every service again.
+* **2** if there was an error specified on the command line, as above.
+
 ## SERVICE URLS
 
 There are too many service URL and combinations to list here. It's best to
@@ -214,6 +243,12 @@ use the tool as part of your every day administration:
 
     $ cat /proc/cpuinfo | apprise -vv -t "cpu info" \
         "mailto://myemail:mypass@gmail.com"
+
+Turn system mail (from cron, for example) into notifications. With this line
+in _/etc/aliases_, a mail transfer agent such as Postfix pipes each message
+for root into **apprise**, and defers or bounces it based on the exit status:
+
+    root: "|/usr/bin/apprise -E -X sysexits --config=/etc/apprise.yml"
 
 Load in a configuration file which identifies all of your notification service
 URLs and notify them all:
