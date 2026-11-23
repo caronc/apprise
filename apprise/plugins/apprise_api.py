@@ -437,7 +437,7 @@ class NotifyAppriseAPI(NotifyBase):
         if self.user or self.password:
             # An empty username is valid for password-only Apprise API
             # administrator accounts.
-            auth = (self.user or "", self.password)
+            auth = (self.user or "", self.password or "")
 
         # Set our schema
         schema = "https" if self.secure else "http"

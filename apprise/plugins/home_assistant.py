@@ -283,7 +283,7 @@ class NotifyHomeAssistant(NotifyBase):
 
         auth = None
         if self.user:
-            auth = (self.user, self.password)
+            auth = (self.user, self.password or "")
 
         # Set our schema
         schema = "https" if self.secure else "http"

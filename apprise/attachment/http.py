@@ -142,7 +142,7 @@ class AttachHTTP(AttachBase):
 
         auth = None
         if self.user:
-            auth = (self.user, self.password)
+            auth = (self.user, self.password or "")
 
         url = f"{self.schema}://{self.host}"
         if isinstance(self.port, int):

@@ -627,7 +627,7 @@ class NotifyBark(NotifyBase):
 
         auth = None
         if self.user:
-            auth = (self.user, self.password)
+            auth = (self.user, self.password or "")
 
         # Create a copy of the targets
         targets = list(self.targets)
