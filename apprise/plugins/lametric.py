@@ -782,12 +782,8 @@ class NotifyLametric(NotifyBase):
                 "repeat": 1,
             }
 
-        if not self.user:
-            # Use default user if there wasn't one otherwise specified
-            self.user = self.default_device_user
-
-        # Prepare our authentication
-        auth = (self.user, self.password)
+        # Use the default device user without storing it in the URL fields.
+        auth = (self.user or self.default_device_user, self.lametric_apikey)
 
         # Prepare our Direct Access Notify URL
         notify_url = self.device_notify_url.format(
@@ -961,7 +957,8 @@ class NotifyLametric(NotifyBase):
             params["sound"] = self.sound[1][0]
 
         auth = ""
-        if self.user and self.password:
+        if self.user:
+            # Write an explicit user before the API key.
             auth = "{user}:{apikey}@".format(
                 user=NotifyLametric.quote(self.user, safe=""),
                 apikey=self.pprint(self.lametric_apikey, privacy, safe=""),

@@ -384,7 +384,7 @@ class NotifyPushplus(NotifyBase):
         self,
         token: str,
         targets: Optional[Union[str, list[str]]] = None,
-        channel: Optional[str] = None,
+        channel: Optional[Union[str, list[str]]] = None,
         webhook: Optional[str] = None,
         option: Optional[str] = None,
         template: Optional[str] = None,
@@ -418,9 +418,15 @@ class NotifyPushplus(NotifyBase):
             # Several channels may be given, comma separated.  Their order
             # is kept because PushPlus pairs each one with its option code.
             # The 'wecom' friendly alias is normalised to the API value 'cp'.
+            # Accept either comma-separated text or a list.
+            entries = (
+                channel.split(",")
+                if isinstance(channel, str)
+                else [str(c) for c in channel]
+            )
             channels_split = [
                 "cp" if c.strip().lower() == "wecom" else c.strip().lower()
-                for c in channel.split(",")
+                for c in entries
                 if c.strip()
             ]
             for ch in channels_split:

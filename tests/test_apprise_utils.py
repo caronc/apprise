@@ -4247,3 +4247,7 @@ def test_time_zoneinfo():
     assert utils.time.zoneinfo(1) is None
     assert utils.time.zoneinfo("") is None
     assert utils.time.zoneinfo("invalid") is None
+
+    # A file path is never a timezone, and is never read
+    assert utils.time.zoneinfo("/etc/passwd") is None
+    assert utils.time.zoneinfo("../../etc/passwd") is None

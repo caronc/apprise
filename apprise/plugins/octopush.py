@@ -440,7 +440,12 @@ class NotifyOctopush(NotifyBase):
             sender="{}:".format(NotifyOctopush.quote(self.sender, safe=""))
             if self.sender
             else "",
-            api_login=self.pprint(self.api_login, privacy, safe="@"),
+            # Keep one email separator and quote any additional ones.
+            api_login=self.pprint(
+                self.api_login,
+                privacy,
+                safe="@" if self.api_login.count("@") == 1 else "",
+            ),
             api_key=self.pprint(
                 self.api_key,
                 privacy,

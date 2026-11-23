@@ -31,7 +31,10 @@ import socket
 from timeit import default_timer
 from unittest import mock
 
+import pytest
+
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.aprs import NotifyAprs
 
 logging.disable(logging.CRITICAL)
@@ -493,3 +496,16 @@ def test_plugin_aprs_long_space_run_is_fast(mock_create_connection):
     ]
     assert len(packets) == 1
     assert packets[0].endswith(":a" + "\t" * 66 + "\r\n")
+
+
+def test_plugin_aprs_refused_setup_cleans_up_quietly():
+    """A refused setup leaves nothing for __del__() to trip over."""
+    import gc
+
+    with mock.patch("sys.unraisablehook") as hook:
+        with pytest.raises(AppriseImproperlyConfigured):
+            NotifyAprs(user="DF1JSL-15", password="12345", tz="/etc/passwd")
+
+        gc.collect()
+
+    assert hook.call_count == 0

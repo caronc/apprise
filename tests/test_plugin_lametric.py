@@ -366,3 +366,63 @@ def test_plugin_lametric_cloud_access_token(mock_post):
     )
     assert mock_post.call_args[1]["headers"]["X-Access-Token"] == token
     assert mock_post.call_args[1]["auth"] is None
+
+
+@pytest.mark.parametrize(
+    "url, user",
+    (
+        # No user of its own: the device's default one
+        (
+            "lametric://8b799edf-6f98-4d3a-9be7-2862fb4e5752@192.168.1.2/",
+            "dev",
+        ),
+        # A user of its own
+        (
+            "lametric://root:8b799edf-6f98-4d3a-9be7-2862fb4e5752@192.168.1.2/",
+            "root",
+        ),
+    ),
+)
+@mock.patch("requests.post")
+def test_plugin_lametric_device_signs_in_with_its_api_key(
+    mock_post, url, user
+):
+    """Use the selected user and API key for device authentication."""
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(url)
+    assert isinstance(obj, NotifyLametric)
+    written = obj.url()
+    assert obj.notify(body="body")
+
+    assert mock_post.call_count == 1
+    assert mock_post.call_args[1]["auth"] == (
+        user,
+        "8b799edf-6f98-4d3a-9be7-2862fb4e5752",
+    )
+    assert obj.url() == written
+
+
+@mock.patch("requests.post")
+def test_plugin_lametric_device_built_from_its_api_key(mock_post):
+    """A device created from its API key (not a URL) signs in with that key."""
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    obj = NotifyLametric(
+        apikey="8b799edf-6f98-4d3a-9be7-2862fb4e5752",
+        host="192.168.1.2",
+        user="root",
+        mode="device",
+    )
+    assert obj.notify(body="body")
+    assert mock_post.call_args[1]["auth"] == (
+        "root",
+        "8b799edf-6f98-4d3a-9be7-2862fb4e5752",
+    )
+    assert obj.url().startswith(
+        "lametric://root:8b799edf-6f98-4d3a-9be7-2862fb4e5752@192.168.1.2"
+    )

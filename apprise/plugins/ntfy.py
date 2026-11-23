@@ -336,12 +336,15 @@ class NotifyNtfy(NotifyBase):
         """Initialize ntfy Object."""
         super().__init__(**kwargs)
 
-        # Prepare our mode
-        self.mode = (
-            mode.strip().lower()
-            if isinstance(mode, str)
-            else self.template_args["mode"]["default"]
-        )
+        # Infer the mode from whether a private host was supplied.
+        if isinstance(mode, str):
+            self.mode = mode.strip().lower()
+
+        elif self.host:
+            self.mode = self.template_args["mode"]["default"]
+
+        else:
+            self.mode = NtfyMode.CLOUD
 
         if self.mode not in NTFY_MODES:
             msg = f"An invalid ntfy Mode ({mode}) was specified."
@@ -938,6 +941,13 @@ class NotifyNtfy(NotifyBase):
         # Acquire our targets/topics
         results["targets"] = NotifyNtfy.split_path(results["fullpath"])
 
+        # Only path topics affect automatic mode detection.
+        path_topics = bool(results["targets"])
+
+        # A login (user, password or token) written before the host always
+        # means a self-hosted server
+        login = bool(results["user"] or results["password"])
+
         # The 'to' makes it easier to use yaml configuration
         if "to" in results["qsd"] and len(results["qsd"]["to"]):
             results["targets"] += NotifyNtfy.parse_list(results["qsd"]["to"])
@@ -1002,7 +1012,7 @@ class NotifyNtfy(NotifyBase):
                         is_hostname(results["host"])
                         or is_ipaddr(results["host"])
                     )
-                    and results["targets"]
+                    and (path_topics or login)
                 )
                 else NtfyMode.CLOUD
             )

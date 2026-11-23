@@ -119,6 +119,13 @@ class NotifyEmby(NotifyBase):
 
     def __init__(self, modal=False, **kwargs):
         """Initialize Emby Object."""
+        # Our access token does not get created until we first
+        # authenticate with our Emby server. The same goes for the
+        # user id below. Both are set first so the logout in __del__()
+        # still works when the setup below is refused.
+        self.access_token = None
+        self.user_id = None
+
         super().__init__(**kwargs)
 
         if self.secure:
@@ -126,12 +133,6 @@ class NotifyEmby(NotifyBase):
 
         else:
             self.schema = "http"
-
-        # Our access token does not get created until we first
-        # authenticate with our Emby server. The same goes for the
-        # user id below.
-        self.access_token = None
-        self.user_id = None
 
         # Whether or not our popup dialog is a timed notification
         # or a modal type box (requires an Okay acknowledgement)

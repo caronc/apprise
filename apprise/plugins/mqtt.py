@@ -315,10 +315,14 @@ class NotifyMQTT(NotifyBase):
             raise AppriseImproperlyConfigured(msg) from None
 
         # Our MQTT Client Object
+        # MQTT v5 does not take a clean session here; it asks for a clean
+        # start when it connects instead (see send())
         self.client = mqtt.Client(
             _MQTTCallbackAPI.VERSION2,
             client_id=self.client_id,
-            clean_session=not self.session,
+            clean_session=(
+                None if self.mqtt_protocol == mqtt.MQTTv5 else not self.session
+            ),
             userdata=None,
             protocol=self.mqtt_protocol,
             transport=self.mqtt_transport,
@@ -384,12 +388,21 @@ class NotifyMQTT(NotifyBase):
                     # Set our TLS Verify Flag
                     self.client.tls_insecure_set(not self.verify_certificate)
 
+                # MQTT v5 asks for a clean start (no saved session) when it
+                # connects, unless session=yes was given
+                options = (
+                    {"clean_start": not self.session}
+                    if self.mqtt_protocol == mqtt.MQTTv5
+                    else {}
+                )
+
                 # Establish our connection
                 if (
                     self.client.connect(
                         self.host,
                         port=self.port,
                         keepalive=self.mqtt_keepalive,
+                        **options,
                     )
                     != mqtt.MQTT_ERR_SUCCESS
                 ):

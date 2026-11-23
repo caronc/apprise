@@ -222,10 +222,11 @@ class NotifyAprs(NotifyBase):
 
     def __init__(self, targets=None, locale=None, delay=None, **kwargs):
         """Initialize APRS Object."""
-        super().__init__(**kwargs)
-
-        # Our (future) socket sobject
+        # Our (future) socket object; set first so the cleanup in __del__()
+        # still works when the setup below is refused
         self.sock = None
+
+        super().__init__(**kwargs)
 
         # Parse our targets
         self.targets = []

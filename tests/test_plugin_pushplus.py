@@ -1363,3 +1363,11 @@ def test_plugin_pushplus_apprise_integration(mock_post):
     assert bool(aobj3.notify(body="WeCom message")) is True
     payload = loads(mock_post.call_args[1]["data"])
     assert payload["channel"] == PushPlusChannel.WECOM
+
+
+def test_plugin_pushplus_channels_given_as_a_list():
+    """Channels may be given as a list, in their own order."""
+    obj = NotifyPushplus(
+        token="abc123def456ghi789jkl012mno345pq", channel=["mail", "wecom"]
+    )
+    assert obj.channel == "mail,cp"

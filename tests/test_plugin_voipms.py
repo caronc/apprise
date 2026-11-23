@@ -288,3 +288,12 @@ def test_plugin_voipms_non_success_status(mock_get):
 
     response.content = "{"
     assert obj.send("title", "body") is False
+
+
+def test_plugin_voipms_drops_a_target_that_is_no_phone_number():
+    """A target that is not a phone number is dropped; the rest still load."""
+    obj = Apprise.instantiate(
+        "voipms://password:user@example.com/16134448888/16134442222/abc"
+    )
+    assert isinstance(obj, NotifyVoipms)
+    assert obj.targets == ["6134442222"]

@@ -302,3 +302,23 @@ def test_plugin_xbmc_kodi_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+def test_plugin_xbmc_kodi_protocol_comes_from_the_schema():
+    """Select the remote protocol from the supplied schema."""
+    assert (
+        NotifyXBMC(host="localhost").protocol
+        == NotifyXBMC.xbmc_remote_protocol
+    )
+    assert NotifyXBMC(host="localhost").url().startswith("xbmc://")
+    for schema in ("kodi", "KODIS"):
+        obj = NotifyXBMC(host="localhost", schema=schema)
+        assert obj.protocol == NotifyXBMC.kodi_remote_protocol
+    assert (
+        NotifyXBMC(host="localhost", schema="xbmc").protocol
+        == NotifyXBMC.xbmc_remote_protocol
+    )
+    # An explicit protocol always wins
+    assert (
+        NotifyXBMC(host="localhost", schema="kodi", protocol=2).protocol == 2
+    )

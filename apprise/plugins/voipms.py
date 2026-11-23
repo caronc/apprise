@@ -175,8 +175,8 @@ class NotifyVoipms(NotifyBase):
                 # Validate targets and drop bad ones:
                 result = is_phone_no(target)
 
-                # Target Phone # only supports +1 country code
-                if (
+                # Keep valid North American phone numbers only.
+                if not result or (
                     result["country"]
                     and result["country"] != self.voip_ms_country_code
                 ):
