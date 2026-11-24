@@ -849,9 +849,11 @@ def parse_url(
                 r"[:]+", result["user"]
             )[:2]
 
-    # Port Parsing
+    # Port Parsing. An IPv6 address keeps its square brackets; whatever is
+    # inside them (any case, an embedded IPv4 address) is checked by
+    # is_hostname() below
     pmatch = re.search(
-        r"^(?P<host>(\[[0-9a-f:]+\]|[^:]+)):(?P<port>[^:]*)$", result["host"]
+        r"^(?P<host>(\[[^\]]+\]|[^:]+)):(?P<port>[^:]*)$", result["host"]
     )
 
     if pmatch:

@@ -356,6 +356,20 @@ def test_parse_url_general():
     assert result["qsd+"] == {}
     assert result["qsd:"] == {}
 
+    # An IPv6 address with a port is read in any case, and with an IPv4
+    # address inside it
+    result = utils.parse.parse_url("json://[2001:DB8::1]:8080/path")
+    assert result["host"] == "[2001:DB8::1]"
+    assert result["port"] == 8080
+    assert result["fullpath"] == "/path"
+
+    result = utils.parse.parse_url("json://[::ffff:192.168.1.1]:8080")
+    assert result["host"] == "[::ffff:192.168.1.1]"
+    assert result["port"] == 8080
+
+    # Brackets that hold no address are still refused
+    assert utils.parse.parse_url("json://[zz]:8080") is None
+
     result = utils.parse.parse_url(
         "http://hostname:0", verify_host=False, strict_port=True
     )
