@@ -33,6 +33,7 @@ import pytest
 
 from apprise import Apprise
 from apprise.fields import (
+    _as_list,
     _hidden,
     _typed,
     fields_to_url,
@@ -574,6 +575,18 @@ def test_typed_values():
     assert _typed("yes", {"type": "bool"}) is True
 
 
+def test_list_entries():
+    """Values are turned into a list of entries."""
+    # Text is split on commas, dropping the empty entries
+    assert _as_list("a,,b,") == ["a", "b"]
+
+    # A list or set is used as it is
+    assert _as_list(("a", "b")) == ["a", "b"]
+
+    # Any other value becomes a list of one
+    assert _as_list(5) == [5]
+
+
 def test_several_topics_stay_topics_without_a_host():
     """Two topics with no host stay two topics on the hosted service.
 
@@ -1070,3 +1083,38 @@ def test_options_that_make_one_value_together_are_combined(schema):
     read = parse_fields(fields_to_url(fields))
     sender = read.get("from") or read.get("from_addr")
     assert sender == "Display Name <reply@example.net>"
+
+
+@pytest.mark.parametrize(
+    "name, sender",
+    (
+        # A whole number is written the way it is usually typed
+        (15.0, "15 <reply@example.net>"),
+        # A switch is written the way a URL writes it
+        (True, "yes <reply@example.net>"),
+    ),
+)
+def test_a_number_or_switch_is_combined_as_a_url_writes_it(name, sender):
+    """A sender name that is not text is written as a URL would show it."""
+    fields = {
+        "schema": "mailto",
+        "user": "sender",
+        "host": "example.com",
+        "from": "reply@example.net",
+        "name": name,
+        "targets": ["to@example.org"],
+    }
+    assert parse_fields(fields_to_url(fields))["from"] == sender
+
+
+def test_options_that_combine_into_nothing_keep_the_value_given():
+    """Blank ?from= and ?name= give no sender, so the last one is used."""
+    fields = {
+        "schema": "mailto",
+        "user": "sender",
+        "host": "example.com",
+        "from": " ",
+        "name": " ",
+        "targets": ["to@example.org"],
+    }
+    assert "from=%20" in fields_to_url(fields)
