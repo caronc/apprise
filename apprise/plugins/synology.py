@@ -155,6 +155,11 @@ class NotifySynology(NotifyBase):
             raise AppriseImproperlyConfigured(msg)
 
         self.fullpath = kwargs.get("fullpath")
+        if not isinstance(self.fullpath, str):
+            # A pathless URL (e.g. synology://localhost?token=abc) parses
+            # with fullpath set to None; fall back to the same '/' default
+            # URLBase applies so send() and url_id() can rely on a string
+            self.fullpath = "/"
 
         # A URL to an attachment you want to upload (must be less then 32MB
         # Acording to API details (at the time of writing plugin)
