@@ -195,7 +195,7 @@ The table below identifies the services this tool supports and some example serv
 | [Syslog](https://appriseit.com/services/syslog/) | syslog://  | n/a | syslog://<br />syslog://Facility
 | [Telegram](https://appriseit.com/services/telegram/) | tgram://  | (TCP) 443   | tgram://bottoken/ChatID<br />tgram://bottoken/ChatID1/ChatID2/ChatIDN
 | [Twitter](https://appriseit.com/services/twitter/) | twitter://  | (TCP) 443   | twitter://CKey/CSecret/AKey/ASecret<br/>twitter://user@CKey/CSecret/AKey/ASecret<br/>twitter://CKey/CSecret/AKey/ASecret/User1/User2/User2<br/>twitter://CKey/CSecret/AKey/ASecret?mode=tweet
-| [Twist](https://appriseit.com/services/twist/) | twist://  | (TCP) 443   | twist://pasword:login<br/>twist://password:login/#channel<br/>twist://password:login/#team:channel<br/>twist://password:login/#team:channel1/channel2/#team3:channel
+| [Twist](https://appriseit.com/services/twist/) | twist://  | (TCP) 443   | twist://password:login<br/>twist://password:login/#channel<br/>twist://password:login/#team:channel<br/>twist://password:login/#team:channel1/channel2/#team3:channel
 | [Vapid (WebPush)](https://appriseit.com/services/vapid/) | vapid://    | (TCP) 443    | vapid://subscriber/target<br/>vapid://subscriber/target?subfile=path&keyfile=path
 | [Viber](https://appriseit.com/services/viber/) | viber://    | (TCP) 443    | viber://token/target
 | [Webex Teams (Cisco)](https://appriseit.com/services/wxteams/) | wxteams://  | (TCP) 443   | wxteams://Token
@@ -728,7 +728,7 @@ apobj.add('mailto://myuser:mypass@hotmail.com')
 # Now add all of the entries we're interested in:
 attach = (
     # ?name= allows us to rename the actual jpeg as found on the site
-    # to be another name when sent to our receipient(s)
+    # to be another name when sent to our recipient(s)
     'https://i.redd.it/my2t4d2fx0u31.jpg?name=FlyingToMars.jpg',
 
     # Now add another:
@@ -796,14 +796,14 @@ You can read more about creating your own custom notifications and/or hooks [her
 
 # Persistent Storage
 
-Persistent storage allows Apprise to cache re-occurring actions optionaly to disk. This can greatly reduce the overhead used to send a notification.
+Persistent storage allows Apprise to cache re-occurring actions optionally to disk. This can greatly reduce the overhead used to send a notification.
 
 There are 3 Persistent Storage operational states Apprise can operate using:
 1. `auto`:  Flush gathered cache information to the filesystem on demand.  This option is incredibly light weight.  This is the default behavior for all CLI usage.
    * Developers who choose to use this operational mode can also force cached information manually if they choose.
    * The CLI will use this operational mode by default.
 2. `flush`: Flushes any cache information to the filesystem during every transaction.
-3. `memory`: Effectively disable Persistent Storage.  Any caching of data required by each plugin used is done in memory.  Apprise effectively operates as it always did before peristent storage was available. This setting ensures no content is ever written to disk.
+3. `memory`: Effectively disable Persistent Storage.  Any caching of data required by each plugin used is done in memory.  Apprise effectively operates as it always did before persistent storage was available. This setting ensures no content is ever written to disk.
    * By default this is the mode Apprise will operate under for those developing with it unless they configure it to otherwise operate as `auto` or `flush`.  This is done through the `AppriseAsset()` object and is explained further on in this documentation.
 
 ## CLI Persistent Storage Commands
@@ -840,7 +840,7 @@ You can also filter your results by adding tags and/or URL Identifiers.  When yo
 
 ```
 The (persistent storage) cache states are:
- - `unused`: This plugin has not commited anything to disk for reuse/cache purposes
+ - `unused`: This plugin has not committed anything to disk for reuse/cache purposes
  - `active`: This plugin has written content to disk.  Or at the very least, it has prepared a persistent storage location it can write into.
  - `stale`: The system detected a location where a URL may have possibly written to in the past, but there is nothing linking to it using the URLs provided.  It is likely wasting space or is no longer of any use.
 
@@ -860,7 +860,7 @@ apprise storage clean ab
 apprise storage list --tag=team
 
 # You can match on multiple URL ID's as well:
-# The followin would actually match the URL ID's of 1. and .2 above
+# The following would actually match the URL ID's of 1. and .2 above
 apprise storage list f 0
 ```
 When using the CLI, Persistent storage is set to the operational mode of `auto` by default, you can change this by providing `--storage-mode=` (`-SM`) during your calls.  If you want to ensure it's always set to a value of your choice.
