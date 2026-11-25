@@ -61,13 +61,10 @@ def zoneinfo(name: str) -> Optional[ZoneInfo]:
     try:
         return ZoneInfo(name)
 
-    except ZoneInfoNotFoundError:
+    except (ZoneInfoNotFoundError, ValueError):
+        # Not found as written; a file path (such as /etc/passwd or ../x)
+        # is refused here too, and never matches a timezone name below
         pass
-
-    except ValueError:
-        # A file path (such as /etc/passwd or ../x) is never a timezone
-        logger.warning("Unknown timezone specified: %s", name)
-        return None
 
     # Try case-insensitive match across available keys
     from zoneinfo import available_timezones

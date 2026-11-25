@@ -139,6 +139,12 @@ class NotifyTwist(NotifyBase):
 
     def __init__(self, email=None, targets=None, **kwargs):
         """Initialize Notify Twist Object."""
+        # The token is None if we're not logged in and False if we
+        # failed to log in.  Otherwise it is set to the actual token.
+        # It is set first so the logout in __del__() still works when the
+        # setup below is refused
+        self.token = None
+
         super().__init__(**kwargs)
 
         # Initialize channels list
@@ -147,10 +153,6 @@ class NotifyTwist(NotifyBase):
         # Initialize Channel ID which are stored as:
         #   <workspace_id>:<channel_id>
         self.channel_ids = set()
-
-        # The token is None if we're not logged in and False if we
-        # failed to log in.  Otherwise it is set to the actual token
-        self.token = None
 
         # Our default workspace (associated with our token)
         self.default_workspace = None

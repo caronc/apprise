@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 from bisect import bisect_left, bisect_right
 import contextlib
+from email.utils import formataddr as _formataddr
 from functools import reduce
 import re
 from typing import Any, Optional
@@ -503,6 +504,26 @@ def is_call_sign(callsign):
     }
 
 
+def formataddr(pair: tuple[Any, str], charset: str = "utf-8") -> str:
+    """Return a display name and email address written as one sender.
+
+    - Works like email.utils.formataddr(): ``(name, address)`` gives
+      ``Name <address>``, with the name quoted or encoded where email needs
+      it, and a missing name gives the address alone.
+    - An address with non-ASCII characters (such as an accented letter,
+      allowed by RFC 6531) is refused by the standard version, so the two
+      are joined as written instead.
+    """
+    try:
+        return _formataddr(pair, charset=charset)
+
+    except UnicodeEncodeError:
+        # The standard version only takes an address made of ASCII
+        # characters; write the address as it was given
+        name, address = pair
+        return "{} <{}>".format(name, address) if name else address
+
+
 def is_email(address):
     """Determine if the specified entry is an email address.
 
@@ -527,6 +548,12 @@ def is_email(address):
 
     except TypeError:
         # not parseable content
+        return False
+
+    if match and match.end() < len(address.rstrip()):
+        # Only the start of the text reads as an address; a character the
+        # address can't hold follows it (me@test.exämple would otherwise
+        # be read as me@test.ex, a different domain)
         return False
 
     if match:

@@ -117,10 +117,10 @@ logger.addFilter(_QUIET_LOGS_FILTER)
 
 def _quiet_child(child: Any) -> None:
     """Add quiet filtering to an Apprise child logger."""
-    if (
-        isinstance(child, logging.Logger)
-        and child.name.startswith(LOGGER_NAME + ".")
-        and _QUIET_LOGS_FILTER not in child.filters
+    # The manager also holds placeholders that are not loggers; addFilter()
+    # skips a filter the logger already has, so this is safe to repeat
+    if isinstance(child, logging.Logger) and child.name.startswith(
+        LOGGER_NAME + "."
     ):
         child.addFilter(_QUIET_LOGS_FILTER)
 

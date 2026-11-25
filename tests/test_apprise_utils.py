@@ -1898,6 +1898,18 @@ def test_parse_url_ipv6_round_trip():
         assert second["url"] == first["url"]
 
 
+def test_is_email_never_reads_part_of_an_address():
+    """An address must be read whole, or it is no address at all."""
+    # A letter the address can't hold would otherwise cut the domain short
+    assert utils.parse.is_email("me@test.exämple") is False
+    assert utils.parse.is_email("me@test.exampleé") is False
+    assert utils.parse.is_email("victim@example.com@evil.com") is False
+
+    # Spaces after the address are fine
+    results = utils.parse.is_email("Me <me@test.example>  ")
+    assert results["full_email"] == "me@test.example"
+
+
 def test_is_email():
     """
     API: is_email() function
@@ -4251,3 +4263,23 @@ def test_time_zoneinfo():
     # A file path is never a timezone, and is never read
     assert utils.time.zoneinfo("/etc/passwd") is None
     assert utils.time.zoneinfo("../../etc/passwd") is None
+
+
+def test_formataddr():
+    """A display name and address are written as one sender."""
+    # The name is quoted where email needs it
+    assert (
+        utils.parse.formataddr(("Doe, J", "a@test.example"))
+        == '"Doe, J" <a@test.example>'
+    )
+
+    # An accented address is joined as written instead of raising
+    assert (
+        utils.parse.formataddr(("Me", "é@test.example"))
+        == "Me <é@test.example>"
+    )
+
+    # Without a name, the address is given alone
+    assert (
+        utils.parse.formataddr((False, "é@test.example")) == "é@test.example"
+    )

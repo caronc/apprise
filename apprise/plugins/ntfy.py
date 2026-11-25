@@ -1031,7 +1031,7 @@ class NotifyNtfy(NotifyBase):
             results["host"] = None
 
         elif results["mode"] == NtfyMode.PRIVATE and not (
-            is_hostname(results["host"] or is_ipaddr(results["host"]))
+            is_hostname(results["host"]) or is_ipaddr(results["host"])
         ):
             # Invalid Host for NtfyMode.PRIVATE
             return None

@@ -46,6 +46,7 @@ from .plugins import details
 from .url import PrivacyMode, URLBase
 from .utils.parse import (
     GET_SCHEMA_RE,
+    is_ipaddr,
     parse_bool,
 )
 
@@ -87,6 +88,10 @@ def _typed(value: Any, meta: dict[str, Any]) -> Any:
         elif isinstance(value, str):
             value = value.split(",")
 
+        elif isinstance(value, (int, float)):
+            # A single number (such as topic 123) is a list of one
+            value = [value]
+
         elif not isinstance(value, (list, tuple)):
             # Objects a plugin keeps for itself are not fields
             return None
@@ -117,27 +122,40 @@ def _typed(value: Any, meta: dict[str, Any]) -> Any:
             try:
                 return convert(value)
 
-            except ValueError:
-                # Keep what was written when it is not a number
-                return value
+            except (ValueError, OverflowError):
+                # Keep what was written when it is not a number. NaN and
+                # infinity (which JSON can carry) can't be a whole number,
+                # so they are passed on as text, the way a URL holds them
+                return value if isinstance(value, str) else _text(value)
 
     return value if isinstance(value, str) else str(value)
 
 
-def _fits(value: Any, meta: dict[str, Any], kwarg: bool = False) -> bool:
+def _fits(name: str, value: Any, info: dict[str, Any]) -> bool:
     """Return whether a field value has the shape its template entry allows.
 
     - A key/value option is a map of names to plain values.
     - A list is one plain value or a flat list of them.
+    - An alias has the shape of the entry (or entries) it stands for.
     - Anything else is one plain value: text, a number or True/False.
     """
     # True/False count as numbers here, so they are plain values too
     plain = (str, int, float)
-    if kwarg:
+    if name in info["kwargs"] and name not in info["args"]:
         return isinstance(value, dict) and all(
             isinstance(key, str) and isinstance(entry, plain)
             for key, entry in value.items()
         )
+
+    meta = _entry(name, info)
+    targets = _alias_targets(meta)
+    if targets:
+        # An alias takes a list when any entry it stands for is a list
+        listed = any(
+            _entry(target, info).get("type", "").startswith("list")
+            for target in targets
+        )
+        meta = {"type": "list:string" if listed else "string"}
 
     listed = meta.get("type", "").startswith("list")
     if listed and isinstance(value, (list, tuple)):
@@ -431,11 +449,11 @@ def _as_list(value: Any) -> list[Any]:
         # Empty entries (such as from "a,,b" or a trailing comma) are dropped
         return [entry for entry in value.split(",") if entry.strip()]
 
-    if isinstance(value, (list, tuple, set)):
+    if isinstance(value, list):
         # Already several entries
-        return list(value)
+        return value
 
-    # A single value becomes a list of one
+    # A single value (such as a topic number) becomes a list of one
     return [value]
 
 
@@ -450,13 +468,15 @@ def _defaults(plugin: Any) -> dict[str, None]:
     # so its signature can always be read
     parameters = inspect.signature(plugin.__init__).parameters.values()
 
-    # Keep the arguments that have no default value of their own
+    # Keep the arguments that have no default value of their own; a plugin
+    # someone writes may also list them after a * (keyword only)
     return {
         parameter.name: None
         for parameter in parameters
         if parameter.name != "self"
         and parameter.default is parameter.empty
-        and parameter.kind is parameter.POSITIONAL_OR_KEYWORD
+        and parameter.kind
+        in (parameter.POSITIONAL_OR_KEYWORD, parameter.KEYWORD_ONLY)
     }
 
 
@@ -496,17 +516,7 @@ def fields_to_url(fields: dict[str, Any]) -> Optional[str]:
             logger.warning("The %s:// field %r is not supported", schema, name)
             return None
 
-        entry = _entry(name, info)
-        targets = _alias_targets(entry)
-        if targets:
-            # An alias has the shape of the item it stands for
-            listed = any(
-                _entry(target, info).get("type", "").startswith("list")
-                for target in targets
-            )
-            entry = {"type": "list:string" if listed else "string"}
-
-        if not _fits(value, entry, kwarg=name in kwargs and name not in args):
+        if not _fits(name, value, info):
             logger.warning(
                 "The %s:// field %s has a value of the wrong type",
                 schema,
@@ -546,22 +556,48 @@ def fields_to_url(fields: dict[str, Any]) -> Optional[str]:
                 # switch (a form may send "no", or a number for text)
                 part = _typed(part, entry)
 
-            prefix = entry.get("prefix")
-            if (
-                prefix
-                and key in lists
-                and not entry.get("type", "").startswith("list")
-            ):
-                # Keep the prefix that marks which kind of list member this
-                # is (such as # for a channel)
-                part = [
-                    text if text.startswith(prefix) else prefix + text
-                    for text in map(str, _as_list(part))
-                ]
+            else:
+                # Each key/value option is text, the way a URL writes it
+                # (False is written no, and 15.0 is written 15)
+                part = {option: _text(text) for option, text in part.items()}
 
-            if key in lists and key in arguments:
+            if key in ("user", "password") and isinstance(part, str):
+                # The user and password are given as typed (see _fields()),
+                # but the plugin unquotes them as it would from a URL, so
+                # they are quoted here; a literal p%2F then stays p%2F
+                part = URLBase.quote(part, safe="")
+
+            elif key == "host" and isinstance(part, str):
+                # An IPv6 address is given in brackets, the way parse_url()
+                # gives it, so a port written after it is never read as
+                # part of the address
+                part = is_ipaddr(part, ipv4=False) or part
+
+            elif (
+                key == "fullpath"
+                and isinstance(part, str)
+                and not part.startswith("/")
+            ):
+                # A path starts with a slash, the way parse_url() gives it;
+                # without one, hook would join the host (example.orghook)
+                part = "/" + part
+
+            if key in lists:
+                # Each entry is given as text, the way a URL path holds it
+                # (a topic number such as 123 would otherwise be dropped)
+                texts = [_text(item) for item in _as_list(part)]
+
+                prefix = entry.get("prefix")
+                if prefix and not entry.get("type", "").startswith("list"):
+                    # Keep the prefix that marks which kind of list member
+                    # this is (such as # for a channel)
+                    texts = [
+                        text if text.startswith(prefix) else prefix + text
+                        for text in texts
+                    ]
+
                 # A list gathers this value along with those before it
-                arguments[key] = _as_list(arguments[key]) + _as_list(part)
+                arguments[key] = arguments.get(key, []) + texts
                 continue
 
             # A single value; a later field replaces an earlier one
@@ -596,7 +632,19 @@ def fields_to_url(fields: dict[str, Any]) -> Optional[str]:
         return None
 
     # The plugin writes its own URL, the same one it gives when loaded
-    return obj.url()
+    url = obj.url()
+
+    # Some checks (such as needing a host) are made when a URL is read, not
+    # when the plugin is built, so json:// with no host would pass above.
+    # Only a URL the plugin can read back is given
+    with quiet_logs():
+        readable = bool(plugin.parse_url(url))
+
+    if not readable:
+        logger.debug("The %s:// fields give a URL that can't be read", schema)
+        return None
+
+    return url
 
 
 def missing_fields(fields: dict[str, Any]) -> list[str]:
@@ -625,8 +673,14 @@ def missing_fields(fields: dict[str, Any]) -> list[str]:
     # The values the fields already fill in
     given = set()
     for name, value in fields.items():
-        if name == "schema" or not isinstance(name, str) or _empty(value):
-            # Nothing to fill in (or not a field name at all)
+        if (
+            name == "schema"
+            or not isinstance(name, str)
+            or _empty(value)
+            or not _fits(name, value, info)
+        ):
+            # Nothing to fill in, not a field name at all, or a value that
+            # fields_to_url() would refuse (such as a list inside a list)
             continue
 
         # An alias fills in the value it stands for

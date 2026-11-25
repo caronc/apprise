@@ -33,7 +33,6 @@ import pytest
 
 from apprise import Apprise
 from apprise.fields import (
-    _as_list,
     _hidden,
     _typed,
     fields_to_url,
@@ -434,7 +433,8 @@ def test_field_values_quoted():
     assert "%5Babc%3Fverify%3Dno%5D" in built
     assert "verify=no" not in built
 
-    # An email keeps its @ only when it is one valid address
+    # An email login must be one whole valid address; a second @ is refused
+    # rather than letting the address move
     phone = ["+15551234567"]
     built = fields_to_url(
         {
@@ -444,7 +444,7 @@ def test_field_values_quoted():
             "targets": phone,
         }
     )
-    assert "victim%40example.com%40evil.com" in built
+    assert built is None
     built = fields_to_url(
         {
             "schema": "octopush",
@@ -573,18 +573,6 @@ def test_typed_values():
     assert _typed("1.5", {"type": "float"}) == 1.5
     assert _typed(5, {"type": "string"}) == "5"
     assert _typed("yes", {"type": "bool"}) is True
-
-
-def test_list_entries():
-    """Values are turned into a list of entries."""
-    # Text is split on commas, dropping the empty entries
-    assert _as_list("a,,b,") == ["a", "b"]
-
-    # A list or set is used as it is
-    assert _as_list(("a", "b")) == ["a", "b"]
-
-    # Any other value becomes a list of one
-    assert _as_list(5) == [5]
 
 
 def test_several_topics_stay_topics_without_a_host():
@@ -1118,3 +1106,148 @@ def test_options_that_combine_into_nothing_keep_the_value_given():
         "targets": ["to@example.org"],
     }
     assert "from=%20" in fields_to_url(fields)
+
+
+@pytest.mark.parametrize("schema", ("mailto", "deltachat", "resend"))
+def test_a_sender_with_an_accented_address_never_raises(schema):
+    """A display name joins an accented address, or the service refuses it.
+
+    - mailto:// and deltachat:// keep the sender as written.
+    - resend:// refuses the address the usual way (no URL).
+    """
+    fields = {
+        "schema": schema,
+        "from": "é@test.example",
+        "name": "Me",
+        "targets": ["to@test.example"],
+    }
+    if schema == "resend":
+        fields["apikey"] = "re_abc123"
+        assert fields_to_url(fields) is None
+        return
+
+    fields.update(user="sender", host="test.example")
+    sender = parse_fields(fields_to_url(fields))["from"]
+    assert sender == "Me <é@test.example>"
+
+
+@pytest.mark.parametrize(
+    "url, user, password",
+    (
+        # A password holding the literal text p%2F
+        ("json://bob:p%252F@localhost", "bob", "p%2F"),
+        # A user holding the literal text b%40b
+        ("json://b%2540b:pw@localhost", "b%40b", "pw"),
+    ),
+)
+def test_credentials_survive_a_round_trip(url, user, password):
+    """A user and password are loaded exactly as written after a rebuild."""
+    obj = Apprise.instantiate(fields_to_url(parse_fields(url)))
+    assert (obj.user, obj.password) == (user, password)
+
+
+@pytest.mark.parametrize("schema", ("json", "xml", "form"))
+def test_a_path_without_a_slash_stays_a_path(schema):
+    """A webhook path typed without its slash never joins the host."""
+    url = fields_to_url(
+        {"schema": schema, "host": "test.example", "path": "hook"}
+    )
+    obj = Apprise.instantiate(url)
+    assert (obj.host, obj.fullpath) == ("test.example", "/hook")
+
+
+@pytest.mark.parametrize("host", ("2001:db8::1", "[2001:db8::1]"))
+def test_an_ipv6_host_keeps_its_port(host):
+    """An IPv6 host typed with or without brackets keeps its own port."""
+    url = fields_to_url({"schema": "json", "host": host, "port": 8080})
+    obj = Apprise.instantiate(url)
+    assert (obj.host, obj.port) == ("[2001:db8::1]", 8080)
+
+
+def test_key_value_options_are_written_as_a_url_writes_them():
+    """A switch or number in a key/value option is sent as URL text."""
+    url = fields_to_url(
+        {
+            "schema": "json",
+            "host": "localhost",
+            "headers": {"X": False, "Y": 15.0, "Z": 1.5},
+        }
+    )
+    assert Apprise.instantiate(url).headers == {
+        "X": "no",
+        "Y": "15",
+        "Z": "1.5",
+    }
+
+
+def test_a_number_given_for_a_list_is_a_list_of_one():
+    """A single number given for a whole list becomes one entry."""
+    url = fields_to_url({"schema": "ntfy", "targets": 123})
+    assert Apprise.instantiate(url).topics == ["123"]
+
+
+def test_an_anonymous_mqtt_url_misses_nothing():
+    """MQTT needs a host and topic; a user and password are optional."""
+    fields = {"schema": "mqtt", "host": "localhost", "topic": "a/b"}
+    assert missing_fields(fields) == []
+    assert missing_fields({"schema": "mqtt"}) == ["host", "topic"]
+
+
+@pytest.mark.parametrize(
+    "fields, targets",
+    (
+        # A topic number on its own
+        ({"target_topic": 123}, ["123"]),
+        # A topic number along with a user
+        ({"targets": ["UID_abc"], "target_topic": 123}, ["123", "UID_abc"]),
+    ),
+)
+def test_a_number_added_to_a_list_is_kept(fields, targets):
+    """A topic number joins the list of targets as text, as a URL holds it."""
+    url = fields_to_url({"schema": "wxpusher", "token": "AT_appid", **fields})
+    assert parse_fields(url)["targets"] == targets
+
+
+@pytest.mark.parametrize("value", (float("nan"), float("inf")))
+def test_a_number_that_is_not_whole_never_raises(value):
+    """NaN and infinity (which JSON can carry) never crash a number field."""
+    url = fields_to_url(
+        {"schema": "kodi", "host": "localhost", "duration": value}
+    )
+    # Kodi refuses the duration and uses its own default instead
+    assert "duration=12" in url
+
+    # A plugin that checks the value itself refuses it the usual way
+    assert (
+        fields_to_url(
+            {"schema": "psafer", "privatekey": "abc123", "priority": value}
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize("schema", ("json", "xml", "kodi", "mqtt"))
+def test_a_url_that_cannot_be_read_back_is_not_given(schema):
+    """No URL is given when its host is missing, even if the plugin loads."""
+    assert fields_to_url({"schema": schema}) is None
+
+
+def test_a_value_too_deep_fills_in_nothing():
+    """A value fields_to_url() would refuse fills in nothing."""
+    assert missing_fields({"schema": "slack", "token": DEEP}) == (
+        missing_fields({"schema": "slack"})
+    )
+
+
+def test_a_plugin_with_keyword_only_arguments_is_refused_cleanly():
+    """A required argument listed after * is given None like any other."""
+    from apprise.exception import AppriseImproperlyConfigured
+    from apprise.plugins.custom_json import NotifyJSON
+
+    def init(self, *, apikey, **kwargs):
+        # The argument arrives empty, so the plugin refuses it
+        assert apikey is None
+        raise AppriseImproperlyConfigured("no apikey")
+
+    with mock.patch.object(NotifyJSON, "__init__", init):
+        assert fields_to_url({"schema": "json", "host": "localhost"}) is None

@@ -9641,3 +9641,14 @@ def test_plugin_matrix_markdown_escapes():
     assert obj.dialect_convert("a \\& b\nnext", NotifyFormat.MARKDOWN) == (
         "<p>a &amp; b\nnext</p>"
     )
+
+
+def test_plugin_matrix_refused_setup_cleans_up_quietly():
+    """A refused setup leaves nothing for __del__() to trip over."""
+    with mock.patch("sys.unraisablehook") as hook:
+        with pytest.raises(AppriseImproperlyConfigured):
+            NotifyMatrix(host="localhost", tz="/etc/passwd")
+
+        gc.collect()
+
+    assert hook.call_count == 0

@@ -956,7 +956,6 @@ class NotifyLametric(NotifyBase):
             # The first element of our tuple is always the id
             params["sound"] = self.sound[1][0]
 
-        auth = ""
         if self.user:
             # Write an explicit user before the API key.
             auth = "{user}:{apikey}@".format(

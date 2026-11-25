@@ -47,14 +47,19 @@
 #
 # {user}@{domain} forms the sender. Without a target, it is also the recipient.
 #
-from email.utils import formataddr
 
 import requests
 
 from ..common import NotifyFormat, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import is_email, parse_bool, parse_emails, validate_regex
+from ..utils.parse import (
+    formataddr,
+    is_email,
+    parse_bool,
+    parse_emails,
+    validate_regex,
+)
 from .base import NotifyBase
 
 # Provide some known codes Mailgun uses and what they translate to:

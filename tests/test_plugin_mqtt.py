@@ -443,6 +443,28 @@ def test_plugin_mqtt_v5_asks_for_a_clean_start_when_connecting(
     assert mqtt_client_mock.connect.call_args.kwargs["clean_start"] is clean
 
 
+def test_plugin_mqtt_v5_saved_session_never_expires(mqtt_client_mock):
+    """An MQTT v5 session=yes asks the broker to keep the session.
+
+    - session=yes gives the session no expiry, as v3 does.
+    - session=no sends no session lifetime at all.
+    """
+    obj = apprise.Apprise.instantiate(
+        "mqtt://localhost/my/topic?version=v5.0&session=yes&client_id=apprise",
+        suppress_exceptions=False,
+    )
+    assert bool(obj.notify(body="test=test")) is True
+    properties = mqtt_client_mock.connect.call_args.kwargs["properties"]
+    assert properties.SessionExpiryInterval == 0xFFFFFFFF
+
+    obj = apprise.Apprise.instantiate(
+        "mqtt://localhost/my/topic?version=v5.0&session=no&client_id=apprise",
+        suppress_exceptions=False,
+    )
+    assert bool(obj.notify(body="test=test")) is True
+    assert "properties" not in mqtt_client_mock.connect.call_args.kwargs
+
+
 def test_plugin_mqtt_v3_keeps_its_clean_session_on_the_client(
     mqtt_client_mock,
 ):

@@ -39,7 +39,6 @@
 # Simple API Reference:
 #  - https://resend.com/onboarding
 
-from email.utils import formataddr
 from json import dumps
 import logging
 
@@ -49,7 +48,7 @@ from .. import exception
 from ..common import NotifyFormat, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import is_email, parse_emails, validate_regex
+from ..utils.parse import formataddr, is_email, parse_emails, validate_regex
 from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 

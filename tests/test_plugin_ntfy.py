@@ -1015,3 +1015,15 @@ def test_plugin_ntfy_html_to_markdown_format(mock_post):
     # The body must arrive as Markdown, not as stripped plain text
     payload = json.loads(mock_post.call_args_list[0][1]["data"])
     assert payload["message"] == "**hello** *world*"
+
+
+def test_plugin_ntfy_private_mode_needs_a_host():
+    """A self-hosted (private) URL is read only with a host or IP address."""
+    # No host at all is refused rather than raising
+    assert NotifyNtfy.parse_url("ntfy://?mode=private") is None
+    assert NotifyNtfy.parse_url("ntfy://#x?mode=private") is None
+
+    # A hostname or an IP address is accepted
+    for host in ("localhost", "10.0.0.1"):
+        results = NotifyNtfy.parse_url(f"ntfy://{host}/t?mode=private")
+        assert results["host"] == host

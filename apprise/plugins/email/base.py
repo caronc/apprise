@@ -31,7 +31,7 @@ from email.mime.application import MIMEApplication
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import format_datetime, formataddr, make_msgid
+from email.utils import format_datetime, make_msgid
 import re
 import smtplib
 from typing import Optional
@@ -44,6 +44,7 @@ from ...logger import logger
 from ...url import PrivacyMode
 from ...utils import pgp as _pgp, wkd as _wkd
 from ...utils.parse import (
+    formataddr,
     is_email,
     is_hostname,
     is_ipaddr,
