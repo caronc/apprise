@@ -251,3 +251,37 @@ def test_plugin_synology_payload_is_url_encoded(mock_post):
     form = parse_qs(body)
     assert list(form.keys()) == ["payload"]
     assert "AT&T 50% off + more" in loads(form["payload"][0])["text"]
+
+
+@mock.patch("requests.post")
+def test_plugin_synology_token_without_path(mock_post):
+    """A token set through ?token= needs no path to be present."""
+
+    response = mock.Mock()
+    response.content = b'{"success": true}'
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    # A pathless URL must behave just like its trailing-slash variant
+    instance = NotifySynology(
+        **NotifySynology.parse_url("synology://localhost?token=abc")
+    )
+    assert isinstance(instance, NotifySynology)
+    assert instance.fullpath == "/"
+
+    # A fullpath is required to build the request and the URL identifier
+    assert instance.url_id()
+    assert instance.send(title="title", body="body") is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == "http://localhost//webapi/entry.cgi"
+
+    # ... and the trailing slash variant posts to the same place
+    reference = NotifySynology(
+        **NotifySynology.parse_url("synology://localhost/?token=abc")
+    )
+    assert reference.send(title="title", body="body") is True
+    assert mock_post.call_args_list[1][0][0] == (
+        "http://localhost//webapi/entry.cgi"
+    )
