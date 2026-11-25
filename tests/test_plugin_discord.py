@@ -741,6 +741,28 @@ def test_plugin_discord_general(mock_sleep, mock_post):
     assert results[4]["name"] == "Heading 5"
     assert results[4]["value"] == "```\n```"
 
+    # A section containing a fenced code block must not have its fence
+    # closed early by the inner code block markers
+    fenced_md = '# Heading\n```python\nprint("hi")\n```\n'
+    desc, results = obj.extract_markdown_sections(fenced_md)
+    assert isinstance(results, list) is True
+    assert len(results) == 1
+    assert results[0]["name"] == "Heading"
+    assert (
+        results[0]["value"]
+        == '````md\n```python\nprint("hi")\n```\n````'
+    )
+
+    # A section too large to wrap in the longer fence is sent as plain
+    # text rather than overflowing the field limit
+    long_code = "```" + "x" * (obj.discord_field_value_maxlen - 13)
+    oversized_md = "# Heading\n" + long_code + "\n"
+    desc, results = obj.extract_markdown_sections(oversized_md)
+    assert isinstance(results, list) is True
+    assert len(results) == 1
+    assert results[0]["name"] == "Heading"
+    assert results[0]["value"] == long_code
+
     # Create an apprise instance
     a = Apprise()
 

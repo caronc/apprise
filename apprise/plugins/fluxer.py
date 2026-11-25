@@ -1202,14 +1202,28 @@ class NotifyFluxer(NotifyBase):
         )
 
         # Show each section as a code block.  An empty one stays empty.
-        fields = [
-            {
-                "name": name,
-                "value": "```md\n{}\n```".format(value.rstrip())
-                if value
-                else "```\n```",
-            }
-            for name, value in sections
-        ]
+        fields = []
+        for name, value in sections:
+            if not value:
+                fields.append({"name": name, "value": "```\n```"})
+                continue
+
+            value = value.rstrip()
+            # The fence must be longer than any run of backticks inside
+            # the value; otherwise an inner code fence closes the block
+            # early and the leftover markers render as stray text.
+            fence = (
+                max((len(run) for run in re.findall(r"`+", value)), default=2)
+                + 1
+            )
+            fence = max(fence, 3)
+            wrapped = "{}md\n{}\n{}".format("`" * fence, value, "`" * fence)
+            if len(wrapped) > cls.fluxer_field_value_maxlen:
+                # The longer fence no longer fits within the field limit;
+                # send the section as plain text instead.
+                fields.append({"name": name, "value": value})
+
+            else:
+                fields.append({"name": name, "value": wrapped})
 
         return description, fields
