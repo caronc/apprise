@@ -264,6 +264,14 @@ FLEET = (
         {},
     ),
     (
+        "sparetext",
+        # One request per phone number, so each can fail on its own
+        f"sparetext://{TOKEN}/12125550001/12125559999?batch=no",
+        "12125550001",
+        "12125559999",
+        {"__http__": 202},
+    ),
+    (
         "line",
         f"line://{TOKEN}/target0001/target9999",
         "target0001",

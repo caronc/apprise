@@ -233,6 +233,7 @@ TRACKED = {
     "smseagle": "smseagle://token@localhost/12512222222/@contact/%23group",
     "smsmanager": "smsmgr://zzzzzzzzzz@123/33333333333/+44444444444",
     "smstunnel": "smstunnel://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/12125550001",
+    "sparetext": "sparetext://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/+12125550001",
     "smtp2go": (
         "smtp2go://user@example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/"
         "one@example.ca"
