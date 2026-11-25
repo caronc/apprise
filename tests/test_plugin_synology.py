@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise.exception import AppriseImproperlyConfigured
+import apprise
 from apprise.plugins.synology import NotifySynology
 
 logging.disable(logging.CRITICAL)
@@ -251,3 +252,32 @@ def test_plugin_synology_payload_is_url_encoded(mock_post):
     form = parse_qs(body)
     assert list(form.keys()) == ["payload"]
     assert "AT&T 50% off + more" in loads(form["payload"][0])["text"]
+
+
+@mock.patch("requests.post")
+def test_plugin_synology_token_escapes_in_path(mock_post):
+    """An escaped token in the path must not corrupt the fullpath."""
+
+    response = mock.Mock()
+    response.content = b'{"success": true}'
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    # The token carries a percent-encoded space; the fullpath must be
+    # sliced by its quoted length and not the unquoted one
+    results = NotifySynology.parse_url("synology://host/a%20b/custom/path/")
+    assert results["token"] == "a b"
+    assert results["fullpath"] == "/custom/path/"
+
+    instance = NotifySynology(**results)
+    assert isinstance(instance, NotifySynology)
+
+    assert instance.send(title="title", body="body") is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == "http://host/custom/path//webapi/entry.cgi"
+
+    # The URL the plugin re-assembles parses back into the same content
+    rebuilt = apprise.Apprise.instantiate(instance.url())
+    assert rebuilt.url() == instance.url()

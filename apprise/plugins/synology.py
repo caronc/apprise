@@ -34,7 +34,10 @@ from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import URL_ENCODED_PATH_SAFE_CHARS
+from ..utils.parse import (
+    URL_ENCODED_PATH_SAFE_CHARS,
+    URL_SEGMENT_SAFE_CHARS,
+)
 from .base import NotifyBase
 
 # For API Details see:
@@ -374,9 +377,18 @@ class NotifySynology(NotifyBase):
                 # Pop the first element
                 results["token"] = entries.pop(0)
 
-                # Update our fullpath to not include our token
+                # Update our fullpath to not include our token. The
+                # fullpath is kept in its quoted form while the token
+                # above is not, so the offset must be measured from the
+                # re-quoted token; otherwise an escape sequence inside
+                # it shifts the slice into the wrong position.
                 results["fullpath"] = results["fullpath"][
-                    len(results["token"]) + 1 :
+                    len(
+                        NotifySynology.quote(
+                            results["token"], safe=URL_SEGMENT_SAFE_CHARS
+                        )
+                    )
+                    + 1 :
                 ]
 
         # Set upload/file_url if not otherwise set
