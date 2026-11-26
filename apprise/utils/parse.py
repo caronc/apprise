@@ -1178,10 +1178,15 @@ def url_assembly(encode=False, **kwargs):
         auth=auth,
         # never encode hostname since we're expecting it to be a valid one
         hostname="" if not kwargs.get("host") else kwargs.get("host", ""),
+        # only a None (or empty) port means no port; 0 is a real value
         port=(
-            "" if not kwargs.get("port") else ":{}".format(kwargs.get("port"))
+            ""
+            if kwargs.get("port") in (None, "")
+            else ":{}".format(kwargs.get("port"))
         ),
-        fullpath=quote_(kwargs.get("fullpath", ""), safe="/"),
+        # fullpath is None for path-less URLs (and not just missing);
+        # treat both the same way
+        fullpath=quote_(kwargs.get("fullpath") or "", safe="/"),
         params=(
             ""
             if not kwargs.get("qsd")
