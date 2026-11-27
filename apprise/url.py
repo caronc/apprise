@@ -31,6 +31,7 @@ import re
 import sys
 import threading
 import time
+from typing import Optional
 from urllib.parse import quote as _quote, unquote as _unquote
 from xml.sax.saxutils import escape as sax_escape
 
@@ -389,18 +390,7 @@ class URLBase:
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         # Determine Authentication
-        auth = ""
-        if self.user and self.password:
-            auth = "{user}:{password}@".format(
-                user=URLBase.quote(self.user, safe=""),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
-                ),
-            )
-        elif self.user:
-            auth = "{user}@".format(
-                user=URLBase.quote(self.user, safe=""),
-            )
+        auth = self.url_auth(privacy)
 
         default_port = 443 if self.secure else 80
         return "{schema}://{auth}{hostname}{port}{fullpath}{params}".format(
@@ -838,10 +828,30 @@ class URLBase:
         return (self.socket_connect_timeout, self.socket_read_timeout)
 
     @property
-    def request_auth(self):
+    def request_auth(self) -> Optional[tuple[str, str]]:
         """This is primarily used to fullfill the `auth` keyword argument that
         is used by requests.get() and requests.put() calls."""
-        return (self.user, self.password) if self.user else None
+        if not (self.user or self.password):
+            # No credentials were given, so no Basic auth is sent
+            return None
+
+        # Basic auth (RFC 7617) allows an empty user or an empty password.
+        # A missing one is sent empty so requests never sends "None".
+        return (self.user or "", self.password or "")
+
+    def url_auth(self, privacy: bool = False) -> str:
+        """Return the ``user:password@`` part of a URL, or ``""``."""
+        if self.password:
+            # A password keeps its colon so an empty user reads back
+            return "{user}:{password}@".format(
+                user=URLBase.quote(self.user or "", safe=""),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
+            )
+
+        # A user on its own, or no credentials at all
+        return f"{URLBase.quote(self.user, safe='')}@" if self.user else ""
 
     @property
     def request_url(self):

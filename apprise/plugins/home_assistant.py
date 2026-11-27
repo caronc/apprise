@@ -38,7 +38,6 @@ import requests
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..url import PrivacyMode
 from ..utils.parse import (
     URL_PATH_SAFE_CHARS,
     is_domain_service_target,
@@ -281,9 +280,9 @@ class NotifyHomeAssistant(NotifyBase):
             "Authorization": f"Bearer {self.accesstoken}",
         }
 
-        auth = None
-        if self.user:
-            auth = (self.user, self.password or "")
+        # Basic Auth support handling for request
+        # A password on its own is not sent so the access token above stays
+        auth = self.request_auth if self.user else None
 
         # Set our schema
         schema = "https" if self.secure else "http"
@@ -472,18 +471,7 @@ class NotifyHomeAssistant(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
-        auth = ""
-        if self.user and self.password:
-            auth = "{user}:{password}@".format(
-                user=NotifyHomeAssistant.quote(self.user, safe=""),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
-                ),
-            )
-        elif self.user:
-            auth = "{user}@".format(
-                user=NotifyHomeAssistant.quote(self.user, safe=""),
-            )
+        auth = self.url_auth(privacy)
 
         default_port = 443 if self.secure else self.default_insecure_port
 

@@ -35,7 +35,6 @@ from .. import exception
 from ..common import NotifyFormat, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..url import PrivacyMode
 from ..utils.parse import URL_PATH_SAFE_CHARS, parse_list, validate_regex
 from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
@@ -268,18 +267,7 @@ class NotifyAppriseAPI(NotifyBase):
             params["tags"] = ",".join(list(self.__tags))
 
         # Determine Authentication
-        auth = ""
-        if self.password:
-            auth = "{user}:{password}@".format(
-                user=NotifyAppriseAPI.quote(self.user or "", safe=""),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
-                ),
-            )
-        elif self.user:
-            auth = "{user}@".format(
-                user=NotifyAppriseAPI.quote(self.user, safe=""),
-            )
+        auth = self.url_auth(privacy)
 
         default_port = 443 if self.secure else 80
 
@@ -433,11 +421,8 @@ class NotifyAppriseAPI(NotifyBase):
 
             payload = dumps(payload)
 
-        auth = None
-        if self.user or self.password:
-            # An empty username is valid for password-only Apprise API
-            # administrator accounts.
-            auth = (self.user or "", self.password or "")
+        # Basic Auth support handling for request
+        auth = self.request_auth
 
         # Set our schema
         schema = "https" if self.secure else "http"

@@ -46,7 +46,6 @@ from ..attachment.memory import AttachMemory
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..url import PrivacyMode
 from ..utils.parse import (
     is_hostname,
     is_ipaddr,
@@ -546,10 +545,11 @@ class NotifyNtfy(NotifyBase):
 
         else:  # NotifyNtfy.PRVATE
             # Allow more settings to be applied now
-            if self.auth == NtfyAuth.BASIC and self.user:
-                auth = (self.user, self.password or "")
+            if self.auth == NtfyAuth.BASIC:
+                # Basic Auth support handling for request
+                auth = self.request_auth
 
-            elif self.auth == NtfyAuth.TOKEN:
+            else:  # NtfyAuth.TOKEN
                 if not self.token:
                     self.logger.warning("No Ntfy Token was specified")
                     return False, None
@@ -820,20 +820,7 @@ class NotifyNtfy(NotifyBase):
         # Determine Authentication
         auth = ""
         if self.auth == NtfyAuth.BASIC:
-            if self.user and self.password:
-                auth = "{user}:{password}@".format(
-                    user=NotifyNtfy.quote(self.user, safe=""),
-                    password=self.pprint(
-                        self.password,
-                        privacy,
-                        mode=PrivacyMode.Secret,
-                        safe="",
-                    ),
-                )
-            elif self.user:
-                auth = "{user}@".format(
-                    user=NotifyNtfy.quote(self.user, safe=""),
-                )
+            auth = self.url_auth(privacy)
 
         elif self.token:  # NtfyAuth.TOKEN also
             auth = "{token}@".format(
