@@ -28,8 +28,8 @@
 from __future__ import annotations
 
 import contextlib
+from email.message import Message
 import os
-import re
 from tempfile import NamedTemporaryFile
 import threading
 import time
@@ -261,12 +261,16 @@ class AttachHTTP(AttachBase):
                     # already enforced
                     self.detected_mimetype = r.headers.get("Content-Type")
 
-                    d = r.headers.get("Content-Disposition", "")
-                    result = re.search(
-                        r"filename=['\"]?(?P<name>[^'\"]+)['\"]?", d, re.I
+                    # Parse the header the standard way so a quoted name
+                    # may hold an apostrophe and trailing parameters
+                    # (; size=10) are not read as part of the name.
+                    header = Message()
+                    header["Content-Disposition"] = r.headers.get(
+                        "Content-Disposition", ""
                     )
-                    if result:
-                        self.detected_name = result.group("name").strip()
+                    name = header.get_filename()
+                    if name and name.strip():
+                        self.detected_name = name.strip()
 
                     # Keep the file on Windows; __del__ cleans it up.
                     self._temp_file = NamedTemporaryFile(  # noqa: SIM115

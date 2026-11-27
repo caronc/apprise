@@ -655,6 +655,35 @@ def test_attach_http_download_dir(mock_get, tmpdir):
     assert dirname(attachment.path) != download_dir
 
 
+@pytest.mark.parametrize(
+    ("disposition", "expected"),
+    [
+        ('attachment; filename="report.pdf"', "report.pdf"),
+        ('attachment; filename="O\'Brien.pdf"', "O'Brien.pdf"),
+        ("attachment; filename=report.pdf; size=100", "report.pdf"),
+        ('attachment; filename="a;b.pdf"', "a;b.pdf"),
+        ("attachment; filename*=UTF-8''na%C3%AFve.pdf", "na\u00efve.pdf"),
+    ],
+)
+@mock.patch("requests.Session.get")
+def test_attach_http_content_disposition(mock_get, disposition, expected):
+    """AttachHTTP reads the filename of a Content-Disposition header."""
+
+    class DispositionResponse(SizedResponse):
+        headers: ClassVar[dict[str, str]] = {
+            "Content-Type": "application/octet-stream",
+            "Content-Disposition": disposition,
+        }
+
+    mock_get.return_value = DispositionResponse()
+
+    results = AttachHTTP.parse_url("http://localhost/download")
+    assert isinstance(results, dict)
+    attachment = AttachHTTP(**results)
+    assert attachment
+    assert attachment.name == expected
+
+
 @mock.patch("requests.Session.get")
 def test_attach_http_size_limit(mock_get):
     """AttachHTTP never writes more than max_file_size bytes."""
