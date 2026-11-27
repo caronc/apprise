@@ -352,7 +352,8 @@ def test_plugin_pagerduty_action_url():
 def test_plugin_pagerduty_severity_case():
     """NotifyPagerDuty() accepts severity= in any case."""
     obj = Apprise.instantiate(
-        "pagerduty://myroutekey@myapikey/Apprise/Notification?severity=Critical"
+        "pagerduty://myroutekey@myapikey/Apprise/Notification"
+        "?severity=Critical"
     )
     assert isinstance(obj, NotifyPagerDuty)
     assert obj.severity == "critical"

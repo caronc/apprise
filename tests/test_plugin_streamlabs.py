@@ -30,6 +30,7 @@ import logging
 from unittest import mock
 
 from helpers import AppriseURLTester
+import pytest
 import requests
 
 import apprise
@@ -298,3 +299,12 @@ def test_plugin_streamlabs_alert_type_case():
     obj2 = apprise.Apprise.instantiate(obj.url())
     assert isinstance(obj2, NotifyStreamlabs)
     assert obj2.alert_type == "host"
+
+
+def test_plugin_streamlabs_alert_type_error():
+    """An invalid alert_type= is named in the error, not the call."""
+    with pytest.raises(AppriseImproperlyConfigured, match=r"\(bogus\)"):
+        NotifyStreamlabs(
+            access_token="IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso",
+            alert_type="bogus",
+        )

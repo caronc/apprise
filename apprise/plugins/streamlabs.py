@@ -228,9 +228,13 @@ class NotifyStreamlabs(NotifyBase):
             if not self.alert_type:
                 # allow the outer except to handle this common response
                 raise
+
         except Exception as e:
             # Invalid region specified
-            msg = f"The streamlabs alert type specified ({call}) is invalid."
+            msg = (
+                "The streamlabs alert type specified "
+                f"({alert_type}) is invalid."
+            )
             self.logger.warning(msg)
             self.logger.debug(f"Socket Exception: {e!s}")
             raise AppriseImproperlyConfigured(msg) from None
