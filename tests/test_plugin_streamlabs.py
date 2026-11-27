@@ -30,6 +30,7 @@ import logging
 from unittest import mock
 
 from helpers import AppriseURLTester
+import pytest
 import requests
 
 import apprise
@@ -275,3 +276,35 @@ def test_plugin_streamlabs_preserves_case(mock_post):
     assert obj.notify(body="the body") is True
     data = mock_post.call_args[1]["data"]
     assert data["sound_href"] == "https://example.org/Sounds/Alert.mp3"
+
+
+def test_plugin_streamlabs_alert_type_case():
+    """NotifyStreamlabs() accepts alert_type= in any case."""
+    obj = apprise.Apprise.instantiate(
+        "strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/"
+        "?call=alerts&alert_type=Follow"
+    )
+    assert isinstance(obj, NotifyStreamlabs)
+    assert obj.alert_type == "follow"
+
+    # Surrounding whitespace is accepted too
+    obj = NotifyStreamlabs(
+        access_token="IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso",
+        call="ALERTS",
+        alert_type=" HOST ",
+    )
+    assert obj.alert_type == "host"
+
+    # The normalized value is written back by url()
+    obj2 = apprise.Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyStreamlabs)
+    assert obj2.alert_type == "host"
+
+
+def test_plugin_streamlabs_alert_type_error():
+    """An invalid alert_type= is named in the error, not the call."""
+    with pytest.raises(AppriseImproperlyConfigured, match=r"\(bogus\)"):
+        NotifyStreamlabs(
+            access_token="IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso",
+            alert_type="bogus",
+        )

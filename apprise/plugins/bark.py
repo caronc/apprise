@@ -494,11 +494,7 @@ class NotifyBark(NotifyBase):
         self.icon = icon if isinstance(icon, str) else None
 
         # Level
-        self.level = (
-            None
-            if not level
-            else next((f for f in BARK_LEVELS if f[0] == level[0]), None)
-        )
+        self.level = parse_choice(level, BARK_LEVELS, length=1)
         if level and not self.level:
             self.logger.warning(
                 "The specified Bark level (%s) is not valid", level

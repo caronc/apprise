@@ -26,11 +26,14 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+import json
 import logging
+from unittest import mock
 
 from helpers import AppriseURLTester
 import requests
 
+from apprise import Apprise
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.parseplatform import NotifyParsePlatform
 
@@ -139,3 +142,43 @@ def test_plugin_parse_platform_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch("requests.post")
+def test_plugin_parse_platform_device_case(mock_post):
+    """NotifyParsePlatform() accepts device= in any case."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    obj = Apprise.instantiate(
+        "parseps://app_id:master_key@localhost?device=IOS"
+    )
+    assert isinstance(obj, NotifyParsePlatform)
+    assert obj.device == "ios"
+
+    # The normalized device is what gets sent
+    assert obj.notify(body="body") is True
+    payload = json.loads(mock_post.call_args[1]["data"])
+    assert payload["where"]["deviceType"]["$in"] == ["ios"]
+
+    # Surrounding whitespace is accepted too
+    obj = NotifyParsePlatform(
+        app_id="app_id",
+        master_key="master_key",
+        host="localhost",
+        device=" Android ",
+    )
+    assert obj.devices == ["android"]
+
+    # The normalized value is written back by url()
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyParsePlatform)
+    assert obj2.device == "android"
+
+    # All devices
+    obj = Apprise.instantiate(
+        "parseps://app_id:master_key@localhost?device=All"
+    )
+    assert isinstance(obj, NotifyParsePlatform)
+    assert obj.devices == ["ios", "android"]

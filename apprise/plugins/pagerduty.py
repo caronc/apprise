@@ -327,14 +327,7 @@ class NotifyPagerDuty(NotifyBase):
         self.severity = (
             None
             if severity is None
-            else next(
-                (
-                    s
-                    for s in PAGERDUTY_SEVERITIES
-                    if str(s).lower().startswith(severity)
-                ),
-                False,
-            )
+            else parse_choice(severity, PAGERDUTY_SEVERITIES, default=False)
         )
 
         if self.severity is False:

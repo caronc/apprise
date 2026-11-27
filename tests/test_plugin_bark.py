@@ -906,3 +906,19 @@ def test_plugin_bark_encrypted_send_connection_error(mock_post, monkeypatch):
 def test_plugin_bark_runtime_dependencies():
     """NotifyBark() declares its optional cryptography dependency."""
     assert NotifyBark.runtime_deps() == ("cryptography",)
+
+
+def test_plugin_bark_level_case():
+    """NotifyBark() accepts level= in any case."""
+    obj = Apprise.instantiate("bark://localhost/device?level=Critical")
+    assert isinstance(obj, NotifyBark)
+    assert obj.level == "critical"
+
+    # Surrounding whitespace is accepted too
+    obj = NotifyBark(host="localhost", targets=["device"], level=" TIME ")
+    assert obj.level == "timeSensitive"
+
+    # The normalized value is written back by url()
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyBark)
+    assert obj2.level == "timeSensitive"
