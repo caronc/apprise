@@ -282,6 +282,9 @@ class NotifySendPulse(NotifyBase):
         # Acquire Targets (To Emails)
         self.targets = []
 
+        # Recipients that are not valid email addresses, kept for url()
+        self.invalid_targets = []
+
         # Acquire Carbon Copies
         self.cc = set()
 
@@ -309,9 +312,12 @@ class NotifySendPulse(NotifyBase):
             template_data if isinstance(template_data, dict) else {}
         )
 
-        if targets:
+        # Text holding only separators (such as ;) names nobody, and counts
+        # the same as giving no recipients at all
+        recipients = parse_emails(targets)
+        if recipients:
             # Validate recipients (to:) and drop bad ones:
-            for recipient in parse_emails(targets):
+            for recipient in recipients:
                 result = is_email(recipient)
                 if result:
                     self.targets.append(result["full_email"])
@@ -320,10 +326,9 @@ class NotifySendPulse(NotifyBase):
                     continue
 
                 self.logger.warning(
-                    "Dropped invalid To email ({}) specified.".format(
-                        recipient
-                    ),
+                    "Dropped invalid To email (%s) specified.", recipient
                 )
+                self.invalid_targets.append(recipient)
 
         else:
             # If our target email list is empty we want to add ourselves to it
@@ -357,10 +362,6 @@ class NotifySendPulse(NotifyBase):
                 "Dropped invalid Blind Carbon Copy email "
                 "({}) specified.".format(recipient),
             )
-
-        if len(self.targets) == 0:
-            # Notify ourselves
-            self.targets.append(self.from_addr)
 
         return
 
@@ -424,7 +425,7 @@ class NotifySendPulse(NotifyBase):
 
         # a simple boolean check as to whether we display our target emails
         # or not
-        has_targets = not (
+        has_targets = self.invalid_targets or not (
             len(self.targets) == 1 and self.targets[0] == self.from_addr
         )
 
@@ -437,6 +438,13 @@ class NotifySendPulse(NotifyBase):
             if not has_targets
             else "/".join(
                 [NotifySendPulse.quote(x, safe="") for x in self.targets]
+                # Recipients that were dropped are written back too, so
+                # the URL still reads as having recipients rather than
+                # falling back to the sender's own address
+                + [
+                    NotifySendPulse.quote(x, safe="")
+                    for x in self.invalid_targets
+                ]
             ),
             params=NotifySendPulse.urlencode(params),
         )
@@ -445,7 +453,7 @@ class NotifySendPulse(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        return len(self.targets)
+        return len(self.targets) if self.targets else 1
 
     def login(self):
         """
@@ -506,6 +514,11 @@ class NotifySendPulse(NotifyBase):
         """
         Perform SendPulse Notification
         """
+
+        if not self.targets:
+            # Every recipient given was invalid, so there is no one to email
+            self.logger.warning("There are no SendPulse recipients to notify")
+            return False
 
         access_token = self.store.get("access_token") or self.login()
         if not access_token:

@@ -222,9 +222,12 @@ class NotifySignalAPI(NotifyBase):
 
         self.source = "+{}".format(result["full"])
 
+        # Split our targets first so input holding only separators counts
+        # the same as giving no targets at all
+        targets = parse_phone_no(targets)
         if targets:
             # Validate our targerts
-            for target in parse_phone_no(targets):
+            for target in targets:
                 # Validate targets and drop bad ones:
                 result = is_phone_no(target)
                 if result:

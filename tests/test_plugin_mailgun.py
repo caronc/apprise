@@ -735,3 +735,33 @@ def test_plugin_mailgun_non_string_region():
                 targets=["user@example.com"],
                 region_name=region,
             )
+
+
+def test_plugin_mailgun_invalid_recipients_kept():
+    """Invalid recipients never fall back to the sender's address."""
+
+    # Read our settings from a URL so only the recipients change below
+    kwargs = NotifyMailgun.parse_url(
+        "mailgun://user@localhost.localdomain/{}-{}-{}".format(
+            "a" * 32, "b" * 8, "c" * 8
+        )
+    )
+
+    # No recipients given, so we notify ourselves
+    obj = NotifyMailgun(**dict(kwargs, targets=None))
+    assert obj.targets == [(False, "user@localhost.localdomain")]
+
+    # Text holding only separators is the same as no recipients given
+    obj = NotifyMailgun(**dict(kwargs, targets=" ; , "))
+    assert obj.targets == [(False, "user@localhost.localdomain")]
+
+    # Every recipient is invalid, so there is nobody to notify
+    obj = NotifyMailgun(**dict(kwargs, targets=["invalid", "bad@"]))
+    assert obj.targets == []
+    assert sorted(obj.invalid_targets) == ["bad@", "invalid"]
+
+    # Reloading our URL keeps it that way instead of using the sender
+    obj = Apprise.instantiate(obj.url(privacy=False))
+    assert isinstance(obj, NotifyMailgun)
+    assert obj.targets == []
+    assert sorted(obj.invalid_targets) == ["bad@", "invalid"]

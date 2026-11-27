@@ -426,3 +426,14 @@ def test_plugin_lametric_device_built_from_its_api_key(mock_post):
     assert obj.url().startswith(
         "lametric://root:8b799edf-6f98-4d3a-9be7-2862fb4e5752@192.168.1.2"
     )
+
+
+def test_plugin_lametric_default_user_identifier():
+    """No user and the default user name the same device login."""
+    apikey = "8b799edf-6f98-4d3a-9be7-2862fb4e5752"
+    bare = Apprise.instantiate(f"lametric://{apikey}@192.168.1.2/")
+    named = Apprise.instantiate(f"lametric://dev:{apikey}@192.168.1.2/")
+    other = Apprise.instantiate(f"lametric://root:{apikey}@192.168.1.2/")
+
+    assert bare.url_identifier == named.url_identifier
+    assert bare.url_identifier != other.url_identifier

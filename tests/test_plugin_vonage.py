@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise import Apprise
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.vonage import NotifyVonage
 
@@ -91,6 +92,8 @@ apprise_url_tests = (
         {
             # valid everything but target numbers
             "instance": NotifyVonage,
+            # Every target is refused, so there is nobody to notify
+            "notify_response": False,
             # Our expected url(privacy=True) startswith() response:
             "privacy_url": "vonage://A...f:****@",
         },
@@ -199,6 +202,8 @@ apprise_url_tests = (
         {
             # valid everything but target numbers
             "instance": NotifyVonage,
+            # Every target is refused, so there is nobody to notify
+            "notify_response": False,
             # Our expected url(privacy=True) startswith() response:
             "privacy_url": "vonage://A...f:****@",
         },
@@ -312,3 +317,44 @@ def test_plugin_vonage_edge_cases(mock_post):
 
     # We will fail with the above error code
     assert bool(obj.notify("title", "body", "info")) is False
+
+
+@mock.patch("requests.post")
+def test_plugin_vonage_invalid_recipients_kept(mock_post):
+    """Refused phone numbers never fall back to messaging ourselves."""
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    # Shared (but valid) credentials for every object below
+    kwargs = {
+        "apikey": "AC" + "a" * 8,
+        "secret": "b" * 16,
+        "source": "15551232000",
+    }
+
+    # No phone numbers given, so we message ourselves
+    obj = NotifyVonage(targets=None, **kwargs)
+    assert obj.notify("body") is True
+    assert mock_post.call_count == 1
+    assert mock_post.call_args[1]["data"]["to"] == "15551232000"
+
+    # Only separators given is the same as giving no phone numbers
+    mock_post.reset_mock()
+    obj = NotifyVonage(targets=";, ,", **kwargs)
+    obj = Apprise.instantiate(obj.url())
+    assert obj.notify("body") is True
+    assert mock_post.call_count == 1
+    assert mock_post.call_args[1]["data"]["to"] == "15551232000"
+
+    # Every phone number refused leaves nobody to notify
+    mock_post.reset_mock()
+    obj = NotifyVonage(targets=["abcd", "123"], **kwargs)
+    assert obj.notify("body") is False
+
+    # Loading our URL again still leaves nobody to notify
+    obj = Apprise.instantiate(obj.url())
+    assert obj.notify("body") is False
+    assert mock_post.call_count == 0

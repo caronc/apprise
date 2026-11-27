@@ -49,7 +49,6 @@ from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
     is_hostname,
-    is_ipaddr,
     parse_bool,
     parse_list,
     validate_regex,
@@ -348,6 +347,13 @@ class NotifyNtfy(NotifyBase):
 
         if self.mode not in NTFY_MODES:
             msg = f"An invalid ntfy Mode ({mode}) was specified."
+            self.logger.warning(msg)
+            raise AppriseImproperlyConfigured(msg)
+
+        if self.mode == NtfyMode.PRIVATE and not self.host:
+            # A self-hosted server can't be reached without its address.
+            # Its URL would otherwise read the first topic as the server
+            msg = "A self-hosted (private) ntfy server requires a host."
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
 
@@ -1007,13 +1013,8 @@ class NotifyNtfy(NotifyBase):
             # specify the mode= flag
             results["mode"] = (
                 NtfyMode.PRIVATE
-                if (
-                    (
-                        is_hostname(results["host"])
-                        or is_ipaddr(results["host"])
-                    )
-                    and (path_topics or login)
-                )
+                # is_hostname() accepts an IP address too
+                if is_hostname(results["host"]) and (path_topics or login)
                 else NtfyMode.CLOUD
             )
 
@@ -1030,10 +1031,10 @@ class NotifyNtfy(NotifyBase):
             # our own; reporting one would read the first topic twice
             results["host"] = None
 
-        elif results["mode"] == NtfyMode.PRIVATE and not (
-            is_hostname(results["host"]) or is_ipaddr(results["host"])
+        elif results["mode"] == NtfyMode.PRIVATE and not is_hostname(
+            results["host"]
         ):
-            # Invalid Host for NtfyMode.PRIVATE
+            # Invalid Host (or IP address) for NtfyMode.PRIVATE
             return None
 
         return results

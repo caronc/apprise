@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from datetime import tzinfo
+from email.header import decode_header, make_header
 from inspect import cleandoc
 
 # Disable logging for a cleaner testing output
@@ -1904,6 +1905,19 @@ def test_is_email_never_reads_part_of_an_address():
     assert utils.parse.is_email("me@test.exämple") is False
     assert utils.parse.is_email("me@test.exampleé") is False
     assert utils.parse.is_email("victim@example.com@evil.com") is False
+
+    # A look-alike letter (the Kelvin sign, the long s or the dotless i)
+    # is not the plain letter it resembles
+    assert utils.parse.is_email("\u212aelvin@example.com") is False
+    assert utils.parse.is_email("\u017fam@example.com") is False
+    assert utils.parse.is_email("me@exam\u0131ple.com") is False
+
+    # The label before the + is plain ASCII too; the display name is not
+    assert utils.parse.is_email("caf\u00e9+owner@example.com") is False
+    results = utils.parse.is_email("Caf\u00e9 <tag+owner@example.com>")
+    assert results["name"] == "Caf\u00e9"
+    assert results["full_email"] == "tag+owner@example.com"
+    assert results["label"] == "tag"
 
     # Spaces after the address are fine
     results = utils.parse.is_email("Me <me@test.example>  ")
@@ -4260,6 +4274,14 @@ def test_time_zoneinfo():
     assert utils.time.zoneinfo("") is None
     assert utils.time.zoneinfo("invalid") is None
 
+
+def test_time_zoneinfo_path_not_searched():
+    """A file path is refused without searching every timezone."""
+    with mock.patch("zoneinfo.available_timezones") as scan:
+        assert utils.time.zoneinfo("/etc/passwd") is None
+        assert utils.time.zoneinfo("../../etc/passwd") is None
+    assert scan.call_count == 0
+
     # A file path is never a timezone, and is never read
     assert utils.time.zoneinfo("/etc/passwd") is None
     assert utils.time.zoneinfo("../../etc/passwd") is None
@@ -4278,6 +4300,20 @@ def test_formataddr():
         utils.parse.formataddr(("Me", "é@test.example"))
         == "Me <é@test.example>"
     )
+
+    # Its name is still quoted or encoded the way email needs
+    assert (
+        utils.parse.formataddr(("Doe, J", "é@test.example"))
+        == '"Doe, J" <é@test.example>'
+    )
+
+    # An accented name is encoded (as base64 or quoted-printable, whichever
+    # the email module is set up for) and reads back as written
+    named = utils.parse.formataddr(("Jöhn", "é@test.example"))
+    name, address = named.rsplit(" ", 1)
+    assert name.startswith("=?utf-8?")
+    assert str(make_header(decode_header(name))) == "Jöhn"
+    assert address == "<é@test.example>"
 
     # Without a name, the address is given alone
     assert (

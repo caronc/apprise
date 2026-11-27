@@ -891,7 +891,8 @@ class NotifyLametric(NotifyBase):
         if self.mode == LametricMode.DEVICE:
             return (
                 self.secure_protocol if self.secure else self.protocol,
-                self.user,
+                # No user means the device's default one, the same login
+                self.user or self.default_device_user,
                 self.lametric_apikey,
                 self.host,
                 (

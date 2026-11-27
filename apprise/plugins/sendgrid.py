@@ -204,6 +204,9 @@ class NotifySendGrid(NotifyBase):
         # Acquire Targets (To Emails)
         self.targets = []
 
+        # Recipients that are not valid email addresses, kept for url()
+        self.invalid_targets = []
+
         # Acquire Carbon Copies
         self.cc = set()
 
@@ -218,17 +221,23 @@ class NotifySendGrid(NotifyBase):
             template_data if isinstance(template_data, dict) else {}
         )
 
+        # Text holding only separators (such as ;) names nobody, and counts
+        # the same as giving no recipients at all
+        recipients = parse_list(targets)
+
         # Validate recipients (to:) and drop bad ones:
-        if targets:
-            for recipient in parse_list(targets):
+        if recipients:
+            for recipient in recipients:
                 result = is_email(recipient)
                 if result:
                     self.targets.append(result["full_email"])
                     continue
 
                 self.logger.warning(
-                    f"Dropped invalid email ({recipient}) specified.",
+                    "Dropped invalid email (%s) specified.", recipient
                 )
+                self.invalid_targets.append(recipient)
+
         else:
             # add ourselves
             self.targets.append(self.from_email)
@@ -290,7 +299,7 @@ class NotifySendGrid(NotifyBase):
 
         # a simple boolean check as to whether we display our target emails
         # or not
-        has_targets = not (
+        has_targets = self.invalid_targets or not (
             len(self.targets) == 1 and self.targets[0] == self.from_email
         )
 
@@ -304,6 +313,13 @@ class NotifySendGrid(NotifyBase):
                 if not has_targets
                 else "/".join(
                     [NotifySendGrid.quote(x, safe="") for x in self.targets]
+                    # Recipients that were dropped are written back too, so
+                    # the URL still reads as having recipients rather than
+                    # falling back to the sender's own address
+                    + [
+                        NotifySendGrid.quote(x, safe="")
+                        for x in self.invalid_targets
+                    ]
                 )
             ),
             params=NotifySendGrid.urlencode(params),

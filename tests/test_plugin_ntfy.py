@@ -1023,6 +1023,11 @@ def test_plugin_ntfy_private_mode_needs_a_host():
     assert NotifyNtfy.parse_url("ntfy://?mode=private") is None
     assert NotifyNtfy.parse_url("ntfy://#x?mode=private") is None
 
+    # Built directly, a private server with only a topic is refused, since
+    # its URL would read the topic back as the server
+    with pytest.raises(AppriseImproperlyConfigured):
+        NotifyNtfy(mode="private", targets=["alerts"])
+
     # A hostname or an IP address is accepted
     for host in ("localhost", "10.0.0.1"):
         results = NotifyNtfy.parse_url(f"ntfy://{host}/t?mode=private")

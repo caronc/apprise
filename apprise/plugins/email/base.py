@@ -88,6 +88,10 @@ PGP_MODES = (
 # The mode used when ?pgp= is absent or empty
 PGP_MODE_DEFAULT = PGPMode.NONE
 
+# Trimmed from either end of a sender. A comma there is treated like a
+# space, so "Chris <a@b.ca>," is still one sender
+SENDER_TRIM = " ,\t\r\n\x0b\x0c"
+
 
 class NotifyEmail(NotifyBase):
     """
@@ -179,11 +183,6 @@ class NotifyEmail(NotifyBase):
         **{
             "from": {
                 "name": _("From Email"),
-                "type": "string",
-                "map_to": "from_addr",
-            },
-            "name": {
-                "name": _("From Name"),
                 "type": "string",
                 "map_to": "from_addr",
             },
@@ -285,10 +284,18 @@ class NotifyEmail(NotifyBase):
         The smtp_host and secure_mode can be automatically detected depending
         on how the URL was built
         """
+        # The deprecated name option is taken from kwargs rather than listed
+        # as an argument, since every listed argument must be an option the
+        # field tools offer
+        name = kwargs.pop("name", None)
+
         super().__init__(**kwargs)
 
         # Acquire Email 'To'
         self.targets = []
+
+        # Recipients that are not valid email addresses, kept for url()
+        self.invalid_targets = []
 
         # Acquire Carbon Copies
         self.cc = set()
@@ -409,13 +416,35 @@ class NotifyEmail(NotifyBase):
                     self.host = result["domain"]
                     self.from_addr = [self.app_id, self.user]
 
+        if name:
+            # A YAML file can still set the deprecated name; the sender
+            # comes back already trimmed
+            from_addr = NotifyEmail.named_sender(from_addr, name)
+
+        elif isinstance(from_addr, str):
+            # The sender is one name, one address, or both. A comma
+            # followed by a second address is refused further below
+            from_addr = from_addr.strip(SENDER_TRIM)
+
         if from_addr:
             result = is_email(from_addr)
             if result:
+                # A comma between the name and the address only separates
+                # them ("Chris Caron, a@b.ca"), so it is not kept in the name
+                sender = result["name"].rstrip(" ,")
                 self.from_addr = (
-                    result["name"] if result["name"] else False,
+                    sender if sender else False,
                     result["full_email"],
                 )
+
+            elif parse_emails(from_addr, store_unparseable=False):
+                # Text shaped like an address (rather than a display name
+                # such as "Ops @ Home") that can't be used is refused, so
+                # mail is never quietly sent from the login's own address
+                msg = f"Invalid ~From~ email specified: {from_addr}"
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
             else:
                 # Only update the string but use the already detected info
                 self.from_addr[0] = from_addr
@@ -434,9 +463,12 @@ class NotifyEmail(NotifyBase):
         # Store our lookup
         self.names[self.from_addr[1]] = self.from_addr[0]
 
-        if targets:
+        # Text holding only separators (such as ;) names nobody, and counts
+        # the same as giving no recipients at all
+        recipients = parse_emails(targets)
+        if recipients:
             # Validate recipients (to:) and drop bad ones:
-            for recipient in parse_emails(targets):
+            for recipient in recipients:
                 result = is_email(recipient)
                 if result:
                     self.targets.append(
@@ -452,6 +484,7 @@ class NotifyEmail(NotifyBase):
                         recipient
                     ),
                 )
+                self.invalid_targets.append(recipient)
 
         else:
             # If our target email list is empty we want to add ourselves to it
@@ -738,9 +771,14 @@ class NotifyEmail(NotifyBase):
 
         return not has_error
 
-    def _url_address(self, email: str) -> str:
-        """Return ``email`` with its display name (if any) for url()."""
-        name = self.names.get(email)
+    def _url_address(self, email: str, name: Optional[str] = None) -> str:
+        """Return ``email`` with its display name (if any) for url().
+
+        - ``name`` is looked up when not given.
+        """
+        if name is None:
+            name = self.names.get(email)
+
         if not name:
             return email
 
@@ -866,9 +904,13 @@ class NotifyEmail(NotifyBase):
         default_port = SECURE_MODES[self.secure_mode]["default_port"]
 
         # a simple boolean check as to whether we display our target emails
-        # or not
-        has_targets = not (
-            len(self.targets) == 1 and self.targets[0][1] == self.from_addr[1]
+        # or not. Only the sender's own address with no name is left out,
+        # since a URL with no recipients sends there anyway; a name given
+        # to it ("Doe, Jane" <sender>) is kept
+        has_targets = self.invalid_targets or not (
+            len(self.targets) == 1
+            and self.targets[0][1] == self.from_addr[1]
+            and not self.targets[0][0]
         )
 
         return "{schema}://{auth}{hostname}{port}/{targets}?{params}".format(
@@ -887,12 +929,25 @@ class NotifyEmail(NotifyBase):
                 else "/".join(
                     [
                         NotifyEmail.quote(
-                            "{}{}".format(
+                            # A name holding a list delimiter (or @) is
+                            # quoted, so "Doe, Jane" isn't split apart when
+                            # the URL is read back; other names keep the
+                            # shorter Name:address form
+                            self._url_address(e[1], e[0])
+                            if e[0] and any(c in e[0] for c in ",;@")
+                            else "{}{}".format(
                                 "" if not e[0] else "{}:".format(e[0]), e[1]
                             ),
                             safe="",
                         )
                         for e in self.targets
+                    ]
+                    # Recipients that were dropped are written back too, so
+                    # the URL still reads as having recipients rather than
+                    # falling back to the sender's own address
+                    + [
+                        NotifyEmail.quote(target, safe="")
+                        for target in self.invalid_targets
                     ]
                 )
             ),
@@ -924,6 +979,41 @@ class NotifyEmail(NotifyBase):
         Returns the number of targets associated with this notification
         """
         return len(self.targets) if self.targets else 1
+
+    @staticmethod
+    def named_sender(from_addr: Optional[str], name: object) -> str:
+        """Return the sender with the deprecated name option folded in.
+
+        - name is the old way to set the sender's name. It still works in a
+          URL or YAML file but is left out of the listed options, since
+          from= takes a name, an address or both (from=Name <address>)
+        - url() only ever writes from=
+        """
+        logger.deprecate(
+            "The email name= option is deprecated; use from= instead "
+            "(it takes a name, an address or both: from=Name <address>)"
+        )
+
+        # Commas and spaces at either end are ignored, the same as for
+        # from=. YAML may hand us a number or similar; treat it as text
+        from_addr = (
+            from_addr.strip(SENDER_TRIM) if isinstance(from_addr, str) else ""
+        )
+        name = str(name).strip(SENDER_TRIM)
+
+        named = is_email(name)
+        if not from_addr or (named and named["name"]):
+            # A name on its own, or a whole sender (Name <address>), is
+            # used in place of from=
+            return name
+
+        # name gives the sender's name. When from= holds a name of its
+        # own, only its address is kept
+        sender = is_email(from_addr)
+        return formataddr(
+            (name, sender["full_email"] if sender else from_addr),
+            charset="utf-8",
+        )
 
     @staticmethod
     def parse_url(url):
@@ -1007,15 +1097,12 @@ class NotifyEmail(NotifyBase):
         if "from" in results["qsd"] and len(results["qsd"]["from"]):
             from_addr = NotifyEmail.unquote(results["qsd"]["from"])
 
-            if "name" in results["qsd"] and len(results["qsd"]["name"]):
-                from_addr = formataddr(
-                    (NotifyEmail.unquote(results["qsd"]["name"]), from_addr),
-                    charset="utf-8",
-                )
-
-        elif "name" in results["qsd"] and len(results["qsd"]["name"]):
-            # Extract from name to associate with from address
-            from_addr = NotifyEmail.unquote(results["qsd"]["name"])
+        if "name" in results["qsd"] and len(results["qsd"]["name"]):
+            # The deprecated name= is folded into the sender here, so the
+            # parsed results already hold it
+            from_addr = NotifyEmail.named_sender(
+                from_addr, NotifyEmail.unquote(results["qsd"]["name"])
+            )
 
         # Store SMTP Host if specified
         if "smtp" in results["qsd"] and len(results["qsd"]["smtp"]):

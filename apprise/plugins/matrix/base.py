@@ -3331,11 +3331,7 @@ class NotifyMatrix(NotifyBase):
             # to re-use our credentials with
             return
 
-        if (
-            self.access_token is not None
-            and self.access_token == self.password
-            and not self.user
-        ):
+        if self.access_token == self.password and not self.user:
             return
 
         # Best-effort cleanup only

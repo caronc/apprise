@@ -24,7 +24,6 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-import contextlib
 from datetime import timezone as _tz
 from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -59,11 +58,17 @@ def zoneinfo(name: str) -> Optional[ZoneInfo]:
 
     # Try exact match first
     try:
-        return ZoneInfo(name)
+        return ZoneInfo(raw)
 
-    except (ZoneInfoNotFoundError, ValueError):
-        # Not found as written; a file path (such as /etc/passwd or ../x)
-        # is refused here too, and never matches a timezone name below
+    except ValueError:
+        # A file path (such as /etc/passwd or ../x) is no timezone name,
+        # so there is no point searching for one below
+        logger.warning("Unknown timezone specified: %s", name)
+        return None
+
+    except ZoneInfoNotFoundError:
+        # Not found as written; a different case or a short name may
+        # still match below
         pass
 
     # Try case-insensitive match across available keys
@@ -75,14 +80,14 @@ def zoneinfo(name: str) -> Optional[ZoneInfo]:
         if full_zone == lowered:
             return ZoneInfo(zone)
 
-        with contextlib.suppress(IndexError):
-            # Break our zones and enforce limit
-            zones = full_zone.split("/")[1:3]
+        # Break our zones and enforce limit
+        zones = full_zone.split("/")[1:3]
 
-            # Possible we'll throw an index error here and that's okay
-            location = zones[-1] if len(zones) == 1 else "/".join(zones)
-            if location and location == lowered:
-                return ZoneInfo(zone)
+        # A single part is used as is; zones[-1] only runs when there is
+        # exactly one, so it can't go out of range
+        location = zones[-1] if len(zones) == 1 else "/".join(zones)
+        if location and location == lowered:
+            return ZoneInfo(zone)
 
     logger.warning("Unknown timezone specified: %s", name)
     return None

@@ -2215,47 +2215,46 @@ def test_apprise_template_undeclared_marker_stays_readable():
 def test_apprise_template_url_uses_written_name():
     """A setting keeps the name it was written under, not an alias.
 
-    mailto's ``from`` and ``name`` both end up in ``from_addr``, yet they
-    mean different things, so the listing must not rename one to the other.
+    Discord's ``url`` is another name for ``href``, so the listing must not
+    rename one to the other.
     """
     entry = parse(
-        "template:\n  - t\n"
-        "urls:\n  - mailtos://u:p@gmail.com:\n      name: ${T}\n"
+        "template:\n  - t\nurls:\n  - discord://i/t:\n      url: ${T}\n"
     )[0]
 
     url = entry.url()
-    assert "name=${T}" in url
-    assert "from=" not in url
+    assert "url=${T}" in url
+    assert "href=" not in url
 
 
 def test_apprise_template_url_setting_precedence():
     """A YAML setting replaces a URL alias for the same field.
 
-    Here, ``name:`` and ``from=`` both fill ``from_addr``. Listing only the
-    YAML setting ensures the displayed URL behaves like the configuration.
+    Here, ``url:`` and ``href=`` both fill ``href``. Listing only the YAML
+    setting ensures the displayed URL behaves like the configuration.
     """
     entry = parse(
         "template:\n  - t\n"
-        "urls:\n  - mailtos://u:p@gmail.com?from=someone@example.com:\n"
-        "      name: ${T}\n"
+        "urls:\n  - discord://i/t?href=https://a.example:\n"
+        "      url: ${T}\n"
     )[0]
 
     url = entry.url()
-    assert "name=${T}" in url
-    assert "someone%40example.com" not in url
+    assert "url=${T}" in url
+    assert "a.example" not in url
 
 
 def test_apprise_template_url_last_written_setting_wins():
     """When two names fill one field, the later one is the one listed."""
     entry = parse(
         "template:\n  - t\n"
-        "urls:\n  - mailtos://u:p@gmail.com:\n"
-        "      from: real@example.com\n      name: ${T}\n"
+        "urls:\n  - discord://i/t:\n"
+        "      href: https://a.example\n      url: ${T}\n"
     )[0]
 
     url = entry.url()
-    assert "name=${T}" in url
-    assert "real%40example.com" not in url
+    assert "url=${T}" in url
+    assert "a.example" not in url
 
 
 def test_apprise_template_url_round_trip():
@@ -2267,7 +2266,7 @@ def test_apprise_template_url_round_trip():
     config = (
         "template:\n  - t\n"
         "urls:\n  - mailtos://u:p@gmail.com:\n"
-        "      to: rcpt@example.com\n      name: ${T}\n"
+        "      to: rcpt@example.com\n      from: ${T}\n"
     )
 
     entry = parse(config)[0]
@@ -2325,11 +2324,11 @@ def test_apprise_template_url_omits_empty_setting():
     entry = parse(
         "template:\n  - t\n"
         "urls:\n  - mailtos://u:p@gmail.com:\n"
-        "      to: []\n      cc: null\n      name: ${T}\n"
+        "      to: []\n      cc: null\n      from: ${T}\n"
     )[0]
 
     url = entry.url()
-    assert "name=${T}" in url
+    assert "from=${T}" in url
     assert "to=" not in url
     assert "cc=" not in url
 

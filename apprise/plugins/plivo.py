@@ -185,19 +185,25 @@ class NotifyPlivo(NotifyBase):
         # Parse our targets
         self.targets = []
 
-        if targets:
-            for target in parse_phone_no(targets):
-                # Validate targets and drop bad ones:
-                result = is_phone_no(target)
-                if result:
-                    # store valid phone number; enforce E.164 format
-                    self.targets.append(f"+{result['full']}")
-                    continue
+        # Keep refused phone numbers so url() can write them back
+        self.invalid_targets = []
 
-                self.logger.warning(
-                    f"Dropped invalid phone # ({target}) specified.",
-                )
-        else:
+        for target in parse_phone_no(targets):
+            # Validate targets and drop bad ones:
+            result = is_phone_no(target)
+            if result:
+                # store valid phone number; enforce E.164 format
+                self.targets.append(f"+{result['full']}")
+                continue
+
+            self.logger.warning(
+                f"Dropped invalid phone # ({target}) specified.",
+            )
+            self.invalid_targets.append(target)
+
+        # Fall back to ourselves only when no phone numbers were given.
+        # If every number given was refused, there is nobody to notify
+        if not self.targets and not self.invalid_targets:
             # No sources specified, use our own phone no
             self.targets.append(self.source)
 
@@ -360,6 +366,10 @@ class NotifyPlivo(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
+        # Refused phone numbers are written back after the valid ones
+        # so that loading this URL again still has nobody to notify
+        targets = self.targets + self.invalid_targets
+
         return (
             "{schema}://{auth_id}@{token}/{source}/{targets}/?{params}".format(
                 schema=self.secure_protocol,
@@ -367,7 +377,7 @@ class NotifyPlivo(NotifyBase):
                 token=self.pprint(self.token, privacy, safe=""),
                 source=self.source,
                 targets="/".join(
-                    [NotifyPlivo.quote(x, safe="+") for x in self.targets]
+                    [NotifyPlivo.quote(x, safe="+") for x in targets]
                 ),
                 params=NotifyPlivo.urlencode(params),
             )

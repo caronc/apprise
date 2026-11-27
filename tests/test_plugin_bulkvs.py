@@ -229,3 +229,31 @@ def test_plugin_bulkvs_edge_cases(mock_post):
     )
     # 2 phones are lumped together
     assert len(obj) == 1
+
+
+@mock.patch("requests.post")
+def test_plugin_bulkvs_invalid_recipients_kept(mock_post):
+    """Refused phone numbers never fall back to messaging ourselves."""
+
+    # Shared (but valid) credentials for every object below
+    kwargs = {"user": "user", "password": "pass", "source": "15551232000"}
+
+    # No phone numbers given, so we message ourselves
+    obj = NotifyBulkVS(targets=None, **kwargs)
+    assert obj.targets == ["15551232000"]
+
+    # Only separators given is the same as giving no phone numbers
+    obj = NotifyBulkVS(targets=";, ,", **kwargs)
+    assert obj.targets == ["15551232000"]
+    obj = Apprise.instantiate(obj.url())
+    assert obj.targets == ["15551232000"]
+
+    # Every phone number refused leaves nobody to notify
+    obj = NotifyBulkVS(targets=["abcd", "123"], **kwargs)
+    assert obj.targets == []
+
+    # Loading our URL again still leaves nobody to notify
+    obj = Apprise.instantiate(obj.url())
+    assert obj.targets == []
+    assert obj.notify("body") is False
+    assert mock_post.call_count == 0

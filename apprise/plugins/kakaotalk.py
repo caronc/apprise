@@ -352,6 +352,12 @@ class NotifyKakaoTalk(NotifyBase):
     ) -> bool:
         """Perform KakaoTalk Notification."""
 
+        if not self.targets and self.invalid_targets:
+            # Friends were given but none of them were usable; don't fall
+            # back to messaging the token owner instead
+            self.logger.warning("There are no valid KakaoTalk targets.")
+            return False
+
         # Use our cached access token, or fetch a new one
         access_token = self.store.get("access_token") or self.login()
         if not access_token:

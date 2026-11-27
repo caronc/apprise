@@ -422,8 +422,15 @@ class NotifyOffice365(NotifyBase):
         # Parse our targets
         self.targets = []
 
-        if targets:
-            for recipient in parse_emails(targets):
+        # Recipients that are not valid email addresses, kept for url()
+        self.invalid_targets = []
+
+        # Text holding only separators (such as ;) names nobody, and counts
+        # the same as giving no recipients at all
+        recipients = parse_emails(targets)
+
+        if recipients:
+            for recipient in recipients:
                 # Validate recipients (to:) and drop bad ones:
                 result = is_email(recipient)
                 if result:
@@ -437,8 +444,9 @@ class NotifyOffice365(NotifyBase):
                     continue
 
                 self.logger.warning(
-                    f"Dropped invalid To email ({recipient}) specified."
+                    "Dropped invalid To email (%s) specified.", recipient
                 )
+                self.invalid_targets.append(recipient)
 
         else:
             result = is_email(self.source)
@@ -1345,6 +1353,14 @@ class NotifyOffice365(NotifyBase):
                 ]
             )
 
+        if self.invalid_targets:
+            # Recipients that were dropped are written back too, so the URL
+            # still reads as having recipients rather than falling back to
+            # the sender's own address. They go in ?to= because only email
+            # addresses are read from the end of the path; anything else
+            # there is taken to be part of the secret.
+            params["to"] = ",".join(self.invalid_targets)
+
         targets_str = "/".join(
             [
                 NotifyOffice365.quote(
@@ -1395,7 +1411,9 @@ class NotifyOffice365(NotifyBase):
 
     def __len__(self):
         """Returns the number of targets associated with this notification."""
-        return len(self.targets)
+        # Always at least one, so a loaded plugin never reads as empty
+        targets = len(self.targets)
+        return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):

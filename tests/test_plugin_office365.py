@@ -1753,3 +1753,34 @@ def test_plugin_office365_cc_bcc_invalid_branch():
     # Valid Reply-To entry was added; invalid one was silently dropped
     assert "reply@example.com" in obj.reply_to
     assert len(obj.reply_to) == 1
+
+
+def test_plugin_office365_invalid_recipients_kept():
+    """Invalid recipients never fall back to the sender's address."""
+
+    # Read our settings from a URL so only the recipients change below
+    kwargs = NotifyOffice365.parse_url(
+        "o365://user@example.edu/tenant/ab-cd-ef-gh/abcd%2F123"
+    )
+
+    # No recipients given, so we notify ourselves
+    obj = NotifyOffice365(**dict(kwargs, targets=None))
+    assert obj.targets == [(False, "user@example.edu")]
+
+    # Text holding only separators is the same as no recipients given
+    obj = NotifyOffice365(**dict(kwargs, targets=" ; , "))
+    assert obj.targets == [(False, "user@example.edu")]
+
+    # Every recipient is invalid, so there is nobody to notify
+    obj = NotifyOffice365(**dict(kwargs, targets=["invalid", "bad@"]))
+    assert obj.targets == []
+    assert sorted(obj.invalid_targets) == ["bad@", "invalid"]
+
+    # It still counts as one notification, so it never reads as empty
+    assert len(obj) == 1
+
+    # Reloading our URL keeps it that way instead of using the sender
+    obj = Apprise.instantiate(obj.url(privacy=False))
+    assert isinstance(obj, NotifyOffice365)
+    assert obj.targets == []
+    assert sorted(obj.invalid_targets) == ["bad@", "invalid"]

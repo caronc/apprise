@@ -250,6 +250,9 @@ class NotifySinch(NotifyBase):
         # Parse our targets
         self.targets = []
 
+        # Keep refused phone numbers so url() can write them back
+        self.invalid_targets = []
+
         for target in parse_phone_no(targets):
             # Parse each phone number we found
             result = is_phone_no(target)
@@ -257,6 +260,7 @@ class NotifySinch(NotifyBase):
                 self.logger.warning(
                     f"Dropped invalid phone # ({target}) specified.",
                 )
+                self.invalid_targets.append(target)
                 continue
 
             # store valid phone number
@@ -267,7 +271,11 @@ class NotifySinch(NotifyBase):
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform Sinch Notification."""
 
-        if not self.targets and len(self.source) in (5, 6):
+        # We only message ourselves when no phone numbers were given.
+        # If every number given was refused, there is nobody to notify
+        if not self.targets and (
+            self.invalid_targets or len(self.source) in (5, 6)
+        ):
             # Generate a warning since we're a short-code.  We need
             # a number to message at minimum
             self.logger.warning("There are no valid Sinch targets to notify.")
@@ -437,6 +445,10 @@ class NotifySinch(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
+        # Refused phone numbers are written back after the valid ones
+        # so that loading this URL again still has nobody to notify
+        targets = self.targets + self.invalid_targets
+
         return "{schema}://{spi}:{token}@{source}/{targets}/?{params}".format(
             schema=self.secure_protocol,
             spi=self.pprint(
@@ -444,9 +456,7 @@ class NotifySinch(NotifyBase):
             ),
             token=self.pprint(self.api_token, privacy, safe=""),
             source=NotifySinch.quote(self.source, safe=""),
-            targets="/".join(
-                [NotifySinch.quote(x, safe="") for x in self.targets]
-            ),
+            targets="/".join([NotifySinch.quote(x, safe="") for x in targets]),
             params=NotifySinch.urlencode(params),
         )
 

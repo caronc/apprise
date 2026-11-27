@@ -638,3 +638,29 @@ def test_plugin_postmark_cc_names_with_spaces(mock_post, caplog):
     assert payload["Bcc"] == "bcc@example.com"
     assert payload["ReplyTo"] == '"Support, Team" <reply@example.com>'
     assert not any("Dropped invalid" in message for message in caplog.messages)
+
+
+def test_plugin_postmark_invalid_recipients_kept():
+    """Invalid recipients never fall back to the sender's address."""
+
+    # Read our settings from a URL so only the recipients change below
+    kwargs = NotifyPostmark.parse_url("postmark://abcd:user@example.com")
+
+    # No recipients given, so we notify ourselves
+    obj = NotifyPostmark(**dict(kwargs, targets=None))
+    assert obj.targets == ["user@example.com"]
+
+    # Text holding only separators is the same as no recipients given
+    obj = NotifyPostmark(**dict(kwargs, targets=" ; , "))
+    assert obj.targets == ["user@example.com"]
+
+    # Every recipient is invalid, so there is nobody to notify
+    obj = NotifyPostmark(**dict(kwargs, targets=["invalid", "bad@"]))
+    assert obj.targets == []
+    assert sorted(obj.invalid_targets) == ["bad@", "invalid"]
+
+    # Reloading our URL keeps it that way instead of using the sender
+    obj = Apprise.instantiate(obj.url(privacy=False))
+    assert isinstance(obj, NotifyPostmark)
+    assert obj.targets == []
+    assert sorted(obj.invalid_targets) == ["bad@", "invalid"]

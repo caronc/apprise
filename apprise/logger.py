@@ -115,26 +115,23 @@ _QUIET_LOGS_FILTER = _QuietLogsFilter()
 logger.addFilter(_QUIET_LOGS_FILTER)
 
 
-def _quiet_child(child: Any) -> None:
-    """Add quiet filtering to an Apprise child logger."""
-    # The manager also holds placeholders that are not loggers; addFilter()
-    # skips a filter the logger already has, so this is safe to repeat
-    if isinstance(child, logging.Logger) and child.name.startswith(
-        LOGGER_NAME + "."
-    ):
-        child.addFilter(_QUIET_LOGS_FILTER)
-
-
 @contextlib.contextmanager
-def quiet_logs():
+def quiet_logs() -> Iterator[None]:
     """Suppress Apprise logs in the current execution context.
 
     - Cover the Apprise logger and the apprise.* loggers that exist when
       the block starts. Python's own logging is never changed.
     - Leave other threads and tasks unchanged.
     """
+    # A filter on the apprise logger does not see what its child loggers
+    # pass up to it, so each apprise.* logger gets the filter as well.
+    # The manager also holds placeholders that are not loggers; addFilter()
+    # skips a filter the logger already has, so this is safe to repeat
     for child in list(logging.Logger.manager.loggerDict.values()):
-        _quiet_child(child)
+        if isinstance(child, logging.Logger) and child.name.startswith(
+            LOGGER_NAME + "."
+        ):
+            child.addFilter(_QUIET_LOGS_FILTER)
 
     token = _quiet_logs.set(True)
     try:

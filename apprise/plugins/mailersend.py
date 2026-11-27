@@ -220,15 +220,22 @@ class NotifyMailerSend(NotifyBase):
         # Acquire Targets (To Emails)
         self.targets = []
 
+        # Recipients that are not valid email addresses, kept for url()
+        self.invalid_targets = []
+
         # Acquire Carbon Copies
         self.cc = set()
 
         # Acquire Blind Carbon Copies
         self.bcc = set()
 
+        # Text holding only separators (such as ;) names nobody, and counts
+        # the same as giving no recipients at all
+        recipients = parse_list(targets)
+
         # Validate recipients (to:) and drop bad ones
-        if targets:
-            for recipient in parse_list(targets):
+        if recipients:
+            for recipient in recipients:
                 result = is_email(recipient)
                 if result:
                     self.targets.append(result["full_email"])
@@ -238,6 +245,7 @@ class NotifyMailerSend(NotifyBase):
                     "Dropped invalid MailerSend email (%s) specified.",
                     recipient,
                 )
+                self.invalid_targets.append(recipient)
 
         else:
             # Use the sender as the default recipient
@@ -300,7 +308,7 @@ class NotifyMailerSend(NotifyBase):
 
         # A simple boolean check as to whether we display our target
         # emails or not
-        has_targets = not (
+        has_targets = self.invalid_targets or not (
             len(self.targets) == 1 and self.targets[0] == self.from_email
         )
 
@@ -315,6 +323,13 @@ class NotifyMailerSend(NotifyBase):
                 if not has_targets
                 else "/".join(
                     [NotifyMailerSend.quote(x, safe="@") for x in self.targets]
+                    # Recipients that were dropped are written back too, so
+                    # the URL still reads as having recipients rather than
+                    # falling back to the sender's own address
+                    + [
+                        NotifyMailerSend.quote(x, safe="")
+                        for x in self.invalid_targets
+                    ]
                 )
             ),
             params=NotifyMailerSend.urlencode(params),

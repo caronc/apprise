@@ -26,12 +26,17 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import syslog
+import threading
 
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_choice
 from .base import NotifyBase
+
+# syslog settings are shared by the whole program, so only one send at a
+# time may set them and log; another send can't swap them in between
+SYSLOG_LOCK = threading.Lock()
 
 
 class SyslogFacility:
@@ -210,10 +215,6 @@ class NotifySyslog(NotifyBase):
         if log_perror:
             self.logoptions |= syslog.LOG_PERROR
 
-        # Initialize our logging
-        syslog.openlog(
-            self.app_id, logoption=self.logoptions, facility=self.facility
-        )
         return
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
@@ -226,21 +227,30 @@ class NotifySyslog(NotifyBase):
             NotifyType.WARNING: syslog.LOG_WARNING,
         }
 
+        # Look up our level first, so a rejected send leaves syslog alone
+        level = SYSLOG_PUBLISH_MAP.get(notify_type)
+        if level is None:
+            # An invalid notification type was specified
+            self.logger.warning(
+                f"An invalid notification type ({notify_type}) was specified."
+            )
+            return False
+
         if title:
             # Format title
             body = f"{title}: {body}"
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
-        try:
-            syslog.syslog(SYSLOG_PUBLISH_MAP[notify_type], body)
 
-        except KeyError:
-            # An invalid notification type was specified
-            self.logger.warning(
-                f"An invalid notification type ({notify_type}) was specified."
+        with SYSLOG_LOCK:
+            # Initialize our logging.  This is done when sending, not when
+            # the object is built, since it changes syslog for the whole
+            # program
+            syslog.openlog(
+                self.app_id, logoption=self.logoptions, facility=self.facility
             )
-            return False
+            syslog.syslog(level, body)
 
         self.logger.info("Sent Syslog notification.")
 

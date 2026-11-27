@@ -491,3 +491,36 @@ def test_plugin_acs_retry_skips_delivered(mock_post):
         for call in mock_post.call_args_list
     ]
     assert sent_to == ["a@example.com", "b@example.com", "b@example.com"]
+
+
+def test_plugin_acs_invalid_recipients_kept():
+    """Invalid recipients never fall back to the sender's address."""
+
+    # No recipients given, so we notify ourselves
+    obj = NotifyACS(from_email="user@example.com", access_key=KEY, endpoint=EP)
+    assert obj.targets == ["user@example.com"]
+
+    # Text holding only separators is the same as no recipients given
+    obj = NotifyACS(
+        from_email="user@example.com",
+        access_key=KEY,
+        endpoint=EP,
+        targets=" ; , ",
+    )
+    assert obj.targets == ["user@example.com"]
+
+    # Every recipient is invalid, so there is nobody to notify
+    obj = NotifyACS(
+        from_email="user@example.com",
+        access_key=KEY,
+        endpoint=EP,
+        targets=["invalid", "bad@"],
+    )
+    assert obj.targets == []
+    assert sorted(obj.invalid_targets) == ["bad@", "invalid"]
+
+    # Reloading our URL keeps it that way instead of using the sender
+    obj = Apprise.instantiate(obj.url(privacy=False))
+    assert isinstance(obj, NotifyACS)
+    assert obj.targets == []
+    assert sorted(obj.invalid_targets) == ["bad@", "invalid"]

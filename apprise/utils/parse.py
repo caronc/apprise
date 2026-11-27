@@ -100,9 +100,15 @@ URL_DETAILS_RE = re.compile(
 # The expression also parses the general email as well such as:
 #   - user@example.com
 #   - label+user@example.com
+#
+# re.ASCII keeps the address to plain a-z letters.  Without it, ignoring
+# case also lets look-alike letters through (such as the Kelvin sign for K).
+# The label is kept to printable ASCII too ([!-*,-~] is ! to ~ without +),
+# since mail servers can't take any other character in an address.  A
+# display name may still hold any character
 GET_EMAIL_RE = re.compile(
     r'(([\s"\']{0,32})?(?P<name>[^:<\'"]{0,128})?[:<\s\'"]{1,32})?'
-    r"(?P<full_email>((?P<label>[^+\s]{1,128})\+)?"
+    r"(?P<full_email>((?P<label>[!-*,-~]{1,128})\+)?"
     r"(?P<email>(?P<userid>[a-z0-9_!#$%&*/=?%`{|}~^-]+"
     r"(?:\.[a-z0-9_!#$%&\'*/=?%`{|}~^-]+)"
     r"*)@(?P<domain>("
@@ -110,7 +116,7 @@ GET_EMAIL_RE = re.compile(
     r"[a-z0-9](?:[a-z0-9_-]*[a-z0-9]))|"
     r"[a-z0-9][a-z0-9_-]{5,})))"
     r"\s*>?",
-    re.IGNORECASE,
+    re.IGNORECASE | re.ASCII,
 )
 
 # A simple verification check to make sure the content specified
@@ -510,18 +516,27 @@ def formataddr(pair: tuple[Any, str], charset: str = "utf-8") -> str:
     - Works like email.utils.formataddr(): ``(name, address)`` gives
       ``Name <address>``, with the name quoted or encoded where email needs
       it, and a missing name gives the address alone.
-    - An address with non-ASCII characters (such as an accented letter,
-      allowed by RFC 6531) is refused by the standard version, so the two
-      are joined as written instead.
+    - An address with non-ASCII characters makes the standard version
+      raise.  It is written as given instead, so the caller can refuse it
+      the usual way (``is_email()`` never accepts it).
     """
     try:
         return _formataddr(pair, charset=charset)
 
     except UnicodeEncodeError:
         # The standard version only takes an address made of ASCII
-        # characters; write the address as it was given
+        # characters, so the address is written as it was given
         name, address = pair
-        return "{} <{}>".format(name, address) if name else address
+        if not name:
+            # No name, so the address is the whole sender
+            return address
+
+        # The name is still quoted or encoded the standard way.  Given an
+        # empty address, the standard version ends with "<>", which the
+        # real address then fills in
+        return "{}<{}>".format(
+            _formataddr((name, ""), charset=charset)[:-2], address
+        )
 
 
 def is_email(address):
@@ -669,6 +684,20 @@ def parse_qsd(qs, simple=False, plus_to_space=False, sanitize=True):
             result["qsd:"][k.group("key")] = val
 
     return result
+
+
+def quote_path(path: str) -> str:
+    """Return a URL path in the form parse_url() gives it.
+
+    - Each segment is decoded and re-encoded on its own, so an encoded
+      slash (%2F) stays part of its segment instead of splitting it.
+    - RFC 3986 path characters some services use literally are kept.
+    - Commas and semicolons stay encoded, since Apprise splits on them.
+    """
+    return "/".join(
+        quote(unquote(segment), safe=URL_SEGMENT_SAFE_CHARS)
+        for segment in path.split("/")
+    )
 
 
 def parse_url(
@@ -823,15 +852,7 @@ def parse_url(
 
     # Parse results
     result["host"] = parsed[1].strip()
-    # Preserve RFC 3986 path characters used literally by some services.
-    # Keep commas and semicolons encoded because Apprise uses them as
-    # delimiters.  Each segment is decoded and re-encoded on its own so
-    # an encoded slash (%2F) stays part of its segment instead of
-    # becoming a separator.
-    result["fullpath"] = "/".join(
-        quote(unquote(segment), safe=URL_SEGMENT_SAFE_CHARS)
-        for segment in tidy_path(parsed[2].strip()).split("/")
-    )
+    result["fullpath"] = quote_path(tidy_path(parsed[2].strip()))
 
     try:
         # Handle trailing slashes removed by tidy_path

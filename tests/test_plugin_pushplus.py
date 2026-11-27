@@ -1371,3 +1371,9 @@ def test_plugin_pushplus_channels_given_as_a_list():
         token="abc123def456ghi789jkl012mno345pq", channel=["mail", "wecom"]
     )
     assert obj.channel == "mail,cp"
+
+    # Nothing but separators is no channel at all, so the default is used
+    obj = NotifyPushplus(
+        token="abc123def456ghi789jkl012mno345pq", channel=" , "
+    )
+    assert obj.channel == PUSHPLUS_CHANNEL_DEFAULT
