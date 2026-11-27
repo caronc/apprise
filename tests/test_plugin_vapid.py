@@ -238,6 +238,21 @@ def test_plugin_vapid_subscriber_left_out_of_url():
 @pytest.mark.skipif(
     "cryptography" not in sys.modules, reason="Requires cryptography"
 )
+def test_plugin_vapid_target_with_slash_kept_whole():
+    """A target name holding a slash reads back as one target."""
+    obj = NotifyVapid(
+        subscriber="sub@example.net", targets=["team/red", "a@example.net"]
+    )
+    url = obj.url(privacy=False)
+    assert "team%2Fred" in url
+
+    again = Apprise.instantiate(url)
+    assert sorted(again.targets) == ["a@example.net", "team/red"]
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
 def test_plugin_vapid_urls_with_required_assets(
     patch_persistent_store_namespace, subscription_reference
 ):

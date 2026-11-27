@@ -624,7 +624,9 @@ class NotifyVapid(NotifyBase):
             subscriber=NotifyVapid.quote(self.subscriber, safe="@"),
             targets="/".join(
                 chain(
-                    [str(t) for t in targets],
+                    # Each target is quoted as one path segment, so a name
+                    # such as team/red is not read back as team and red
+                    [NotifyVapid.quote(str(t), safe="@") for t in targets],
                     [
                         NotifyVapid.quote(x, safe="@")
                         for x in self._invalid_targets

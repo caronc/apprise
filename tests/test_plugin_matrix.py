@@ -9652,3 +9652,16 @@ def test_plugin_matrix_refused_setup_cleans_up_quietly():
         gc.collect()
 
     assert hook.call_count == 0
+
+
+def test_plugin_matrix_target_with_slash_kept_whole():
+    """A room or user name holding a slash reads back as one target."""
+    obj = Apprise.instantiate(
+        "matrix://user:pass@localhost/%23team%2Fred/%40ops%2Fbot:localhost"
+    )
+    url = obj.url(privacy=False)
+    assert "%23team%2Fred" in url
+
+    again = Apprise.instantiate(url)
+    assert again.rooms == ["#team/red"]
+    assert again.users == ["@ops/bot:localhost"]

@@ -3454,7 +3454,11 @@ class NotifyMatrix(NotifyBase):
                 else self.pprint(self.access_token, privacy, safe="")
             ),
             port=("" if not self.port else f":{self.port}"),
-            rooms=NotifyMatrix.quote("/".join(self.rooms + self.users)),
+            # Each room and user is quoted as one path segment, so a name
+            # such as team/red is not read back as team and red
+            rooms="/".join(
+                NotifyMatrix.quote(x, safe="") for x in self.rooms + self.users
+            ),
             params=NotifyMatrix.urlencode(params),
         )
 
