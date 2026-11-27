@@ -63,3 +63,10 @@ def test_config_memory():
 
     # Test situation where we can not detect the data
     assert len(ConfigMemory(content="garbage")) == 0
+
+    # YAML that begins with the (optional) document start marker is still
+    # valid YAML and must be detected
+    cm = ConfigMemory(content="---\nurls:\n  - json://localhost\n")
+    assert len(cm) == 1
+    assert isinstance(cm.url(), str)
+    assert isinstance(cm.read(), str)

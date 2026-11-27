@@ -232,6 +232,49 @@ def test_config_base_detect_config_format():
     # Invalid Config
     assert ConfigBase.detect_config_format("3") is None
 
+    # YAML document structure must not disqualify otherwise valid YAML;
+    # the explicit document start marker is part of the YAML spec
+    assert (
+        ConfigBase.detect_config_format("""
+    ---
+    urls:
+      - json://localhost
+    """)
+        is ConfigFormat.YAML
+    )
+
+    # A leading comment followed by the document start marker
+    assert (
+        ConfigBase.detect_config_format("""
+    # A comment line over top of our YAML file
+    ---
+    version: 1
+    """)
+        is ConfigFormat.YAML
+    )
+
+    # A YAML directive header is valid YAML file structure as well
+    assert (
+        ConfigBase.detect_config_format("""
+    %YAML 1.1
+    ---
+    version: 1
+    """)
+        is ConfigFormat.YAML
+    )
+
+    # A UTF-8 BOM is invisible file structure and must not disqualify YAML
+    assert (
+        ConfigBase.detect_config_format("\ufeffurls:\n  - json://localhost\n")
+        is ConfigFormat.YAML
+    )
+
+    # The end-of-document marker does not change an already detectable file
+    assert (
+        ConfigBase.detect_config_format("urls:\n  - json://localhost\n...\n")
+        is ConfigFormat.YAML
+    )
+
 
 def test_config_base_config_parse():
     """

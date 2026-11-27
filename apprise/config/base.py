@@ -536,10 +536,15 @@ class ConfigBase(URLBase):
         # "2:endpoint=ntfy://..." is recognised as TEXT format.
         # A tag group assignment such as "family=me,wife" carries tags instead
         # of a URL on the right hand side; it is TEXT format as well.
+        # YAML document markers ("---" and "...") and directives ("%YAML 1.1",
+        # "%TAG ...") carry no format of their own; they are skipped like
+        # comments so detection still begins on the first real entry.
         # Leading whitespace is stripped before matching; matching it here
         # is very slow on long runs of spaces.
         valid_line_re = re.compile(
             r"^(?P<line>([;#]+(?P<comment>.*))|"
+            r"(?:-{3}|\.{3})|"
+            r"(%[^\r\n]*)|"
             r"(?P<text>((?P<tag>[ \t,a-z0-9_:-]*)=)?[a-z0-9]+://.*)|"
             r"((?P<yaml>[a-z0-9]+):.*)|"
             r"(?P<assign>[ \t,a-z0-9_:-]*=[a-z0-9, \t_-]+))?$",
@@ -547,6 +552,10 @@ class ConfigBase(URLBase):
         )
 
         try:
+            # A leading UTF-8 BOM is valid YAML file structure; drop it so the
+            # first line is not treated as an undetectable entry.
+            content = content.lstrip("﻿")
+
             # split our content up to read line by line
             content = [line.rstrip("\r") for line in content.split("\n")]
 
