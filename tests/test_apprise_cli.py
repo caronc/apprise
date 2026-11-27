@@ -3488,3 +3488,216 @@ def test_apprise_cli_service_limit_option_omitted(
     )
     assert result.exit_code == 0
     assert mock_asset_cls.call_args.kwargs.get("service_timeout") is None
+
+
+@mock.patch("requests.request")
+def test_apprise_cli_email_input(mock_request, tmpdir):
+    """CLI: --email-input (-E) reads the title and body from an email."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_request.return_value = response
+
+    runner = CliRunner()
+
+    def sent(raw, *args):
+        """Return the title and message the email produced."""
+        mock_request.reset_mock()
+        result = runner.invoke(
+            cli.main, ["-E", *args, "json://localhost"], input=raw
+        )
+        assert result.exit_code == 0
+        assert mock_request.call_count == 1
+        payload = json.loads(mock_request.call_args_list[0][1]["data"])
+        return payload["title"], payload["message"]
+
+    # A simple message, as cron sends it
+    title, body = sent(
+        b"From: Cron Daemon <root@example.com>\r\n"
+        b"Date: Mon, 23 Nov 2026 03:10:01 +0000\r\n"
+        b"Subject: Cron <root@host> run-parts /etc/cron.daily\r\n"
+        b"\r\n"
+        b"logrotate failed\r\n"
+    )
+    assert title == "Cron <root@host> run-parts /etc/cron.daily"
+    assert body == (
+        "From: Cron Daemon <root@example.com>\n"
+        "Date: Mon, 23 Nov 2026 03:10:01 +0000\n\n"
+        "logrotate failed"
+    )
+
+    # An encoded subject and a multipart message with a non UTF-8 charset
+    title, body = sent(
+        b"From: smartd <root@example.com>\r\n"
+        b"Subject: =?utf-8?q?Disk_warning_=E2=9A=A0?=\r\n"
+        b"MIME-Version: 1.0\r\n"
+        b'Content-Type: multipart/alternative; boundary="b"\r\n'
+        b"\r\n"
+        b"--b\r\n"
+        b"Content-Type: text/html; charset=utf-8\r\n"
+        b"\r\n"
+        b"<p>ignored</p>\r\n"
+        b"--b\r\n"
+        b"Content-Type: text/plain; charset=iso-8859-1\r\n"
+        b"Content-Transfer-Encoding: quoted-printable\r\n"
+        b"\r\n"
+        b"Temp=E9rature high\r\n"
+        b"--b--\r\n"
+    )
+    assert title == "Disk warning ⚠"
+    assert body == "From: smartd <root@example.com>\n\nTemp\xe9rature high"
+
+    # A message without headers, or without a plain text part
+    title, body = sent(b"\r\n")
+    assert title == "(no subject)"
+    assert body == "From: (unknown sender)\n\n(empty body)"
+
+    title, body = sent(
+        b"Subject: html only\r\n"
+        b"MIME-Version: 1.0\r\n"
+        b'Content-Type: multipart/alternative; boundary="b"\r\n'
+        b"\r\n"
+        b"--b\r\n"
+        b"Content-Type: text/html\r\n"
+        b"\r\n"
+        b"<p>ignored</p>\r\n"
+        b"--b--\r\n"
+    )
+    assert title == "html only"
+    assert body == "From: (unknown sender)\n\n(empty body)"
+
+    # A charset Python does not know falls back to UTF-8
+    title, body = sent(
+        b"Subject: odd charset\r\n"
+        b"Content-Type: text/plain; charset=x-unknown\r\n"
+        b"\r\n"
+        b"caf\xc3\xa9\r\n"
+    )
+    assert body == "From: (unknown sender)\n\ncaf\xe9"
+
+    # An explicit title still wins over the Subject
+    title, _ = sent(b"Subject: from the mail\r\n\r\nbody\r\n", "-t", "mine")
+    assert title == "mine"
+
+    # The body can not come from both the email and --body (-b)
+    mock_request.reset_mock()
+    result = runner.invoke(
+        cli.main,
+        ["--email-input", "-b", "body", "json://localhost"],
+        input=b"Subject: test\r\n\r\nbody\r\n",
+    )
+    assert result.exit_code == 2
+    assert mock_request.call_count == 0
+
+    # A dry run never reads the message
+    result = runner.invoke(
+        cli.main, ["-E", "--dry-run", "json://localhost"], input=b""
+    )
+    assert result.exit_code == 0
+    assert mock_request.call_count == 0
+
+
+@pytest.mark.parametrize(
+    "status, apprise_code, sysexits_code",
+    [
+        (AppriseResultStatus.SUCCESS, 0, 0),
+        (AppriseResultStatus.FAILURE, 1, 75),
+        (AppriseResultStatus.NOMATCH, 3, 67),
+        (AppriseResultStatus.PARTIAL, 4, 75),
+        (AppriseResultStatus.TIMEOUT, 5, 75),
+    ],
+)
+@mock.patch("apprise.cli._wait_for_abandoned_calls", return_value=True)
+def test_apprise_cli_exit_codes_map(
+    mock_wait, status, apprise_code, sysexits_code
+):
+    """CLI: --exit-codes (-X) maps every result status."""
+    runner = CliRunner()
+    result_ = mock.MagicMock()
+    result_.status = status
+
+    with mock.patch.object(Apprise, "notify", return_value=result_):
+        result = runner.invoke(cli.main, ["-b", "body", "json://localhost"])
+        assert result.exit_code == apprise_code
+
+        result = runner.invoke(
+            cli.main, ["-X", "apprise", "-b", "body", "json://localhost"]
+        )
+        assert result.exit_code == apprise_code
+
+        result = runner.invoke(
+            cli.main,
+            ["--exit-codes", "SYSEXITS", "-b", "body", "json://localhost"],
+        )
+        assert result.exit_code == sysexits_code
+
+
+@mock.patch("apprise.cli._force_exit")
+@mock.patch("apprise.cli._wait_for_abandoned_calls", return_value=False)
+def test_apprise_cli_exit_codes_hard_exit(mock_wait, mock_force_exit):
+    """CLI: a forced exit after a timeout uses the chosen exit code."""
+    runner = CliRunner()
+    result_ = mock.MagicMock()
+    result_.status = AppriseResultStatus.TIMEOUT
+
+    with mock.patch.object(Apprise, "notify", return_value=result_):
+        runner.invoke(
+            cli.main, ["-X", "sysexits", "-b", "body", "json://localhost"]
+        )
+
+    mock_force_exit.assert_called_once_with(mock.ANY, cli.EX_TEMPFAIL)
+
+
+@mock.patch("requests.request")
+def test_apprise_cli_exit_codes_sysexits(mock_request, tmpdir):
+    """CLI: --exit-codes=sysexits tells a mail transfer agent what to do."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_request.return_value = response
+
+    runner = CliRunner()
+    raw = b"Subject: test\r\n\r\nbody\r\n"
+
+    # Delivered
+    result = runner.invoke(
+        cli.main, ["-E", "-X", "sysexits", "json://localhost"], input=raw
+    )
+    assert result.exit_code == 0
+
+    # The service failed, so the message should be retried later
+    response.status_code = requests.codes.internal_server_error
+    result = runner.invoke(
+        cli.main, ["-E", "-X", "sysexits", "json://localhost"], input=raw
+    )
+    assert result.exit_code == cli.EX_TEMPFAIL
+
+    # Nothing matched the tag, so retrying can not help
+    config = tmpdir.join("apprise.cfg")
+    config.write("tagged=json://localhost")
+    result = runner.invoke(
+        cli.main,
+        ["-E", "-X", "sysexits", "-c", str(config), "-g", "missing"],
+        input=raw,
+    )
+    assert result.exit_code == cli.EX_NOUSER
+
+    # No services loaded (perhaps an unreachable remote configuration)
+    result = runner.invoke(
+        cli.main,
+        ["-E", "-X", "sysexits", "-c", str(tmpdir.join("missing.cfg"))],
+        input=raw,
+    )
+    assert result.exit_code == cli.EX_TEMPFAIL
+
+    # Without sysexits the old exit code is kept
+    result = runner.invoke(
+        cli.main, ["-E", "-c", str(tmpdir.join("missing.cfg"))], input=raw
+    )
+    assert result.exit_code == 1
+
+    # An unsupported mode
+    result = runner.invoke(
+        cli.main, ["-X", "invalid", "-b", "body", "json://localhost"]
+    )
+    assert result.exit_code == 2

@@ -112,6 +112,20 @@ accept them).</li>
 <p><code>-t</code>, <code>--title=</code><var>VALUE</var>:
   Specify the message title. This field is completely optional.</p>
 
+<p><code>-E</code>, <code>--email-input</code>:
+  Read an email message from <var>stdin</var>, such as one a mail transfer agent pipes
+  in. The <strong>Subject</strong> becomes the title (or "(no subject)" when there is
+  none). The body names the sender (<strong>From</strong>) and the <strong>Date</strong>, followed by
+  the first plain text part of the message, decoded with its own character
+  set. An explicit <strong>--title</strong> (<strong>-t</strong>) wins over the <strong>Subject</strong>. This option
+  can not be combined with <strong>--body</strong> (<strong>-b</strong>).</p>
+
+<p><code>-X</code>, <code>--exit-codes=</code><var>MODE</var>:
+  Specify how the outcome is reported as an exit code. Possible values are
+  "apprise" (the default; see <strong>EXIT STATUS</strong>) and "sysexits", which uses the
+  codes from <em>sysexits.h</em> that a mail transfer agent acts on. See
+  <strong>EXIT STATUS</strong> for the mapping.</p>
+
 <p><code>-c</code>, <code>--config=</code><var>CONFIG-URL</var>:
   Specify one or more configuration locations.</p>
 
@@ -291,6 +305,27 @@ one other was not (whether it failed outright or ran out of time).</li>
 more services ran out of time.</li>
 </ul>
 
+<p>With <strong>--exit-codes=sysexits</strong> (<strong>-X sysexits</strong>), <strong>apprise</strong> exits instead
+with a status of:</p>
+
+<ul>
+  <li>
+<strong>0</strong> if all of the notifications were sent successfully.</li>
+  <li>
+<strong>67</strong> (EX_NOUSER) if one or more Apprise Service URLs were loaded but none
+matched the tags. Retrying can not help, so a mail transfer agent bounces
+the message.</li>
+  <li>
+<strong>75</strong> (EX_TEMPFAIL) if any notification failed or ran out of time, or if no
+Apprise Service URL could be loaded (a remote configuration may only be
+unreachable for now). A mail transfer agent keeps the message and tries
+again later. Apprise can not tell a temporary failure from a permanent one,
+so every failure is reported as temporary. When only some notifications
+failed, a retry sends the message to every service again.</li>
+  <li>
+<strong>2</strong> if there was an error specified on the command line, as above.</li>
+</ul>
+
 <h2 id="SERVICE-URLS">SERVICE URLS</h2>
 
 <p>There are too many service URL and combinations to list here. It's best to
@@ -315,6 +350,13 @@ use the tool as part of your every day administration:</p>
 
 <pre><code>$ cat /proc/cpuinfo | apprise -vv -t "cpu info" \
     "mailto://myemail:mypass@gmail.com"
+</code></pre>
+
+<p>Turn system mail (from cron, for example) into notifications. With this line
+in <em>/etc/aliases</em>, a mail transfer agent such as Postfix pipes each message
+for root into <strong>apprise</strong>, and defers or bounces it based on the exit status:</p>
+
+<pre><code>root: "|/usr/bin/apprise -E -X sysexits --config=/etc/apprise.yml"
 </code></pre>
 
 <p>Load in a configuration file which identifies all of your notification service

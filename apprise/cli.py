@@ -26,6 +26,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import contextlib
+import email
+import email.policy
 import logging
 import os
 from os.path import exists, isfile
@@ -195,6 +197,42 @@ NOTIFY_FORMAT_CHOICES: tuple[NotifyFormat, ...] = (
     NotifyFormat.MARKDOWN,
     NotifyFormat.HTML,
 )
+
+
+#
+# Exit Codes
+#
+class ExitCodeMode:
+    """How the CLI reports its outcome as an exit code."""
+
+    # Apprise's own exit codes (see AppriseResultStatus)
+    APPRISE = "apprise"
+
+    # The <sysexits.h> codes a mail transfer agent acts on
+    SYSEXITS = "sysexits"
+
+
+EXIT_CODE_MODES = (
+    ExitCodeMode.APPRISE,
+    ExitCodeMode.SYSEXITS,
+)
+
+# <sysexits.h>: the addressee is unknown, so the mail bounces at once
+EX_NOUSER = 67
+
+# <sysexits.h>: a temporary failure, so the mail is deferred and retried
+EX_TEMPFAIL = 75
+
+# Apprise cannot tell a temporary delivery failure from a permanent one, so
+# every failure asks to be retried later.  Only a run that matched nothing
+# to notify is permanent: retrying it cannot help.
+SYSEXITS_MAP = {
+    AppriseResultStatus.SUCCESS: 0,
+    AppriseResultStatus.FAILURE: EX_TEMPFAIL,
+    AppriseResultStatus.NOMATCH: EX_NOUSER,
+    AppriseResultStatus.PARTIAL: EX_TEMPFAIL,
+    AppriseResultStatus.TIMEOUT: EX_TEMPFAIL,
+}
 
 #
 # Persistent Storage
@@ -378,6 +416,39 @@ def print_version_msg():
     click.echo("\n".join(result))
 
 
+def email_to_notification(raw: bytes) -> tuple[str, str]:
+    """Return the title and body for an RFC 5322 email message.
+
+    The Subject becomes the title.  The body names the sender and the date,
+    followed by the first text/plain part decoded with its own charset.
+    """
+    msg = email.message_from_bytes(raw, policy=email.policy.default)
+    title = str(msg.get("Subject", "")).strip() or "(no subject)"
+
+    header = ["From: {}".format(msg.get("From", "(unknown sender)"))]
+    if msg.get("Date"):
+        header.append("Date: {}".format(msg["Date"]))
+
+    # A multipart message carries its text in one of its parts
+    part = (
+        msg.get_body(preferencelist=("plain",)) if msg.is_multipart() else msg
+    )
+
+    text = ""
+    if part is not None:
+        payload = part.get_payload(decode=True) or b""
+        try:
+            text = payload.decode(
+                part.get_content_charset() or "utf-8", errors="replace"
+            ).strip()
+
+        except LookupError:
+            # The message names a charset Python does not know
+            text = payload.decode("utf-8", errors="replace").strip()
+
+    return title, "\n".join(header) + "\n\n" + (text or "(empty body)")
+
+
 class CustomHelpCommand(click.Command):
     def format_help(self, ctx, formatter):
         formatter.write_text("Usage:")
@@ -557,7 +628,7 @@ def _wait_for_abandoned_calls(timeout: float) -> bool:
     return not still_running
 
 
-def _force_exit(apobj: Apprise, status: AppriseResultStatus) -> None:
+def _force_exit(apobj: Apprise, status: int) -> None:
     """Unconditionally end the process, skipping Python's normal
     shutdown sequence entirely.
     """
@@ -608,6 +679,35 @@ def _force_exit(apobj: Apprise, status: AppriseResultStatus) -> None:
     default=None,
     type=str,
     help="Specify the message title. This field is completely optional.",
+)
+@click.option(
+    "--email-input",
+    "-E",
+    is_flag=True,
+    help=(
+        "Read an email message from <stdin>, such as one piped in by a mail "
+        "transfer agent. Its subject becomes the title and its sender, date "
+        "and plain text become the body."
+    ),
+)
+@click.option(
+    "--exit-codes",
+    "-X",
+    default=ExitCodeMode.APPRISE,
+    type=str,
+    metavar="MODE",
+    help=(
+        "Specify how the outcome is reported as an exit code "
+        f"(default={ExitCodeMode.APPRISE}). "
+        'Possible values are: "{}". With "{}", a failed notification exits '
+        "with {} (retry later) and a run that matched nothing to notify "
+        "exits with {}.".format(
+            '", "'.join(EXIT_CODE_MODES),
+            ExitCodeMode.SYSEXITS,
+            EX_TEMPFAIL,
+            EX_NOUSER,
+        )
+    ),
 )
 @click.option(
     "--plugin-path",
@@ -845,6 +945,8 @@ def main(
     ctx,
     body,
     title,
+    email_input,
+    exit_codes,
     config,
     attach,
     urls,
@@ -946,6 +1048,26 @@ def main(
         click.echo(
             f"The --input-format (-i) value of {input_format} is not"
             " supported."
+        )
+        click.echo("Try 'apprise --help' for more information.")
+        # 2 is the same exit code returned by Click if there is a parameter
+        # issue.  For consistency, we also return a 2
+        ctx.exit(2)
+
+    exit_codes = exit_codes.strip().lower()
+    if exit_codes not in EXIT_CODE_MODES:
+        click.echo(
+            f"The --exit-codes (-X) value of {exit_codes} is not supported."
+        )
+        click.echo("Try 'apprise --help' for more information.")
+        # 2 is the same exit code returned by Click if there is a parameter
+        # issue.  For consistency, we also return a 2
+        ctx.exit(2)
+
+    if email_input and body is not None:
+        click.echo(
+            "The --email-input (-E) and --body (-b) options can not be used"
+            " together."
         )
         click.echo("Try 'apprise --help' for more information.")
         # 2 is the same exit code returned by Click if there is a parameter
@@ -1258,7 +1380,9 @@ def main(
             "configuration file."
         )
         click.echo("Try 'apprise --help' for more information.")
-        ctx.exit(1)
+        # A remote configuration may only be unreachable for now, so a mail
+        # transfer agent should retry rather than bounce the message.
+        ctx.exit(EX_TEMPFAIL if exit_codes == ExitCodeMode.SYSEXITS else 1)
 
     # Each --tag value is a comma-separated AND group; values are ORed.
     tags = None if not tag else [parse_list(t) for t in tag]
@@ -1502,7 +1626,13 @@ def main(
         # end if storage()
 
     if not dry_run:
-        if body is None:
+        if email_input:
+            logger.trace("Reading an email message from stdin")
+            email_title, body = email_to_notification(sys.stdin.buffer.read())
+            # An explicit --title (-t) still wins over the Subject
+            title = email_title if title is None else title
+
+        elif body is None:
             logger.trace("No --body (-b) specified; reading from stdin")
             # if no body was specified, then read from STDIN
             body = sys.stdin.read()
@@ -1637,11 +1767,15 @@ def main(
         else:
             status = AppriseResultStatus.PARTIAL
 
+    # AppriseResultStatus values map directly to CLI exit codes.
+    # Exit code 2 is left to Click for bad command-line parameters.
+    exit_code = (
+        SYSEXITS_MAP[status] if exit_codes == ExitCodeMode.SYSEXITS else status
+    )
+
     if status == AppriseResultStatus.TIMEOUT and not _wait_for_abandoned_calls(
         CLI_TIMEOUT_EXIT_GRACE_SECONDS
     ):
-        _force_exit(a, status)
+        _force_exit(a, exit_code)
 
-    # AppriseResultStatus values map directly to CLI exit codes.
-    # Exit code 2 is left to Click for bad command-line parameters.
-    ctx.exit(status)
+    ctx.exit(exit_code)
