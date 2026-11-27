@@ -1012,9 +1012,17 @@ def test_apprise_urlbase_object():
     assert results.get("verify") is True
     base = URLBase(**results)
     assert base.request_timeout == (4.0, 4.0)
-    assert base.request_auth == ("user", None)
+    assert base.request_auth == ("user", "")
     assert base.request_url == "http://127.0.0.1/path/"
     assert base.url().startswith("http://user@127.0.0.1/path/")
+
+    # A password with no user is valid Basic auth (RFC 7617)
+    results = URLBase.parse_url("http://:pass@127.0.0.1/path/")
+    base = URLBase(**results)
+    assert base.request_auth == ("", "pass")
+    assert base.url().startswith("http://:pass@127.0.0.1/path/")
+    assert base.url_auth() == ":pass@"
+    assert "pass" not in base.url_auth(privacy=True)
 
     # redirect= defaults to True (follows redirects, matching requests default)
     results = URLBase.parse_url("https://localhost/path/?redirect=yes")

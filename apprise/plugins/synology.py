@@ -33,7 +33,6 @@ import requests
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..url import PrivacyMode
 from ..utils.parse import URL_ENCODED_PATH_SAFE_CHARS
 from .base import NotifyBase
 
@@ -200,18 +199,7 @@ class NotifySynology(NotifyBase):
         params.update({f"+{k}": v for k, v in self.headers.items()})
 
         # Determine Authentication
-        auth = ""
-        if self.user and self.password:
-            auth = "{user}:{password}@".format(
-                user=NotifySynology.quote(self.user, safe=""),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
-                ),
-            )
-        elif self.user:
-            auth = "{user}@".format(
-                user=NotifySynology.quote(self.user, safe=""),
-            )
+        auth = self.url_auth(privacy)
 
         default_port = 443 if self.secure else 80
 
@@ -275,9 +263,8 @@ class NotifySynology(NotifyBase):
             "token": self.token,
         }
 
-        auth = None
-        if self.user:
-            auth = (self.user, self.password)
+        # Basic Auth support handling for request
+        auth = self.request_auth
 
         # Set our schema
         schema = "https" if self.secure else "http"

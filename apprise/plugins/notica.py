@@ -46,7 +46,6 @@ import requests
 from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..url import PrivacyMode
 from ..utils.parse import URL_PATH_SAFE_CHARS, validate_regex
 from .base import NotifyBase
 
@@ -209,8 +208,8 @@ class NotifyNotica(NotifyBase):
             # Apply any/all header over-rides defined
             headers.update(self.headers)
 
-            if self.user:
-                auth = (self.user, self.password)
+            # Basic Auth support handling for request
+            auth = self.request_auth
 
             # Set our schema
             schema = "https" if self.secure else "http"
@@ -311,20 +310,9 @@ class NotifyNotica(NotifyBase):
         params.update({f"+{k}": v for k, v in self.headers.items()})
 
         # Authorization can be used for self-hosted sollutions
-        auth = ""
 
         # Determine Authentication
-        if self.user and self.password:
-            auth = "{user}:{password}@".format(
-                user=NotifyNotica.quote(self.user, safe=""),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
-                ),
-            )
-        elif self.user:
-            auth = "{user}@".format(
-                user=NotifyNotica.quote(self.user, safe=""),
-            )
+        auth = self.url_auth(privacy)
 
         default_port = 443 if self.secure else 80
         return "{schema}://{auth}{hostname}{port}{fullpath}{token}/?{params}".format(

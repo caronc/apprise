@@ -39,7 +39,6 @@ import requests
 
 from ..common import ContentLocation
 from ..locale import gettext_lazy as _
-from ..url import PrivacyMode
 from ..utils.http import (
     ConnectionTracker,
     WatchdogUnavailableError,
@@ -140,9 +139,8 @@ class AttachHTTP(AttachBase):
         # Apply any/all header over-rides defined
         headers.update(self.headers)
 
-        auth = None
-        if self.user:
-            auth = (self.user, self.password)
+        # Basic Auth support handling for request
+        auth = self.request_auth
 
         url = f"{self.schema}://{self.host}"
         if isinstance(self.port, int):
@@ -455,18 +453,7 @@ class AttachHTTP(AttachBase):
         params.update(self.qsd)
 
         # Determine Authentication
-        auth = ""
-        if self.user and self.password:
-            auth = "{user}:{password}@".format(
-                user=self.quote(self.user, safe=""),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
-                ),
-            )
-        elif self.user:
-            auth = "{user}@".format(
-                user=self.quote(self.user, safe=""),
-            )
+        auth = self.url_auth(privacy)
 
         default_port = 443 if self.secure else 80
         return "{schema}://{auth}{hostname}{port}{fullpath}?{params}".format(

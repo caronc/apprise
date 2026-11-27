@@ -58,7 +58,6 @@ import requests
 from ..common import NotifyFormat, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..url import PrivacyMode
 from ..utils.parse import parse_choice, parse_list
 from .base import NotifyBase
 
@@ -337,8 +336,8 @@ class NotifyGorush(NotifyBase):
             "Content-Type": "application/json",
         }
 
-        # Basic auth is only needed when a reverse proxy asks for it.
-        auth = (self.user, self.password) if self.user else None
+        # Basic Auth support handling for request
+        auth = self.request_auth
 
         # Prepare our URL
         url = "{schema}://{host}{port}/api/push".format(
@@ -484,19 +483,7 @@ class NotifyGorush(NotifyBase):
         params.update({f"+{k}": v for k, v in self.data_kwargs.items()})
 
         # Determine Authentication
-        auth = ""
-        if self.user and self.password:
-            auth = "{user}:{password}@".format(
-                user=NotifyGorush.quote(self.user, safe=""),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
-                ),
-            )
-
-        elif self.user:
-            auth = "{user}@".format(
-                user=NotifyGorush.quote(self.user, safe=""),
-            )
+        auth = self.url_auth(privacy)
 
         return "{schema}://{auth}{host}{port}/{targets}?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,

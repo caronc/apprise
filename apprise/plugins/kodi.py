@@ -32,7 +32,6 @@ import requests
 
 from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
-from ..url import PrivacyMode
 from ..utils.parse import parse_bool
 from .base import NotifyBase
 
@@ -254,9 +253,8 @@ class NotifyXBMC(NotifyBase):
                 title, body, notify_type, **kwargs
             )
 
-        auth = None
-        if self.user:
-            auth = (self.user, self.password)
+        # Basic Auth support handling for request
+        auth = self.request_auth
 
         url = f"{self.schema}://{self.host}"
         if self.port:
@@ -359,18 +357,7 @@ class NotifyXBMC(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
-        auth = ""
-        if self.user and self.password:
-            auth = "{user}:{password}@".format(
-                user=NotifyXBMC.quote(self.user, safe=""),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
-                ),
-            )
-        elif self.user:
-            auth = "{user}@".format(
-                user=NotifyXBMC.quote(self.user, safe=""),
-            )
+        auth = self.url_auth(privacy)
 
         default_schema = (
             self.xbmc_protocol

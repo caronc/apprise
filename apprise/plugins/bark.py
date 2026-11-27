@@ -621,9 +621,8 @@ class NotifyBark(NotifyBase):
         if self.delete:
             routing["delete"] = "1"
 
-        auth = None
-        if self.user:
-            auth = (self.user, self.password)
+        # Basic Auth support handling for request
+        auth = self.request_auth
 
         # Create a copy of the targets
         targets = list(self.targets)
@@ -863,18 +862,7 @@ class NotifyBark(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
-        auth = ""
-        if self.user and self.password:
-            auth = "{user}:{password}@".format(
-                user=NotifyBark.quote(self.user, safe=""),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
-                ),
-            )
-        elif self.user:
-            auth = "{user}@".format(
-                user=NotifyBark.quote(self.user, safe=""),
-            )
+        auth = self.url_auth(privacy)
 
         default_port = 443 if self.secure else 80
         return "{schema}://{auth}{hostname}{port}/{targets}?{params}".format(

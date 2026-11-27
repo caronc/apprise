@@ -56,7 +56,6 @@ from ..conversion import (
 )
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_bool, parse_phone_no
 from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase, NotifyFormat
@@ -640,10 +639,8 @@ class NotifySignalAPI(NotifyBase):
             # Store our attachments
             payload["base64_attachments"] = attachments
 
-        # Determine Authentication
-        auth = None
-        if self.user:
-            auth = (self.user, self.password)
+        # Basic Auth support handling for request
+        auth = self.request_auth
 
         # Set our schema
         schema = "https" if self.secure else "http"
@@ -788,18 +785,7 @@ class NotifySignalAPI(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
-        auth = ""
-        if self.user and self.password:
-            auth = "{user}:{password}@".format(
-                user=NotifySignalAPI.quote(self.user, safe=""),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
-                ),
-            )
-        elif self.user:
-            auth = "{user}@".format(
-                user=NotifySignalAPI.quote(self.user, safe=""),
-            )
+        auth = self.url_auth(privacy)
 
         default_port = 443 if self.secure else 80
 

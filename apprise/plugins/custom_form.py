@@ -32,7 +32,6 @@ import requests
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..url import PrivacyMode
 from ..utils.parse import URL_ENCODED_PATH_SAFE_CHARS
 from .base import NotifyBase
 
@@ -385,9 +384,8 @@ class NotifyForm(NotifyBase):
         # Apply any/all payload over-rides defined
         payload.update(self.payload_extras)
 
-        auth = None
-        if self.user:
-            auth = (self.user, self.password)
+        # Basic Auth support handling for request
+        auth = self.request_auth
 
         # Set our schema
         schema = "https" if self.secure else "http"
@@ -516,18 +514,7 @@ class NotifyForm(NotifyBase):
             params["attach-as"] = self.attach_as
 
         # Determine Authentication
-        auth = ""
-        if self.user and self.password:
-            auth = "{user}:{password}@".format(
-                user=NotifyForm.quote(self.user, safe=""),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
-                ),
-            )
-        elif self.user:
-            auth = "{user}@".format(
-                user=NotifyForm.quote(self.user, safe=""),
-            )
+        auth = self.url_auth(privacy)
 
         default_port = 443 if self.secure else 80
         return "{schema}://{auth}{hostname}{port}{fullpath}?{params}".format(
