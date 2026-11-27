@@ -40,7 +40,7 @@ import requests
 import apprise
 from apprise import Apprise, NotifyFormat
 from apprise.exception import AppriseImproperlyConfigured
-from apprise.fields import fields_to_url
+from apprise.fields import fields_to_url, parse_fields
 from apprise.plugins.ntfy import NotifyNtfy, NtfyPriority
 
 logging.disable(logging.CRITICAL)
@@ -672,12 +672,56 @@ def test_plugin_ntfy_cloud_fields(url, topics):
     assert fields["targets"] == topics
     assert fields["mode"] == "cloud"
 
-    # Put back together, the topics are written once
+    # Put back together, the URL is the one ntfy writes itself: the topics
+    # once each, with mode=cloud so none is read back as a server
     built = fields_to_url(fields)
-    assert built.split("?")[0] == "ntfys://" + "/".join(topics) + (
-        "/" if len(topics) == 1 else ""
-    )
+    assert parse_fields(built)["targets"] == topics
     assert Apprise.instantiate(built).url() == obj.url()
+
+
+@pytest.mark.parametrize(
+    "url, mode, host, topics",
+    (
+        # ?to= only adds topics: the first part stays a topic on ntfy.sh
+        (
+            "ntfys://topic1?to=topic2,topic3",
+            "cloud",
+            "",
+            {"topic1", "topic2", "topic3"},
+        ),
+        ("ntfy://myserver?to=alerts", "cloud", "", {"myserver", "alerts"}),
+        # A topic in the path makes the first part a server of its own
+        ("ntfy://myserver/alerts", "private", "myserver", {"alerts"}),
+        (
+            "ntfy://myserver/alerts?to=more",
+            "private",
+            "myserver",
+            {"alerts", "more"},
+        ),
+        # A topic on its own is on ntfy.sh, as before
+        ("ntfy://topic1", "cloud", "", {"topic1"}),
+        # A login always means a server of its own
+        (
+            "ntfys://user:pass@localhost?to=topic",
+            "private",
+            "localhost",
+            {"topic"},
+        ),
+        ("ntfy://tk_abc@localhost?to=t", "private", "localhost", {"t"}),
+    ),
+)
+def test_plugin_ntfy_topics_in_the_query_never_make_a_server(
+    url, mode, host, topics
+):
+    """Use path topics or a login, not query topics, to detect a server."""
+    obj = Apprise.instantiate(url)
+    assert obj.mode == mode
+    assert (obj.host or "") == host
+    assert set(obj.topics) == topics
+
+    again = Apprise.instantiate(obj.url())
+    assert again.mode == mode
+    assert set(again.topics) == topics
 
 
 def test_plugin_ntfy_attach_filename():
@@ -971,3 +1015,20 @@ def test_plugin_ntfy_html_to_markdown_format(mock_post):
     # The body must arrive as Markdown, not as stripped plain text
     payload = json.loads(mock_post.call_args_list[0][1]["data"])
     assert payload["message"] == "**hello** *world*"
+
+
+def test_plugin_ntfy_private_mode_needs_a_host():
+    """A self-hosted (private) URL is read only with a host or IP address."""
+    # No host at all is refused rather than raising
+    assert NotifyNtfy.parse_url("ntfy://?mode=private") is None
+    assert NotifyNtfy.parse_url("ntfy://#x?mode=private") is None
+
+    # Built directly, a private server with only a topic is refused, since
+    # its URL would read the topic back as the server
+    with pytest.raises(AppriseImproperlyConfigured):
+        NotifyNtfy(mode="private", targets=["alerts"])
+
+    # A hostname or an IP address is accepted
+    for host in ("localhost", "10.0.0.1"):
+        results = NotifyNtfy.parse_url(f"ntfy://{host}/t?mode=private")
+        assert results["host"] == host

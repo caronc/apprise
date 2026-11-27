@@ -234,7 +234,14 @@ class NotifyACS(NotifyBase):
         self.names = {}
 
         self.targets = []
-        for recipient in parse_emails(targets):
+
+        # Recipients that are not valid email addresses, kept for url()
+        self.invalid_targets = []
+
+        # Text holding only separators (such as ;) names nobody, and counts
+        # the same as giving no recipients at all
+        recipients = parse_emails(targets)
+        for recipient in recipients:
             result = is_email(recipient)
             if result:
                 self.targets.append(result["full_email"])
@@ -244,8 +251,9 @@ class NotifyACS(NotifyBase):
             self.logger.warning(
                 "Dropped invalid ACS email (%s) specified.", recipient
             )
+            self.invalid_targets.append(recipient)
 
-        if not self.targets and not targets:
+        if not recipients:
             # With no targets at all we notify ourselves
             self.targets.append(self.from_email)
 
@@ -339,7 +347,7 @@ class NotifyACS(NotifyBase):
                     for e in sorted(emails)
                 )
 
-        has_targets = not (
+        has_targets = self.invalid_targets or not (
             len(self.targets) == 1 and self.targets[0] == self.from_email
         )
 
@@ -352,7 +360,16 @@ class NotifyACS(NotifyBase):
             key=self.pprint(self.access_key, privacy, safe=""),
             endpoint=self.endpoint,
             targets=(
-                "/".join(NotifyACS.quote(x, safe="@") for x in self.targets)
+                "/".join(
+                    [NotifyACS.quote(x, safe="@") for x in self.targets]
+                    # Recipients that were dropped are written back too, so
+                    # the URL still reads as having recipients rather than
+                    # falling back to the sender's own address
+                    + [
+                        NotifyACS.quote(x, safe="")
+                        for x in self.invalid_targets
+                    ]
+                )
                 if has_targets
                 else ""
             ),

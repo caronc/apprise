@@ -288,3 +288,44 @@ def test_plugin_voipms_non_success_status(mock_get):
 
     response.content = "{"
     assert obj.send("title", "body") is False
+
+
+def test_plugin_voipms_drops_a_target_that_is_no_phone_number():
+    """A target that is not a phone number is dropped; the rest still load."""
+    obj = Apprise.instantiate(
+        "voipms://password:user@example.com/16134448888/16134442222/abc"
+    )
+    assert isinstance(obj, NotifyVoipms)
+    assert obj.targets == ["6134442222"]
+
+
+@mock.patch("requests.get")
+def test_plugin_voipms_invalid_recipients_kept(mock_get):
+    """Refused phone numbers never fall back to messaging ourselves."""
+
+    # Shared (but valid) credentials for every object below
+    kwargs = {
+        "email": "user@example.com",
+        "password": "pass",
+        "source": "16135551234",
+    }
+
+    # No phone numbers given, so we message ourselves
+    obj = NotifyVoipms(targets=None, **kwargs)
+    assert obj.targets == ["6135551234"]
+
+    # Only separators given is the same as giving no phone numbers
+    obj = NotifyVoipms(targets=";, ,", **kwargs)
+    assert obj.targets == ["6135551234"]
+    obj = Apprise.instantiate(obj.url())
+    assert obj.targets == ["6135551234"]
+
+    # Every phone number refused leaves nobody to notify
+    obj = NotifyVoipms(targets=["abcd", "123"], **kwargs)
+    assert obj.targets == []
+
+    # Loading our URL again still leaves nobody to notify
+    obj = Apprise.instantiate(obj.url())
+    assert obj.targets == []
+    assert obj.notify("body") is False
+    assert mock_get.call_count == 0

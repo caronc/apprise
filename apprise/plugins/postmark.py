@@ -211,6 +211,9 @@ class NotifyPostmark(NotifyBase):
         # Acquire Targets (To Emails)
         self.targets = []
 
+        # Recipients that are not valid email addresses, kept for url()
+        self.invalid_targets = []
+
         # Acquire Carbon Copies
         self.cc = set()
 
@@ -220,9 +223,13 @@ class NotifyPostmark(NotifyBase):
         # Acquire Reply-To addresses
         self.reply_to = set()
 
+        # Text holding only separators (such as ;) names nobody, and counts
+        # the same as giving no recipients at all
+        recipients = parse_emails(targets)
+
         # Validate recipients (to:) and drop bad ones:
-        if targets:
-            for recipient in parse_emails(targets):
+        if recipients:
+            for recipient in recipients:
                 result = is_email(recipient)
                 if result:
                     self.targets.append(result["full_email"])
@@ -233,9 +240,10 @@ class NotifyPostmark(NotifyBase):
                     continue
 
                 self.logger.warning(
-                    "Dropped invalid Postmark To email "
-                    f"({recipient}) specified.",
+                    "Dropped invalid Postmark To email (%s) specified.",
+                    recipient,
                 )
+                self.invalid_targets.append(recipient)
 
         else:
             # Default to the from address when no targets are specified
@@ -335,7 +343,7 @@ class NotifyPostmark(NotifyBase):
             )
 
         # Determine whether to display target emails in the URL
-        has_targets = not (
+        has_targets = self.invalid_targets or not (
             len(self.targets) == 1 and self.targets[0] == self.from_addr[1]
         )
 
@@ -349,6 +357,13 @@ class NotifyPostmark(NotifyBase):
                 if not has_targets
                 else "/".join(
                     [NotifyPostmark.quote(x, safe="@") for x in self.targets]
+                    # Recipients that were dropped are written back too, so
+                    # the URL still reads as having recipients rather than
+                    # falling back to the sender's own address
+                    + [
+                        NotifyPostmark.quote(x, safe="")
+                        for x in self.invalid_targets
+                    ]
                 )
             ),
             params=NotifyPostmark.urlencode(params),

@@ -612,3 +612,18 @@ def test_plugin_twist_html_to_markdown_format(mock_post, mock_get):
     # The body must arrive as Markdown in the threads/add payload
     data = mock_post.call_args_list[1][1]["data"]
     assert data["content"] == "**hello** *world*"
+
+
+def test_plugin_twist_refused_setup_cleans_up_quietly():
+    """A refused setup leaves nothing for __del__() to trip over."""
+    import gc
+
+    with mock.patch("sys.unraisablehook") as hook:
+        with pytest.raises(AppriseImproperlyConfigured):
+            NotifyTwist(
+                email="user@example.com", password="abc123", tz="/etc/passwd"
+            )
+
+        gc.collect()
+
+    assert hook.call_count == 0

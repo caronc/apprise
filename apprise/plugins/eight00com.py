@@ -175,7 +175,8 @@ class NotifyEight00com(NotifyBase):
         self.targets = []
 
         # Track if we encountered any error parsing targets
-        has_error = False
+        # Keep refused phone numbers so url() can write them back
+        self.invalid_targets = []
         for target in parse_phone_no(targets):
             # Validate each target phone number
             result = is_phone_no(target)
@@ -183,13 +184,15 @@ class NotifyEight00com(NotifyBase):
                 self.targets.append(result["full"])
                 continue
 
-            has_error = True
+            self.invalid_targets.append(target)
             self.logger.warning(
                 "Dropped invalid 800.com phone # (%s).",
                 target,
             )
 
-        if not targets and not has_error:
+        # Fall back to ourselves only when no phone numbers were given.
+        # If every number given was refused, there is nobody to notify
+        if not self.targets and not self.invalid_targets:
             # Default: send to ourselves when no target is provided
             self.targets.append(self.source)
 
@@ -446,10 +449,12 @@ class NotifyEight00com(NotifyBase):
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         # Omit the target list when the only target is ourselves
+        # Refused phone numbers are written back after the valid ones
+        # so that loading this URL again still has nobody to notify
         targets = (
             []
-            if len(self.targets) == 1 and self.targets[0] == self.source
-            else self.targets
+            if self.targets == [self.source] and not self.invalid_targets
+            else self.targets + self.invalid_targets
         )
 
         return "{schema}://{token}@{source}/{targets}?{params}".format(

@@ -245,3 +245,31 @@ def test_plugin_telnyx_edge_cases(mock_post):
     obj2 = Apprise.instantiate(obj.url())
     assert obj2.url_id() == obj.url_id()
     assert obj2.profile == "40017-abcd"
+
+
+@mock.patch("requests.post")
+def test_plugin_telnyx_invalid_recipients_kept(mock_post):
+    """Refused phone numbers never fall back to messaging ourselves."""
+
+    # Shared (but valid) credentials for every object below
+    kwargs = {"apikey": "abc123", "source": "15551232000"}
+
+    # No phone numbers given, so we message ourselves
+    obj = NotifyTelnyx(targets=None, **kwargs)
+    assert obj.targets == ["15551232000"]
+
+    # Only separators given is the same as giving no phone numbers
+    obj = NotifyTelnyx(targets=";, ,", **kwargs)
+    assert obj.targets == ["15551232000"]
+    obj = Apprise.instantiate(obj.url())
+    assert obj.targets == ["15551232000"]
+
+    # Every phone number refused leaves nobody to notify
+    obj = NotifyTelnyx(targets=["abcd", "123"], **kwargs)
+    assert obj.targets == []
+
+    # Loading our URL again still leaves nobody to notify
+    obj = Apprise.instantiate(obj.url())
+    assert obj.targets == []
+    assert obj.notify("body") is False
+    assert mock_post.call_count == 0

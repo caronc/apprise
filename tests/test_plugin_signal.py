@@ -731,3 +731,26 @@ def test_plugin_signal_deeply_nested_links():
 
     # Only the outer labels become links; the rest stay as plain text
     assert result.count("](u)") == depth - MAX_LINK_DEPTH
+
+
+def test_plugin_signal_invalid_recipients_kept():
+    """Invalid recipients never turn into a message to ourselves."""
+    base = "signal://localhost/+15551234567"
+
+    # No targets given (or only separators); we notify ourselves
+    for targets in (None, [], ";", ", ,"):
+        obj = NotifySignalAPI(
+            host="localhost", source="+15551234567", targets=targets
+        )
+        assert obj.targets == ["+15551234567"]
+
+        # The same holds after a round trip
+        obj2 = Apprise.instantiate(obj.url(privacy=False))
+        assert obj2.targets == ["+15551234567"]
+
+    # Every target is invalid; nobody is notified, even after a round trip
+    obj = Apprise.instantiate(base + "/abc")
+    obj2 = Apprise.instantiate(obj.url(privacy=False))
+    for o in (obj, obj2):
+        assert o.targets == []
+        assert o.invalid_targets == ["abc"]

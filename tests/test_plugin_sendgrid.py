@@ -286,3 +286,29 @@ def test_plugin_sendgrid_attachments(mock_post, mock_get):
             )
             is False
         )
+
+
+def test_plugin_sendgrid_invalid_recipients_kept():
+    """Invalid recipients never fall back to the sender's address."""
+
+    # Read our settings from a URL so only the recipients change below
+    kwargs = NotifySendGrid.parse_url("sendgrid://abcd:user@example.com")
+
+    # No recipients given, so we notify ourselves
+    obj = NotifySendGrid(**dict(kwargs, targets=None))
+    assert obj.targets == ["user@example.com"]
+
+    # Text holding only separators is the same as no recipients given
+    obj = NotifySendGrid(**dict(kwargs, targets=" ; , "))
+    assert obj.targets == ["user@example.com"]
+
+    # Every recipient is invalid, so there is nobody to notify
+    obj = NotifySendGrid(**dict(kwargs, targets=["invalid", "bad@"]))
+    assert obj.targets == []
+    assert sorted(obj.invalid_targets) == ["bad@", "invalid"]
+
+    # Reloading our URL keeps it that way instead of using the sender
+    obj = Apprise.instantiate(obj.url(privacy=False))
+    assert isinstance(obj, NotifySendGrid)
+    assert obj.targets == []
+    assert sorted(obj.invalid_targets) == ["bad@", "invalid"]

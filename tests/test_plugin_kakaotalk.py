@@ -356,3 +356,36 @@ def test_plugin_kakaotalk_url_parsing():
 
     with pytest.raises(AppriseImproperlyConfigured):
         NotifyKakaoTalk(client_id=CLIENT_ID, refresh_token="bad token")
+
+
+@mock.patch("requests.post")
+def test_plugin_kakaotalk_invalid_recipients_kept(mock_post):
+    """Invalid friends never turn into a message to the token owner."""
+
+    # No friends given; the token owner gets the message
+    mock_post.side_effect = [_token(), _mk_resp({"result_code": 0})]
+    obj = NotifyKakaoTalk(client_id=CLIENT_ID, refresh_token=REFRESH)
+    assert obj.targets == []
+    assert obj.notify(body="hello") is True
+    assert urlparse(mock_post.call_args[0][0]).path == (
+        "/v2/api/talk/memo/default/send"
+    )
+
+    # Only separators counts the same as giving no friends at all
+    obj = NotifyKakaoTalk(
+        client_id=CLIENT_ID, refresh_token=REFRESH, targets=", ,"
+    )
+    assert obj.targets == []
+    assert obj.invalid_targets == []
+
+    # Every friend is invalid; nobody is notified, even after a round trip
+    obj = NotifyKakaoTalk(
+        client_id=CLIENT_ID, refresh_token=REFRESH, targets=["bad.uuid"]
+    )
+    obj2 = Apprise.instantiate(obj.url(privacy=False))
+    for o in (obj, obj2):
+        assert o.targets == []
+        assert o.invalid_targets == ["bad.uuid"]
+        mock_post.reset_mock()
+        assert o.notify(body="hello") is False
+        assert mock_post.call_count == 0

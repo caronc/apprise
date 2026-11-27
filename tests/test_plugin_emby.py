@@ -32,6 +32,7 @@ import logging
 from unittest import mock
 
 from helpers import AppriseURLTester
+import pytest
 import requests
 
 from apprise import Apprise
@@ -457,3 +458,16 @@ def test_plugin_emby_logout(mock_post, mock_get, mock_login):
 
     # Tidy object
     del obj
+
+
+def test_plugin_emby_refused_setup_cleans_up_quietly():
+    """A refused setup leaves nothing for __del__() to trip over."""
+    import gc
+
+    with mock.patch("sys.unraisablehook") as hook:
+        with pytest.raises(AppriseImproperlyConfigured):
+            NotifyEmby(host="localhost", tz="/etc/passwd")
+
+        gc.collect()
+
+    assert hook.call_count == 0

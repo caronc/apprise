@@ -577,3 +577,35 @@ def test_plugin_sparkpost_cc_names():
     assert obj2.cc == obj.cc
     assert obj2.names["l2g@nuxref.com"] == "Chris"
     assert obj2.names["plain@example.com"] is False
+
+
+def test_plugin_sparkpost_invalid_recipients_kept():
+    """NotifySparkPost() keeps invalid recipients so url() never targets
+    self."""
+
+    def build(targets):
+        return NotifySparkPost(
+            user="user", host="example.com", apikey="a" * 32, targets=targets
+        )
+
+    # No recipients given, so the sender is emailed
+    obj = build(None)
+    assert obj.targets == [(False, "user@example.com")]
+    obj2 = Apprise.instantiate(obj.url(privacy=False))
+    assert obj2.targets == [(False, "user@example.com")]
+
+    # Separators alone count the same as no recipients at all
+    obj = build(";, ,")
+    assert obj.targets == [(False, "user@example.com")]
+    obj2 = Apprise.instantiate(obj.url(privacy=False))
+    assert obj2.targets == [(False, "user@example.com")]
+
+    # Every recipient is invalid, so nobody is emailed
+    obj = build(["invalid", "bad@"])
+    assert obj.targets == []
+    assert obj.invalid_targets == ["invalid", "bad@"]
+
+    # Reading the URL back still emails nobody, never the sender
+    obj2 = Apprise.instantiate(obj.url(privacy=False))
+    assert obj2.targets == []
+    assert obj2.invalid_targets == ["invalid", "bad@"]

@@ -33,19 +33,22 @@ lets a form show one URL as separate entries and assemble it again.
 
 from __future__ import annotations
 
+from enum import Enum
+import inspect
 import re
 from typing import Any, Optional
 
-from .logger import logger
+from .asset import AppriseAsset
+from .exception import AppriseImproperlyConfigured
+from .logger import logger, quiet_logs
 from .manager_plugins import NotificationManager
 from .plugins import details
 from .url import PrivacyMode, URLBase
 from .utils.parse import (
     GET_SCHEMA_RE,
-    URL_SEGMENT_SAFE_CHARS,
-    is_email,
     is_ipaddr,
     parse_bool,
+    quote_path,
 )
 
 # Grant access to our Notification Manager Singleton
@@ -54,22 +57,19 @@ N_MGR = NotificationManager()
 # A {name} placeholder inside a URL template
 TEMPLATE_TOKEN_RE = re.compile(r"\{(?P<name>[^}]+)\}")
 
-# Placeholders still in an assembled URL have no value, so they are
-# removed along with the separators around them; the rest are left alone.
-EMPTY_PLACEHOLDERS = (
-    # {user}:{password}@
-    (re.compile(r"\{[^}]+\}:\{[^}]+\}@"), ""),
-    # user:{password}@
-    (re.compile(r":\{[^}]+\}@"), "@"),
-    # {user}@
-    (re.compile(r"\{[^}]+\}@"), ""),
-    # :{port}
-    (re.compile(r":\{[^}]+\}"), ""),
-    # /{targets}, but never the second slash of schema://
-    (re.compile(r"(?<!:/)/\{[^}]+\}"), ""),
-    # Anything left over
-    (re.compile(r"\{[^}]+\}"), ""),
-)
+# The characters that end a host in a URL and start its port, path, query,
+# fragment or login
+HOST_DELIMITER_RE = re.compile(r"[:/?#@]")
+
+
+def _service(schema: Any) -> Optional[Any]:
+    """Return the plugin ``schema`` names, or ``None`` if unknown or off."""
+    # Only a known service that is turned on can be used
+    if not isinstance(schema, str) or schema.lower() not in N_MGR:
+        return None
+
+    plugin = N_MGR[schema.lower()]
+    return plugin if plugin.enabled else None
 
 
 def _empty(value: Any) -> bool:
@@ -88,15 +88,22 @@ def _typed(value: Any, meta: dict[str, Any]) -> Any:
 
     - Lists come back as lists; text is split on commas.
     - ``None`` comes back for anything that is not plain data.
+    - A choice a plugin keeps as an Enum (such as ``NotifyFormat.MARKDOWN``)
+      comes back as its plain value (``markdown``), the way a URL writes it.
     """
+    if isinstance(value, Enum):
+        value = value.value
+
     kind = meta.get("type", "string")
     if kind.startswith("list"):
         if isinstance(value, set):
             # A set has no order of its own
             value = sorted(value, key=str)
 
-        elif isinstance(value, str):
-            value = value.split(",")
+        elif isinstance(value, (str, int, float)):
+            # Text is split on commas, and a single number (such as topic
+            # 123) is a list of one
+            value = _as_list(value)
 
         elif not isinstance(value, (list, tuple)):
             # Objects a plugin keeps for itself are not fields
@@ -113,8 +120,11 @@ def _typed(value: Any, meta: dict[str, Any]) -> Any:
         ]
 
     if isinstance(value, (list, tuple, set)):
-        # A list read for a text entry is written the way a URL writes it
-        value = _text(sorted(value) if isinstance(value, set) else value)
+        # A list read for a text entry is written the way a URL writes it.
+        # A set has no order of its own, so it is sorted first
+        value = _text(
+            sorted(value, key=str) if isinstance(value, set) else value
+        )
 
     if not isinstance(value, (str, int, float)):
         # Objects a plugin keeps for itself are not fields
@@ -122,6 +132,12 @@ def _typed(value: Any, meta: dict[str, Any]) -> Any:
 
     if kind.endswith("bool"):
         return parse_bool(value)
+
+    if kind.endswith("int") and isinstance(value, float) and value % 1:
+        # A fraction is not a whole number, and int() would cut 8080.7 down
+        # to 8080. It is passed on as text, the way a URL holds it. NaN and
+        # infinity (which JSON can carry) land here too
+        return _text(value)
 
     for convert, suffix in ((int, "int"), (float, "float")):
         if kind.endswith(suffix) and not isinstance(value, bool):
@@ -132,29 +148,81 @@ def _typed(value: Any, meta: dict[str, Any]) -> Any:
                 # Keep what was written when it is not a number
                 return value
 
+            except OverflowError:
+                # A whole number too large to hold as a decimal is passed
+                # on as text, which the plugin reads the way a URL holds it
+                return _text(value)
+
     return value if isinstance(value, str) else str(value)
 
 
-def _fits(value: Any, meta: dict[str, Any], kwarg: bool = False) -> bool:
+def _fits(name: str, value: Any, info: dict[str, Any]) -> bool:
     """Return whether a field value has the shape its template entry allows.
 
     - A key/value option is a map of names to plain values.
     - A list is one plain value or a flat list of them.
+    - An alias has the shape of the entry (or entries) it stands for.
     - Anything else is one plain value: text, a number or True/False.
     """
-    # True/False count as numbers here, so they are plain values too
-    plain = (str, int, float)
-    if kwarg:
+
+    def plain(entry: Any) -> bool:
+        """Whether a value is text, a number or True/False."""
+        if isinstance(entry, str):
+            try:
+                # Text a URL can't hold, such as half of a surrogate pair
+                # (which JSON can carry), would fail when quoted
+                entry.encode("utf-8")
+
+            except UnicodeEncodeError:
+                return False
+
+            return True
+
+        if isinstance(entry, int) and not isinstance(entry, bool):
+            try:
+                # Python refuses to write out a whole number with more
+                # digits than its limit allows (4300 by default)
+                str(entry)
+
+            except ValueError:
+                return False
+
+            return True
+
+        # True/False count as numbers here, so they are plain values too
+        return isinstance(entry, (bool, float))
+
+    if name in info["kwargs"] and name not in info["args"]:
         return isinstance(value, dict) and all(
-            isinstance(key, str) and isinstance(entry, plain)
+            isinstance(key, str) and plain(key) and plain(entry)
             for key, entry in value.items()
         )
 
+    meta = _entry(name, info)
+    targets = _alias_targets(meta)
+    if targets:
+        # An alias takes a list when any entry it stands for is a list
+        listed = any(
+            _entry(target, info).get("type", "").startswith("list")
+            for target in targets
+        )
+        meta = {"type": "list:string" if listed else "string"}
+
     listed = meta.get("type", "").startswith("list")
     if listed and isinstance(value, (list, tuple)):
-        return all(isinstance(entry, plain) for entry in value)
+        return all(plain(entry) for entry in value)
 
-    return isinstance(value, plain)
+    if (
+        meta.get("type", "").endswith("bool")
+        and isinstance(value, (int, float))
+        and not isinstance(value, bool)
+    ):
+        # A number is an on/off switch only when it is 0 or 1. Any other
+        # number (such as 2) has no clear meaning, and would turn the
+        # option on here while ?redirect=2 in a URL turns it off
+        return value in (0, 1)
+
+    return plain(value)
 
 
 def _hidden(value: Any) -> Any:
@@ -233,12 +301,7 @@ def hide_fields(plugin: Any, fields: dict[str, Any]) -> dict[str, Any]:
 
     hidden: dict[str, Any] = {}
     for name, value in fields.items():
-        meta = (
-            tokens.get(name)
-            or info["args"].get(name)
-            or info["kwargs"].get(name)
-            or {}
-        )
+        meta = _entry(name, info)
         if name == "schema":
             hidden[name] = value
 
@@ -263,12 +326,12 @@ def parse_fields(url: str, privacy: bool = False) -> dict[str, Any]:
     """
     # Only a known service that is turned on can read the URL
     found = GET_SCHEMA_RE.match(url) if isinstance(url, str) else None
-    schema = found.group("schema").lower() if found else ""
-    if schema not in N_MGR or not N_MGR[schema].enabled:
+    plugin = _service(found.group("schema") if found else None)
+    if plugin is None:
         return {}
 
-    results = N_MGR[schema].parse_url(url.replace("/#", "/%23")) or {}
-    return _fields(N_MGR[schema], results, privacy)
+    results = plugin.parse_url(url.replace("/#", "/%23")) or {}
+    return _fields(plugin, results, privacy)
 
 
 def _fields(
@@ -350,36 +413,6 @@ def _fields(
     return fields
 
 
-def _value_for(name: str, given: dict[str, Any], tokens: dict) -> Any:
-    """Return the token value that fills a template placeholder.
-
-    A list placeholder also takes the values of every token that adds to
-    the same list, such as ``target_user`` for ``targets``.
-    """
-    # Other tokens may set the same value (a list token and its members)
-    meta = tokens.get(name, {})
-    key = meta.get("map_to", name)
-    found = [
-        value
-        for other, value in given.items()
-        if tokens[other]["map_to"] == key
-    ]
-    if not found:
-        # Nothing was given for this placeholder
-        return None
-
-    if not meta.get("type", "").startswith("list"):
-        # One value fills it; the token the template names comes first
-        return given.get(name, found[0])
-
-    # Every value given is kept, so none is lost from the list
-    merged: list[Any] = []
-    for value in found:
-        merged.extend(value if isinstance(value, (list, tuple)) else [value])
-
-    return merged
-
-
 def _text(value: Any) -> str:
     """Return a value as it is written in a URL, before quoting."""
     if isinstance(value, bool):
@@ -395,64 +428,174 @@ def _text(value: Any) -> str:
     return str(value)
 
 
-def _encoded(value: Any, meta: dict[str, Any], path: bool = False) -> str:
-    """Return a token value quoted for its place in a URL template.
+def _alias_targets(entry: dict[str, Any]) -> tuple[str, ...]:
+    """Return the names referenced by an alias entry."""
+    targets = entry.get("alias_of")
+    if isinstance(targets, str):
+        # An alias for one entry, such as ?to= for targets
+        return (targets,)
 
-    ``path`` keeps the slashes of a value that is a path of its own.
+    if isinstance(targets, (list, tuple)):
+        # An alias for several entries; the plugin decides which one a
+        # value belongs to
+        return tuple(target for target in targets if isinstance(target, str))
+
+    # Not an alias at all
+    return ()
+
+
+def _entry(name: str, info: dict[str, Any]) -> dict[str, Any]:
+    """Return a field's metadata."""
+    # A name is looked up as a token first, then an argument, then a
+    # key/value option; an unknown name has no metadata at all
+    return (
+        info["tokens"].get(name)
+        or info["args"].get(name)
+        or info["kwargs"].get(name)
+        or {}
+    )
+
+
+def _parsed(
+    plugin: Any, schema: str, options: list[tuple[str, Any]], url: str = ""
+) -> dict[str, Any]:
+    """Return what the plugin reads from a URL holding these options.
+
+    - The options are added to ``url`` when one is given, otherwise they
+      make up the whole URL. With no options, ``url`` is read as it is.
     """
-    kind = meta.get("type", "string")
-    if isinstance(value, (list, tuple, set)):
-        # List entries are joined by the list's own delimiter
-        delim = (meta.get("delim") or ("/",))[0]
-        item = {"type": "email" if kind == "list:email" else "string"}
-        return delim.join(
-            _encoded(entry, item) for entry in value if not _empty(entry)
+    # Each option is written as name=value, both quoted, just as a person
+    # would type them after the ?
+    query = "&".join(
+        "{}={}".format(
+            URLBase.quote(name, safe=""), URLBase.quote(_text(value), safe="")
+        )
+        for name, value in options
+    )
+    # The plugin may warn about values it doesn't like; those warnings are
+    # not meant for whoever is filling in the fields
+    with quiet_logs():
+        return (
+            plugin.parse_url(
+                (
+                    "{}{}{}".format(url, "&" if "?" in url else "?", query)
+                    if query
+                    else url
+                )
+                if url
+                else "{}://?{}".format(schema, query)
+            )
+            or {}
         )
 
-    text = _text(value)
-    if path:
-        # A path keeps its slashes, and each part is encoded the way
-        # parse_url() does it: escapes such as %20 are kept, while a space
-        # or a lone % typed by a person is encoded
-        return "/".join(
-            URLBase.quote(URLBase.unquote(part), safe=URL_SEGMENT_SAFE_CHARS)
-            for part in text.split("/")
-        )
 
-    if meta.get("map_to") == "host" and is_ipaddr(text, ipv4=False):
-        # An IPv6 host keeps its brackets and colons
-        return is_ipaddr(text, ipv4=False)
+def _aliased(
+    name: str, value: Any, plugin: Any, schema: str, info: dict[str, Any]
+) -> dict[str, Any]:
+    """Map a field value to its destination names.
 
-    quoted = URLBase.quote(text, safe="")
-    if kind == "email" and text.count("@") == 1 and is_email(text):
-        # One valid address keeps its @, as plugins write it (a name around
-        # it is fine); a second @ is quoted so it can't move the address
-        return quoted.replace("%40", "@")
+    - Direct fields and single aliases map without parsing.
+    - The plugin parser resolves aliases with several destinations.
+    """
+    targets = _alias_targets(_entry(name, info))
+    if not targets:
+        # Not an alias; the value stays under its own name
+        return {name: value}
 
-    return quoted
+    if len(targets) == 1:
+        # An alias for one entry passes its value straight to it
+        return {targets[0]: value}
+
+    # An alias for several entries: let the plugin read it, then keep each
+    # entry the plugin filled in
+    results = _parsed(plugin, schema, [(name, value)])
+    filled = {}
+    for target in targets:
+        found = results.get(_entry(target, info).get("map_to", target))
+        if not _empty(found):
+            filled[target] = found
+
+    # When the plugin could not read it, the first entry takes the value
+    return filled or {targets[0]: value}
+
+
+def _as_list(value: Any) -> list[Any]:
+    """Return a value as a list of entries (text is split on commas).
+
+    - A comma inside double quotes is part of its entry, so
+      "Doe, Jane" <jane@example.net> stays one recipient.
+    """
+    # parse_list() is not used here.  It also splits on spaces, ; and [ ],
+    # which a field value may hold (Name <address>, or [::1]), and it
+    # drops numbers found in a list (such as topic 123)
+    if isinstance(value, str):
+        entries = []
+        start = 0
+        quoted = False
+        for index, char in enumerate(value):
+            if char == '"':
+                # Going in or out of a quoted part
+                quoted = not quoted
+
+            elif char == "," and not quoted:
+                # A comma outside quotes ends this entry; each entry is cut
+                # out once rather than built up one character at a time
+                entries.append(value[start:index])
+                start = index + 1
+
+        # Whatever follows the last comma is the final entry
+        entries.append(value[start:])
+
+        # Empty entries (such as from "a,,b" or a trailing comma) are dropped
+        return [entry for entry in entries if entry.strip()]
+
+    if isinstance(value, list):
+        # Already several entries
+        return value
+
+    # A single value (such as a topic number) becomes a list of one
+    return [value]
+
+
+def _defaults(plugin: Any) -> dict[str, None]:
+    """Return required constructor arguments initialized to ``None``.
+
+    - A plugin may require an argument its URL always provides; giving it
+      ``None`` lets the plugin refuse it the usual way instead of Python
+      failing on the missing argument.
+    """
+    # Every plugin is a NotifyBase class, so it always has an __init__()
+    # (its own or one it inherits) whose signature can be read
+    parameters = inspect.signature(plugin.__init__).parameters.values()
+
+    # Keep the arguments that have no default value of their own; a plugin
+    # someone writes may also list them after a * (keyword only)
+    return {
+        parameter.name: None
+        for parameter in parameters
+        if parameter.name != "self"
+        and parameter.default is parameter.empty
+        and parameter.kind
+        in (parameter.POSITIONAL_OR_KEYWORD, parameter.KEYWORD_ONLY)
+    }
 
 
 def fields_to_url(fields: dict[str, Any]) -> Optional[str]:
-    """Assemble a URL from fields named the way details() does.
+    """Build a plugin URL from its described fields.
 
-    - ``fields`` must name the ``schema`` of an enabled service; any name
-      the plugin does not define is refused.
-    - The template that holds the given tokens best is filled in; the
-      arguments and key/value options go into its query string.
-    - Returns ``None`` when the URL cannot be assembled. The URL is not
-      checked here; load it to find out whether it works.
+    - Reject unknown schemas, fields, and value shapes.
+    - Let the plugin validate and serialize the values.
+    - Suppress Apprise validation logs and managed file writes.
+    - Return ``None`` when the plugin rejects the values.
     """
     schema = fields.get("schema") if isinstance(fields, dict) else None
-    if (
-        not isinstance(schema, str)
-        or schema.lower() not in N_MGR
-        or not N_MGR[schema.lower()].enabled
-    ):
+    plugin = _service(schema)
+    if plugin is None:
         logger.warning("Fields must name a supported schema")
         return None
 
     schema = schema.lower()
-    info = details(N_MGR[schema])
+    info = details(plugin)
     tokens, args, kwargs = info["tokens"], info["args"], info["kwargs"]
 
     given = {
@@ -464,23 +607,17 @@ def fields_to_url(fields: dict[str, Any]) -> Optional[str]:
         if not isinstance(name, str) or (
             name not in tokens and name not in args and name not in kwargs
         ):
-            logger.warning("The %s:// field %s is not supported", schema, name)
+            # The name is shown quoted (%r) so a name holding a line break
+            # can't pass itself off as a log entry of its own.  A very long
+            # name is cut short so it can't flood the log
+            logger.warning(
+                "The %s:// field %r is not supported",
+                schema,
+                name[:64] if isinstance(name, str) else name,
+            )
             return None
 
-        entry = tokens.get(name) or args.get(name) or {}
-        if "alias_of" in entry:
-            # An alias has the shape of the item it stands for
-            targets = entry["alias_of"]
-            targets = (targets,) if isinstance(targets, str) else targets
-            listed = any(
-                (tokens.get(t) or args.get(t) or {})
-                .get("type", "")
-                .startswith("list")
-                for t in targets
-            )
-            entry = {"type": "list:string" if listed else "string"}
-
-        if not _fits(value, entry, kwarg=name in kwargs and name not in args):
+        if not _fits(name, value, info):
             logger.warning(
                 "The %s:// field %s has a value of the wrong type",
                 schema,
@@ -488,104 +625,380 @@ def fields_to_url(fields: dict[str, Any]) -> Optional[str]:
             )
             return None
 
-    # Tokens are written into the URL template itself
-    placeable = {
-        name: value
-        for name, value in given.items()
-        if name in tokens and "alias_of" not in tokens[name]
+    # The values that gather every entry given for them (such as targets)
+    lists = {
+        entry.get("map_to", name)
+        for name, entry in list(tokens.items()) + list(args.items())
+        if entry.get("type", "").startswith("list")
     }
 
-    # Pick the template that places the most tokens, then the one missing
-    # the fewest required ones, then the shortest
-    chosen, best, placed = "", None, set()
-    for template in info["templates"]:
-        names = [
-            name
-            for name in TEMPLATE_TOKEN_RE.findall(template)
-            if name != "schema"
-        ]
-        keys = {tokens.get(name, {}).get("map_to", name) for name in names}
-        holds = {name for name in placeable if tokens[name]["map_to"] in keys}
-        missing = sum(
-            1
-            for name in names
-            if tokens.get(name, {}).get("required")
-            and _value_for(name, placeable, tokens) is None
-        )
-        score = (len(placeable) - len(holds), missing, len(names))
-        if best is None or score < best:
-            chosen, best, placed = template, score, holds
+    # Fields are read the way a URL is read, left to right: its path values
+    # first, then its query options in the order given. A list gathers every
+    # value, and for a single value the later field wins (sender=A then its
+    # alias from=B gives B; a query option always wins over a path value).
+    # The plugin works out whether the schema is the secure one by itself
+    arguments: dict[str, Any] = {"schema": schema}
 
-    url = chosen.replace("{schema}", schema)
-    for name in TEMPLATE_TOKEN_RE.findall(chosen):
-        value = _value_for(name, placeable, tokens)
-        if name != "schema" and value is not None:
-            meta = tokens.get(name, {})
-            path = name == "path" or meta.get("map_to", "").endswith("path")
-            text = _encoded(value, meta, path=path)
-            if path and "}{" + name + "}" in chosen:
-                # A path straight after the host starts with a slash
-                text = "/" + text.lstrip("/")
+    # Separate query options that together make one value
+    # (?from=me@example.com&name=Me can make "Me <me@example.com>"),
+    # combined below by the plugin
+    combined: dict[str, list[tuple[str, Any]]] = {}
 
-            if path and "{" + name + "}{" in chosen:
-                # Another token follows the path directly
-                text = text.rstrip("/") + "/"
+    # What each list holds from the URL path, kept apart from its query
+    # options so the plugin can work out the query part on its own
+    from_path: dict[str, list[str]] = {}
+    in_path = [item for item in given.items() if item[0] not in args]
+    in_query = [item for item in given.items() if item[0] in args]
+    for name, value in in_path + in_query:
+        for target, part in _aliased(
+            name, value, plugin, schema, info
+        ).items():
+            entry = _entry(target, info)
+            key = entry.get("map_to", target)
+            if name not in kwargs or name in args:
+                # Give the plugin the type its entry declares, the way
+                # parse_url() would: text for text and True/False for a
+                # switch (a form may send "no", or a number for text)
+                part = _typed(part, entry)
 
-            url = url.replace("{" + name + "}", text)
+            else:
+                # Each key/value option is text, the way a URL writes it
+                # (False is written no, and 15.0 is written 15)
+                part = {option: _text(text) for option, text in part.items()}
 
-    for pattern, replacement in EMPTY_PLACEHOLDERS:
-        url = pattern.sub(replacement, url)
+            if key in ("user", "password") and isinstance(part, str):
+                # The user and password are given as typed (see _fields()),
+                # but the plugin unquotes them as it would from a URL, so
+                # they are quoted here; a literal p%2F then stays p%2F
+                part = URLBase.quote(part, safe="")
 
-    # Keep the slash after the host even when there is no path, the way
-    # plugins write their own URLs
-    base, mark, rest = url.partition("?")
-    if "/" not in base.split("://", 1)[-1]:
-        url = base + "/" + mark + rest
+            elif key == "host" and isinstance(part, str):
+                # An IPv6 address is given in brackets, the way parse_url()
+                # gives it, so a port written after it is never read as
+                # part of the address
+                ipv6 = is_ipaddr(part, ipv4=False)
 
-    # Everything the template did not take goes into the query string
-    query = []
-    for name, value in given.items():
-        if name in placed:
-            continue
+                # is_hostname() is not used here.  Some services keep other
+                # text in the host (a sender domain, or a _ placeholder) and
+                # check it themselves.  Only text that would change the URL
+                # is refused.  A service that needs a real hostname refuses
+                # anything else when its URL is read back below
+                if not ipv6 and HOST_DELIMITER_RE.search(
+                    URLBase.unquote(part)
+                ):
+                    # Text such as example.org/hook or a@example.org would
+                    # spill into the path, query or login of the URL the
+                    # plugin writes. The plugin unquotes its host, so %2F
+                    # counts as a slash too
+                    logger.warning(
+                        "The %s:// field %s is not a valid host", schema, name
+                    )
+                    return None
 
-        if name in kwargs and name not in args:
-            prefix = kwargs[name].get("prefix", "+")
-            query.extend((prefix + str(k), _text(v)) for k, v in value.items())
-            continue
+                part = ipv6 or part
 
-        if (
-            name in args
-            and args[name].get("type") in ("int", "float")
-            and value == args[name].get("default")
-        ):
-            # A number left at its default is filled in by the service the
-            # way it writes it (cto=15 rather than cto=15.0)
-            continue
+            elif key == "port" and not (
+                isinstance(part, int)
+                and not isinstance(part, bool)
+                and entry.get("min", 1) <= part <= entry.get("max", 65535)
+            ):
+                # A port is a whole number in the range its entry allows;
+                # anything else would be dropped or cut down to another port
+                logger.warning(
+                    "The %s:// field %s is not a valid port", schema, name
+                )
+                return None
 
-        query.append((_query_name(name, args, tokens), _text(value)))
+            elif key == "fullpath" and isinstance(part, str):
+                # A path starts with a slash, the way parse_url() gives it;
+                # without one, hook would join the host (example.orghook).
+                # It is also encoded the way parse_url() does it, so a
+                # literal % reads back the same
+                part = quote_path(part if part.startswith("/") else "/" + part)
 
-    if query:
-        # A template may hold a query string of its own already
-        url += ("&" if "?" in url else "?") + "&".join(
-            "{}={}".format(
-                URLBase.quote(key, safe=""), URLBase.quote(text, safe="")
-            )
-            for key, text in query
-        )
+            if key in lists:
+                # Each entry is given as text, the way a URL path holds it
+                # (a topic number such as 123 would otherwise be dropped)
+                texts = [_text(item) for item in _as_list(part)]
+
+                prefix = entry.get("prefix")
+                if prefix and not entry.get("type", "").startswith("list"):
+                    # Keep the prefix that marks which kind of list member
+                    # this is (such as # for a channel)
+                    texts = [
+                        text if text.startswith(prefix) else prefix + text
+                        for text in texts
+                    ]
+
+                # A list gathers this value along with those before it
+                arguments[key] = arguments.get(key, []) + texts
+                if name in args:
+                    # One query option may replace another rather than add
+                    # to it (channel= wins over its alias mode=), so the
+                    # plugin reads them together below
+                    combined.setdefault(key, []).append((name, value))
+
+                else:
+                    from_path.setdefault(key, []).extend(texts)
+
+                continue
+
+            # A single value; a later field replaces an earlier one
+            arguments[key] = part
+            if name in args and name == target:
+                combined.setdefault(key, []).append((name, value))
+
+    for key, options in combined.items():
+        if len(options) > 1:
+            # Several options make up this one value; the plugin puts them
+            # together the way it does when reading a URL
+            found = _parsed(plugin, schema, options).get(key)
+            if not _empty(found):
+                # A list keeps its path values ahead of what the plugin
+                # read from the query, just as a URL holds them
+                arguments[key] = (
+                    from_path.get(key, [])
+                    + [_text(item) for item in _as_list(found)]
+                    if key in lists
+                    else found
+                )
+
+    # Aliases given as query options, checked once the plugin is built
+    aliases = [item for item in in_query if "alias_of" in args[item[0]]]
+
+    # Query options an alias may set as well. Values the host or path also
+    # fill (a token, or targets) are left to the fields themselves
+    implied = (
+        {
+            entry.get("map_to", name)
+            for name, entry in args.items()
+            if "alias_of" not in entry
+        }
+        - {entry.get("map_to", name) for name, entry in tokens.items()}
+        - set(arguments)
+    )
+
+    # Arguments the plugin can't do without, but nobody filled in
+    for name, empty in _defaults(plugin).items():
+        arguments.setdefault(name, empty)
+
+    # Keep validation quiet, and keep anything Apprise would store in
+    # memory so building a URL never writes a file
+    arguments["asset"] = AppriseAsset(
+        pem_autogen=False, pgp_autogen=False, storage_mode="memory"
+    )
+    try:
+        with quiet_logs():
+            obj = plugin(**arguments)
+
+            # The plugin writes its own URL, the same one it gives when loaded
+            url = obj.url()
+
+            # What the plugin reads back from that URL, when already known
+            read = None
+
+            # Reading an alias in a URL may set another query option too
+            # (?team= in Mattermost also picks its bot mode). Each alias is
+            # added to the URL the plugin writes, and any option it changes
+            # there is kept, unless a field already gives it
+            found = {}
+            if aliases and implied:
+                read = before = _parsed(plugin, schema, [], url)
+                for option in aliases:
+                    after = _parsed(plugin, schema, [option], url)
+                    found.update(
+                        {
+                            key: after[key]
+                            for key in implied
+                            if not _empty(after.get(key))
+                            and after[key] != before.get(key)
+                        }
+                    )
+
+            if found:
+                # Built again with what the aliases set, so its URL is new
+                obj = plugin(**{**arguments, **found})
+                url = obj.url()
+                read = None
+
+    except AppriseImproperlyConfigured:
+        # The plugin refused the values, so there is no URL to give
+        logger.debug("The %s:// fields could not be loaded", schema)
+        return None
+
+    # Some checks (such as needing a host) are made when a URL is read, not
+    # when the plugin is built, so json:// with no host would pass above.
+    # Only a URL the plugin can read back is given
+    if read is None:
+        with quiet_logs():
+            read = plugin.parse_url(url)
+
+    if not read:
+        logger.debug("The %s:// fields give a URL that can't be read", schema)
+        return None
 
     return url
 
 
-def _query_name(name: str, args: dict, tokens: dict) -> str:
-    """Return the query string name a field is written under."""
-    if name in args or name not in tokens:
-        return name
+def missing_fields(fields: dict[str, Any]) -> list[str]:
+    """Return fields missing from the closest matching URL template.
 
-    # A token the template has no place for is set by the argument that
-    # stands in for it, such as ?token= for a session token
-    key = tokens[name]["map_to"]
-    for arg, meta in args.items():
-        if meta.get("alias_of") == name or meta.get("map_to") == key:
-            return arg
+    - Aliases and list members satisfy their shared destination.
+    - A field the template can't do without counts, even when it is not
+      marked required (see ``needed`` below).
+    - A template that fixes a query option (``?mode=oauth2``) is skipped
+      when the fields set that option to something else.
+    - Fields that fill a template are checked with fields_to_url(). If no
+      URL comes of them, the fields of the next closest template of
+      another kind are named instead (such as FCM in OAuth2 mode).
+    - Return an empty list for unknown or disabled schemas, or complete
+      fields.
+    """
+    # Only a known service that is turned on can be filled in
+    schema = fields.get("schema") if isinstance(fields, dict) else None
+    plugin = _service(schema)
+    if plugin is None:
+        return []
 
-    return name
+    schema = schema.lower()
+    info = details(plugin)
+    tokens = info["tokens"]
+
+    # The values the fields already fill in, and the fields that do so
+    given = set()
+    usable = {"schema": schema}
+
+    # The query options the fields set, such as {"mode": "oauth2"}
+    chosen: dict[str, str] = {}
+    for name, value in fields.items():
+        if (
+            name == "schema"
+            or not isinstance(name, str)
+            or _empty(value)
+            or not _fits(name, value, info)
+        ):
+            # Nothing to fill in, not a field name at all, or a value that
+            # fields_to_url() would refuse (such as a list inside a list)
+            continue
+
+        if name in tokens or name in info["args"] or name in info["kwargs"]:
+            # Kept for the check below that the fields really make a URL
+            usable[name] = value
+
+        if name in info["args"]:
+            # An alias sets the option it stands for
+            for target in _alias_targets(info["args"][name]) or (name,):
+                chosen[target] = _text(value).lower()
+
+        # An alias fills in the value it stands for
+        for target in _aliased(name, value, plugin, schema, info):
+            given.add(_entry(target, info).get("map_to", target))
+
+    # The fields of each template, so a template can be compared with others
+    slots = [
+        [
+            name
+            for name in dict.fromkeys(TEMPLATE_TOKEN_RE.findall(template))
+            if name != "schema"
+        ]
+        for template in info["templates"]
+    ]
+    shapes = {frozenset(names) for names in slots}
+
+    def needed(name: str, names: list[str]) -> bool:
+        """Whether a template can't do without a field.
+
+        - A required field with no default is always needed.
+        - Another field is needed unless it has a default, or the service
+          lists the same template without it (``:{port}``, ``/{targets}``).
+          A service listing ``{apikey}@`` or ``{user}:{password}@`` in every
+          template needs one of them, although neither is marked required.
+        """
+        entry = tokens.get(name, {})
+        if entry.get("default") is not None:
+            # The plugin fills it in by itself
+            return False
+
+        if entry.get("required"):
+            return True
+
+        # Needed unless the same template is listed without it
+        return frozenset(names) - {name} not in shapes
+
+    # Each template, as (score, the fields it is missing, the values it
+    # holds, the values it can't do without)
+    ranked = []
+    for template, names in zip(info["templates"], slots):
+        # A template may fix a query option (FCM's ?mode=oauth2). One fixed
+        # to another value than the fields chose is for another setting, so
+        # it is left out (FCM in OAuth2 mode never needs an apikey)
+        query = template.partition("?")[2]
+        fixed = dict(
+            pair.split("=", 1)
+            for pair in query.split("&")
+            if "=" in pair and "{" not in pair.split("=", 1)[1]
+        )
+        if any(
+            chosen.get(option, value.lower()) != value.lower()
+            for option, value in fixed.items()
+        ):
+            continue
+
+        values = [tokens.get(name, {}).get("map_to", name) for name in names]
+        missing = [
+            name
+            for name, value in zip(names, values)
+            if value not in given and needed(name, names)
+        ]
+        # How many of the given values this template has a place for. A
+        # field with a default (such as a path) is optional everywhere, so
+        # it doesn't pull in a longer template (user, password, port...)
+        # just because that one lists it
+        placed = sum(
+            value in given
+            for name, value in zip(names, values)
+            if tokens.get(name, {}).get("default") is None
+        )
+        if not placed:
+            # A template none of the fields fit still needs all of them
+            missing = names
+
+        # A lower score is better: a template the fields fit, missing the
+        # fewest fields, holding the most values, then the shortest one
+        score = (placed == 0, len(missing), -placed, len(names))
+        core = {
+            value for name, value in zip(names, values) if needed(name, names)
+        }
+        ranked.append((score, missing, set(values), core))
+
+    # Best first; templates that score the same keep the order the plugin
+    # lists them in
+    ranked.sort(key=lambda entry: entry[0])
+    if not ranked:
+        # A service with no templates has nothing to be missing
+        return []
+
+    if ranked[0][1]:
+        return ranked[0][1]
+
+    # Every field the closest template needs is there. Make sure they really
+    # make a URL; a setting can call for another template (FCM's
+    # mode=oauth2 needs a project and keyfile, not an apikey)
+    with quiet_logs():
+        if fields_to_url(usable) is not None:
+            return []
+
+    # Offer the next closest template of another kind: one without a place
+    # for something the closest one can't do without (a project and keyfile
+    # in place of an apikey). A template that only adds to it (a login on
+    # top of the same host) can't fix a value that was refused, so in that
+    # case nothing is reported missing
+    core = ranked[0][3]
+    return next(
+        (
+            missing
+            for _, missing, values, _ in ranked
+            if missing and not core <= values
+        ),
+        [],
+    )

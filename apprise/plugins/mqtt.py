@@ -52,6 +52,8 @@ try:
     # 3rd party modules
     import paho.mqtt.client as mqtt
     from paho.mqtt.client import CallbackAPIVersion as _MQTTCallbackAPI
+    from paho.mqtt.packettypes import PacketTypes
+    from paho.mqtt.properties import Properties
 
     # We're good to go!
     NOTIFY_MQTT_SUPPORT_ENABLED = True
@@ -137,6 +139,8 @@ class NotifyMQTT(NotifyBase):
 
     # Define object templates
     templates = (
+        "{schema}://{host}/{topic}",
+        "{schema}://{host}:{port}/{topic}",
         "{schema}://{user}@{host}/{topic}",
         "{schema}://{user}@{host}:{port}/{topic}",
         "{schema}://{user}:{password}@{host}/{topic}",
@@ -160,13 +164,11 @@ class NotifyMQTT(NotifyBase):
             "user": {
                 "name": _("User Name"),
                 "type": "string",
-                "required": True,
             },
             "password": {
                 "name": _("Password"),
                 "type": "string",
                 "private": True,
-                "required": True,
             },
             "topic": {
                 "name": _("Target Queue"),
@@ -315,10 +317,14 @@ class NotifyMQTT(NotifyBase):
             raise AppriseImproperlyConfigured(msg) from None
 
         # Our MQTT Client Object
+        # MQTT v5 does not take a clean session here; it asks for a clean
+        # start when it connects instead (see send())
         self.client = mqtt.Client(
             _MQTTCallbackAPI.VERSION2,
             client_id=self.client_id,
-            clean_session=not self.session,
+            clean_session=(
+                None if self.mqtt_protocol == mqtt.MQTTv5 else not self.session
+            ),
             userdata=None,
             protocol=self.mqtt_protocol,
             transport=self.mqtt_transport,
@@ -384,12 +390,27 @@ class NotifyMQTT(NotifyBase):
                     # Set our TLS Verify Flag
                     self.client.tls_insecure_set(not self.verify_certificate)
 
+                options = {}
+                if self.mqtt_protocol == mqtt.MQTTv5:
+                    # MQTT v5 asks for a clean start (no saved session) when
+                    # it connects, unless session=yes was given
+                    options["clean_start"] = not self.session
+
+                    if self.session:
+                        # A v5 session ends when the connection closes
+                        # unless it is given a lifetime; 0xFFFFFFFF means it
+                        # never expires, the same as a v3 saved session
+                        properties = Properties(PacketTypes.CONNECT)
+                        properties.SessionExpiryInterval = 0xFFFFFFFF
+                        options["properties"] = properties
+
                 # Establish our connection
                 if (
                     self.client.connect(
                         self.host,
                         port=self.port,
                         keepalive=self.mqtt_keepalive,
+                        **options,
                     )
                     != mqtt.MQTT_ERR_SUCCESS
                 ):

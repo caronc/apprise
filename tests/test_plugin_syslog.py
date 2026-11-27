@@ -160,3 +160,72 @@ def test_plugin_syslog_edge_cases(openlog, syslog):
 
     with pytest.raises(AppriseImproperlyConfigured):
         NotifySyslog(facility=object)
+
+
+@mock.patch("syslog.syslog")
+@mock.patch("syslog.openlog")
+def test_plugin_syslog_opened_on_send(mock_openlog, mock_syslog):
+    """Syslog is set up when a message is sent, not when the URL loads."""
+    obj = apprise.Apprise.instantiate("syslog://local5?logpid=no")
+    assert isinstance(obj, NotifySyslog)
+
+    # Loading the URL leaves the program's syslog settings alone
+    assert mock_openlog.call_count == 0
+
+    # Sending applies this URL's own settings first
+    assert obj.notify("body") is True
+    mock_openlog.assert_called_once_with(
+        obj.app_id, logoption=0, facility=syslog.LOG_LOCAL5
+    )
+
+
+@mock.patch("syslog.syslog")
+@mock.patch("syslog.openlog")
+def test_plugin_syslog_rejected_send_untouched(mock_openlog, mock_syslog):
+    """A send with an unknown type leaves syslog settings alone."""
+    obj = apprise.Apprise.instantiate("syslog://local5")
+    assert obj.notify("body", notify_type="invalid") is False
+    assert mock_openlog.call_count == 0
+    assert mock_syslog.call_count == 0
+
+
+def test_plugin_syslog_parallel_sends_keep_settings():
+    """Sends running at the same time each log with their own facility."""
+    from concurrent.futures import ThreadPoolExecutor
+    import time
+
+    # Stand in for the program-wide setting that openlog() changes
+    state = {}
+    logged = []
+
+    def fake_openlog(ident, logoption=0, facility=0):
+        state["facility"] = facility
+        # Give another send the chance to cut in before syslog()
+        time.sleep(0.001)
+
+    def fake_syslog(level, body):
+        logged.append((body, state["facility"]))
+
+    objs = {
+        "local1": apprise.Apprise.instantiate("syslog://local1"),
+        "local2": apprise.Apprise.instantiate("syslog://local2"),
+    }
+    expected = {
+        "local1": syslog.LOG_LOCAL1,
+        "local2": syslog.LOG_LOCAL2,
+    }
+    with (
+        mock.patch("syslog.openlog", side_effect=fake_openlog),
+        mock.patch("syslog.syslog", side_effect=fake_syslog),
+        ThreadPoolExecutor(max_workers=8) as pool,
+    ):
+        jobs = [
+            pool.submit(objs[name].send, name)
+            for _ in range(25)
+            for name in objs
+        ]
+        assert all(job.result() for job in jobs)
+
+    assert len(logged) == 50
+    for body, facility in logged:
+        assert facility == expected[body]

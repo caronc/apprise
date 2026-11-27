@@ -586,3 +586,31 @@ def test_plugin_eight00com_apprise_integration(mock_post):
     )
     assert bool(a2.notify(body="Integration test 2")) is True
     assert mock_post.call_count == 1
+
+
+@mock.patch("requests.post")
+def test_plugin_eight00com_invalid_recipients_kept(mock_post):
+    """Refused phone numbers never fall back to messaging ourselves."""
+
+    # Shared (but valid) credentials for every object below
+    kwargs = {"token": "abc123", "source": "15551232000"}
+
+    # No phone numbers given, so we message ourselves
+    obj = NotifyEight00com(targets=None, **kwargs)
+    assert obj.targets == ["15551232000"]
+
+    # Only separators given is the same as giving no phone numbers
+    obj = NotifyEight00com(targets=";, ,", **kwargs)
+    assert obj.targets == ["15551232000"]
+    obj = Apprise.instantiate(obj.url())
+    assert obj.targets == ["15551232000"]
+
+    # Every phone number refused leaves nobody to notify
+    obj = NotifyEight00com(targets=["abcd", "123"], **kwargs)
+    assert obj.targets == []
+
+    # Loading our URL again still leaves nobody to notify
+    obj = Apprise.instantiate(obj.url())
+    assert obj.targets == []
+    assert obj.notify("body") is False
+    assert mock_post.call_count == 0

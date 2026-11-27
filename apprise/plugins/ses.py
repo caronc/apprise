@@ -290,6 +290,9 @@ class NotifySES(NotifyBase):
         # Acquire Email 'To'
         self.targets = []
 
+        # Recipients that are not valid email addresses, kept for url()
+        self.invalid_targets = []
+
         # Acquire Carbon Copies
         self.cc = set()
 
@@ -343,9 +346,12 @@ class NotifySES(NotifyBase):
                 result["full_email"],
             )
 
-        if targets:
+        # Text holding only separators (such as ;) names nobody, and counts
+        # the same as giving no recipients at all
+        recipients = parse_emails(targets)
+        if recipients:
             # Validate recipients (to:) and drop bad ones:
-            for recipient in parse_emails(targets):
+            for recipient in recipients:
                 result = is_email(recipient)
                 if result:
                     self.targets.append(
@@ -357,8 +363,9 @@ class NotifySES(NotifyBase):
                     continue
 
                 self.logger.warning(
-                    f"Dropped invalid To email ({recipient}) specified.",
+                    "Dropped invalid To email (%s) specified.", recipient
                 )
+                self.invalid_targets.append(recipient)
 
         else:
             # If our target email list is empty we want to add ourselves to it
@@ -874,7 +881,7 @@ class NotifySES(NotifyBase):
 
         # a simple boolean check as to whether we display our target emails
         # or not
-        has_targets = not (
+        has_targets = self.invalid_targets or not (
             len(self.targets) == 1 and self.targets[0][1] == self.from_addr
         )
 
@@ -920,6 +927,13 @@ class NotifySES(NotifyBase):
                                 safe="",
                             )
                             for e in self.targets
+                        ]
+                        # Recipients that were dropped are written back too, so
+                        # the URL still reads as having recipients rather than
+                        # falling back to the sender's own address
+                        + [
+                            NotifySES.quote(target, safe="")
+                            for target in self.invalid_targets
                         ]
                     )
                 ),

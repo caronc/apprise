@@ -47,14 +47,19 @@
 #
 # {user}@{domain} forms the sender. Without a target, it is also the recipient.
 #
-from email.utils import formataddr
 
 import requests
 
 from ..common import NotifyFormat, NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import is_email, parse_bool, parse_emails, validate_regex
+from ..utils.parse import (
+    formataddr,
+    is_email,
+    parse_bool,
+    parse_emails,
+    validate_regex,
+)
 from .base import NotifyBase
 
 # Provide some known codes Mailgun uses and what they translate to:
@@ -236,6 +241,9 @@ class NotifyMailgun(NotifyBase):
         # Acquire Email 'To'
         self.targets = []
 
+        # Recipients that are not valid email addresses, kept for url()
+        self.invalid_targets = []
+
         # Acquire Carbon Copies
         self.cc = set()
 
@@ -292,9 +300,13 @@ class NotifyMailgun(NotifyBase):
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
 
-        if targets:
+        # Text holding only separators (such as ;) names nobody, and counts
+        # the same as giving no recipients at all
+        recipients = parse_emails(targets)
+
+        if recipients:
             # Validate recipients (to:) and drop bad ones:
-            for recipient in parse_emails(targets):
+            for recipient in recipients:
                 result = is_email(recipient)
                 if result:
                     self.targets.append(
@@ -306,8 +318,9 @@ class NotifyMailgun(NotifyBase):
                     continue
 
                 self.logger.warning(
-                    f"Dropped invalid To email ({recipient}) specified.",
+                    "Dropped invalid To email (%s) specified.", recipient
                 )
+                self.invalid_targets.append(recipient)
 
         else:
             # If our target email list is empty we want to add ourselves to it
@@ -679,7 +692,7 @@ class NotifyMailgun(NotifyBase):
 
         # a simple boolean check as to whether we display our target emails
         # or not
-        has_targets = not (
+        has_targets = self.invalid_targets or not (
             len(self.targets) == 1
             and self.targets[0] == (False, self.from_addr[1])
         )
@@ -701,6 +714,13 @@ class NotifyMailgun(NotifyBase):
                             safe="",
                         )
                         for e in self.targets
+                    ]
+                    # Recipients that were dropped are written back too, so
+                    # the URL still reads as having recipients rather than
+                    # falling back to the sender's own address
+                    + [
+                        NotifyMailgun.quote(x, safe="")
+                        for x in self.invalid_targets
                     ]
                 )
             ),

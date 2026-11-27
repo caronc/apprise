@@ -236,6 +236,8 @@ apprise_url_tests = (
             # an invalid to email
             "instance": NotifySendPulse,
             "requests_response_text": SENDPULSE_GOOD_RESPONSE,
+            # The only recipient is invalid, so there is no one to email
+            "notify_response": False,
         },
     ),
     (
@@ -856,3 +858,45 @@ def test_plugin_sendpulse_attachments(mock_post):
             )
             is False
         )
+
+
+@mock.patch("requests.post")
+def test_plugin_sendpulse_invalid_recipients_kept(mock_post):
+    """NotifySendPulse() keeps invalid recipients so url() never targets
+    self."""
+
+    def build(targets):
+        return NotifySendPulse(
+            user="user",
+            host="example.com",
+            client_id="abcd",
+            client_secret="abcd123",
+            targets=targets,
+        )
+
+    # No recipients given, so the sender is emailed
+    obj = build(None)
+    assert obj.targets == ["user@example.com"]
+    obj2 = Apprise.instantiate(obj.url(privacy=False))
+    assert obj2.targets == ["user@example.com"]
+
+    # Separators alone count the same as no recipients at all
+    obj = build(";, ,")
+    assert obj.targets == ["user@example.com"]
+    obj2 = Apprise.instantiate(obj.url(privacy=False))
+    assert obj2.targets == ["user@example.com"]
+
+    # Every recipient is invalid, so nobody is emailed
+    obj = build(["invalid", "bad@"])
+    assert obj.targets == []
+    assert obj.invalid_targets == ["invalid", "bad@"]
+    assert len(obj) == 1
+
+    # Reading the URL back still emails nobody, never the sender
+    obj2 = Apprise.instantiate(obj.url(privacy=False))
+    assert obj2.targets == []
+    assert obj2.invalid_targets == ["invalid", "bad@"]
+
+    # Sending fails without contacting the server at all
+    assert obj2.notify(body="body") is False
+    assert mock_post.call_count == 0

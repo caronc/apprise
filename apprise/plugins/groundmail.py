@@ -64,7 +64,6 @@
 
 from __future__ import annotations
 
-from email.utils import formataddr
 from json import dumps
 import logging
 from typing import Any, Optional
@@ -77,7 +76,7 @@ from ..common import NotifyFormat, NotifyType
 from ..conversion import convert_between
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..utils.parse import is_email, parse_emails, validate_regex
+from ..utils.parse import formataddr, is_email, parse_emails, validate_regex
 from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
@@ -228,6 +227,9 @@ class NotifyGroundmail(NotifyBase):
         # Acquire Targets (To Emails)
         self.targets = []
 
+        # Recipients that are not valid email addresses, kept for url()
+        self.invalid_targets = []
+
         # Acquire Carbon Copies
         self.cc = set()
 
@@ -271,6 +273,8 @@ class NotifyGroundmail(NotifyBase):
                 self.logger.warning(
                     "Dropped invalid email (%s) specified.", recipient
                 )
+                self.invalid_targets.append(recipient)
+
         else:
             # If our target email list is empty we want to add ourselves to it
             self.targets.append(self.from_addr[1])
@@ -367,7 +371,7 @@ class NotifyGroundmail(NotifyBase):
 
         # a simple boolean check as to whether we display our target emails
         # or not
-        has_targets = not (
+        has_targets = self.invalid_targets or not (
             len(self.targets) == 1 and self.targets[0] == self.from_addr[1]
         )
 
@@ -385,6 +389,13 @@ class NotifyGroundmail(NotifyBase):
                 if not has_targets
                 else "/".join(
                     [NotifyGroundmail.quote(x, safe="@") for x in self.targets]
+                    # Recipients that were dropped are written back too, so
+                    # the URL still reads as having recipients rather than
+                    # falling back to the sender's own address
+                    + [
+                        NotifyGroundmail.quote(x, safe="")
+                        for x in self.invalid_targets
+                    ]
                 )
             ),
             params=NotifyGroundmail.urlencode(params),

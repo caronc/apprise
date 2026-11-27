@@ -148,6 +148,16 @@ class NotifyXBMC(NotifyBase):
             else duration
         )
 
+        # Pick the remote protocol from the schema (kodi:// or xbmc://)
+        # when none was given; this must happen before the schema is
+        # replaced with http/https below
+        self.protocol = kwargs.get(
+            "protocol",
+            self.kodi_remote_protocol
+            if self.schema.startswith("kodi")
+            else self.xbmc_remote_protocol,
+        )
+
         # Build our schema
         self.schema = "https" if self.secure else "http"
 
@@ -156,9 +166,6 @@ class NotifyXBMC(NotifyBase):
             "User-Agent": self.app_id,
             "Content-Type": "application/json",
         }
-
-        # Default protocol
-        self.protocol = kwargs.get("protocol", self.xbmc_remote_protocol)
 
         # Track whether or not we want to send an image with our notification
         # or not.

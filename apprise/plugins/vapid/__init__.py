@@ -606,11 +606,16 @@ class NotifyVapid(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
+        # The subscriber is left out when it is the only target, since a
+        # URL with no targets notifies the subscriber anyway. Not when some
+        # were refused: those are written below, and alone they would read
+        # back as nobody instead of the subscriber
         targets = (
             self.targets
             if not (
-                self.targets == 1
+                len(self.targets) == 1
                 and self.targets[0].lower() == self.subscriber.lower()
+                and not self._invalid_targets
             )
             else []
         )
@@ -619,7 +624,9 @@ class NotifyVapid(NotifyBase):
             subscriber=NotifyVapid.quote(self.subscriber, safe="@"),
             targets="/".join(
                 chain(
-                    [str(t) for t in targets],
+                    # Each target is quoted as one path segment, so a name
+                    # such as team/red is not read back as team and red
+                    [NotifyVapid.quote(str(t), safe="@") for t in targets],
                     [
                         NotifyVapid.quote(x, safe="@")
                         for x in self._invalid_targets

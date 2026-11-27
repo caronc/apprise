@@ -9641,3 +9641,27 @@ def test_plugin_matrix_markdown_escapes():
     assert obj.dialect_convert("a \\& b\nnext", NotifyFormat.MARKDOWN) == (
         "<p>a &amp; b\nnext</p>"
     )
+
+
+def test_plugin_matrix_refused_setup_cleans_up_quietly():
+    """A refused setup leaves nothing for __del__() to trip over."""
+    with mock.patch("sys.unraisablehook") as hook:
+        with pytest.raises(AppriseImproperlyConfigured):
+            NotifyMatrix(host="localhost", tz="/etc/passwd")
+
+        gc.collect()
+
+    assert hook.call_count == 0
+
+
+def test_plugin_matrix_target_with_slash_kept_whole():
+    """A room or user name holding a slash reads back as one target."""
+    obj = Apprise.instantiate(
+        "matrix://user:pass@localhost/%23team%2Fred/%40ops%2Fbot:localhost"
+    )
+    url = obj.url(privacy=False)
+    assert "%23team%2Fred" in url
+
+    again = Apprise.instantiate(url)
+    assert again.rooms == ["#team/red"]
+    assert again.users == ["@ops/bot:localhost"]

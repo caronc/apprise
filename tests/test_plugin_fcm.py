@@ -225,6 +225,13 @@ apprise_url_tests = (
         },
     ),
     (
+        "fcm://project_id?to=device&mode=oauth2&keyfile=invalid://path",
+        {
+            # a keyfile scheme that can't be loaded
+            "instance": AppriseImproperlyConfigured,
+        },
+    ),
+    (
         "fcm://project_id?to=device&mode=oauth2&keyfile=/invalid/path",
         {
             # Same test as above except we explicitly set our oauth2 mode
@@ -923,6 +930,34 @@ def test_plugin_fcm_bad_keyfile_parse():
     path = os.path.join(PRIVATE_KEYFILE_DIR, "service_account-bad-type.json")
     oauth = GoogleOAuth()
     assert oauth.load(path) is False
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
+def test_plugin_fcm_rejected_keyfile_not_logged(caplog):
+    """A rejected keyfile reference is never logged or raised."""
+    keyfile = "invalid://user:topsecret@localhost/key.json?sig=signedvalue"
+    with (
+        caplog.at_level(logging.DEBUG, logger="apprise"),
+        pytest.raises(AppriseImproperlyConfigured) as error,
+    ):
+        NotifyFCM(
+            project="myproject",
+            apikey=None,
+            mode="oauth2",
+            keyfile=keyfile,
+            targets=["device"],
+        )
+
+    # The attachment layer masks the password in what it logs
+    assert "topsecret" not in caplog.text
+
+    # The FCM error names neither the keyfile nor anything in it
+    for record in caplog.records:
+        if "FCM" in record.getMessage():
+            assert "localhost" not in record.getMessage()
+    assert "localhost" not in str(error.value)
 
 
 @pytest.mark.skipif(

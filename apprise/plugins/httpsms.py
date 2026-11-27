@@ -145,7 +145,8 @@ class NotifyHttpSMS(NotifyBase):
         # Parse our targets
         self.targets = []
 
-        has_error = False
+        # Keep refused phone numbers so url() can write them back
+        self.invalid_targets = []
         for target in parse_phone_no(targets):
             # Parse each phone number we found
             result = is_phone_no(target)
@@ -153,12 +154,14 @@ class NotifyHttpSMS(NotifyBase):
                 self.targets.append(result["full"])
                 continue
 
-            has_error = True
+            self.invalid_targets.append(target)
             self.logger.warning(
                 f"Dropped invalid phone # ({target}) specified.",
             )
 
-        if not targets and not has_error:
+        # Fall back to ourselves only when no phone numbers were given.
+        # If every number given was refused, there is nobody to notify
+        if not self.targets and not self.invalid_targets:
             # Default the SMS Message to ourselves
             self.targets.append(self.source)
 
@@ -285,10 +288,12 @@ class NotifyHttpSMS(NotifyBase):
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         # A nice way of cleaning up the URL length a bit
+        # Refused phone numbers are written back after the valid ones
+        # so that loading this URL again still has nobody to notify
         targets = (
             []
-            if len(self.targets) == 1 and self.targets[0] == self.source
-            else self.targets
+            if self.targets == [self.source] and not self.invalid_targets
+            else self.targets + self.invalid_targets
         )
 
         return "{schema}://{apikey}@{source}/{targets}?{params}".format(

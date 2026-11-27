@@ -286,28 +286,21 @@ class NotifyTwitter(NotifyBase):
         # Prepare Image Batch Mode Flag
         self.batch = batch
 
-        # Track any errors
-        has_error = False
-
         # Identify our targets
         self.targets = []
+
+        # Users we could not make sense of; kept so url() can write them back
+        self.invalid_targets = []
         for target in parse_list(targets):
             match = IS_USER.match(target)
             if match and match.group("user"):
                 self.targets.append(match.group("user"))
                 continue
 
-            has_error = True
             self.logger.warning(
-                f"Dropped invalid Twitter user ({target}) specified.",
+                "Dropped invalid Twitter user (%s) specified.", target
             )
-
-        if has_error and not self.targets:
-            # We have specified that we want to notify one or more individual
-            # and we failed to load any of them.  Since it's also valid to
-            # notify no one at all (which means we notify ourselves), it's
-            # important we don't switch from the users original intentions
-            self.targets = None
+            self.invalid_targets.append(target)
 
         # Initialize our cache values
         self._whoami_cache = None
@@ -325,7 +318,11 @@ class NotifyTwitter(NotifyBase):
     ):
         """Perform Twitter Notification."""
 
-        if self.targets is None:
+        if not self.targets and self.invalid_targets:
+            # We have specified that we want to notify one or more individual
+            # and we failed to load any of them.  Since it's also valid to
+            # notify no one at all (which means we notify ourselves), it's
+            # important we don't switch from the users original intentions
             self.logger.warning("No valid Twitter targets to notify.")
             return False
 
@@ -926,15 +923,17 @@ class NotifyTwitter(NotifyBase):
                 asecret=self.pprint(
                     self.asecret, privacy, mode=PrivacyMode.Secret, safe=""
                 ),
-                targets=(
-                    "/".join(
-                        [
-                            NotifyTwitter.quote(f"@{target}", safe="@")
-                            for target in self.targets
-                        ]
-                    )
-                    if self.targets
-                    else ""
+                # Invalid users follow the valid ones so they are refused
+                # again on reload instead of falling back to ourselves
+                targets="/".join(
+                    [
+                        NotifyTwitter.quote(f"@{target}", safe="@")
+                        for target in self.targets
+                    ]
+                    + [
+                        NotifyTwitter.quote(target, safe="@")
+                        for target in self.invalid_targets
+                    ]
                 ),
                 params=NotifyTwitter.urlencode(params),
             )

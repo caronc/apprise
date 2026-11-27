@@ -170,25 +170,30 @@ class NotifyVoipms(NotifyBase):
         # Parse our targets
         self.targets = []
 
-        if targets:
-            for target in parse_phone_no(targets):
-                # Validate targets and drop bad ones:
-                result = is_phone_no(target)
+        # Keep refused phone numbers so url() can write them back
+        self.invalid_targets = []
 
-                # Target Phone # only supports +1 country code
-                if (
-                    result["country"]
-                    and result["country"] != self.voip_ms_country_code
-                ):
-                    self.logger.warning(
-                        f"Ignoring invalid phone # ({target}) specified.",
-                    )
-                    continue
+        for target in parse_phone_no(targets):
+            # Validate targets and drop bad ones:
+            result = is_phone_no(target)
 
-                # store valid phone number
-                self.targets.append(result["area"] + result["line"])
+            # Keep valid North American phone numbers only.
+            if not result or (
+                result["country"]
+                and result["country"] != self.voip_ms_country_code
+            ):
+                self.logger.warning(
+                    f"Ignoring invalid phone # ({target}) specified.",
+                )
+                self.invalid_targets.append(target)
+                continue
 
-        else:
+            # store valid phone number
+            self.targets.append(result["area"] + result["line"])
+
+        # Fall back to ourselves only when no phone numbers were given.
+        # If every number given was refused, there is nobody to notify
+        if not self.targets and not self.invalid_targets:
             # Send a message to ourselves
             self.targets.append(self.source)
 
@@ -356,10 +361,17 @@ class NotifyVoipms(NotifyBase):
             password=self.pprint(self.password, privacy, safe=""),
             from_phone=self.voip_ms_country_code
             + self.pprint(self.source, privacy, safe=""),
+            # Refused phone numbers are written back as they were given,
+            # after the valid ones, so loading this URL again still has
+            # nobody to notify
             targets="/".join(
                 [
                     self.voip_ms_country_code + NotifyVoipms.quote(x, safe="")
                     for x in self.targets
+                ]
+                + [
+                    NotifyVoipms.quote(x, safe="")
+                    for x in self.invalid_targets
                 ]
             ),
             params=NotifyVoipms.urlencode(params),

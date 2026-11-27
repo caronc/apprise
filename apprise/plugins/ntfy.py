@@ -49,7 +49,6 @@ from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
     is_hostname,
-    is_ipaddr,
     parse_bool,
     parse_list,
     validate_regex,
@@ -336,15 +335,25 @@ class NotifyNtfy(NotifyBase):
         """Initialize ntfy Object."""
         super().__init__(**kwargs)
 
-        # Prepare our mode
-        self.mode = (
-            mode.strip().lower()
-            if isinstance(mode, str)
-            else self.template_args["mode"]["default"]
-        )
+        # Infer the mode from whether a private host was supplied.
+        if isinstance(mode, str):
+            self.mode = mode.strip().lower()
+
+        elif self.host:
+            self.mode = self.template_args["mode"]["default"]
+
+        else:
+            self.mode = NtfyMode.CLOUD
 
         if self.mode not in NTFY_MODES:
             msg = f"An invalid ntfy Mode ({mode}) was specified."
+            self.logger.warning(msg)
+            raise AppriseImproperlyConfigured(msg)
+
+        if self.mode == NtfyMode.PRIVATE and not self.host:
+            # A self-hosted server can't be reached without its address.
+            # Its URL would otherwise read the first topic as the server
+            msg = "A self-hosted (private) ntfy server requires a host."
             self.logger.warning(msg)
             raise AppriseImproperlyConfigured(msg)
 
@@ -938,6 +947,13 @@ class NotifyNtfy(NotifyBase):
         # Acquire our targets/topics
         results["targets"] = NotifyNtfy.split_path(results["fullpath"])
 
+        # Only path topics affect automatic mode detection.
+        path_topics = bool(results["targets"])
+
+        # A login (user, password or token) written before the host always
+        # means a self-hosted server
+        login = bool(results["user"] or results["password"])
+
         # The 'to' makes it easier to use yaml configuration
         if "to" in results["qsd"] and len(results["qsd"]["to"]):
             results["targets"] += NotifyNtfy.parse_list(results["qsd"]["to"])
@@ -997,13 +1013,8 @@ class NotifyNtfy(NotifyBase):
             # specify the mode= flag
             results["mode"] = (
                 NtfyMode.PRIVATE
-                if (
-                    (
-                        is_hostname(results["host"])
-                        or is_ipaddr(results["host"])
-                    )
-                    and results["targets"]
-                )
+                # is_hostname() accepts an IP address too
+                if is_hostname(results["host"]) and (path_topics or login)
                 else NtfyMode.CLOUD
             )
 
@@ -1020,10 +1031,10 @@ class NotifyNtfy(NotifyBase):
             # our own; reporting one would read the first topic twice
             results["host"] = None
 
-        elif results["mode"] == NtfyMode.PRIVATE and not (
-            is_hostname(results["host"] or is_ipaddr(results["host"]))
+        elif results["mode"] == NtfyMode.PRIVATE and not is_hostname(
+            results["host"]
         ):
-            # Invalid Host for NtfyMode.PRIVATE
+            # Invalid Host (or IP address) for NtfyMode.PRIVATE
             return None
 
         return results

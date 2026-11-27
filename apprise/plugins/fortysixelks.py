@@ -158,16 +158,23 @@ class Notify46Elks(NotifyBase):
         # Parse our targets
         self.targets = []
 
+        # Phone numbers that are not valid, kept so url() writes them back
+        self.invalid_targets = []
+
+        # Text holding only separators (such as ;) names nobody, and counts
+        # the same as giving no phone numbers at all
+        targets = parse_phone_no(targets)
         if not targets and is_phone_no(self.source):
             targets = [self.source]
 
-        for target in parse_phone_no(targets):
+        for target in targets:
             # Validate targets and drop bad ones:
             result = is_phone_no(target)
             if not result:
                 self.logger.warning(
-                    f"Dropped invalid phone # ({target}) specified.",
+                    "Dropped invalid phone # (%s) specified.", target
                 )
+                self.invalid_targets.append(target)
                 continue
 
             # store valid phone number
@@ -306,8 +313,13 @@ class Notify46Elks(NotifyBase):
             pw=self.pprint(
                 self.password, privacy, mode=PrivacyMode.Secret, safe=""
             ),
+            # Phone numbers that were dropped are written back too, so the
+            # URL never reads as having none (which sends to the source)
             targets="/".join(
-                [Notify46Elks.quote(x, safe="+") for x in targets]
+                [
+                    Notify46Elks.quote(x, safe="+")
+                    for x in targets + self.invalid_targets
+                ]
             ),
             params=Notify46Elks.urlencode(params),
         )

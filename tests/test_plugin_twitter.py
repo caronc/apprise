@@ -1624,3 +1624,27 @@ def test_plugin_twitter_mode_case():
     obj2 = Apprise.instantiate(obj.url())
     assert isinstance(obj2, NotifyTwitter)
     assert obj2.mode == "dm"
+
+
+@patch("requests.post")
+def test_plugin_twitter_invalid_recipients_kept(mock_post):
+    """Invalid users never turn into a message to ourselves."""
+    base = "twitter://ckey/csecret/akey/asecret"
+
+    # No users given (or only separators); we notify ourselves
+    for url in (base, base + "?to=,%20,"):
+        obj = Apprise.instantiate(url)
+        assert obj.targets == []
+        assert obj.invalid_targets == []
+        assert len(obj) == 1
+
+    # Every user is invalid; nobody is notified, even after a round trip
+    obj = Apprise.instantiate(base + "/-/%25?mode=dm")
+    obj2 = Apprise.instantiate(obj.url(privacy=False))
+    for o in (obj, obj2):
+        assert o.targets == []
+        assert o.invalid_targets == ["%", "-"]
+        assert len(o) == 1
+        assert o.notify(body="hello") is False
+
+    assert mock_post.call_count == 0

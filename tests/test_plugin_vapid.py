@@ -216,6 +216,43 @@ def test_plugin_vapid_urls():
 @pytest.mark.skipif(
     "cryptography" not in sys.modules, reason="Requires cryptography"
 )
+def test_plugin_vapid_subscriber_left_out_of_url():
+    """url() leaves out the subscriber only when it is all there is."""
+    # The subscriber alone is not written; reloading notifies it anyway
+    obj = NotifyVapid(
+        subscriber="sub@example.net", targets=["sub@example.net"]
+    )
+    assert obj.url(privacy=False).startswith("vapid://sub@example.net/?")
+
+    # Once another target was refused, the subscriber is written with it,
+    # or the URL would read back as the refused target alone
+    obj = NotifyVapid(
+        subscriber="sub@example.net", targets=["sub@example.net", "gone"]
+    )
+    obj.targets.remove("gone")
+    obj._invalid_targets.append("gone")
+    again = Apprise.instantiate(obj.url(privacy=False))
+    assert sorted(again.targets) == ["gone", "sub@example.net"]
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
+def test_plugin_vapid_target_with_slash_kept_whole():
+    """A target name holding a slash reads back as one target."""
+    obj = NotifyVapid(
+        subscriber="sub@example.net", targets=["team/red", "a@example.net"]
+    )
+    url = obj.url(privacy=False)
+    assert "team%2Fred" in url
+
+    again = Apprise.instantiate(url)
+    assert sorted(again.targets) == ["a@example.net", "team/red"]
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
 def test_plugin_vapid_urls_with_required_assets(
     patch_persistent_store_namespace, subscription_reference
 ):

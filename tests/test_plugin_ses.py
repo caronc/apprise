@@ -773,3 +773,38 @@ def test_plugin_ses_cc_names_with_spaces():
     assert isinstance(obj3, NotifySES)
     assert obj3.bcc == {"jane@example.com"}
     assert obj3.names["jane@example.com"] == "Jane Doe"
+
+
+def test_plugin_ses_invalid_recipients_kept():
+    """NotifySES() keeps invalid recipients so url() never targets self."""
+
+    def build(targets):
+        return NotifySES(
+            from_addr="user@example.com",
+            access_key_id="T1JJ3T3L2",
+            secret_access_key="A1BRTD4JD/TIiajkdnlazkcevi7FQ",
+            region_name="us-west-2",
+            targets=targets,
+        )
+
+    # No recipients given, so the sender is emailed
+    obj = build(None)
+    assert obj.targets == [(False, "user@example.com")]
+    obj2 = Apprise.instantiate(obj.url(privacy=False))
+    assert obj2.targets == [(False, "user@example.com")]
+
+    # Separators alone count the same as no recipients at all
+    obj = build(";, ,")
+    assert obj.targets == [(False, "user@example.com")]
+    obj2 = Apprise.instantiate(obj.url(privacy=False))
+    assert obj2.targets == [(False, "user@example.com")]
+
+    # Every recipient is invalid, so nobody is emailed
+    obj = build(["invalid", "bad@"])
+    assert obj.targets == []
+    assert obj.invalid_targets == ["invalid", "bad@"]
+
+    # Reading the URL back still emails nobody, never the sender
+    obj2 = Apprise.instantiate(obj.url(privacy=False))
+    assert obj2.targets == []
+    assert obj2.invalid_targets == ["invalid", "bad@"]

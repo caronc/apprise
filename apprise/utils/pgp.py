@@ -32,7 +32,7 @@ import os
 
 from ..apprise_attachment import AppriseAttachment
 from ..asset import AppriseAsset
-from ..exception import ApprisePluginException
+from ..exception import AppriseImproperlyConfigured, ApprisePluginException
 from ..logger import logger
 from ..utils.cwe312 import cwe312_loggable
 
@@ -127,7 +127,13 @@ class ApprisePGPController:
             self._pub_keyfile = AppriseAttachment(asset=self.asset)
 
             # Add our definition to our pgp_key reference
-            self._pub_keyfile.add(pub_keyfile)
+            if not self._pub_keyfile.add(pub_keyfile):
+                # A key that can't be loaded (such as an unsupported scheme)
+                # leaves nothing to read. Where it points is left out, since
+                # a remote one may hold a login
+                msg = "An invalid PGP public key was specified."
+                logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # Enforce maximum file size
             self._pub_keyfile[0].max_file_size = self.max_pgp_public_key_size
@@ -141,7 +147,11 @@ class ApprisePGPController:
             self._prv_keyfile = AppriseAttachment(asset=self.asset)
 
             # Add our definition to our pgp_key reference
-            self._prv_keyfile.add(prv_keyfile)
+            if not self._prv_keyfile.add(prv_keyfile):
+                # The same as the public key above
+                msg = "An invalid PGP private key was specified."
+                logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # Private keys may contain extra identities and subkeys.
             self._prv_keyfile[0].max_file_size = self.max_pgp_private_key_size

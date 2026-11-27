@@ -96,6 +96,50 @@ logging.Logger.deprecate = deprecate
 # Create ourselve a generic (singleton) logging reference
 logger = logging.getLogger(LOGGER_NAME)
 
+# Track whether the current context suppresses Apprise logs.
+_quiet_logs: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "apprise_quiet_logs", default=False
+)
+
+
+class _QuietLogsFilter(logging.Filter):
+    """Drops Apprise's log records while quiet_logs() is active."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Keep the record unless this context asked for quiet."""
+        return not _quiet_logs.get()
+
+
+# Share one filter across the Apprise logger hierarchy.
+_QUIET_LOGS_FILTER = _QuietLogsFilter()
+logger.addFilter(_QUIET_LOGS_FILTER)
+
+
+@contextlib.contextmanager
+def quiet_logs() -> Iterator[None]:
+    """Suppress Apprise logs in the current execution context.
+
+    - Cover the Apprise logger and the apprise.* loggers that exist when
+      the block starts. Python's own logging is never changed.
+    - Leave other threads and tasks unchanged.
+    """
+    # A filter on the apprise logger does not see what its child loggers
+    # pass up to it, so each apprise.* logger gets the filter as well.
+    # The manager also holds placeholders that are not loggers; addFilter()
+    # skips a filter the logger already has, so this is safe to repeat
+    for child in list(logging.Logger.manager.loggerDict.values()):
+        if isinstance(child, logging.Logger) and child.name.startswith(
+            LOGGER_NAME + "."
+        ):
+            child.addFilter(_QUIET_LOGS_FILTER)
+
+    token = _quiet_logs.set(True)
+    try:
+        yield
+
+    finally:
+        _quiet_logs.reset(token)
+
 
 def _safe_internal_log(level: int, message: str, *args: Any) -> None:
     """Report a capture problem without letting logging handlers raise."""

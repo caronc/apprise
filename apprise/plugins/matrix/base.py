@@ -421,6 +421,10 @@ class NotifyMatrix(NotifyBase):
         **kwargs,
     ):
         """Initialize Matrix Object."""
+        # This gets initialized after a login/registration. It is set first
+        # so __del__() still works when the setup below is refused
+        self.access_token = None
+
         super().__init__(**kwargs)
 
         # Prepare a list of rooms to connect and notify; separate
@@ -438,9 +442,6 @@ class NotifyMatrix(NotifyBase):
 
         # our user_id gets populated after a login/registration
         self.user_id = None
-
-        # This gets initialized after a login/registration
-        self.access_token = None
 
         # Our device ID assigned by the Matrix server during login
         self.device_id = None
@@ -3316,6 +3317,11 @@ class NotifyMatrix(NotifyBase):
 
     def __del__(self):
         """Ensure we relinquish our token."""
+        if not self.access_token:
+            # Never logged in (or the setup was refused), so there is no
+            # token to give back
+            return
+
         if self.mode == MatrixWebhookMode.T2BOT:
             # nothing to do
             return
@@ -3325,11 +3331,7 @@ class NotifyMatrix(NotifyBase):
             # to re-use our credentials with
             return
 
-        if (
-            self.access_token is not None
-            and self.access_token == self.password
-            and not self.user
-        ):
+        if self.access_token == self.password and not self.user:
             return
 
         # Best-effort cleanup only
@@ -3452,7 +3454,11 @@ class NotifyMatrix(NotifyBase):
                 else self.pprint(self.access_token, privacy, safe="")
             ),
             port=("" if not self.port else f":{self.port}"),
-            rooms=NotifyMatrix.quote("/".join(self.rooms + self.users)),
+            # Each room and user is quoted as one path segment, so a name
+            # such as team/red is not read back as team and red
+            rooms="/".join(
+                NotifyMatrix.quote(x, safe="") for x in self.rooms + self.users
+            ),
             params=NotifyMatrix.urlencode(params),
         )
 

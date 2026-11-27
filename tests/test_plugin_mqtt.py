@@ -411,6 +411,75 @@ def test_plugin_mqtt_session_client_id_success(mqtt_client_mock):
     assert bool(obj.notify(body="test=test")) is True
 
 
+def test_plugin_mqtt_v5_loads():
+    """An MQTT v5 URL loads with the real paho client (not a mock)."""
+    if "paho" not in sys.modules:
+        raise pytest.skip("Requires that `paho-mqtt` is installed")
+
+    for session in ("no", "yes"):
+        obj = apprise.Apprise.instantiate(
+            f"mqtt://localhost/my/topic?version=v5.0&session={session}"
+            "&client_id=apprise",
+            suppress_exceptions=False,
+        )
+        assert isinstance(obj, NotifyMQTT)
+        assert re.search(r"version=v5.0", obj.url())
+
+
+@pytest.mark.parametrize("session, clean", (("no", True), ("yes", False)))
+def test_plugin_mqtt_v5_asks_for_a_clean_start_when_connecting(
+    mqtt_client_mock, session, clean
+):
+    """MQTT v5 sets its clean start on connect, not on the client."""
+    import paho.mqtt.client as paho_client
+
+    obj = apprise.Apprise.instantiate(
+        f"mqtt://localhost/my/topic?version=v5.0&session={session}"
+        "&client_id=apprise",
+        suppress_exceptions=False,
+    )
+    assert paho_client.Client.call_args.kwargs["clean_session"] is None
+    assert bool(obj.notify(body="test=test")) is True
+    assert mqtt_client_mock.connect.call_args.kwargs["clean_start"] is clean
+
+
+def test_plugin_mqtt_v5_saved_session_never_expires(mqtt_client_mock):
+    """An MQTT v5 session=yes asks the broker to keep the session.
+
+    - session=yes gives the session no expiry, as v3 does.
+    - session=no sends no session lifetime at all.
+    """
+    obj = apprise.Apprise.instantiate(
+        "mqtt://localhost/my/topic?version=v5.0&session=yes&client_id=apprise",
+        suppress_exceptions=False,
+    )
+    assert bool(obj.notify(body="test=test")) is True
+    properties = mqtt_client_mock.connect.call_args.kwargs["properties"]
+    assert properties.SessionExpiryInterval == 0xFFFFFFFF
+
+    obj = apprise.Apprise.instantiate(
+        "mqtt://localhost/my/topic?version=v5.0&session=no&client_id=apprise",
+        suppress_exceptions=False,
+    )
+    assert bool(obj.notify(body="test=test")) is True
+    assert "properties" not in mqtt_client_mock.connect.call_args.kwargs
+
+
+def test_plugin_mqtt_v3_keeps_its_clean_session_on_the_client(
+    mqtt_client_mock,
+):
+    """MQTT v3 still sets its clean session on the client."""
+    import paho.mqtt.client as paho_client
+
+    obj = apprise.Apprise.instantiate(
+        "mqtt://localhost/my/topic?session=yes&client_id=apprise",
+        suppress_exceptions=False,
+    )
+    assert paho_client.Client.call_args.kwargs["clean_session"] is False
+    assert bool(obj.notify(body="test=test")) is True
+    assert "clean_start" not in mqtt_client_mock.connect.call_args.kwargs
+
+
 def test_plugin_mqtt_retain(mqtt_client_mock):
     """Verify handling of Retain Message Flag."""
 

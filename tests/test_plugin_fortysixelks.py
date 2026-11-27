@@ -160,3 +160,25 @@ def test_plugin_46elks_edge_cases(mock_post):
 
     # Verify our URL looks good
     assert obj.url().startswith(f"46elks://{user}:{password}@{phone}")
+
+
+def test_plugin_46elks_invalid_recipients_kept():
+    """Phone numbers that are all invalid never turn into the source."""
+    source = "+15551234567"
+
+    def reloaded(obj: Notify46Elks) -> list:
+        return Apprise.instantiate(obj.url(privacy=False)).targets
+
+    # None given, or only separators: the source's own number
+    for targets in (None, ";", [";"]):
+        obj = Notify46Elks(
+            user="u1", password="p1", source=source, targets=targets
+        )
+        assert obj.targets == [source]
+        assert reloaded(obj) == [source]
+
+    # Given, but none valid: nobody, before and after url()
+    obj = Notify46Elks(user="u1", password="p1", source=source, targets="abc")
+    assert obj.targets == []
+    assert obj.invalid_targets == ["abc"]
+    assert reloaded(obj) == []

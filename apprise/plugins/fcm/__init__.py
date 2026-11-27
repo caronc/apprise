@@ -131,9 +131,9 @@ class NotifyFCM(NotifyBase):
     # Define object templates
     templates = (
         # OAuth2
-        "{schema}://{project}/{targets}?keyfile={keyfile}",
+        "{schema}://{project}/{targets}?mode=oauth2&keyfile={keyfile}",
         # Legacy Mode
-        "{schema}://{apikey}/{targets}",
+        "{schema}://{apikey}/{targets}?mode=legacy",
     )
 
     # Define our template
@@ -286,7 +286,14 @@ class NotifyFCM(NotifyBase):
             # Our keyfile object is just an AppriseAttachment object
             self.keyfile = AppriseAttachment(asset=self.asset)
             # Add our definition to our template
-            self.keyfile.add(keyfile)
+            if not self.keyfile.add(keyfile):
+                # A keyfile that can't be loaded (such as an unsupported
+                # scheme) leaves nothing to read the key from. Where it
+                # points is left out, since a remote one may hold a login
+                msg = "An invalid FCM JSON KeyFile was specified."
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
+
             # Enforce maximum file size
             self.keyfile[0].max_file_size = self.max_fcm_keyfile_size
 

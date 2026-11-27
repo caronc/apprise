@@ -36,6 +36,7 @@ import shutil
 import smtplib
 import ssl
 import sys
+import time
 from unittest import mock
 
 import pytest
@@ -1414,6 +1415,319 @@ def test_plugin_email_from_roundtrip():
     obj = Apprise.instantiate("mailtos://user:pass@gmail.com/a@example.com")
     assert isinstance(obj, email.NotifyEmail)
     assert "from=" not in obj.url()
+
+
+@pytest.mark.parametrize(
+    "sender",
+    (
+        "é@example.com",
+        "Me <é@example.com>",
+        "me@test.exämple",
+    ),
+)
+def test_plugin_email_unusable_from_refused(sender):
+    """A from= address that can't be used never falls back to the login."""
+    url = "mailtos://user:pass@gmail.com?from={}".format(
+        email.NotifyEmail.quote(sender, safe="")
+    )
+    with pytest.raises(AppriseImproperlyConfigured):
+        Apprise.instantiate(url, suppress_exceptions=False)
+
+
+@pytest.mark.parametrize(
+    "sender",
+    (
+        # Long runs of @ that make a careless pattern retry at every @
+        "a@" * 40000 + " x",
+        "<" + "a@" * 40000,
+        "é" + "a@" * 40000,
+    ),
+)
+def test_plugin_email_long_from_is_fast(sender):
+    """Checking a very long from= value takes moments, never seconds."""
+    url = "mailtos://user:pass@gmail.com"
+
+    # Load the plugins first so only the from= check itself is timed
+    assert Apprise.instantiate(url)
+
+    started = time.monotonic()
+    Apprise.instantiate(
+        "{}?from={}".format(url, email.NotifyEmail.quote(sender, safe=""))
+    )
+
+    # This takes well under a second; a slow pattern needs over ten
+    assert time.monotonic() - started < 3.0
+
+
+@pytest.mark.parametrize("sender", ("Rene", "Ops @ Home"))
+def test_plugin_email_from_name_only(sender):
+    """A from= display name keeps the login address as the sender."""
+    url = "mailtos://user:pass@gmail.com?from={}".format(
+        email.NotifyEmail.quote(sender, safe="")
+    )
+    obj = Apprise.instantiate(url, suppress_exceptions=False)
+    assert tuple(obj.from_addr) == (sender, "user@gmail.com")
+
+
+@pytest.mark.parametrize(
+    "url, from_addr",
+    (
+        # a name on its own
+        (
+            "mailtos://user:pass@nuxref.com?name=Jason",
+            ("Jason", "user@nuxref.com"),
+        ),
+        # a name and address together
+        (
+            "mailtos://user:pass@nuxref.com?name=Jason<jason@gmail.com>",
+            ("Jason", "jason@gmail.com"),
+        ),
+        # a name alongside a from= address
+        (
+            "mailtos://user:pass@nuxref.com?from=jason@gmail.com&name=Jason",
+            ("Jason", "jason@gmail.com"),
+        ),
+        # a whole sender in name= is used in place of from=
+        (
+            "mailtos://user:pass@nuxref.com"
+            "?from=jack@gmail.com&name=Jason<jason@gmail.com>",
+            ("Jason", "jason@gmail.com"),
+        ),
+        # a name replaces the one from= holds, keeping its address
+        (
+            "mailtos://user:pass@nuxref.com"
+            "?from=Jason<jason@gmail.com>&name=Other",
+            ("Other", "jason@gmail.com"),
+        ),
+        # neither one is an address, so the login address sends
+        (
+            "mailtos://user:pass@nuxref.com?from=Joe&name=Bob",
+            ("Bob <Joe>", "user@nuxref.com"),
+        ),
+    ),
+)
+def test_plugin_email_name_is_deprecated(url, from_addr):
+    """name= still works, logs a deprecation notice and comes back as from=."""
+    with mock.patch.object(email.base.logger, "deprecate") as deprecate:
+        obj = Apprise.instantiate(url, suppress_exceptions=False)
+    assert deprecate.call_count == 1
+    assert "name=" in deprecate.call_args[0][0]
+    assert tuple(obj.from_addr) == from_addr
+
+    # url() only ever writes from=, which reads back the same way
+    out = obj.url(privacy=False)
+    assert "name=" not in out
+    assert "from=" in out
+    with mock.patch.object(email.base.logger, "deprecate") as deprecate:
+        again = Apprise.instantiate(out, suppress_exceptions=False)
+    assert deprecate.call_count == 0
+    assert tuple(again.from_addr) == from_addr
+
+
+@pytest.mark.parametrize(
+    "entry, from_addr",
+    (
+        ("name: Ops Team", ("Ops Team", "user@example.com")),
+        (
+            "name: Ops Team\n      from: alerts@example.com",
+            ("Ops Team", "alerts@example.com"),
+        ),
+        # YAML reads this as a number
+        ("name: 2024", ("2024", "user@example.com")),
+    ),
+)
+def test_plugin_email_yaml_name_is_deprecated(entry, from_addr):
+    """A YAML name: still works and logs a deprecation notice."""
+    content = (
+        "urls:\n  - mailtos://user:pass@example.com:\n    - " + entry + "\n"
+    )
+    with mock.patch.object(email.base.logger, "deprecate") as deprecate:
+        result, _ = ConfigBase.config_parse(content, asset=AppriseAsset())
+    assert deprecate.call_count == 1
+    assert len(result) == 1
+    assert tuple(result[0].from_addr) == from_addr
+    assert "name=" not in result[0].url(privacy=False)
+
+
+@pytest.mark.parametrize(
+    "sender, from_addr",
+    (
+        # commas inside a name are part of the name
+        ("Chris Caron,John Smith", ("Chris Caron,John Smith", "user@a.ca")),
+        (
+            "Chris Caron, John Smith <me@b.ca>",
+            ("Chris Caron, John Smith", "me@b.ca"),
+        ),
+        # a comma between the name and address only separates them
+        ("Chris Caron, me@b.ca", ("Chris Caron", "me@b.ca")),
+        # commas at either end are ignored
+        ("Chris <me@b.ca>, ", ("Chris", "me@b.ca")),
+        ("me@b.ca,", (False, "me@b.ca")),
+        (",Chris Caron,", ("Chris Caron", "user@a.ca")),
+        ("Chris <me@b.ca>,\x0b", ("Chris", "me@b.ca")),
+        # a plus sign is part of what was typed and is kept
+        ("+1 Ops Desk", ("+1 Ops Desk", "user@a.ca")),
+        # nothing left but commas keeps the default sender
+        (",", ("Apprise", "user@a.ca")),
+    ),
+)
+def test_plugin_email_from_commas(sender, from_addr):
+    """A comma in from= only matters when a second sender follows it."""
+    obj = Apprise.instantiate(
+        "mailtos://user:pass@a.ca?from="
+        + email.NotifyEmail.quote(sender, safe=""),
+        suppress_exceptions=False,
+    )
+    assert tuple(obj.from_addr) == from_addr
+
+    # url() writes a from= that reads back the same way
+    again = Apprise.instantiate(obj.url(privacy=False))
+    assert tuple(again.from_addr) == from_addr
+
+
+def test_plugin_email_invalid_recipients_kept():
+    """Recipients that are all invalid never turn into the sender."""
+    # No recipients given: mail goes to the sender's own address
+    obj = email.NotifyEmail(host="a.ca", user="user", password="pass")
+    assert obj.targets == [(False, "user@a.ca")]
+    again = Apprise.instantiate(obj.url(privacy=False))
+    assert again.targets == [(False, "user@a.ca")]
+
+    # Recipients given, but none valid: there is nobody to send to, and
+    # url() keeps it that way
+    obj = email.NotifyEmail(
+        host="a.ca", user="user", password="pass", targets=["not-an-email"]
+    )
+    assert obj.targets == []
+    assert obj.invalid_targets == ["not-an-email"]
+    again = Apprise.instantiate(obj.url(privacy=False))
+    assert again.targets == []
+    assert again.invalid_targets == ["not-an-email"]
+
+
+@pytest.mark.parametrize(
+    "display", ("Doe, Jane", "Ops @ Home", "Semi; Colon", "Plain Name")
+)
+def test_plugin_email_target_names_round_trip(display):
+    """url() writes a recipient name so it reads back whole."""
+    obj = email.NotifyEmail(
+        host="a.ca",
+        user="user",
+        password="pass",
+        targets=[f'"{display}" <jane@b.ca>', "bob@b.ca"],
+    )
+    assert obj.targets == [(display, "jane@b.ca"), (False, "bob@b.ca")]
+
+    again = Apprise.instantiate(obj.url(privacy=False))
+    assert again.targets == obj.targets
+
+
+@pytest.mark.parametrize(
+    "target, written",
+    (
+        # the sender's own address with no name is left out of the URL
+        ("user@a.ca", False),
+        # given a name, it is written so the name comes back
+        ('"Doe, Jane" <user@a.ca>', True),
+        ("Jane <user@a.ca>", True),
+    ),
+)
+def test_plugin_email_named_self_recipient_kept(target, written):
+    """A name given to the sender's own address survives url()."""
+    obj = email.NotifyEmail(
+        host="a.ca", user="user", password="pass", targets=[target]
+    )
+    url = obj.url(privacy=False)
+    assert ("user%40a.ca" in url.split("?")[0]) is written
+
+    again = Apprise.instantiate(url)
+    assert again.targets == obj.targets
+
+
+@pytest.mark.parametrize(
+    "sender",
+    (
+        "me@b.ca,you@b.ca",
+        "Chris Caron, John Smith <me@b.ca>,you@b.ca",
+        "Chris <me@b.ca>, John",
+    ),
+)
+def test_plugin_email_from_one_sender_only(sender):
+    """from= with more than one sender is refused."""
+    with pytest.raises(AppriseImproperlyConfigured):
+        email.NotifyEmail(
+            host="a.ca", user="user", password="pass", from_addr=sender
+        )
+
+
+def test_plugin_email_non_ascii_tag_refused():
+    """A non-ASCII label (café+owner@) is no usable address."""
+    # As the sender it is refused, rather than sent from the login
+    with pytest.raises(AppriseImproperlyConfigured):
+        email.NotifyEmail(
+            host="a.ca",
+            user="user",
+            password="pass",
+            from_addr="café+owner@b.ca",
+        )
+
+    # As a recipient it is dropped, while an ASCII label is kept
+    obj = email.NotifyEmail(
+        host="a.ca",
+        user="user",
+        password="pass",
+        targets=["café+owner@b.ca", "tag+owner@b.ca"],
+    )
+    assert obj.targets == [(False, "tag+owner@b.ca")]
+
+
+@pytest.mark.parametrize(
+    "query, sender",
+    (
+        ("name=Operations", "Operations"),
+        ("from=ops@b.ca&name=Operations", "Operations <ops@b.ca>"),
+    ),
+)
+def test_plugin_email_name_kept_by_parse_fields(query, sender):
+    """parse_fields() keeps the sender a deprecated name= gives."""
+    from apprise.fields import parse_fields
+
+    fields = parse_fields("mailtos://user:pass@a.ca?" + query)
+    assert fields["from"] == sender
+    assert "name" not in fields
+
+
+def test_plugin_email_name_not_in_fields():
+    """name is not offered as an email option."""
+    assert "name" not in email.NotifyEmail.template_args
+    assert "name" not in email.NotifyEmail.template_tokens
+
+
+@pytest.mark.parametrize(
+    "query",
+    (
+        "name=Jason<jason@gmail.com>",
+        "from=jason@gmail.com&name=Jason",
+        "from=jack@gmail.com&name=Jason<jason@gmail.com>",
+    ),
+)
+def test_plugin_email_name_and_from_url(query):
+    """from=Name <address> is what a name= URL turns into."""
+    obj = Apprise.instantiate(
+        "mailtos://user:pass@nuxref.com?" + query,
+        suppress_exceptions=False,
+    )
+    assert "from=Jason%20%3Cjason%40gmail.com%3E" in obj.url(privacy=False)
+
+
+def test_plugin_email_from_needs_no_notice():
+    """from= on its own logs no deprecation notice."""
+    with mock.patch.object(email.base.logger, "deprecate") as deprecate:
+        Apprise.instantiate(
+            "mailtos://user:pass@nuxref.com?from=Jason<jason@gmail.com>",
+            suppress_exceptions=False,
+        )
+    assert deprecate.call_count == 0
 
 
 @mock.patch("smtplib.SMTP_SSL")
