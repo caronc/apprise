@@ -30,8 +30,8 @@
 #
 # To get your key:
 #  1. Install the NextMsg app; no account is needed.
-#  2. Open Settings -> Send keys. Use the Default key, or tap Create a key
-#     to give Apprise a key of its own that you can revoke on its own.
+#  2. Open Settings -> Send keys. Copy your starter key, or tap
+#     Add send key -> Copy a key to give Apprise its own revocable key.
 #     Every key starts with nextmsg_live_.
 #
 # Your Apprise URL should be assembled as:
