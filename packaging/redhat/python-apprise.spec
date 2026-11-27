@@ -62,7 +62,7 @@ Apprise is a Python package that simplifies access to many popular \
 notification services. It supports sending alerts to platforms such as: \
 \
 `46elks`, `800.com`, `AfricasTalking`, `AMQP`, \
-`Apprise API`, `APRS`, \
+`anypush`, `Apprise API`, `APRS`, \
 `AWS End User Messaging Social`, `AWS SES`, `AWS SNS`, `Bale`, \
 `Azure Communication Services`, `Bark`, \
 `Better Stack`, `Blink(1)`, `BlueSky`, \
