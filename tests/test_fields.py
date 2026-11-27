@@ -1005,10 +1005,17 @@ def test_alias_check_reads_url_once():
         "mode": "bot",
         "targets": ["general"],
     }
+    # Count url() calls with a plain function, which binds to the plugin
+    # like any method on every Python version
+    real_url = plugin.url
+    written = []
+
+    def counted_url(self, *args, **kwargs):
+        written.append(1)
+        return real_url(self, *args, **kwargs)
+
     with (
-        mock.patch.object(
-            plugin, "url", autospec=True, wraps=plugin.url
-        ) as url,
+        mock.patch.object(plugin, "url", counted_url),
         mock.patch.object(
             plugin, "parse_url", wraps=plugin.parse_url
         ) as parse_url,
@@ -1016,7 +1023,7 @@ def test_alias_check_reads_url_once():
         assert fields_to_url(fields)
 
     # Written once; read as written and once with the alias added
-    assert url.call_count == 1
+    assert len(written) == 1
     assert parse_url.call_count == 2
 
 
