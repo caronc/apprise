@@ -250,7 +250,15 @@ class NotifyGrowl(NotifyBase):
         self.growl = gntp.notifier.GrowlNotifier(**payload)
 
         try:
-            self.growl.register()
+            # gntp returns the server's error description (a non-boolean)
+            # when the registration is answered with a non-OK response
+            # instead of raising an exception; that is a failure too
+            response = self.growl.register()
+            if not isinstance(response, bool):
+                self.logger.warning(
+                    f"Growl registration failed with response: {response!s}"
+                )
+                return False
 
         except gntp.errors.NetworkError:
             msg = (
@@ -335,6 +343,9 @@ class NotifyGrowl(NotifyBase):
                     "Growl notification failed to send with response:"
                     f" {response!s}",
                 )
+
+                # Return; we're done
+                return False
 
             else:
                 self.logger.info("Sent Growl notification.")

@@ -66,6 +66,53 @@ def test_plugin_growl_gntp_import_error():
 
 @pytest.mark.skipif("gntp" not in sys.modules, reason="Requires gntp")
 @mock.patch("gntp.notifier.GrowlNotifier")
+def test_plugin_growl_rejected_notifications(mock_gntp):
+    """NotifyGrowl() rejected responses are reported as failures.
+
+    gntp does not raise an exception when the Growl server answers with
+    a non-OK response; it returns the response's error description as
+    a non-boolean value instead.  These must be treated as failures.
+
+    """
+    mock_notifier = mock.Mock()
+    mock_gntp.return_value = mock_notifier
+
+    # Successful registration; the notification itself is answered with
+    # an error response that gntp returns as-is (non-boolean)
+    mock_notifier.register.return_value = True
+    mock_notifier.notify.return_value = "notification disabled"
+
+    obj = apprise.Apprise.instantiate(
+        "growl://growl.server.hostname", suppress_exceptions=False
+    )
+    assert obj is not None
+
+    assert (
+        obj.notify(
+            title="test",
+            body="body",
+            notify_type=apprise.NotifyType.INFO,
+        )
+        is False
+    )
+
+    # A rejected registration (no exception thrown) is a failure too;
+    # gntp warns that notifications are ignored without registration
+    obj.growl = None
+    mock_notifier.register.return_value = "unauthorized"
+
+    assert (
+        obj.notify(
+            title="test",
+            body="body",
+            notify_type=apprise.NotifyType.INFO,
+        )
+        is False
+    )
+
+
+@pytest.mark.skipif("gntp" not in sys.modules, reason="Requires gntp")
+@mock.patch("gntp.notifier.GrowlNotifier")
 def test_plugin_growl_exception_handling(mock_gntp):
     """NotifyGrowl() Exception Handling."""
     TEST_GROWL_EXCEPTIONS = (
@@ -192,6 +239,7 @@ def test_plugin_growl_general(mock_gntp):
             {
                 "instance": NotifyGrowl,
                 "growl_response": None,
+                "response": False,
             },
         ),
         (
@@ -209,6 +257,7 @@ def test_plugin_growl_general(mock_gntp):
                 "include_image": False,
                 "instance": NotifyGrowl,
                 "growl_response": None,
+                "response": False,
             },
         ),
         # Priorities
@@ -310,6 +359,10 @@ def test_plugin_growl_general(mock_gntp):
         mock_notifier = mock.Mock()
         mock_gntp.return_value = mock_notifier
         mock_notifier.notify.side_effect = None
+        mock_notifier.register.side_effect = None
+
+        # gntp returns True when the server acknowledges the registration
+        mock_notifier.register.return_value = True
 
         # Store our response
         mock_notifier.notify.return_value = growl_response
