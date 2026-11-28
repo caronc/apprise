@@ -1443,6 +1443,34 @@ def test_url_assembly():
         "arg=a%2Bspace&arg2=a%20space&arg3=a%20space"
     )
 
+    # A URL without a path still round-trips cleanly (fullpath is None)
+    for url in ("schema://hostname", "schema://user@hostname"):
+        assert (
+            utils.parse.url_assembly(
+                **utils.parse.parse_url(url, verify_host=False)
+            )
+            == url
+        )
+
+    # ... and does not raise a TypeError with encode=True either
+    assert (
+        utils.parse.url_assembly(
+            **utils.parse.parse_url("schema://hostname", verify_host=False),
+            encode=True,
+        )
+        == "schema://hostname"
+    )
+
+    # A port of 0 is a real value and is kept
+    assert (
+        utils.parse.url_assembly(
+            **utils.parse.parse_url(
+                "schema://hostname:0", verify_host=False
+            )
+        )
+        == "schema://hostname:0"
+    )
+
 
 def test_parse_bool():
     "utils: parse_bool() testing"
