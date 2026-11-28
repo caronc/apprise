@@ -2453,3 +2453,15 @@ msgstr "Palayaw sa MUC"
 #: apprise/plugins/xmpp/base.py:177
 msgid "SCRAM-PLUS Channel Binding"
 msgstr "Pag-ugnay ng channel na SCRAM-PLUS"
+
+#: apprise/plugins/notifly.py:127
+msgid "Workflow"
+msgstr "Daloy ng Trabaho"
+
+#: apprise/plugins/notifly.py:132
+msgid "Subscriber ID"
+msgstr "ID ng Subscriber"
+
+#: apprise/plugins/notifly.py:137
+msgid "Subscribers"
+msgstr "Mga Subscriber"

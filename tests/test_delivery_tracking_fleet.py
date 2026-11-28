@@ -264,6 +264,16 @@ FLEET = (
         {},
     ),
     (
+        "notifly",
+        f"notifly://{TOKEN}/workflow/sub0001/sub9999",
+        "sub0001",
+        "sub9999",
+        {
+            "__http__": 201,
+            "data": {"acknowledged": True, "status": "processed"},
+        },
+    ),
+    (
         "line",
         f"line://{TOKEN}/target0001/target9999",
         "target0001",
