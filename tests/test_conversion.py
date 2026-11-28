@@ -2875,9 +2875,20 @@ def test_conversion_text_to_markdown():
     assert to_markdown("hello world") == "hello world"
 
     # Every Markdown-significant punctuation character gets escaped.
-    response = to_markdown("_*[]()~`>#+=|{}.!-")
+    response = to_markdown("_*[]()~`<>#+=|{}.!-")
     assert response == (
-        "\\_\\*\\[\\]\\(\\)\\~\\`\\>\\#\\+\\=\\|\\{\\}\\.\\!\\-"
+        "\\_\\*\\[\\]\\(\\)\\~\\`\\<\\>\\#\\+\\=\\|\\{\\}\\.\\!\\-"
+    )
+
+    # A URL in angle brackets must not read as a CommonMark autolink.  With
+    # only the closing ">" escaped, "<https://x>" still linked to the URL
+    # "https://x\" and showed the backslashes in the link text.
+    response = to_markdown('Link: <https://example.com/page?a=1>; rel="next"')
+    assert response == (
+        'Link: \\<https://example\\.com/page?a\\=1\\>; rel\\="next"'
+    )
+    assert markdown_to_html(response) == (
+        '<p>Link: &lt;https://example.com/page?a=1&gt;; rel="next"</p>'
     )
 
     # An ampersand is only escaped when the text looks like an HTML
