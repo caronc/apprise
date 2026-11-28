@@ -41,8 +41,10 @@ from .html import HTMLConverter, HTMLMarkdownConverter
 # CommonMark syntax characters, including backslash itself.
 # Plain text has no escape state, so escape every occurrence.  An "&" is
 # only escaped when it would otherwise read as an entity such as "&amp;".
+# An "<" is escaped too: with only the closing ">" escaped, the text
+# "<https://x>" would still read as an autolink to "https://x\".
 _COMMONMARK_ESCAPABLE_RE = re.compile(
-    r"([\\_*\[\]()~`>#+=|{}.!-]|&(?=#?[0-9A-Za-z]{1,32};))"
+    r"([\\_*\[\]()~`<>#+=|{}.!-]|&(?=#?[0-9A-Za-z]{1,32};))"
 )
 
 
